@@ -25,3 +25,4 @@ What decides each kind of name and place in the C ports. Workers and the splitte
 
 (One line per correction, newest last.)
 * 2026-11-03: the base is ninety-four v0.3.6 with its `make VANILLA=1` build as the vanilla one, not v0.2.0 and not gens94-c (Abdul). gens94-c is a finished cross-check.
+* 2026-11-03: ignore gens94-c (INDIO's Genesis repo) entirely: no work, no cross-checks, not a gate. The base is checked by its own lockstep, captures and golden runs (Abdul).

@@ -32,6 +32,8 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 * `VANILLA=1` (`make VANILLA=1 nhl94`: `build/nhl94-vanilla`, docs/VANILLA.md): gens94-c's 8 scripts 8 of 8 identical to
   its `expected.txt`; lockstep 18 of 18. Its first run caught a stand-in that skipped reading the teams' tables at power on.
 
+**gens94-c is ignored from 2026-11-03 (Abdul)**: no work or cross-checks on it; the E1/E3 results above are history. `test/crosscheck.sh` is not run any more.
+
 ## Next, in order
 
 1. **Coverage, part 3** (plan E5): new lockstep vectors for the 53 routines lockstep never reaches
