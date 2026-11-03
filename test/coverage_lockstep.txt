@@ -1,27 +1,27 @@
 # Coverage of the original routines by make lockstep alone: the sessions compared with the cartridge at every vblank (tools/coverage.py)
-# 777 of 838 routines ran (92.7%); 10854 of 12131 of their lines (89.5%)
+# 785 of 838 routines ran (93.7%); 10977 of 12131 of their lines (90.5%)
 
 ## By module (routines ran / routines, lines ran / lines)
 
-assign       14 / 17       289 / 319     90.6%
+assign       14 / 17       292 / 319     91.5%
 attract       5 / 5         62 / 67      92.5%
 cards        54 / 59       605 / 648     93.4%
-checks       70 / 73      1654 / 1818    91.0%
+checks       71 / 73      1684 / 1818    92.6%
 checksum      1 / 1          5 / 12      41.7%
-collide      36 / 38       868 / 1034    83.9%
+collide      36 / 38       869 / 1034    84.0%
 crowd        17 / 18       168 / 173     97.1%
 data         36 / 38       388 / 467     83.1%
 dispatch      0 / 0          0 / 0      100.0%
-display      25 / 25       354 / 371     95.4%
+display      25 / 25       356 / 371     96.0%
 fourway       2 / 2         14 / 14     100.0%
-goalie        5 / 7         39 / 63      61.9%
+goalie        6 / 7         52 / 63      82.5%
 hockey       24 / 28       232 / 286     81.1%
 input        38 / 38       573 / 613     93.5%
-menu          8 / 8         90 / 95      94.7%
-onetimer      6 / 8        131 / 193     67.9%
+menu          8 / 8         95 / 95     100.0%
+onetimer      7 / 8        149 / 193     77.2%
 optsetup     28 / 30       426 / 451     94.5%
-penalty      55 / 57       717 / 895     80.1%
-period       13 / 18       158 / 232     68.1%
+penalty      55 / 57       730 / 895     81.6%
+period       14 / 18       161 / 232     69.4%
 ram           0 / 0          0 / 0      100.0%
 records      29 / 30       480 / 505     95.0%
 replay       18 / 19       510 / 547     93.2%
@@ -30,16 +30,16 @@ rosters       0 / 0          0 / 0      100.0%
 rules         0 / 0          0 / 0      100.0%
 scout        17 / 17       255 / 258     98.8%
 setup        35 / 39       450 / 496     90.7%
-shootout     13 / 15       213 / 231     92.2%
+shootout     15 / 15       227 / 231     98.3%
 sound        30 / 32       284 / 298     95.3%
 sram          7 / 8         57 / 76      75.0%
 start         2 / 2         29 / 30      96.7%
 stats        73 / 77       913 / 966     94.5%
-title        40 / 50       368 / 430     85.6%
+title        42 / 50       389 / 430     90.5%
 video        76 / 79       522 / 543     96.1%
 z80           0 / 0          0 / 0      100.0%
 
-## Never ran (61)
+## Never ran (53)
 
 assign     assfight                           1 lines
 assign     assfwatch                          1 lines
@@ -49,7 +49,6 @@ cards      AppendRecordVs                     7 lines
 cards      PrintCentered                      1 lines
 cards      PrintRecordHolder                  6 lines
 cards      PrintRecordVs                      5 lines
-checks     EndPenaltyShotPlay                 11 lines
 checks     SkateToTempTarget                  3 lines
 checks     assbreakaway                       7 lines
 collide    TryAddPlayerToList                 7 lines
@@ -57,13 +56,11 @@ collide    setInjuryType                      27 lines
 crowd      Clamp0to100                        4 lines
 data       GetPlayerNumInitial                4 lines
 data       ShowInjuryBox                      8 lines
-goalie     ManualGoalieMenu                   19 lines
 goalie     SetCameraTop                       5 lines
 hockey     VBjsr                              1 lines
 hockey     startpause2                        1 lines
 hockey     startpause3                        1 lines
 hockey     startpause4                        1 lines
-onetimer   onetimershot                       17 lines
 onetimer   puckvzadj                          22 lines
 optsetup   SetupDemo                          10 lines
 optsetup   rtsSetup                           1 lines
@@ -72,7 +69,6 @@ penalty    getBAplayerInfo                    15 lines
 period     ClampPositionBox                   11 lines
 period     EndShootout                        17 lines
 period     PeriodStatsScreen                  38 lines
-period     ShortenMsgTimer                    3 lines
 period     SkipNameNumber                     5 lines
 records    rtsNameCursor                      1 lines
 replay     ClampReplayView                    6 lines
@@ -80,8 +76,6 @@ setup      ReloadFaceOffMap                   1 lines
 setup      ReloadFaceOffTiles                 1 lines
 setup      ReloadRefHorTiles                  1 lines
 setup      setupice_highlight                 32 lines
-shootout   CountShootoutGoals                 9 lines
-shootout   ShootoutWonBy                      9 lines
 sound      ResetZ80Bus                        4 lines
 sound      handle_command_30                  8 lines
 sram       SRAMWaitVblank                     3 lines
@@ -92,8 +86,6 @@ stats      PlayerStatsScreen                  3 lines
 title      ClearPenalties                     8 lines
 title      ClearWinRecords                    7 lines
 title      PSandSOpassdir                     5 lines
-title      ShootoutShootCheck                 13 lines
-title      SkatePath                          11 lines
 title      chkFgtBit1                         1 lines
 title      clrTmPdst                          4 lines
 title      getFgtbyte                         1 lines
@@ -103,15 +95,13 @@ video      Opcode_CopyBackwardExtended2       4 lines
 video      UnpackNibbles                      9 lines
 video      waitjoy                            7 lines
 
-## Partly ran (129): lines ran / lines
+## Partly ran (130): lines ran / lines
 
-penalty    StartHL2                           4 / 102
+penalty    StartHL2                           17 / 102
 penalty    PenGoalStuff                       3 / 16
 data       PenaltyShotBox                     3 / 14
 hockey     clockcont_0                        8 / 37
 penalty    AddPenalty                         2 / 8
-menu       PrintMenuItem                      2 / 7
-checks     UpdatePenaltyShotEnd               6 / 20
 data       ResolveGames                       17 / 45
 input      setpassmode                        4 / 10
 cards      PrintRecordValue                   5 / 12
@@ -123,7 +113,9 @@ stats      DrawStatsRow                       21 / 44
 data       EncodePW                           10 / 20
 hockey     EndDemoOnPress                     2 / 4
 sram       InitSaveRAM                        16 / 32
+title      ShootoutShootCheck                 7 / 13
 input      doinput_onetimer                   6 / 11
+shootout   CountShootoutGoals                 5 / 9
 attract    DrawTeamBitmap                     4 / 7
 checks     chkpuckc                           4 / 7
 records    PrintPlayerRecords                 12 / 21
@@ -145,6 +137,7 @@ data       CalcStarScores                     6 / 9
 data       ContinuePlayoffs                   8 / 12
 display    showzam                            12 / 18
 assign     assepen                            19 / 28
+goalie     ManualGoalieMenu                   13 / 19
 checks     chk4lc                             11 / 16
 collide    checkagr                           16 / 23
 input      SetShotMode                        14 / 20
@@ -154,12 +147,11 @@ penalty    ChkShotStat                        26 / 36
 checks     CompLine                           24 / 33
 setup      PeriodOver                         8 / 11
 collide    checkgoal                          119 / 162
-onetimer   assonetimer                        67 / 90
 collide    ClampNibble                        3 / 4
 collide    Setplass                           3 / 4
 hockey     CheckInjury                        3 / 4
 setup      ExitToOpening                      3 / 4
-title      NextPathPoint                      9 / 12
+onetimer   assonetimer                        68 / 90
 checks     assgoaliectrl                      23 / 30
 input      lineinput                          10 / 13
 input      prepshot                           10 / 13
@@ -178,7 +170,7 @@ setup      Opening                            4 / 5
 setup      Opening3                           4 / 5
 start      Start                              4 / 5
 stats      CheckPenaltyScroll                 4 / 5
-checks     asspuckc                           38 / 47
+checks     EndPenaltyShotPlay                 9 / 11
 cards      PlayerCardScreen                   57 / 69
 collide    makepde                            5 / 6
 display    setvideo                           20 / 24
@@ -187,35 +179,34 @@ input      restorepl                          11 / 13
 collide    holdcheck                          18 / 21
 display    uppads                             24 / 28
 penalty    RemovePlayerFromList               6 / 7
-assign     assscore                           19 / 22
 hockey     DoGameFrame                        13 / 15
-checks     puckfaceoff                        48 / 55
+checks     asspuckc                           41 / 47
 setup      GameOver                           7 / 8
 setup      Opening2                           7 / 8
 sound      p_music_vblank                     14 / 16
 data       FigureJoy                          44 / 50
 data       maketree                           22 / 25
 input      doinput                            67 / 76
-display    VBlank                             23 / 26
 penalty    Intermission                       32 / 36
 replay     adda4                              24 / 27
 collide    puckgoalie                         57 / 64
-checks     checkanim                          147 / 164
 stats      PlayerStatsList                    35 / 39
 replay     ReplayMode                         132 / 147
 checks     dostop                             9 / 10
 crowd      CompareHotColdTotals               9 / 10
 input      passto                             9 / 10
 replay     RestoreReplayFrame                 56 / 62
-collide    puckstick                          38 / 42
 data       CalcTeamStarScores                 19 / 21
+checks     checkanim                          149 / 164
 replay     updatereplay                       40 / 44
 checks     BreakawayOffsidesFlagSet           21 / 23
 penalty    updatepwrplay                      21 / 23
 stats      DrawStatsList                      44 / 48
 checks     puckpenshot                        79 / 86
 input      doinput_cbut                       24 / 26
+checks     puckfaceoff                        51 / 55
 checks     AdjustFacingDirection              13 / 14
+collide    puckstick                          39 / 42
 setup      IntermissionStart                  13 / 14
 checks     goalieacc                          40 / 43
 checks     ChkOffsides                        27 / 29
@@ -224,9 +215,11 @@ assign     assbench                           43 / 46
 penalty    InProgress                         66 / 70
 hockey     Pausemode                          34 / 36
 setup      UpdateScoutingDisplay              75 / 79
+checks     UpdatePenaltyShotEnd               19 / 20
 hockey     Begin                              22 / 23
 checks     checkob                            23 / 24
 video      dobitmap                           24 / 25
+display    VBlank                             25 / 26
 hockey     StartGame                          25 / 26
 scout      ScoutingReport                     103 / 106
 optsetup   GameSetUp                          77 / 79

@@ -25,14 +25,16 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 * E5: coverage of the 838 original routines (gcov build, `tools/coverage.py`). gens94-c's 8 scripts, lockstep and the
   golden runs together: 793 ran (94.6%), 93.0% of their lines (`test/coverage.txt`: the 45 never reached, the partly
   run). Lockstep alone, the part compared with the cartridge every vblank: 777 (92.7%), 89.5% of lines
-  (`test/coverage_lockstep.txt`, 61 never reached). `tools/golden.py` fix: a run whose snapshot is missing crashed
+  (`test/coverage_lockstep.txt`, 61 never reached). E5 part 2 added two vectors (`demo_long`, `shootout_full`):
+  lockstep 20 of 20, 785 routines (93.7%), 53 never reached. Both were cut before the frame where the cartridge's
+  slowdown away from the game loop's wait takes them out of step (a lockstep limit, not a difference in the code). `tools/golden.py` fix: a run whose snapshot is missing crashed
   the recorder (a 2-tuple where 3 are unpacked).
 * `VANILLA=1` (`make VANILLA=1 nhl94`: `build/nhl94-vanilla`, docs/VANILLA.md): gens94-c's 8 scripts 8 of 8 identical to
   its `expected.txt`; lockstep 18 of 18. Its first run caught a stand-in that skipped reading the teams' tables at power on.
 
 ## Next, in order
 
-1. **Coverage, part 2** (plan E5): new lockstep vectors for the 61 routines lockstep never reaches
+1. **Coverage, part 3** (plan E5): new lockstep vectors for the 53 routines lockstep never reaches
    (`test/coverage_lockstep.txt`: injuries, fights, breakaways, the period stats screen, manual goalie, record holders).
 2. ~~`VANILLA=1` build~~ (done 2026-11-03, see Results).
 3. **Ask 1nput** whether he takes renames and the file re-cut upstream. Until then the names gate only reports.
