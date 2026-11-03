@@ -32,7 +32,7 @@ import sys
 from collections import Counter
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-DEF = re.compile(r'^(?:static\s+)?(?:inline\s+)?[A-Za-z_][\w \*]*?\b(\w+)\s*\([^;]*\)\s*\{?\s*$')
+DEF = re.compile(r'^(?:static\s+)?(?:inline\s+)?[A-Za-z_][\w \*]*?\b(\w+)\s*\([^;{]*\)\s*(?:\{.*\}.*|\{?\s*)$')   # a head, or a one-line body
 SYM = re.compile(r'^#define SYM_(\w+) 0x([0-9A-Fa-f]+)u?')
 LABEL = re.compile(r'^([A-Za-z_]\w*):?(?:\s|$)')
 KEYWORDS = {'if', 'while', 'for', 'switch', 'return', 'sizeof'}
