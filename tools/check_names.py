@@ -21,7 +21,7 @@ function is matched by its cartridge address as well as its name.
                                                  # past tools/names_baseline.json
   python3 tools/check_names.py --write-baseline
 
-The asm repository is found at --asm, else $NHL_ASM, else ref/<name> or ../<name>
+The asm repository is found at --asm, else $NHL_ASM, else ../<name> or ref/<name>
 (NHL94Genesis or NHL94SNES)."""
 import argparse
 import csv
@@ -50,8 +50,10 @@ def c_dir():
 
 def find_asm(arg, platform):
     name = 'NHL94SNES' if platform == 'snes' else 'NHL94Genesis'
-    for cand in (arg, os.environ.get('NHL_ASM'), os.path.join(ROOT, 'ref', name),
-                 os.path.join(ROOT, '..', name)):
+    # (../NAME before ref/NAME: the gate compares with the asm as it is now, and ref/ may be pinned to
+    # the commit the C's symbols were made from, as tools/e2_setup.sh pins it)
+    for cand in (arg, os.environ.get('NHL_ASM'), os.path.join(ROOT, '..', name),
+                 os.path.join(ROOT, 'ref', name)):
         if cand and os.path.isdir(os.path.join(cand, 'src')):
             return os.path.normpath(cand)
     sys.exit('check_names.py: no %s checkout (give --asm, set NHL_ASM, or clone it beside this '
@@ -133,6 +135,18 @@ def snes_asm(asm):
     return labels, {}, by_addr
 
 
+def c_of(label):
+    """the C name of an asm label: a local Parent.x is the C function Parent_x"""
+    return label.replace('.', '_')
+
+
+def by_c_name(labels):
+    """the labels also under their C names (Parent_x for Parent.x)"""
+    for k, v in list(labels.items()):
+        labels.setdefault(c_of(k), v)
+    return labels
+
+
 def current(name, labels, renames):
     seen = set()
     key = name.lower()
@@ -155,19 +169,20 @@ def main():
     platform = 'snes' if any(a > 0x7FFFFF for a in syms.values()) else 'genesis'
     asm = find_asm(a.asm, platform)
     labels, renames, by_addr = (snes_asm if platform == 'snes' else genesis_asm)(asm)
+    labels = by_c_name(labels)
 
     rows = []
     for path, module, name in c_functions(cdir, syms):
         addr = syms[name]
         hit = labels.get(name.lower())
-        if platform == 'snes' and addr in by_addr and by_addr[addr][0].lower() != name.lower():
+        if platform == 'snes' and addr in by_addr and c_of(by_addr[addr][0]).lower() != name.lower():
             hit = None                     # the address now carries another name: a rename
             new = by_addr[addr]
         else:
             new = current(name, labels, renames) if hit is None else None
-        if hit and hit[0] == name and hit[1] == module:
+        if hit and c_of(hit[0]) == name and hit[1] == module:
             rows.append((path, name, '%06X' % addr, 'ok', hit[1], ''))
-        elif hit and hit[0] == name:
+        elif hit and c_of(hit[0]) == name:
             rows.append((path, name, '%06X' % addr, 'other_module', hit[1], ''))
         elif hit:                          # same label, other case
             rows.append((path, name, '%06X' % addr, 'renamed', hit[1], hit[0]))
