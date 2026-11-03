@@ -16,19 +16,20 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
   `test/expected.txt`. INDIO's reference hashes are reproducible from public code.
 * E4: tag v0.2.0 on the same scripts (`make WERROR= nhl94` on GCC 13): 8 of 8 identical. v0.2.0, v0.3.6 Classic and
   gens94-c are one game on these runs.
+* E2: 1nput's ROM checks on a fresh Linux machine (`tools/e2_setup.sh ROM` sets it up): `make lockstep` 18 of 18 vectors
+  pass (about 180k vblanks against the cartridge in Genesis Plus GX); `make test` 10,276 of 10,276 capture records pass,
+  0 failed, 570 skipped (interrupted calls), 29 captures; `make golden-check` 20 of 20 runs identical, 2 of 2 roster set
+  runs, 7 of 7 states, keys / restart / reset OK.
 
 ## Next, in order
 
-1. **Equivalence on our machine** (needs the ROM): `tools/fetch_refs.sh`, `make oracle && make vectors`,
-   `tools/hybrid/capture_all.sh`, then `make test && make lockstep && make golden-check` (plan E2).
-2. **gens94-c cross-check** (needs the ROM): play gens94-c's 8 scripts (`../gens94-c/test/scripts`) with this
-   build's `--golden` and compare with `../gens94-c/test/expected.txt` (plan E1). Same for tag v0.2.0 (plan E4).
-3. **Coverage** (plan E5): a gcov build over the golden runs and lockstep sessions; `test/coverage.txt` lists every
+1. **Lockstep on gens94-c** (plan E3), test tooling only.
+2. **Coverage** (plan E5; first pass in `test/coverage.txt`): add the golden runs and lockstep sessions; `test/coverage.txt` lists every
    routine and branch never reached.
-4. **`VANILLA=1` build**: the same `src/`, without native/rules.c, rosters.c, romsrc.c, art.c, banner.c, ratings.c,
+3. **`VANILLA=1` build**: the same `src/`, without native/rules.c, rosters.c, romsrc.c, art.c, banner.c, ratings.c,
    net.c, state.c and their menu pages; its golden runs must equal the default build's Classic runs.
-5. **Ask 1nput** whether he takes renames and the file re-cut upstream. Until then the names gate only reports.
-6. **Slowdown option** (off by default): a 68k cost model, then lockstep with lag frames checked (plan E6).
+4. **Ask 1nput** whether he takes renames and the file re-cut upstream. Until then the names gate only reports.
+5. **Slowdown option** (off by default): a 68k cost model, then lockstep with lag frames checked (plan E6).
 
 ## Needs
 
