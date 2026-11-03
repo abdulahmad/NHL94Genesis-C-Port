@@ -65,6 +65,13 @@ test: build/captest
 # checkout; its release build with the SDL2 platform)
 MDRT   ?= ext/pulseman
 NATIVE := $(wildcard native/*.c)
+# VANILLA=1: the game without the host extras (game rules, roster sets, states, online play):
+# build/nhl94-vanilla, its own objects (native/vanilla/stubs.c, docs/VANILLA.md)
+ifeq ($(VANILLA),1)
+NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c romsrc.c art.c banner.c ratings.c state.c net.c),$(NATIVE)) native/vanilla/stubs.c
+BIN    ?= build/nhl94-vanilla$(EXE)
+OBJ    ?= build/obj-vanilla
+endif
 MDRTB  ?= build/release
 MDRTLIBS := $(MDRT)/$(MDRTB)/libmdrt_sdl2.a $(MDRT)/$(MDRTB)/libmdrt.a
 ifeq ($(OS),Windows_NT)

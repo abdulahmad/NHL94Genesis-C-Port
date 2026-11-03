@@ -22,5 +22,10 @@ cartridge does.
 * The game code (`src/`) is the original path when the rules are Classic (the default) and the rosters are the
   cartridge's (the default). The rule and roster hooks stay in the code but do nothing then.
 * Host extras beyond vanilla: game rules, roster sets, save states and rewind, rollback netplay, the GIF replay.
-  They are opt-in. A `VANILLA=1` build that leaves them out is planned (docs/C_PORTS_HANDOFF.md).
+  They are opt-in. **`make VANILLA=1 nhl94`** builds `build/nhl94-vanilla` without them: native/rules.c, rosters.c,
+  romsrc.c, art.c, banner.c, ratings.c, state.c and net.c are left out, and `native/vanilla/stubs.c` stands in for
+  them (the original's rules, the cartridge's teams, no pages, a plain error for the options that need them).
+  `src/` is the same code in both builds. Gate (2026-11-03): gens94-c's 8 scripts on the vanilla build give gens94-c's
+  `test/expected.txt` (`test/crosscheck.sh ROM ../gens94-c build/nhl94-vanilla`: 8 of 8 identical), and the 18
+  lockstep vectors pass on it against the cartridge.
 * Slowdown: not implemented yet (upstream deferred it); it will be an option, off by default.

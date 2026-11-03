@@ -27,13 +27,14 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
   run). Lockstep alone, the part compared with the cartridge every vblank: 777 (92.7%), 89.5% of lines
   (`test/coverage_lockstep.txt`, 61 never reached). `tools/golden.py` fix: a run whose snapshot is missing crashed
   the recorder (a 2-tuple where 3 are unpacked).
+* `VANILLA=1` (`make VANILLA=1 nhl94`: `build/nhl94-vanilla`, docs/VANILLA.md): gens94-c's 8 scripts 8 of 8 identical to
+  its `expected.txt`; lockstep 18 of 18. Its first run caught a stand-in that skipped reading the teams' tables at power on.
 
 ## Next, in order
 
 1. **Coverage, part 2** (plan E5): new lockstep vectors for the 61 routines lockstep never reaches
    (`test/coverage_lockstep.txt`: injuries, fights, breakaways, the period stats screen, manual goalie, record holders).
-2. **`VANILLA=1` build**: the same `src/`, without native/rules.c, rosters.c, romsrc.c, art.c, banner.c, ratings.c,
-   net.c, state.c and their menu pages; its golden runs must equal the default build's Classic runs.
+2. ~~`VANILLA=1` build~~ (done 2026-11-03, see Results).
 3. **Ask 1nput** whether he takes renames and the file re-cut upstream. Until then the names gate only reports.
 4. **Slowdown option** (off by default): a 68k cost model, then lockstep with lag frames checked (plan E6).
 
