@@ -97,7 +97,7 @@ def run(name, frames, opts, out, save=None, load=None):
         elif o == '--snap':
             path = os.path.join(ROOT, opts[i + 1])
             if not os.path.exists(path):
-                return name, 'no %s (make vectors)' % opts[i + 1]
+                return name, 'no %s (make vectors)' % opts[i + 1], None
             args += [o, path]
             i += 2
         else:

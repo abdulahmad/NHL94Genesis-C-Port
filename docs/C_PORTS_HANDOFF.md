@@ -22,11 +22,16 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
   runs, 7 of 7 states, keys / restart / reset OK.
 * E3: gens94-c's `game/` in this repository's lockstep host (gens94-c `test/oracle/build.sh`, `lockstep.py`): 18 of 18
   vectors pass; two planted bugs were caught.
+* E5: coverage of the 838 original routines (gcov build, `tools/coverage.py`). gens94-c's 8 scripts, lockstep and the
+  golden runs together: 793 ran (94.6%), 93.0% of their lines (`test/coverage.txt`: the 45 never reached, the partly
+  run). Lockstep alone, the part compared with the cartridge every vblank: 777 (92.7%), 89.5% of lines
+  (`test/coverage_lockstep.txt`, 61 never reached). `tools/golden.py` fix: a run whose snapshot is missing crashed
+  the recorder (a 2-tuple where 3 are unpacked).
 
 ## Next, in order
 
-1. **Coverage** (plan E5; first pass in `test/coverage.txt`): add the golden runs and lockstep sessions; `test/coverage.txt` lists every
-   routine and branch never reached.
+1. **Coverage, part 2** (plan E5): new lockstep vectors for the 61 routines lockstep never reaches
+   (`test/coverage_lockstep.txt`: injuries, fights, breakaways, the period stats screen, manual goalie, record holders).
 2. **`VANILLA=1` build**: the same `src/`, without native/rules.c, rosters.c, romsrc.c, art.c, banner.c, ratings.c,
    net.c, state.c and their menu pages; its golden runs must equal the default build's Classic runs.
 3. **Ask 1nput** whether he takes renames and the file re-cut upstream. Until then the names gate only reports.
