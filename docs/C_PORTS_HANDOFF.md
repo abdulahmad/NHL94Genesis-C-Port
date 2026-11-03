@@ -1,12 +1,21 @@
 # Handoff
 
 Where the C-port work stands in this repository. Plan: `alignment-plan/c_ports_plan.md` in the project files.
+Project-wide handoff (always current, read it first): `alignment-plan/c_ports_HANDOFF.md` in the project files; how the project is run: `alignment-plan/HARNESS.md`.
+
 Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md).
 
 ## Done
 
 * Phase 0: credit in the README and the release READMEs, AGENTS.md, CLAUDE.md, docs/RULES.md, docs/VANILLA.md, this file.
 * Phase 1 (part): the names gate `tools/check_names.py` and its baseline `tools/names_baseline.json`.
+
+## Results (2026-11-03)
+
+* E1: `test/crosscheck.sh ROM` plays gens94-c's 8 scripts (156k frames) on this build: 8 of 8 identical to gens94-c's
+  `test/expected.txt`. INDIO's reference hashes are reproducible from public code.
+* E4: tag v0.2.0 on the same scripts (`make WERROR= nhl94` on GCC 13): 8 of 8 identical. v0.2.0, v0.3.6 Classic and
+  gens94-c are one game on these runs.
 
 ## Next, in order
 
