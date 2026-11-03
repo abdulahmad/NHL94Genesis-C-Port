@@ -20,16 +20,17 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
   pass (about 180k vblanks against the cartridge in Genesis Plus GX); `make test` 10,276 of 10,276 capture records pass,
   0 failed, 570 skipped (interrupted calls), 29 captures; `make golden-check` 20 of 20 runs identical, 2 of 2 roster set
   runs, 7 of 7 states, keys / restart / reset OK.
+* E3: gens94-c's `game/` in this repository's lockstep host (gens94-c `test/oracle/build.sh`, `lockstep.py`): 18 of 18
+  vectors pass; two planted bugs were caught.
 
 ## Next, in order
 
-1. **Lockstep on gens94-c** (plan E3), test tooling only.
-2. **Coverage** (plan E5; first pass in `test/coverage.txt`): add the golden runs and lockstep sessions; `test/coverage.txt` lists every
+1. **Coverage** (plan E5; first pass in `test/coverage.txt`): add the golden runs and lockstep sessions; `test/coverage.txt` lists every
    routine and branch never reached.
-3. **`VANILLA=1` build**: the same `src/`, without native/rules.c, rosters.c, romsrc.c, art.c, banner.c, ratings.c,
+2. **`VANILLA=1` build**: the same `src/`, without native/rules.c, rosters.c, romsrc.c, art.c, banner.c, ratings.c,
    net.c, state.c and their menu pages; its golden runs must equal the default build's Classic runs.
-4. **Ask 1nput** whether he takes renames and the file re-cut upstream. Until then the names gate only reports.
-5. **Slowdown option** (off by default): a 68k cost model, then lockstep with lag frames checked (plan E6).
+3. **Ask 1nput** whether he takes renames and the file re-cut upstream. Until then the names gate only reports.
+4. **Slowdown option** (off by default): a 68k cost model, then lockstep with lag frames checked (plan E6).
 
 ## Needs
 
