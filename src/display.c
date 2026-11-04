@@ -125,11 +125,11 @@ void DumpSprites(void)
 void DumpSprites2(void)
 {
     DoDMA(ram_addr(g.Satt), g.Sattsize, g.VSPRITES);
-    DoDMAList();
+    dodmalist();
 }
 
-/* display94.asm:DoDMAList. Transfer every entry of the DMA list, last first. */
-void DoDMAList(void)
+/* display94.asm:dodmalist. Transfer every entry of the DMA list, last first. */
+void dodmalist(void)
 {
     const uint8_t *base = dmalist(), *a6 = base + (g.DMAlistend - ram_addr(base));   /* (DMAlistend: the 68000 address of its end) */
     while (a6 != base) {
@@ -533,19 +533,19 @@ void QueuePadLabel(uint16_t code, struct RinkObj *pad, struct Vid *v)
         d2 = -0x10;                                       /* a blank leading zero */
         pad->Xfrac -= 4;
     }
-    RenderSmallFontChar((uint16_t)(d2 + 0x30), 0, pad, v);
+    uppads_pd((uint16_t)(d2 + 0x30), 0, pad, v);
     d2 = (int16_t)(code & 0xF);
     if (d2 == 0xF) d2 = -0x10;
-    RenderSmallFontChar((uint16_t)(d2 + 0x30), 1, pad, v);
+    uppads_pd((uint16_t)(d2 + 0x30), 1, pad, v);
     uint16_t d = (g.sflags7 & 0x80) ? 0 : code;
     d = (uint16_t)((d >> 8) & 7);
     if (d == 0) pad->Xfrac += 4;
-    RenderSmallFontChar((uint8_t)letters[d], 2, pad, v);
+    uppads_pd((uint8_t)letters[d], 2, pad, v);
 }
 
-/* display94.asm:RenderSmallFontChar. DMA one small font tile to the object's chars: d2 = the
+/* display94.asm:uppads_pd. DMA one small font tile to the object's chars: d2 = the
  * character, d0 = the char slot. */
-void RenderSmallFontChar(uint16_t ch, uint16_t slot, const struct RinkObj *pad, struct Vid *v)
+void uppads_pd(uint16_t ch, uint16_t slot, const struct RinkObj *pad, struct Vid *v)
 {
     const uint8_t *map = rom_ptr(ART(SmallFontMap) + rd32(rom_ptr(ART(SmallFontMap)) + 4));
     uint16_t tile = (uint16_t)(rd16(map + 4 + (int16_t)(ch << 1)) & 0x7FF);

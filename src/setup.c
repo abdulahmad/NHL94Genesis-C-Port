@@ -316,7 +316,7 @@ void setupice(void)
     struct Vid v = { g.DMAList, g.Satt, 1 };
     for (int i = 0; i < 6; i++) addframe2(0, 0, &g.pads[i].head, &v);                     /* pads, logo, gloves */
     g.DMAlistend = ram_addr(v.dma);
-    DoDMAList();
+    dodmalist();
     g.disflags = saved;
     g.vbint = SYM_VBlank;
     g.disflags &= (uint16_t)~(HI(dfok) | HI(dfng));
@@ -410,7 +410,7 @@ void setupice_highlight(void)
     struct Vid v = { g.DMAList, g.Satt, 1 };
     for (int i = 0; i < 6; i++) addframe2(0, 0, &g.pads[i].head, &v);
     g.DMAlistend = ram_addr(v.dma);
-    DoDMAList();
+    dodmalist();
     g.palcount = 0x1C;
     g.disflags = saved;
     g.vbint = SYM_VBlank;

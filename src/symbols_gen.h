@@ -457,7 +457,7 @@
 #define SYM_IRQ7 0x15E6Cu
 #define SYM_DumpSprites 0x15E6Eu
 #define SYM_DumpSprites2 0x15E72u
-#define SYM_DoDMAList 0x15E82u
+#define SYM_dodmalist 0x15E82u
 #define SYM_SetScroll2 0x15EA4u
 #define SYM_setvideo 0x15EC0u
 #define SYM_updatescroll 0x15F34u
@@ -472,7 +472,7 @@
 #define SYM_setffo 0x1661Au
 #define SYM_uppads 0x16648u
 #define SYM_QueuePadLabel 0x166E6u
-#define SYM_RenderSmallFontChar 0x1674Au
+#define SYM_uppads_pd 0x1674Au
 #define SYM_addframe 0x16782u
 #define SYM_addframe2 0x167AAu
 #define SYM_find3d 0x16920u
@@ -3778,7 +3778,7 @@ static const struct SymEntry rom_syms[] = {
     {0x15E6Cu, "IRQ7"},
     {0x15E6Eu, "DumpSprites"},
     {0x15E72u, "DumpSprites2"},
-    {0x15E82u, "DoDMAList"},
+    {0x15E82u, "dodmalist"},
     {0x15EA4u, "SetScroll2"},
     {0x15EC0u, "setvideo"},
     {0x15F34u, "updatescroll"},
@@ -3793,7 +3793,7 @@ static const struct SymEntry rom_syms[] = {
     {0x1661Au, "setffo"},
     {0x16648u, "uppads"},
     {0x166E6u, "QueuePadLabel"},
-    {0x1674Au, "RenderSmallFontChar"},
+    {0x1674Au, "uppads_pd"},
     {0x16782u, "addframe"},
     {0x167AAu, "addframe2"},
     {0x16920u, "find3d"},

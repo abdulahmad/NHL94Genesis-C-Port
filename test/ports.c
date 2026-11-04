@@ -276,14 +276,14 @@ static void run_VBlank(const Record *r) { VBlank(); }
 static void run_vb2(const Record *r) { vb2(); }
 static void run_DumpSprites(const Record *r) { DumpSprites(); }
 static void run_DumpSprites2(const Record *r) { DumpSprites2(); }
-static void run_DoDMAList(const Record *r) { DoDMAList(); }
+static void run_dodmalist(const Record *r) { dodmalist(); }
 static void run_SetScroll2(const Record *r) { SetScroll2(); }
 static void run_setvideo(const Record *r) { setvideo(); }
 VID_RUN(updatescroll) VID_RUN(showref) VID_RUN(checkfo) VID_RUN(showzam) VID_RUN(showcrowd) VID_RUN(showclock)
 VID_RUN(checksso) VID_RUN(setsortcords) VID_RUN(setffo) VID_RUN(uppads)
 static void run_SetSframe(const Record *r) { VID_IN(v); SetSframe(r->regs_in[R_A0], D16(R_D0), D16(R_D1), (uint16_t)r->regs_in[R_D2], (uint16_t)r->regs_in[R_D3], &v); VID_OUT(v); }
 static void run_QueuePadLabel(const Record *r) { VID_IN(v); QueuePadLabel((uint16_t)r->regs_in[R_D1], RINK(R_A0), &v); VID_OUT(v); }
-static void run_RenderSmallFontChar(const Record *r) { VID_IN(v); RenderSmallFontChar((uint16_t)r->regs_in[R_D2], (uint16_t)r->regs_in[R_D0], RINK(R_A0), &v); VID_OUT(v); }
+static void run_uppads_pd(const Record *r) { VID_IN(v); uppads_pd((uint16_t)r->regs_in[R_D2], (uint16_t)r->regs_in[R_D0], RINK(R_A0), &v); VID_OUT(v); }
 static void run_addframe(const Record *r) { VID_IN(v); addframe(RINK(R_A3), &v); VID_OUT(v); }
 static void run_addframe2(const Record *r) { VID_IN(v); addframe2(D16(R_D0), D16(R_D1), RAM_AT(struct SpriteHead, PLACE(R_A3)), &v); VID_OUT(v); }
 static void run_find3d(const Record *r) { int16_t d0 = D16(R_D0), d1 = D16(R_D1); find3d(&d0, &d1, D16(R_D2)); expect_reg16(r, R_D0, (uint16_t)d0, "d0"); expect_reg16(r, R_D1, (uint16_t)d1, "d1"); }
@@ -1114,7 +1114,7 @@ const Port ports[] = {
     { SYM_vb2, "vb2", run_vb2 },
     { SYM_DumpSprites, "DumpSprites", run_DumpSprites },
     { SYM_DumpSprites2, "DumpSprites2", run_DumpSprites2 },
-    { SYM_DoDMAList, "DoDMAList", run_DoDMAList },
+    { SYM_dodmalist, "dodmalist", run_dodmalist },
     { SYM_SetScroll2, "SetScroll2", run_SetScroll2 },
     { SYM_setvideo, "setvideo", run_setvideo },
     { SYM_updatescroll, "updatescroll", run_updatescroll },
@@ -1129,7 +1129,7 @@ const Port ports[] = {
     { SYM_setffo, "setffo", run_setffo },
     { SYM_uppads, "uppads", run_uppads },
     { SYM_QueuePadLabel, "QueuePadLabel", run_QueuePadLabel },
-    { SYM_RenderSmallFontChar, "RenderSmallFontChar", run_RenderSmallFontChar },
+    { SYM_uppads_pd, "uppads_pd", run_uppads_pd },
     { SYM_addframe, "addframe", run_addframe },
     { SYM_addframe2, "addframe2", run_addframe2 },
     { SYM_find3d, "find3d", run_find3d },

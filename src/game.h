@@ -282,7 +282,7 @@ void VBlank(void);                                       /* the game play vblank
 void vb2(void);                                          /* the fades-only vblank handler */
 void DumpSprites(void);
 void DumpSprites2(void);
-void DoDMAList(void);
+void dodmalist(void);
 void SetScroll2(void);
 void setvideo(void);                                     /* once per game frame: builds the lists, sets dfok */
 void updatescroll(struct Vid *v);                        /* a5 */
@@ -297,7 +297,7 @@ void setsortcords(struct Vid *v);
 void setffo(struct Vid *v);
 void uppads(struct Vid *v);                              /* a5 */
 void QueuePadLabel(uint16_t code, struct RinkObj *pad, struct Vid *v);       /* d1, a0, a5 */
-void RenderSmallFontChar(uint16_t ch, uint16_t slot, const struct RinkObj *pad, struct Vid *v);   /* d2, d0, a0, a5 */
+void uppads_pd(uint16_t ch, uint16_t slot, const struct RinkObj *pad, struct Vid *v);   /* d2, d0, a0, a5 */
 void addframe(struct RinkObj *o, struct Vid *v);         /* a3, a5, a6, d6 */
 void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v);   /* d0, d1, a3, a5, a6, d6 */
 void find3d(int16_t *x, int16_t *y, int16_t z);          /* d0, d1, d2 -> d0, d1 ($4E20 = off screen) */
