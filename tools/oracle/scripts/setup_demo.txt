@@ -1,0 +1,2 @@
+# power on: Start at the title, then no further press. ReadSetupPads waits $5460 frames (six minutes) on the setup screen and SetupDemo runs; cut before the demo's ice work would take lockstep out of step.
+1200:START,1206:

@@ -66,6 +66,13 @@ VECTORS = [
     # (demo_long: frame 11015, lldisp; shootout_full: frame 15966, the screen after the shootout)
     ('demo_long', 'lockstep', dict(frames=10950, state='demo_faceoff', snap='demo_faceoff')),
     ('shootout_full', 'lockstep', dict(frames=15940, script='shootout_full.txt')),
+    # coverage part 3 (test/coverage_lockstep.txt): pause items lockstep never opened (Player Stats,
+    # Period Stats, Manual Goalie, Team Roster Weight), and pad 2 Start in the demo (startpause2)
+    ('pause_stats', 'lockstep', dict(frames=3100, state='faceoff', snap='faceoff', script='pause_stats.txt')),
+    ('demo_p2_pause', 'lockstep', dict(frames=1000, state='demo_faceoff', snap='demo_faceoff',
+                                      script2='demo_p2_pause.txt')),
+    # six minutes idle on the setup screen: SetupDemo. Cut after it starts, before the demo ice.
+    ('setup_demo', 'lockstep', dict(frames=23800, script='setup_demo.txt')),
     # EA's 4 Way Play from power on: four players, a period of four pads at random and the next
     ('four_way_game', 'lockstep', dict(frames=6000, four_way=1, script='four_way_p1.txt', script2='four_way_p2.txt',
                                        script3='four_way_p3.txt', script4='four_way_p4.txt')),

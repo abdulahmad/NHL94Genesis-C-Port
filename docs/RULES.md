@@ -28,3 +28,4 @@ What decides each kind of name and place in the C ports. Workers and the splitte
 * 2026-11-03: ignore gens94-c (INDIO's Genesis repo) entirely: no work, no cross-checks, not a gate. The base is checked by its own lockstep, captures and golden runs (Abdul).
 * 2026-11-04: CONTRIBUTING.md must not contradict History: lineage lives only in the asm repositories' `docs/name_map.csv`, never in source comments. (CONTRIBUTING rewrite vs RULES History row)
 * 2026-11-04: `oracle_vdp_get` must not load GPGX `cram`/`vsram` as `uint16_t*` at `-O2`: they are `ALIGNED_(4)`, and GCC 13 emits `movdqa` (SIGSEGV). Copy with `memcpy`; compile the shim with `-fno-tree-vectorize`. (`make vectors` snapshot/lockstep on GCC 13)
+* 2026-11-04: after `make CC="gcc --coverage" nhl94`, do not run `make lockstep`: it relinks `build/nhl94` with the default CC and fails (`__gcov_init`). Check that binary with `python3 tools/oracle/vectors.py check`, then rebuild without coverage.
