@@ -53,18 +53,28 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
   the wait. Failure 2: L=1 size-weighted extras on L=0 spans, hashes fail at frame 2. Failure 3:
   faceoff as above. Need GPGX event-pair cycle traces, not lockstep L. Overclock slider still open.
 * `VANILLA=1` (`make VANILLA=1 nhl94`: `build/nhl94-vanilla`, docs/VANILLA.md): lockstep **20 of 20** against the cartridge
-  (2026-11-04). `src/` is the same code as the default build; host extras are stubbed. 1nput names stay in the base.
+  (2026-11-04). `src/` is the same code as the default build; host extras are stubbed.
+* **NHL94Genesis names** (2026-11-04, Abdul: 1nput forked before the cleanup). One asm module at a time, rename
+  lens only. 31 `renamed` + 3 `missing` original routines now use the current NHL94Genesis labels
+  (`TitleScreen`, `Pausemode_*`, `TeamIcons`, `Fprintsmall`, `setupEASportsMap`, …). Names gate
+  **558 ok / 280 other_module / 0 renamed / 0 missing**. `other_module` rose 270→280 because ten of
+  those routines already sat in a C file that is not the asm module; no file re-cut. This C port has
+  no `name_map.csv`; lineage stays in NHL94Genesis `docs/name_map.csv`. Capture `--fn` lists in
+  `tools/hybrid/` still use the pinned vasm names (af1b6f2) so re-recording keeps working.
+  Smooth gates after the names: `make lockstep` **23 of 23**; `make test` 10,276 of 10,276, 0 failed,
+  570 skipped, 29 captures; `make golden-check` 20 of 20 identical, 2 of 2 roster-set LIKE, 7 of 7
+  states, keys / restart / reset OK.
 
 **gens94-c is ignored from 2026-11-03 (Abdul)**: no work or cross-checks on it; the E1/E3 results above are history. `test/crosscheck.sh` is not run any more.
 
-2026-11-04: E2 re-run (GCC 13), VANILLA=1 lockstep 20 of 20, E5 part 3 lockstep 23 of 23, Original speed opt-in, E6 parked. Work stays on `claude/project-thread-4gad59`; do not merge to main. Do not ask 1nput/INDIO; keep 1nput names.
+2026-11-04: NHL94Genesis names applied on `claude/project-thread-4gad59`; do not merge to main. E6 stays parked. SNES Smooth was not flipped. File re-cut (`other_module` 280) is the next names-related unit.
 
 ## Next, in order
 
 1. ~~Coverage, part 3~~ (done 2026-11-04; lockstep 23 of 23, 790/838, 48 never reached).
 2. ~~`VANILLA=1` build~~ (done 2026-11-03; lockstep 20 of 20 re-checked 2026-11-04).
 3. ~~**Slowdown option**~~ (done 2026-11-04): `--original` / `--speed original` / Speed page / `game.speed` in settings.ini. Smooth remains the default.
-4. **Keep 1nput names** in the base (do not ask 1nput this session). The names gate only reports. No file re-cut.
+4. ~~**NHL94Genesis names**~~ (done 2026-11-04): 0 renamed, 0 missing. **File re-cut** of the 280 `other_module` routines still waits (rename OR move, never both).
 5. ~~**E6**~~ parked 2026-11-04 (3 Original lockstep failures; see Results). Overclock slider still to come. SNES Smooth was not flipped.
 
 ## Needs
