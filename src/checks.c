@@ -1929,7 +1929,7 @@ void pucknorm(struct Team *tm, struct SortObj *puck)
         puck->Xvel = a2->Xvel;
         puck->Yvel = a2->Yvel;
     }
-    d0 = puckIChk(d0);
+    d0 = PuckIChk(d0);
     ChkOffsides(d0, puck);
     if (!(g.gmode & (1 << gmclock))) {
         if (puckc() < 0 && puck->Xpos == puck->OldXpos && puck->Ypos == puck->OldYpos) {
@@ -2057,9 +2057,9 @@ void a2touchpuck(struct SortObj *pl, struct SortObj *puck)
     g.iflags |= 4;
 }
 
-/* checks94.asm:puckIChk. Check for icing of the puck: a loose puck crossing the far goal line
+/* checks94.asm:PuckIChk. Check for icing of the puck: a loose puck crossing the far goal line
  * outside the crease sets ifcgl. d0 is the goal line on that path, else unchanged. */
-int16_t puckIChk(int16_t d0)
+int16_t PuckIChk(int16_t d0)
 {
     if (!(g.iflags & 4)) return d0;
     if (g.iflags & 1) return d0;

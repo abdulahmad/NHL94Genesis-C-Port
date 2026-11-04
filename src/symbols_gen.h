@@ -157,9 +157,9 @@
 #define SYM_getlchoice2 0xBA18u
 #define SYM_lineinput 0xBA88u
 #define SYM_lcfound 0xBB06u
-#define SYM_lcfound2 0xBB36u
+#define SYM_lcfound_close 0xBB36u
 #define SYM_burst 0xBB62u
-#define SYM_holdplayer 0xBBB6u
+#define SYM_Holdplayer 0xBBB6u
 #define SYM_Acheck 0xBBD4u
 #define SYM_setpassmode 0xBC06u
 #define SYM_rtss 0xBC3Eu
@@ -254,7 +254,7 @@
 #define SYM_ClearOffsidesIfAllPlayers 0x100A6u
 #define SYM_a2offsides 0x100E6u
 #define SYM_a2touchpuck 0x1013Eu
-#define SYM_puckIChk 0x10246u
+#define SYM_PuckIChk 0x10246u
 #define SYM_puckunflip 0x102A8u
 #define SYM_puckflip 0x102D2u
 #define SYM_puckshadow 0x102ECu
@@ -3478,9 +3478,9 @@ static const struct SymEntry rom_syms[] = {
     {0xBA18u, "getlchoice2"},
     {0xBA88u, "lineinput"},
     {0xBB06u, "lcfound"},
-    {0xBB36u, "lcfound2"},
+    {0xBB36u, "lcfound_close"},
     {0xBB62u, "burst"},
-    {0xBBB6u, "holdplayer"},
+    {0xBBB6u, "Holdplayer"},
     {0xBBD4u, "Acheck"},
     {0xBC06u, "setpassmode"},
     {0xBC3Eu, "rtss"},
@@ -3575,7 +3575,7 @@ static const struct SymEntry rom_syms[] = {
     {0x100A6u, "ClearOffsidesIfAllPlayers"},
     {0x100E6u, "a2offsides"},
     {0x1013Eu, "a2touchpuck"},
-    {0x10246u, "puckIChk"},
+    {0x10246u, "PuckIChk"},
     {0x102A8u, "puckunflip"},
     {0x102D2u, "puckflip"},
     {0x102ECu, "puckshadow"},

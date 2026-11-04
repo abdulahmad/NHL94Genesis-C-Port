@@ -75,7 +75,7 @@ void doinput(uint16_t d0, uint16_t d1, uint16_t d2, uint16_t d3, int16_t d4, str
     if (!(o->pflags3 & (1 << pf3onetimer)) && PFLAG(o, pfalock)) { doinput_islocked(d1, d4, o); return; }
     if (o->pflags2 & 1) return;                           /* fightinput: nothing */
     if (puckc() == o->SCnum) { doinput_ispc(d0, d1, d2, d3, d4, o); return; }
-    if (o->position != 0 && !(o->pflags3 & (1 << pf3onetimer)) && (d1 & BUT_A)) { holdplayer(o); return; }
+    if (o->position != 0 && !(o->pflags3 & (1 << pf3onetimer)) && (d1 & BUT_A)) { Holdplayer(o); return; }
     if (o->position != 0) {
         if (g.BA_PS_flags & HI(2)) goto noswitch;
     } else if (!(g.sflags5 & 0x40) && goaliemode(d4) != 0 && o->SCnum != puckc()) {
@@ -376,7 +376,7 @@ void lineinput(uint16_t d0, uint16_t d1, uint16_t d2, struct SortObj *o)
     struct Team *tm = team_struct(PFLAG(o, pfteam));
     if (tm->flags & 1) {
         tm->flags &= (uint8_t)~1;
-        lcfound2(tm);
+        lcfound_close(tm);
         SetLCmode2(tm);
     }
     if (d1 & BUT_A) { lcfound(0, tm, o); return; }
@@ -399,11 +399,11 @@ void lcfound(uint16_t choice, struct Team *tm, struct SortObj *o)
     tm->flags &= (uint8_t)~2;
     tm->line = (uint16_t)line;
     setpersonel(tm);
-    lcfound2(tm);
+    lcfound_close(tm);
 }
 
-/* input94.asm:lcfound2. Close the line change box of team a2. */
-void lcfound2(struct Team *tm)
+/* input94.asm:lcfound_close. Close the line change box of team a2. */
+void lcfound_close(struct Team *tm)
 {
     if (g.sflags & HI(sfhor)) return;
     uint16_t d0, d1;
@@ -433,8 +433,8 @@ void burst(struct SortObj *o)
     SetSPA(o, SPAburst);
 }
 
-/* input94.asm:holdplayer. A button hold: hook the last player he hit (Acheck). */
-void holdplayer(struct SortObj *o)
+/* input94.asm:Holdplayer. A button hold: hook the last player he hit (Acheck). */
+void Holdplayer(struct SortObj *o)
 {
     o->pflags |= 1 << pfalock;
     if (o->impact == 0) { SetSPA(o, SPAhook); return; }

@@ -28,8 +28,8 @@ void box(void)
 void ShowGoalBox(void)
 {
     if (g.BA_PS_flags & HI(2)) g.sflags2 |= HI(sf2drec);
-    lcfound2(team_struct(0));
-    lcfound2(team_struct(1));
+    lcfound_close(team_struct(0));
+    lcfound_close(team_struct(1));
     const uint8_t *e = last_goal();
     PRINTZ(str_ShowGoalBox_1);
     uint16_t rows = 5;

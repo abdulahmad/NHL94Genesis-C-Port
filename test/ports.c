@@ -124,7 +124,7 @@ static void run_ChkOffsides(const Record *r) { ChkOffsides(D16(R_D0), OBJ(R_A3))
 static void run_ClearOffsidesIfAllPlayers(const Record *r) { int16_t d0 = D16(R_D0); ClearOffsidesIfAllPlayers(TEAM(R_A2), &d0); expect_reg16(r, R_D0, (uint16_t)d0, "d0"); }
 static void run_a2offsides(const Record *r) { a2offsides(OBJ(R_A2), OBJ(R_A3)); }
 static void run_a2touchpuck(const Record *r) { a2touchpuck(OBJ(R_A2), OBJ(R_A3)); }
-static void run_puckIChk(const Record *r) { expect_reg16(r, R_D0, (uint16_t)puckIChk(D16(R_D0)), "d0"); }
+static void run_PuckIChk(const Record *r) { expect_reg16(r, R_D0, (uint16_t)PuckIChk(D16(R_D0)), "d0"); }
 static void run_puckflip(const Record *r) { puckflip(D16(R_D0), OBJ(R_A3)); }
 static void run_skateto(const Record *r) { skateto(D16(R_D0), D16(R_D1), aux_from(r->regs_in[R_A0]), OBJ(R_A3)); }
 static void run_avdgoal(const Record *r)
@@ -181,11 +181,11 @@ O(doinput_chkanim)
 static void run_doinput_onetimer(const Record *r) { doinput_onetimer((uint16_t)r->regs_in[R_D1], D16(R_D4), OBJ(R_A3)); }
 static void run_doinput_ispc(const Record *r) { doinput_ispc((uint16_t)r->regs_in[R_D0], (uint16_t)r->regs_in[R_D1], (uint16_t)r->regs_in[R_D2], (uint16_t)r->regs_in[R_D3], D16(R_D4), OBJ(R_A3)); }
 static void run_doinput_islocked(const Record *r) { doinput_islocked((uint16_t)r->regs_in[R_D1], D16(R_D4), OBJ(R_A3)); }
-O(setpassmode) O(holdplayer) O(prepshot) O(doshot) O(shotdiradj)
+O(setpassmode) O(Holdplayer) O(prepshot) O(doshot) O(shotdiradj)
 static void run_passmode(const Record *r) { passmode((uint16_t)r->regs_in[R_D0], (uint16_t)r->regs_in[R_D2], OBJ(R_A3)); }
 static void run_faceoffinput(const Record *r) { faceoffinput((uint16_t)r->regs_in[R_D0], (uint16_t)r->regs_in[R_D1], OBJ(R_A3)); }
 static void run_lineinput(const Record *r) { lineinput((uint16_t)r->regs_in[R_D0], (uint16_t)r->regs_in[R_D1], (uint16_t)r->regs_in[R_D2], OBJ(R_A3)); }
-static void run_lcfound2(const Record *r) { lcfound2(TEAM(R_A2)); }
+static void run_lcfound_close(const Record *r) { lcfound_close(TEAM(R_A2)); }
 static void run_setlccords(const Record *r) { uint16_t d0, d1; setlccords(TEAM(R_A2), &d0, &d1); expect_reg16(r, R_D0, d0, "d0"); expect_reg16(r, R_D1, d1, "d1"); }
 static void run_getlchoice2(const Record *r) { expect_reg16(r, R_D0, (uint16_t)getlchoice2(D16(R_D0), D16(R_D2), TEAM(R_A2)), "d0"); }
 static void run_passto(const Record *r) { passto(OBJ(R_A0), OBJ(R_A3)); }
@@ -912,7 +912,7 @@ const Port ports[] = {
     { SYM_ClearOffsidesIfAllPlayers, "ClearOffsidesIfAllPlayers", run_ClearOffsidesIfAllPlayers },
     { SYM_a2offsides, "a2offsides", run_a2offsides },
     { SYM_a2touchpuck, "a2touchpuck", run_a2touchpuck },
-    { SYM_puckIChk, "puckIChk", run_puckIChk },
+    { SYM_PuckIChk, "PuckIChk", run_PuckIChk },
     { SYM_puckunflip, "puckunflip", run_puckunflip },
     { SYM_puckflip, "puckflip", run_puckflip },
     { SYM_puckshadow, "puckshadow", run_puckshadow },
@@ -974,10 +974,10 @@ const Port ports[] = {
     { SYM_doinput_islocked, "doinput_islocked", run_doinput_islocked },
     { SYM_setpassmode, "setpassmode", run_setpassmode },
     { SYM_passmode, "passmode", run_passmode },
-    { SYM_holdplayer, "holdplayer", run_holdplayer },
+    { SYM_Holdplayer, "Holdplayer", run_Holdplayer },
     { SYM_faceoffinput, "faceoffinput", run_faceoffinput },
     { SYM_lineinput, "lineinput", run_lineinput },
-    { SYM_lcfound2, "lcfound2", run_lcfound2 },
+    { SYM_lcfound_close, "lcfound_close", run_lcfound_close },
     { SYM_setlccords, "setlccords", run_setlccords },
     { SYM_getlchoice2, "getlchoice2", run_getlchoice2 },
     { SYM_passto, "passto", run_passto },

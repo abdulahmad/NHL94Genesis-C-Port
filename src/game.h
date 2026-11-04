@@ -384,7 +384,7 @@ void ChkOffsides(int16_t d0, struct SortObj *puck);
 void ClearOffsidesIfAllPlayers(struct Team *tm, int16_t *d0);
 void a2offsides(struct SortObj *pl, struct SortObj *puck);
 void a2touchpuck(struct SortObj *pl, struct SortObj *puck);
-int16_t puckIChk(int16_t d0);                          /* d0 passes through unless the goal line is set */
+int16_t PuckIChk(int16_t d0);                          /* d0 passes through unless the goal line is set */
 void puckunflip(struct SortObj *puck);
 void puckflip(int16_t d0, struct SortObj *puck);       /* d0 bit 0 flips the facing */
 void puckshadow(struct Team *tm, struct SortObj *shadow);
@@ -452,10 +452,10 @@ void doinput_ispc(uint16_t d0, uint16_t d1, uint16_t d2, uint16_t d3, int16_t d4
 void doinput_islocked(uint16_t d1, int16_t d4, struct SortObj *o);
 void setpassmode(struct SortObj *o);
 void passmode(uint16_t d0, uint16_t d2, struct SortObj *o);
-void holdplayer(struct SortObj *o);
+void Holdplayer(struct SortObj *o);
 void faceoffinput(uint16_t d0, uint16_t d1, struct SortObj *o);
 void lineinput(uint16_t d0, uint16_t d1, uint16_t d2, struct SortObj *o);
-void lcfound2(struct Team *tm);
+void lcfound_close(struct Team *tm);
 void setlccords(struct Team *tm, uint16_t *d0, uint16_t *d1);
 int16_t getlchoice2(int16_t d0, int16_t d2, struct Team *tm);
 void passto(struct SortObj *rcv, struct SortObj *o);   /* a0, a3 */
