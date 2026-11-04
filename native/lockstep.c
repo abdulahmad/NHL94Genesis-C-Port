@@ -189,7 +189,7 @@ static uint32_t routine_end(uint32_t a)
 }
 
 /* the oracle at record r (its whole state) out of the game's logic: in Pausemode or
- * IntermissionStart, or on its stack, from the top, a return into one of them before one into
+ * PeriodOver_sp, or on its stack, from the top, a return into one of them before one into
  * DoGameFrame (any long word there that is such an address counts); else (DoGameFrame, the game
  * loop between two frames, no state) in it */
 static int oracle_out_of_game_logic(const record *r)
@@ -197,15 +197,15 @@ static int oracle_out_of_game_logic(const record *r)
     static uint32_t dgf_end, int_end, pause_end;
     if (!dgf_end) {
         dgf_end = routine_end(SYM_DoGameFrame);
-        int_end = routine_end(SYM_IntermissionStart);
+        int_end = routine_end(SYM_PeriodOver_sp);
         pause_end = routine_end(SYM_Pausemode);
     }
     if (!r->state) return 0;
-    if (r->routine == SYM_Pausemode || r->routine == SYM_IntermissionStart) return 1;
+    if (r->routine == SYM_Pausemode || r->routine == SYM_PeriodOver_sp) return 1;
     const uint8_t *regs = r->state + 0x10000 + 24 + 0x10000 + 128 + 80;   /* (D0-D7, A0-A7) */
     for (uint32_t a = le32(regs + 15 * 4) & 0xFFFF; a + 4 <= 0x10000; a += 2) {   /* (the stack: up to the top of RAM) */
         uint32_t v = be32(r->state + a);
-        if ((v > SYM_IntermissionStart && v < int_end) || (v > SYM_Pausemode && v < pause_end)) return 1;
+        if ((v > SYM_PeriodOver_sp && v < int_end) || (v > SYM_Pausemode && v < pause_end)) return 1;
         if (v > SYM_DoGameFrame && v < dgf_end) return 0;
     }
     return 0;
@@ -452,7 +452,7 @@ int NI native_at_game_loop_wait(void)
 static NI int in_game_logic(void)
 {
     for (int i = (depth < 512 ? depth : 512) - 1; i >= 0; i--) {
-        if (where[i] == SYM_IntermissionStart || where[i] == SYM_Pausemode) return 0;
+        if (where[i] == SYM_PeriodOver_sp || where[i] == SYM_Pausemode) return 0;
         if (where[i] == SYM_DoGameFrame) return 1;
     }
     return 0;

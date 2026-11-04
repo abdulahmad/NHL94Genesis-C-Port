@@ -463,7 +463,7 @@ static void run_HandleMenuInput(const Record *r) { uint16_t d1 = R16(R_D1); expe
 static void run_PutTeamBlock(const Record *r) { PutTeamBlock(R16(R_D0)); }
 V(ChooseSong) V(CheckScoreLeader) V(LeadSong) V(ClearLeadSong) V(rtsChgplayer) V(ClearPenalties) V(SetSflags8Bit1) V(box) V(ShowGoalBox)
 V(PenaltyShotBox) V(ShowThreeStars) V(ShowInjuryBox) V(CountGoalies) V(ReloadRinkGraphics) V(PeriodOver) V(resetplstuff) V(SprSort)
-V(setupEASNmap) V(setupIceRinkPal) V(setplayercolors) V(ShootoutModeBox) V(CountShootoutGoals) V(ShootoutWonBy) V(SetMenuPrintX) V(MenuWaitVblank)
+V(setupEASportsMap) V(setupIceRinkPal) V(setplayercolors) V(ShootoutModeBox) V(CountShootoutGoals) V(ShootoutWonBy) V(SetMenuPrintX) V(MenuWaitVblank)
 
 
 /* ---- sound94 ---- */
@@ -490,7 +490,7 @@ V(UploadCommandBufferToZ80) V(StopPCMChannel) V(p_initialZ80) V(ClearAllTrackAnd
 
 /* ---- the game loop: hockey94 drivers and the period start ---- */
 static void run_defaultsprites(const Record *r) { expect_reg16(r, R_D4, defaultsprites(R16(R_D4)), "d4"); }
-static void run_defaultsprites2(const Record *r) { expect_reg16(r, R_D4, defaultsprites2(R16(R_D4)), "d4"); }
+static void run_defaultsprites_0(const Record *r) { expect_reg16(r, R_D4, defaultsprites_0(R16(R_D4)), "d4"); }
 static void run_setupTeamBlocksMap(const Record *r) { expect_reg16(r, R_D4, setupTeamBlocksMap(R16(R_D4)), "d4"); }
 static void run_CopyTeamBlockMapData(const Record *r)
 {
@@ -557,13 +557,13 @@ static void run_GetRandomUnusedTeam(const Record *r)
 }
 static void run_InitializeGameStructures(const Record *r) { InitializeGameStructures(); }
 static void run_FigureJoy(const Record *r) { FigureJoy(); }
-static void run_maketree(const Record *r) { maketree(); }
+static void run_MakeTree(const Record *r) { MakeTree(); }
 static void run_NewPO(const Record *r) { NewPO(); }
 static void run_ContinuePlayoffs(const Record *r) { ContinuePlayoffs(); }
 static void run_InitShooters(const Record *r) { InitShooters(); }
 static void run_ClearShootout(const Record *r) { ClearShootout(); }
 static void run_UpdatePlayoffLevel(const Record *r) { UpdatePlayoffLevel(); }
-static void run_DrawMatchupBitmaps(const Record *r) { DrawMatchupBitmaps(); }
+static void run_TeamIcons(const Record *r) { TeamIcons(); }
 static void run_DrawTeamBitmap(const Record *r) { expect_reg16(r, R_D4, DrawTeamBitmap(R16(R_D1), R16(R_D4)), "d4"); }
 static void run_VBlank_SetOptions(const Record *r) { VBlank_SetOptions(); }
 static void run_UnpackPicture(const Record *r) { UnpackPicture(A(R_A2)); }
@@ -649,14 +649,14 @@ static void run_WriteNameLog(const Record *r) { WriteNameLog(); }
 
 /* ---- the playoff screen (setup94) ---- */
 static void run_PlayoffScreen(const Record *r) { PlayoffScreen(); }
-static void run_HandlePlayoffInput(const Record *r) { HandlePlayoffInput(); }
-static void run_UpdatePlayoffScroll(const Record *r) { UpdatePlayoffScroll(); }
-static void run_PlayoffScreen_waitvsync(const Record *r) { PlayoffScreen_waitvsync(); }
-static void run_PrintSeriesScore(const Record *r) { PrintSeriesScore(MATCHUP(R_A2)); }
-static void run_DrawTreeArrow(const Record *r) { DrawTreeArrow(R16(R_D0)); }
-static void run_DrawTeamBlocks(const Record *r) { DrawTeamBlocks(R16(R_D1)); }
+static void run_PlayoffScreen_jin(const Record *r) { PlayoffScreen_jin(); }
+static void run_PlayoffScreen_scrup(const Record *r) { PlayoffScreen_scrup(); }
+static void run_waitxc1(const Record *r) { waitxc1(); }
+static void run_PlayoffScreen_doscores(const Record *r) { PlayoffScreen_doscores(MATCHUP(R_A2)); }
+static void run_PlayoffScreen_doarrow(const Record *r) { PlayoffScreen_doarrow(R16(R_D0)); }
+static void run_PlayoffScreen_doteam(const Record *r) { PlayoffScreen_doteam(R16(R_D1)); }
 static void run_VBlank_Playoff(const Record *r) { VBlank_Playoff(); }
-static void run_PlayoffScreenExit(const Record *r) { PlayoffScreenExit(); }   /* (pops its caller's return: abnormal, never run) */
+static void run_PlayoffScreen_exit(const Record *r) { PlayoffScreen_exit(); }   /* (pops its caller's return: abnormal, never run) */
 static void run_DrawPlayoffSprite(const Record *r) { DrawPlayoffSprite(); }
 
 /* ---- the scouting report (scout94, the text player of setup94, cards94 / title94 helpers) ---- */
@@ -1297,7 +1297,7 @@ const Port ports[] = {
     { SYM_PeriodOver, "PeriodOver", run_PeriodOver },
     { SYM_resetplstuff, "resetplstuff", run_resetplstuff },
     { SYM_SprSort, "SprSort", run_SprSort },
-    { SYM_setupEASNmap, "setupEASNmap", run_setupEASNmap },
+    { SYM_setupEASportsMap, "setupEASportsMap", run_setupEASportsMap },
     { SYM_setupIceRinkPal, "setupIceRinkPal", run_setupIceRinkPal },
     { SYM_setplayercolors, "setplayercolors", run_setplayercolors },
     { SYM_ShootoutModeBox, "ShootoutModeBox", run_ShootoutModeBox },
@@ -1338,7 +1338,7 @@ const Port ports[] = {
     { SYM_p_initialZ80, "p_initialZ80", run_p_initialZ80 },
     { SYM_ClearAllTrackAndSFXSlots, "ClearAllTrackAndSFXSlots", run_ClearAllTrackAndSFXSlots },
     { SYM_defaultsprites, "defaultsprites", run_defaultsprites },
-    { SYM_defaultsprites2, "defaultsprites2", run_defaultsprites2 },
+    { SYM_defaultsprites_0, "defaultsprites_0", run_defaultsprites_0 },
     { SYM_setupTeamBlocksMap, "setupTeamBlocksMap", run_setupTeamBlocksMap },
     { SYM_CopyTeamBlockMapData, "CopyTeamBlockMapData", run_CopyTeamBlockMapData },
     { SYM_ReloadRefHorTiles, "ReloadRefHorTiles", run_ReloadRefHorTiles },
@@ -1349,7 +1349,7 @@ const Port ports[] = {
     { SYM_setSlotBit, "setSlotBit", run_setSlotBit },
     { SYM_Gameloop, "Gameloop", run_never },
     { SYM_StartPer, "StartPer", run_never },
-    { SYM_IntermissionStart, "IntermissionStart", run_never },
+    { SYM_PeriodOver_sp, "PeriodOver_sp", run_never },
     { SYM_StartHL, "StartHL", run_StartHL },
     { SYM_StartHL2, "StartHL2", run_StartHL2 },
     { SYM_InitTeamStructure, "InitTeamStructure", run_InitTeamStructure },
@@ -1406,13 +1406,13 @@ const Port ports[] = {
     { SYM_GetRandomUnusedTeam, "GetRandomUnusedTeam", run_GetRandomUnusedTeam },
     { SYM_InitializeGameStructures, "InitializeGameStructures", run_InitializeGameStructures },
     { SYM_FigureJoy, "FigureJoy", run_FigureJoy },
-    { SYM_maketree, "maketree", run_maketree },
+    { SYM_MakeTree, "MakeTree", run_MakeTree },
     { SYM_NewPO, "NewPO", run_NewPO },
     { SYM_ContinuePlayoffs, "ContinuePlayoffs", run_ContinuePlayoffs },
     { SYM_InitShooters, "InitShooters", run_InitShooters },
     { SYM_ClearShootout, "ClearShootout", run_ClearShootout },
     { SYM_UpdatePlayoffLevel, "UpdatePlayoffLevel", run_UpdatePlayoffLevel },
-    { SYM_DrawMatchupBitmaps, "DrawMatchupBitmaps", run_DrawMatchupBitmaps },
+    { SYM_TeamIcons, "TeamIcons", run_TeamIcons },
     { SYM_DrawTeamBitmap, "DrawTeamBitmap", run_DrawTeamBitmap },
     { SYM_VBlank_SetOptions, "VBlank_SetOptions", run_VBlank_SetOptions },
     { SYM_UnpackPicture, "UnpackPicture", run_UnpackPicture },
@@ -1485,15 +1485,15 @@ const Port ports[] = {
     { SYM_SkipOtherUserName, "SkipOtherUserName", run_SkipOtherUserName },
     { SYM_WriteNameLog, "WriteNameLog", run_WriteNameLog },
     { SYM_PlayoffScreen, "PlayoffScreen", run_PlayoffScreen },
-    { SYM_HandlePlayoffInput, "HandlePlayoffInput", run_HandlePlayoffInput },
-    { SYM_UpdatePlayoffScroll, "UpdatePlayoffScroll", run_UpdatePlayoffScroll },
-    { SYM_PlayoffScreen_waitvsync, "PlayoffScreen_waitvsync", run_PlayoffScreen_waitvsync },
-    { SYM_PrintSeriesScore, "PrintSeriesScore", run_PrintSeriesScore },
-    { SYM_DrawTreeArrow, "DrawTreeArrow", run_DrawTreeArrow },
-    { SYM_DrawTeamBlocks, "DrawTeamBlocks", run_DrawTeamBlocks },
+    { SYM_PlayoffScreen_jin, "PlayoffScreen_jin", run_PlayoffScreen_jin },
+    { SYM_PlayoffScreen_scrup, "PlayoffScreen_scrup", run_PlayoffScreen_scrup },
+    { SYM_waitxc1, "waitxc1", run_waitxc1 },
+    { SYM_PlayoffScreen_doscores, "PlayoffScreen_doscores", run_PlayoffScreen_doscores },
+    { SYM_PlayoffScreen_doarrow, "PlayoffScreen_doarrow", run_PlayoffScreen_doarrow },
+    { SYM_PlayoffScreen_doteam, "PlayoffScreen_doteam", run_PlayoffScreen_doteam },
     { SYM_VBlank_Playoff, "VBlank_Playoff", run_VBlank_Playoff },
     { SYM_DrawPlayoffSprite, "DrawPlayoffSprite", run_DrawPlayoffSprite },
-    { SYM_PlayoffScreenExit, "PlayoffScreenExit", run_PlayoffScreenExit },
+    { SYM_PlayoffScreen_exit, "PlayoffScreen_exit", run_PlayoffScreen_exit },
     { SYM_ScoutingReport, "ScoutingReport", run_ScoutingReport },
     { SYM_ScoutCrowdRecord, "ScoutCrowdRecord", run_ScoutCrowdRecord },
     { SYM_PageMatchup, "PageMatchup", run_PageMatchup },

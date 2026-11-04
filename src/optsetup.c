@@ -301,7 +301,7 @@ void PrintOptions(uint16_t d7)
         if (line == 0x10) break;
     }
     PrintScrollMarks();
-    DrawMatchupBitmaps();
+    TeamIcons();
     if (!(g.setupcardflags & CARD(0))) ResetCardTimer();
 }
 
@@ -429,7 +429,7 @@ void setoptions(void)
     c = DecompressGraphicsPlain(ART(LogoBoxMap) + 8, c);
     g.logobox2chars = c;
     c = DecompressGraphicsWithRemap(ART(LogoBoxMap) + 8, c, rom_find(SYM_setoptions, SYM_ReadSetupPads, logobox, 8));
-    defaultsprites2(c);
+    defaultsprites_0(c);
     sortobj(0)->OldXpos = 0x28;
     sortobj(6)->OldXpos = 0x28;
     ST_W(g.teams[0].shots);
@@ -510,7 +510,7 @@ void SetupDemo(void)
 /* optsetup94.asm:SetupStart. Start: the Goalies option to both teams, pojoy, a new seed;
  * OptLine and OptPlayMode kept in TmpOptLine2 / TempOptPlayMode while Auto line changes play as
  * On (sflags7 bit 4) and Shootout as Regular Season (gmode2 bit 0, ClearShootout); then the
- * playoff tree (maketree). */
+ * playoff tree (MakeTree). */
 void SetupStart(void)
 {
     g.goaliemode1 = g.OptGoalie;
@@ -529,7 +529,7 @@ void SetupStart(void)
         g.gmode2 |= HI(0);
         ClearShootout();
     }
-    maketree();
+    MakeTree();
 }
 
 /* the colour table LoadSetupTiles remaps the visitors' TeamBitmaps with (its 68k address) */

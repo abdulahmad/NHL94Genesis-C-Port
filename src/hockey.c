@@ -462,5 +462,5 @@ void StartGame(void)
     InitScores();
     setupice();
     LoadCrowdRec();
-    IntermissionStart();
+    PeriodOver_sp();
 }

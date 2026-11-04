@@ -703,7 +703,7 @@ void ReadPassBits(uint8_t *bits);                             /* a3 */
 uint16_t GetRandomUnusedTeam(uint32_t *used);           /* d3 -> d0 */
 void InitializeGameStructures(void);
 void FigureJoy(void);
-void maketree(void);
+void MakeTree(void);
 void NewPO(void);
 void ContinuePlayoffs(void);
 void ClrPassBits(uint8_t *bits);                              /* a3 */
@@ -721,14 +721,14 @@ uint32_t FormatPlayerNameLast(uint16_t player, struct Team *tm);     /* d0, a2 -
 void PeriodOver(void);                                  /* does not return on the 68k */
 void resetplstuff(void);
 void SprSort(void);
-uint16_t setupEASNmap(void);                            /* -> d4 */
+uint16_t setupEASportsMap(void);                            /* -> d4 */
 void setupIceRinkPal(void);
 uint16_t ReloadEnergyBarTiles(void);                    /* -> d4 */
 uint16_t ReloadCrowdTiles(void);                        /* -> d4 */
 void setplayercolors(void);
 void setupice(void);
 uint16_t defaultsprites(uint16_t chars);                /* d4 -> d4 */
-uint16_t defaultsprites2(uint16_t chars);               /* d4 -> d4 */
+uint16_t defaultsprites_0(uint16_t chars);               /* d4 -> d4 */
 uint16_t setupTeamBlocksMap(uint16_t chars);            /* d4 -> d4 */
 uint8_t *CopyTeamBlockMapData(uint32_t map, uint16_t team, uint16_t vram, uint8_t *dst);  /* a0, d0, d1, a1 -> a1 */
 uint16_t ReloadRefHorTiles(void);                       /* -> d4 */
@@ -744,19 +744,19 @@ void Opening(void);                                     /* none of the three ret
 void Opening2(void);
 void Opening3(void);
 void PlayoffScreen(void);                               /* the playoff tree */
-int HandlePlayoffInput(void);                           /* -> 1: Start (PlayoffScreenExit) */
-void UpdatePlayoffScroll(void);
-void PlayoffScreenExit(void);
-void PlayoffScreen_waitvsync(void);
-void PrintSeriesScore(const struct Matchup *gs);        /* a2 */
-void DrawTreeArrow(uint16_t col);                       /* d0 */
-void DrawTeamBlocks(uint16_t row);                      /* d1 */
+int PlayoffScreen_jin(void);                           /* -> 1: Start (PlayoffScreen_exit) */
+void PlayoffScreen_scrup(void);
+void PlayoffScreen_exit(void);
+void waitxc1(void);
+void PlayoffScreen_doscores(const struct Matchup *gs);        /* a2 */
+void PlayoffScreen_doarrow(uint16_t col);                       /* d0 */
+void PlayoffScreen_doteam(uint16_t row);                      /* d1 */
 void VBlank_Playoff(void);
 uint32_t InitScoutingDisplay(void);                     /* -> a0 */
 void UpdateScoutingDisplay(void);
 void ScrollDisplayUp(void);
 void GameOver(void);                                    /* the password, the playoff screens, back to the title */
-void IntermissionStart(void);                           /* the intermission, then StartPer or GameOver */
+void PeriodOver_sp(void);                           /* the intermission, then StartPer or GameOver */
 void ExitToOpening(void);                               /* restarts the front end */
 
 /* ---- optsetup94.asm: the game setup screen ---- */
@@ -795,7 +795,7 @@ void DrawLogoBox(uint16_t chars);                       /* d4 */
 /* ---- attract94.asm: the EA screen, matchup pictures, option screen helpers ---- */
 void EASportsScreen(void);
 void UpdatePlayoffLevel(void);
-void DrawMatchupBitmaps(void);
+void TeamIcons(void);
 uint16_t DrawTeamBitmap(uint16_t team, uint16_t chars); /* d1, d4 -> d4 */
 void VBlank_SetOptions(void);
 

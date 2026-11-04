@@ -45,7 +45,7 @@ void ReloadRinkGraphics(void)
     DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, g.smallfontchars,
                                    rom_find(SYM_ReloadRinkGraphics, SYM_ReloadRinkGraphics + 0x80, table, 8));
     AddFramer(g.framercset);
-    setupEASNmap();
+    setupEASportsMap();
     ReloadEnergyBarTiles();
     ReloadCrowdTiles();
     setupIceRinkPal();

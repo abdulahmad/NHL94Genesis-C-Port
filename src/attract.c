@@ -49,20 +49,20 @@ void UpdatePlayoffLevel(void)
     g.pojoy = (uint16_t)((g.FourWayPlay ? 0xB : 7) - g.OptNOP);
 }
 
-/* attract94.asm:DrawMatchupBitmaps. The visitors' and the home team's bitmaps (DrawTeamBitmap)
+/* attract94.asm:TeamIcons. The visitors' and the home team's bitmaps (DrawTeamBitmap)
  * with their colours from TeamPalettes (the menu's teams in Regular Season and Shootout), then
  * the team structs (setteams) and the palette at once. */
-void DrawMatchupBitmaps(void)
+void TeamIcons(void)
 {
     if (g.OptPlayMode == 4 || g.OptPlayMode == 0) {
         g.HomeTeam = g.Opt1Team;
         g.VisTeam = g.Opt2Team;
     }
-    printz(str_DrawMatchupBitmaps_1, sizeof str_DrawMatchupBitmaps_1);
+    printz(str_TeamIcons_1, sizeof str_TeamIcons_1);
     uint16_t t = g.VisTeam;
     pal_load_w(0x13, &rosters_team(t)->matchup[1][3], 2);          /* (TeamPalettes: colours 3 and 4 of its second) */
     DrawTeamBitmap(t, g.teambitmapchars);
-    printz(str_DrawMatchupBitmaps_2, sizeof str_DrawMatchupBitmaps_2);
+    printz(str_TeamIcons_2, sizeof str_TeamIcons_2);
     t = g.HomeTeam;
     pal_load_w(0x11, &rosters_team(t)->matchup[0][1], 2);          /* (colours 1 and 2 of its first) */
     g.palfadenew[0x15] = 0xEEE;

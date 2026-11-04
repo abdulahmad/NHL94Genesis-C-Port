@@ -179,7 +179,7 @@ setup      GameOver                           7 / 8
 setup      Opening2                           7 / 8
 sound      p_music_vblank                     14 / 16
 data       FigureJoy                          44 / 50
-data       maketree                           22 / 25
+data       MakeTree                           22 / 25
 input      doinput                            67 / 76
 penalty    Intermission                       32 / 36
 replay     adda4                              24 / 27
@@ -200,7 +200,7 @@ input      doinput_cbut                       24 / 26
 checks     puckfaceoff                        51 / 55
 checks     AdjustFacingDirection              13 / 14
 collide    puckstick                          39 / 42
-setup      IntermissionStart                  13 / 14
+setup      PeriodOver_sp                  13 / 14
 checks     goalieacc                          40 / 43
 checks     ChkOffsides                        27 / 29
 records    RecordHoldersScreen                42 / 45

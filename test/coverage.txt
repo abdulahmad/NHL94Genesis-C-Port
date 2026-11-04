@@ -152,7 +152,7 @@ setup      GameOver                           7 / 8
 setup      Opening2                           7 / 8
 sound      p_music_vblank                     14 / 16
 data       FigureJoy                          44 / 50
-data       maketree                           22 / 25
+data       MakeTree                           22 / 25
 replay     adda4                              24 / 27
 collide    CCStart                            34 / 38
 checks     dostop                             9 / 10
@@ -164,7 +164,7 @@ checks     puckpenshot                        79 / 86
 input      doinput_cbut                       24 / 26
 collide    checkgoal                          150 / 162
 checks     puckfaceoff                        51 / 55
-setup      IntermissionStart                  13 / 14
+setup      PeriodOver_sp                  13 / 14
 records    RecordHoldersScreen                42 / 45
 assign     assbench                           43 / 46
 replay     RestoreReplayFrame                 58 / 62

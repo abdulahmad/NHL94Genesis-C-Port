@@ -18,7 +18,7 @@ static uint32_t inline_table(uint32_t from, uint32_t to, const uint8_t table[8])
 
 /* setup94.asm:PeriodOver. The period is over: count it (gsp) and flip the ends; after the third
  * period a tied game goes to overtime, after overtime only a tied playoff game goes on; else
- * the game is over (gsp 4). Fade out and fall into IntermissionStart, which does not return. */
+ * the game is over (gsp 4). Fade out and fall into PeriodOver_sp, which does not return. */
 void PeriodOver(void)
 {
     g.gsp++;
@@ -31,7 +31,7 @@ void PeriodOver(void)
         if (team_struct(0)->score != team_struct(1)->score) g.gsp = 4;
     }
     forceblack();
-    IntermissionStart();
+    PeriodOver_sp();
 }
 
 /* resetplstuff's .top: team a2's skaters lose their flags and glide again */
@@ -80,11 +80,11 @@ void SprSort(void)
     } while (moved);
 }
 
-/* setup94.asm:setupEASNmap. Load the EASN logo tiles at EASNcset, colours remapped -> d4. */
-uint16_t setupEASNmap(void)
+/* setup94.asm:setupEASportsMap. Load the EASN logo tiles at EASNcset, colours remapped -> d4. */
+uint16_t setupEASportsMap(void)
 {
     static const uint8_t table[8] = { 0x71, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
-    return DecompressGraphicsWithRemap(ART(EASNmap) + 8, g.EASNcset, inline_table(SYM_setupEASNmap, SYM_setupEASNmap + 0x20, table));
+    return DecompressGraphicsWithRemap(ART(EASNmap) + 8, g.EASNcset, inline_table(SYM_setupEASportsMap, SYM_setupEASportsMap + 0x20, table));
 }
 
 /* setup94.asm:setupIceRinkPal. The ice rink palettes 0 and 1 (Rinktilelist) to palfadenew. */
@@ -109,10 +109,10 @@ void setplayercolors(void)
     }
 }
 
-/* setup94.asm:IntermissionStart. Between periods: reset the clock, two vblanks with the sound
+/* setup94.asm:PeriodOver_sp. Between periods: reset the clock, two vblanks with the sound
  * off between, the end of period song, the ticker scores (and the playoff team stats at the end
  * of the game), the intermission, then the next period or the game over. Does not return. */
-void IntermissionStart(void)
+void PeriodOver_sp(void)
 {
     ResetClock();
     uint16_t v = g.vcount;
@@ -133,7 +133,7 @@ uint16_t ReloadRefHorTiles(void) { return DecompressGraphicsPlain(ART(RefMap2) +
 
 /* setup94.asm:defaultsprites. d4 = first char: the 4 screen objects (sso, 0x14 bytes) and the 7
  * objects tied to the rink scrolling (pads, 0x1C bytes) from their tables, each given its
- * chars, then defaultsprites2 -> d4. */
+ * chars, then defaultsprites_0 -> d4. */
 uint16_t defaultsprites(uint16_t chars)
 {
     const uint16_t *t = listsso;
@@ -159,13 +159,13 @@ uint16_t defaultsprites(uint16_t chars)
         o->VRchar = chars;
         chars += *t++;
     }
-    return defaultsprites2(chars);
+    return defaultsprites_0(chars);
 }
 
-/* setup94.asm:defaultsprites2. The 16 sort objects (players, nets, puck, shadow) cleared and set
+/* setup94.asm:defaultsprites_0. The 16 sort objects (players, nets, puck, shadow) cleared and set
  * from the table (position, frame, attribute, chars, radius, first assignment, flags), with
  * the sort order lists, then SprSort -> d4. */
-uint16_t defaultsprites2(uint16_t chars)
+uint16_t defaultsprites_0(uint16_t chars)
 {
     const uint16_t *t = dslist;
     for (uint16_t n = 0; n < 0x10; n++) {
@@ -287,7 +287,7 @@ void setupice(void)
     uint16_t c = DecompressGraphicsPlain(g.sflags4 & HI(4) ? ART(RevRinkTiles) : ART(Rinktiles), 0);
     c = LoadHomeTeamGfx(c);
     g.EASNcset = c;
-    c = setupEASNmap();
+    c = setupEASportsMap();
     g.energybarchars = c;
     c = DecompressGraphicsPlain(ART(EnergyBarMap) + 8, c);
     g.animchars = c;
@@ -406,7 +406,7 @@ void setupice_highlight(void)
     memset(g.padcont, 0, sizeof g.padcont);
     ST_W(g.c1playernum);
     ST_W(g.c2playernum);
-    setupEASNmap();
+    setupEASportsMap();
     struct Vid v = { g.DMAList, g.Satt, 1 };
     for (int i = 0; i < 6; i++) addframe2(0, 0, &g.pads[i].head, &v);
     g.DMAlistend = ram_addr(v.dma);
@@ -514,12 +514,12 @@ void PlayoffScreen(void)
         printz(str_PlayoffScreen_4, sizeof str_PlayoffScreen_4);
         g.printx = (uint16_t)((g.printx & 0xFF00) | *a0++);
         g.printy = (uint16_t)((g.printy & 0xFF00) | *a0++);
-        DrawTeamBlocks((uint16_t)(*tree++ << 1));
+        PlayoffScreen_doteam((uint16_t)(*tree++ << 1));
     }
     for (int16_t n = *a0++; n >= 0; n--) {                /* the arrows */
         printz(str_PlayoffScreen_5, sizeof str_PlayoffScreen_5);
         g.printx = (uint16_t)((g.printx & 0xFF00) | *a0++);
-        DrawTreeArrow(*a0++);
+        PlayoffScreen_doarrow(*a0++);
     }
     printz(str_PlayoffScreen_6, sizeof str_PlayoffScreen_6);
     if (g.bosgames != 7 && !(*a0 & 0x80)) {               /* the series scores */
@@ -527,7 +527,7 @@ void PlayoffScreen(void)
         for (int16_t n = *a0++; n >= 0; n--, gs++) {
             g.printx = (uint16_t)((g.printx & 0xFF00) | *a0++);
             g.printy = (uint16_t)((g.printy & 0xFF00) | *a0++);
-            PrintSeriesScore(gs);
+            PlayoffScreen_doscores(gs);
         }
     }
     printsmallz(str_PlayoffScreen_7, sizeof str_PlayoffScreen_7);
@@ -539,32 +539,32 @@ void PlayoffScreen(void)
     song(SYM_SngEOG);
     g.PlayerScrollCtr = 0xFFFF;
     g.DispAttribCtr = 1;
-    UpdatePlayoffScroll();
+    PlayoffScreen_scrup();
     for (;;) {
-        PlayoffScreen_waitvsync();
+        waitxc1();
         DrawPlayoffSprite();
-        if (HandlePlayoffInput()) return;                 /* PlayoffScreenExit */
+        if (PlayoffScreen_jin()) return;                 /* PlayoffScreen_exit */
     }
 }
 
-/* setup94.asm:HandlePlayoffInput. Both pads: Start leaves the playoff screen (-> 1, the 68k's
- * PlayoffScreenExit), right / left set the scroll step; then UpdatePlayoffScroll. */
-int HandlePlayoffInput(void)
+/* setup94.asm:PlayoffScreen_jin. Both pads: Start leaves the playoff screen (-> 1, the 68k's
+ * PlayoffScreen_exit), right / left set the scroll step; then PlayoffScreen_scrup. */
+int PlayoffScreen_jin(void)
 {
     uint16_t d0, d1, d2, held, held2;
     ReadJoy1(&d0, &d1, &d2, &held);
     ReadJoy2(&d0, &d1, &d2, &held2);
     held |= held2;
-    if (held & 0x80) { PlayoffScreenExit(); return 1; }
+    if (held & 0x80) { PlayoffScreen_exit(); return 1; }
     if (held & 8) g.PlayerScrollCtr = 0xFFFE;
     if (held & 4) g.PlayerScrollCtr = 2;
-    UpdatePlayoffScroll();
+    PlayoffScreen_scrup();
     return 0;
 }
 
-/* setup94.asm:UpdatePlayoffScroll. The tree one step (PlayerScrollCtr) within its pages (up to
+/* setup94.asm:PlayoffScreen_scrup. The tree one step (PlayerScrollCtr) within its pages (up to
  * gamelevel x $70 either way), stopping on a page boundary; the sprite's x while it shows. */
-void UpdatePlayoffScroll(void)
+void PlayoffScreen_scrup(void)
 {
     int16_t d0 = (int16_t)g.PlayerScrollCtr;
     if (d0 == 0) return;
@@ -579,13 +579,13 @@ void UpdatePlayoffScroll(void)
     if ((int16_t)(m68k_divs(d0, 0x70) >> 16) == 0) g.PlayerScrollCtr = 0;
 }
 
-/* setup94.asm:PlayoffScreenExit. Drop HandlePlayoffInput's return: PlayoffScreen returns (the C
+/* setup94.asm:PlayoffScreen_exit. Drop PlayoffScreen_jin's return: PlayoffScreen returns (the C
  * caller does). */
-void PlayoffScreenExit(void) {}
+void PlayoffScreen_exit(void) {}
 
-/* setup94.asm:PlayoffScreen_waitvsync. When the fade has run out, colour $21 flashes ($EE eor)
+/* setup94.asm:waitxc1. When the fade has run out, colour $21 flashes ($EE eor)
  * and the fade starts again; then wait for the vblank. */
-void PlayoffScreen_waitvsync(void)
+void waitxc1(void)
 {
     if ((int16_t)g.palcount < 0) {
         g.palfadenew[0x21] ^= 0xEE;
@@ -595,8 +595,8 @@ void PlayoffScreen_waitvsync(void)
     g.oldvcount = g.vcount;
 }
 
-/* setup94.asm:PrintSeriesScore. The best-of-7 wins "t-b" of game struct a2 at printx / printy. */
-void PrintSeriesScore(const struct Matchup *gs)
+/* setup94.asm:PlayoffScreen_doscores. The best-of-7 wins "t-b" of game struct a2 at printx / printy. */
+void PlayoffScreen_doscores(const struct Matchup *gs)
 {
     uint8_t *m = g.mesarea;
     wr16(m, 6);
@@ -607,17 +607,17 @@ void PrintSeriesScore(const struct Matchup *gs)
     print(ram_addr(g.mesarea));
 }
 
-/* setup94.asm:DrawTreeArrow. Column d0 of the arrows map (Arrowsmap, 2 x $17) at printx /
+/* setup94.asm:PlayoffScreen_doarrow. Column d0 of the arrows map (Arrowsmap, 2 x $17) at printx /
  * printy. */
-void DrawTreeArrow(uint16_t col)
+void PlayoffScreen_doarrow(uint16_t col)
 {
     uint32_t img = ART(Arrowsmap);
     dobitmap(img + rd32(rom_ptr(img)), img + rd32(rom_ptr(img + 4)), SYM_NoTiles, col, 0, 2, 0x17, g.ExtraChars, 0);
 }
 
-/* setup94.asm:DrawTeamBlocks. Team block d1 (team x 2: its row of Teamblocksmap) at printx /
+/* setup94.asm:PlayoffScreen_doteam. Team block d1 (team x 2: its row of Teamblocksmap) at printx /
  * printy, highlighted (printa $6000) for the user's playoff team. */
-void DrawTeamBlocks(uint16_t row)
+void PlayoffScreen_doteam(uint16_t row)
 {
     uint8_t user = (uint8_t)(g.potree[g.potreeteam] << 1);
     if (user == (uint8_t)row) g.printa = 0x6000;

@@ -481,7 +481,7 @@
 #define SYM_setupice 0x169FAu
 #define SYM_setupice_highlight 0x16BACu
 #define SYM_setupIceRinkPal 0x16C96u
-#define SYM_setupEASNmap 0x16CACu
+#define SYM_setupEASportsMap 0x16CACu
 #define SYM_ReloadEnergyBarTiles 0x16CC4u
 #define SYM_ReloadCrowdTiles 0x16CD2u
 #define SYM_ReloadRefHorTiles 0x16CE0u
@@ -491,7 +491,7 @@
 #define SYM_setupTeamBlocksMap 0x16D18u
 #define SYM_CopyTeamBlockMapData 0x16D64u
 #define SYM_defaultsprites 0x16DA2u
-#define SYM_defaultsprites2 0x16E82u
+#define SYM_defaultsprites_0 0x16E82u
 #define SYM_SprSort 0x1702Eu
 #define SYM_resetplstuff 0x170B0u
 #define SYM_clearTeamStats 0x17102u
@@ -499,27 +499,27 @@
 #define SYM_InitTeamStructure 0x171BEu
 #define SYM_setplayercolors 0x1720Cu
 #define SYM_PeriodOver 0x17236u
-#define SYM_IntermissionStart 0x17278u
+#define SYM_PeriodOver_sp 0x17278u
 #define SYM_GameOver 0x172C8u
 #define SYM_ExitToOpening 0x172E4u
 #define SYM_Opening 0x172F0u
 #define SYM_Opening2 0x172FAu
 #define SYM_Opening3 0x1731Eu
 #define SYM_PlayoffScreen 0x17336u
-#define SYM_HandlePlayoffInput 0x17542u
-#define SYM_UpdatePlayoffScroll 0x17572u
-#define SYM_PlayoffScreenExit 0x175D4u
-#define SYM_PlayoffScreen_waitvsync 0x175D8u
-#define SYM_PrintSeriesScore 0x175FCu
-#define SYM_DrawTreeArrow 0x17626u
-#define SYM_DrawTeamBlocks 0x17652u
+#define SYM_PlayoffScreen_jin 0x17542u
+#define SYM_PlayoffScreen_scrup 0x17572u
+#define SYM_PlayoffScreen_exit 0x175D4u
+#define SYM_waitxc1 0x175D8u
+#define SYM_PlayoffScreen_doscores 0x175FCu
+#define SYM_PlayoffScreen_doarrow 0x17626u
+#define SYM_PlayoffScreen_doteam 0x17652u
 #define SYM_VBlank_Playoff 0x17692u
 #define SYM_InitScoutingDisplay 0x17718u
 #define SYM_UpdateScoutingDisplay 0x17730u
 #define SYM_ScrollDisplayUp 0x179D2u
 #define SYM_EASportsScreen 0x17A18u
 #define SYM_UpdatePlayoffLevel 0x17AC8u
-#define SYM_DrawMatchupBitmaps 0x17AF4u
+#define SYM_TeamIcons 0x17AF4u
 #define SYM_DrawTeamBitmap 0x17B78u
 #define SYM_dotb 0x17B98u
 #define SYM_ClearRosterName 0x17BBAu
@@ -529,7 +529,7 @@
 #define SYM_DefaultMenus 0x17C72u
 #define SYM_ContinuePlayoffs 0x17CA0u
 #define SYM_NewPO 0x17D16u
-#define SYM_maketree 0x17D80u
+#define SYM_MakeTree 0x17D80u
 #define SYM_FigureJoy 0x17E42u
 #define SYM_InitializeGameStructures 0x18002u
 #define SYM_GetRandomUnusedTeam 0x18032u
@@ -3802,7 +3802,7 @@ static const struct SymEntry rom_syms[] = {
     {0x169FAu, "setupice"},
     {0x16BACu, "setupice_highlight"},
     {0x16C96u, "setupIceRinkPal"},
-    {0x16CACu, "setupEASNmap"},
+    {0x16CACu, "setupEASportsMap"},
     {0x16CC4u, "ReloadEnergyBarTiles"},
     {0x16CD2u, "ReloadCrowdTiles"},
     {0x16CE0u, "ReloadRefHorTiles"},
@@ -3812,7 +3812,7 @@ static const struct SymEntry rom_syms[] = {
     {0x16D18u, "setupTeamBlocksMap"},
     {0x16D64u, "CopyTeamBlockMapData"},
     {0x16DA2u, "defaultsprites"},
-    {0x16E82u, "defaultsprites2"},
+    {0x16E82u, "defaultsprites_0"},
     {0x1702Eu, "SprSort"},
     {0x170B0u, "resetplstuff"},
     {0x17102u, "clearTeamStats"},
@@ -3820,27 +3820,27 @@ static const struct SymEntry rom_syms[] = {
     {0x171BEu, "InitTeamStructure"},
     {0x1720Cu, "setplayercolors"},
     {0x17236u, "PeriodOver"},
-    {0x17278u, "IntermissionStart"},
+    {0x17278u, "PeriodOver_sp"},
     {0x172C8u, "GameOver"},
     {0x172E4u, "ExitToOpening"},
     {0x172F0u, "Opening"},
     {0x172FAu, "Opening2"},
     {0x1731Eu, "Opening3"},
     {0x17336u, "PlayoffScreen"},
-    {0x17542u, "HandlePlayoffInput"},
-    {0x17572u, "UpdatePlayoffScroll"},
-    {0x175D4u, "PlayoffScreenExit"},
-    {0x175D8u, "PlayoffScreen_waitvsync"},
-    {0x175FCu, "PrintSeriesScore"},
-    {0x17626u, "DrawTreeArrow"},
-    {0x17652u, "DrawTeamBlocks"},
+    {0x17542u, "PlayoffScreen_jin"},
+    {0x17572u, "PlayoffScreen_scrup"},
+    {0x175D4u, "PlayoffScreen_exit"},
+    {0x175D8u, "waitxc1"},
+    {0x175FCu, "PlayoffScreen_doscores"},
+    {0x17626u, "PlayoffScreen_doarrow"},
+    {0x17652u, "PlayoffScreen_doteam"},
     {0x17692u, "VBlank_Playoff"},
     {0x17718u, "InitScoutingDisplay"},
     {0x17730u, "UpdateScoutingDisplay"},
     {0x179D2u, "ScrollDisplayUp"},
     {0x17A18u, "EASportsScreen"},
     {0x17AC8u, "UpdatePlayoffLevel"},
-    {0x17AF4u, "DrawMatchupBitmaps"},
+    {0x17AF4u, "TeamIcons"},
     {0x17B78u, "DrawTeamBitmap"},
     {0x17B98u, "dotb"},
     {0x17BBAu, "ClearRosterName"},
@@ -3850,7 +3850,7 @@ static const struct SymEntry rom_syms[] = {
     {0x17C72u, "DefaultMenus"},
     {0x17CA0u, "ContinuePlayoffs"},
     {0x17D16u, "NewPO"},
-    {0x17D80u, "maketree"},
+    {0x17D80u, "MakeTree"},
     {0x17E42u, "FigureJoy"},
     {0x18002u, "InitializeGameStructures"},
     {0x18032u, "GetRandomUnusedTeam"},

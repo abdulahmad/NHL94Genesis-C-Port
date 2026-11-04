@@ -772,7 +772,7 @@ void ReplayMode(void)
     g.sflags2 &= (uint16_t)~HI(sf2replay);
     g.disflags = saved;
     ReloadRinkGraphics();
-    setupEASNmap();
+    setupEASportsMap();
     ReloadEnergyBarTiles();
     ReloadCrowdTiles();
     ReloadRefTiles();

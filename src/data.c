@@ -524,10 +524,10 @@ void FigureJoy(void)
     InitializeGameStructures();
 }
 
-/* data94.asm:maketree. The playoff tree (potree): the first round's 16 teams from playoffseats
+/* data94.asm:MakeTree. The playoff tree (potree): the first round's 16 teams from playoffseats
  * row postarts, each later round's winners by WinBits; then this round's games: scores
  * cleared, their teams (in tree order for series games 2, 3 and 5, else flipped), FigureJoy. */
-void maketree(void)
+void MakeTree(void)
 {
     uint8_t *tree = g.potree;
     memcpy(tree, roster_seats[g.postarts & 31], 16);
@@ -558,7 +558,7 @@ void maketree(void)
 
 /* data94.asm:NewPO. New playoffs: a random tree row (from the one after a random one) that holds
  * Team 1 (the all-stars count as the last playoff team), series wins cleared unless
- * best-of-one; falls into maketree. */
+ * best-of-one; falls into MakeTree. */
 void NewPO(void)
 {
     uint16_t row = randomd0(rosters.playoff_rows), d1;
@@ -581,17 +581,17 @@ void NewPO(void)
             g.matchups[n].botwins = 0;
         }
     }
-    maketree();
+    MakeTree();
 }
 
 /* data94.asm:ContinuePlayoffs. The playoff state saved at pwddatabuffer (ReadPassBits); when a
- * game has been played, the tree (maketree) and OptNOP from pojoy (7 or $B - pojoy, pojoy
+ * game has been played, the tree (MakeTree) and OptNOP from pojoy (7 or $B - pojoy, pojoy
  * moved to the pad set-ups). */
 void ContinuePlayoffs(void)
 {
     ReadPassBits(pass_bits(RAM(pwddatabuffer)));
     if ((g.gamelevel | g.bosgames) == 0) return;          /* nothing played yet */
-    maketree();
+    MakeTree();
     uint16_t d0 = g.FourWayPlay ? 0xB : 7;
     if (!g.FourWayPlay) {
         if ((int16_t)g.pojoy >= 2) g.pojoy -= 2;
@@ -737,13 +737,13 @@ void EncodePW(void)
     g.OptPlayMode = 1;                                    /* continue playoffs */
     g.TempOptPlayMode = 1;
     ResolveGames();
-    maketree();
+    MakeTree();
     if (g.gamelevel != 4 && (int16_t)g.gamenum >= 0) {
         WritePassBits(pass_bits(RAM(pwddatabuffer)));
         WriteLineData();
         if (!(g.sflags3 & (1 << sf3alttree))) return;
         ReadPassBits(pass_bits(RAM(tpassbits)));                          /* the bits before the round was settled */
-        maketree();
+        MakeTree();
         return;
     }
     ClrPassBits(pass_bits(RAM(pwddatabuffer)));

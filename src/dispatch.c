@@ -66,7 +66,7 @@ void call68k(uint32_t addr)
 }
 
 /* movea.w #Stack,sp: StartPer and Opening2 restart the program with an empty stack, from
- * however deep the 68k was (IntermissionStart is reached from inside puckfaceoff). The C does
+ * however deep the 68k was (PeriodOver_sp is reached from inside puckfaceoff). The C does
  * the same with a longjmp back to run68k, which then calls the routine. */
 #include <setjmp.h>
 static jmp_buf top;
