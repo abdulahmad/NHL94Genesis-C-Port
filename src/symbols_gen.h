@@ -111,13 +111,13 @@
 #define SYM_ExitStatsScreen 0x9CD8u
 #define SYM_ReloadRinkGraphics 0x9CDCu
 #define SYM_TimeoutMenu 0x9D7Au
-#define SYM_SelectGoalieMenu 0x9DE6u
-#define SYM_DrawGoalieSelectList 0x9E86u
+#define SYM_Pausemode_go 0x9DE6u
+#define SYM_Pausemode_gnum 0x9E86u
 #define SYM_GetGoalieCount 0x9F40u
 #define SYM_GetDefenseStart 0x9F5Cu
 #define SYM_GetForwardCount 0x9F7Eu
 #define SYM_GetPlayerCount 0x9F9Au
-#define SYM_WaitVSyncAndReadInput 0x9FB8u
+#define SYM_Pausemode_rjoy 0x9FB8u
 #define SYM_ReplayMode 0x9FD0u
 #define SYM_getpzjoy 0xA41Eu
 #define SYM_ShowReplayIcon 0xA448u
@@ -3432,13 +3432,13 @@ static const struct SymEntry rom_syms[] = {
     {0x9CD8u, "ExitStatsScreen"},
     {0x9CDCu, "ReloadRinkGraphics"},
     {0x9D7Au, "TimeoutMenu"},
-    {0x9DE6u, "SelectGoalieMenu"},
-    {0x9E86u, "DrawGoalieSelectList"},
+    {0x9DE6u, "Pausemode_go"},
+    {0x9E86u, "Pausemode_gnum"},
     {0x9F40u, "GetGoalieCount"},
     {0x9F5Cu, "GetDefenseStart"},
     {0x9F7Eu, "GetForwardCount"},
     {0x9F9Au, "GetPlayerCount"},
-    {0x9FB8u, "WaitVSyncAndReadInput"},
+    {0x9FB8u, "Pausemode_rjoy"},
     {0x9FD0u, "ReplayMode"},
     {0xA41Eu, "getpzjoy"},
     {0xA448u, "ShowReplayIcon"},

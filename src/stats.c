@@ -97,9 +97,9 @@ void ExitStatsScreen(void)
     ReloadRinkGraphics();
 }
 
-/* stats94.asm:WaitVSyncAndReadInput. Wait for the next vblank and a new button press -> d1 (and
+/* stats94.asm:Pausemode_rjoy. Wait for the next vblank and a new button press -> d1 (and
  * the other pad words). */
-uint16_t WaitVSyncAndReadInput(uint16_t *d0, uint16_t *d2, uint16_t *d3)
+uint16_t Pausemode_rjoy(uint16_t *d0, uint16_t *d2, uint16_t *d3)
 {
     uint16_t d1;
     do {
@@ -1291,7 +1291,7 @@ void CrowdMeterScreen(void)
     PrintCrowdMeter();
     for (;;) {
         uint16_t d0, d2, d3;
-        if (WaitVSyncAndReadInput(&d0, &d2, &d3) & 0x80) break;
+        if (Pausemode_rjoy(&d0, &d2, &d3) & 0x80) break;
     }
     ExitStatsScreen();
 }
@@ -1348,22 +1348,22 @@ void TimeoutMenu(struct Team *tm)
     waitx(0x78, &d0, &d1, &d2, &d3);
 }
 
-/* stats94.asm:SelectGoalieMenu. Change Goalie for team a2 (a menu item): its goalies (or none)
- * listed (DrawGoalieSelectList); up / down, then C or Start: the goalie ($26 of the team struct,
+/* stats94.asm:Pausemode_go. Change Goalie for team a2 (a menu item): its goalies (or none)
+ * listed (Pausemode_gnum); up / down, then C or Start: the goalie ($26 of the team struct,
  * SetPersonel). The menu's state kept. */
-void SelectGoalieMenu(struct Team *tm)
+void Pausemode_go(struct Team *tm)
 {
     struct MenuPos *mi = &g.menu, kept = *mi;
     mi->top = GetGoalieCount(tm);                         /* (the last row: the goalies after "no goalie") */
-    printz(str_SelectGoalieMenu_1, sizeof str_SelectGoalieMenu_1);
+    printz(str_Pausemode_go_1, sizeof str_Pausemode_go_1);
     Framer(0x18, (uint16_t)(3 + mi->top));
     int16_t cur = (int16_t)tm->goalie;
     if (cur < 0) cur = -1;
     mi->item = (uint16_t)(cur + 1);
     for (;;) {
-        DrawGoalieSelectList(tm);
+        Pausemode_gnum(tm);
         uint16_t d0, d2, d3, d1;
-        d1 = WaitVSyncAndReadInput(&d0, &d2, &d3);
+        d1 = Pausemode_rjoy(&d0, &d2, &d3);
         if (d1 & 0xA0) break;
         if (d1 & 2) {
             uint16_t n = (uint16_t)(mi->item + 1);
@@ -1383,9 +1383,9 @@ void SelectGoalieMenu(struct Team *tm)
     *mi = kept;
 }
 
-/* stats94.asm:DrawGoalieSelectList. The goalie list from row $D: "no goalie", then each goalie's
+/* stats94.asm:Pausemode_gnum. The goalie list from row $D: "no goalie", then each goalie's
  * number and name, row menuitem highlighted. */
-void DrawGoalieSelectList(struct Team *tm)
+void Pausemode_gnum(struct Team *tm)
 {
     const struct MenuPos *mi = &g.menu;
     g.printy = 0xD;
@@ -1393,10 +1393,10 @@ void DrawGoalieSelectList(struct Team *tm)
     for (uint16_t n = 0; rows >= 0; rows--, n++) {
         g.printx = 5;
         g.printa = n == mi->item ? 0x8000 : 0xA000;
-        printz(str_DrawGoalieSelectList_1, sizeof str_DrawGoalieSelectList_1);
+        printz(str_Pausemode_gnum_1, sizeof str_Pausemode_gnum_1);
         if (n == 0) {
             g.printx = 0xB;
-            printz(str_DrawGoalieSelectList_2, sizeof str_DrawGoalieSelectList_2);
+            printz(str_Pausemode_gnum_2, sizeof str_Pausemode_gnum_2);
         } else {
             const struct RosterPlayer *P = &rosters_team(tm->team)->player[n - 1];
             g.printx = 8;

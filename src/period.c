@@ -338,7 +338,7 @@ void PeriodStatsScreen(void)
     g.palcount = 0x18;
     for (;;) {
         uint16_t d0, d2, d3;
-        uint16_t d1 = WaitVSyncAndReadInput(&d0, &d2, &d3);
+        uint16_t d1 = Pausemode_rjoy(&d0, &d2, &d3);
         if (d1 & 0x80) break;
         if (d1 & 4) {
             if (!g.matchup) continue;

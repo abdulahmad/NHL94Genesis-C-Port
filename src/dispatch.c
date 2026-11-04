@@ -12,7 +12,7 @@ static void player_stats(void) { PlayerStatsScreen(seta2()); }
 static void line_editor(void) { LineEditor(seta2()); }
 static void team_roster(void) { TeamRosterScreen(seta2()); }
 static void timeout_menu(void) { TimeoutMenu(seta2()); }
-static void select_goalie(void) { SelectGoalieMenu(seta2()); }
+static void select_goalie(void) { Pausemode_go(seta2()); }
 static void shootout_shooters(void) { ShootoutShooters(seta2()); }
 static void encode_lines(void) { EncodeTeamLines(seta2()); }
 static void decode_lines(void) { DecodeTeamLines(seta2()); }
@@ -27,7 +27,7 @@ static const struct { uint32_t addr; void (*fn)(void); } routines[] = {
     { SYM_LineEditor, line_editor },
     { SYM_TeamRosterScreen, team_roster },
     { SYM_TimeoutMenu, timeout_menu },
-    { SYM_SelectGoalieMenu, select_goalie },
+    { SYM_Pausemode_go, select_goalie },
     { SYM_ShootoutShooters, shootout_shooters },
     { SYM_EncodeTeamLines, encode_lines },
     { SYM_DecodeTeamLines, decode_lines },

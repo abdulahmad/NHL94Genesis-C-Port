@@ -917,7 +917,7 @@ uint16_t GetGoalieCount(struct Team *team);             /* a2 -> d0 */
 void ReloadRinkGraphics(void);
 uint16_t SetupScreen(uint16_t row, uint16_t rows);      /* d0, d1 -> d4 */
 void ExitStatsScreen(void);                             /* falls into ReloadRinkGraphics */
-uint16_t WaitVSyncAndReadInput(uint16_t *d0, uint16_t *d2, uint16_t *d3);   /* -> d1 */
+uint16_t Pausemode_rjoy(uint16_t *d0, uint16_t *d2, uint16_t *d3);   /* -> d1 */
 void PlayoffStatsScreen(void);                          /* the player stats lists */
 void PlayerStatsScreen(struct Team *tm);                /* a2 */
 void PlayerStatsList(struct Team *tm, int playoff);     /* a2, d7 */
@@ -988,8 +988,8 @@ void CrowdMeterScreen(void);
 void PrintCrowdMeter(void);
 void PrintCrowdDB(uint16_t level);                      /* d0 */
 void TimeoutMenu(struct Team *tm);                      /* a2 */
-void SelectGoalieMenu(struct Team *tm);                 /* a2 */
-void DrawGoalieSelectList(struct Team *tm);
+void Pausemode_go(struct Team *tm);                 /* a2 */
+void Pausemode_gnum(struct Team *tm);
 uint16_t GetDefenseStart(struct Team *tm);              /* a2 -> d0 */
 uint16_t GetForwardCount(struct Team *tm);              /* a2 -> d0 */
 

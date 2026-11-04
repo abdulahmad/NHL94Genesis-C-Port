@@ -510,7 +510,7 @@ static void run_ReloadRefTiles(const Record *r) { expect_reg16(r, R_D4, ReloadRe
 static void run_ReloadFaceOffTiles(const Record *r) { expect_reg16(r, R_D4, ReloadFaceOffTiles(), "d4"); }
 static void run_ReloadFaceOffMap(const Record *r) { expect_reg16(r, R_D4, ReloadFaceOffMap(), "d4"); }
 static void run_SetupScreen(const Record *r) { expect_reg16(r, R_D4, SetupScreen(R16(R_D0), R16(R_D1)), "d4"); }
-static void run_WaitVSyncAndReadInput(const Record *r) { uint16_t d0, d2, d3; expect_reg16(r, R_D1, WaitVSyncAndReadInput(&d0, &d2, &d3), "d1"); }
+static void run_Pausemode_rjoy(const Record *r) { uint16_t d0, d2, d3; expect_reg16(r, R_D1, Pausemode_rjoy(&d0, &d2, &d3), "d1"); }
 static void run_PlayerRecordIO(const Record *r) { PlayerRecordIO(r->regs_in[R_D0], R16(R_D1), r->regs_in[R_A0]); }
 static void run_ReadPlayerRecord(const Record *r) { ReadPlayerRecord(r->regs_in[R_D0], R16(R_D1), r->regs_in[R_A0]); }
 static void run_WritePlayerRecord(const Record *r) { WritePlayerRecord(r->regs_in[R_D0], R16(R_D1), r->regs_in[R_A0]); }
@@ -767,8 +767,8 @@ static void run_CrowdMeterScreen(const Record *r) { CrowdMeterScreen(); }
 static void run_PrintCrowdMeter(const Record *r) { PrintCrowdMeter(); }
 static void run_PrintCrowdDB(const Record *r) { PrintCrowdDB(R16(R_D0)); }
 static void run_TimeoutMenu(const Record *r) { TimeoutMenu(TEAM(R_A2)); }
-static void run_SelectGoalieMenu(const Record *r) { SelectGoalieMenu(TEAM(R_A2)); }
-static void run_DrawGoalieSelectList(const Record *r) { DrawGoalieSelectList(TEAM(R_A2)); }
+static void run_Pausemode_go(const Record *r) { Pausemode_go(TEAM(R_A2)); }
+static void run_Pausemode_gnum(const Record *r) { Pausemode_gnum(TEAM(R_A2)); }
 static void run_GetDefenseStart(const Record *r) { expect_reg16(r, R_D0, GetDefenseStart(TEAM(R_A2)), "d0"); }
 static void run_GetForwardCount(const Record *r) { expect_reg16(r, R_D0, GetForwardCount(TEAM(R_A2)), "d0"); }
 static void run_PlayerCards(const Record *r) { PlayerCards(); }
@@ -1357,7 +1357,7 @@ const Port ports[] = {
     { SYM_ReloadFaceOffTiles, "ReloadFaceOffTiles", run_ReloadFaceOffTiles },
     { SYM_ReloadFaceOffMap, "ReloadFaceOffMap", run_ReloadFaceOffMap },
     { SYM_SetupScreen, "SetupScreen", run_SetupScreen },
-    { SYM_WaitVSyncAndReadInput, "WaitVSyncAndReadInput", run_WaitVSyncAndReadInput },
+    { SYM_Pausemode_rjoy, "Pausemode_rjoy", run_Pausemode_rjoy },
     { SYM_PlayerRecordIO, "PlayerRecordIO", run_PlayerRecordIO },
     { SYM_ReadPlayerRecord, "ReadPlayerRecord", run_ReadPlayerRecord },
     { SYM_WritePlayerRecord, "WritePlayerRecord", run_WritePlayerRecord },
@@ -1592,8 +1592,8 @@ const Port ports[] = {
     { SYM_PrintCrowdMeter, "PrintCrowdMeter", run_PrintCrowdMeter },
     { SYM_PrintCrowdDB, "PrintCrowdDB", run_PrintCrowdDB },
     { SYM_TimeoutMenu, "TimeoutMenu", run_TimeoutMenu },
-    { SYM_SelectGoalieMenu, "SelectGoalieMenu", run_SelectGoalieMenu },
-    { SYM_DrawGoalieSelectList, "DrawGoalieSelectList", run_DrawGoalieSelectList },
+    { SYM_Pausemode_go, "Pausemode_go", run_Pausemode_go },
+    { SYM_Pausemode_gnum, "Pausemode_gnum", run_Pausemode_gnum },
     { SYM_GetDefenseStart, "GetDefenseStart", run_GetDefenseStart },
     { SYM_GetForwardCount, "GetForwardCount", run_GetForwardCount },
     { SYM_PlayerCards, "PlayerCards", run_PlayerCards },

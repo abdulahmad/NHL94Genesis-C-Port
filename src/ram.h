@@ -395,7 +395,7 @@ _Static_assert(offsetof(struct Voice, volume) == 0x004, "Voice volume");
 /* a menu's state */
 struct RAM_PACKED MenuPos {
     uint16_t item;  /* the item chosen */
-    uint16_t top;  /* the first shown (SelectGoalieMenu: the last, its goalies) */
+    uint16_t top;  /* the first shown (Pausemode_go: the last, its goalies) */
 };
 _Static_assert(sizeof(struct MenuPos) == 0x4, "MenuPos size");
 _Static_assert(offsetof(struct MenuPos, item) == 0x000, "MenuPos item");
