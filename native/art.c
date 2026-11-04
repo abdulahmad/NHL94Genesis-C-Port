@@ -347,7 +347,7 @@ int art_banners(const struct romsrc *s, int t, uint8_t px[ART_BANNER_H * ART_BAN
     pal[ART_BANNER_SETUP + 2] = rs16(s, tp + 4);
     pal[ART_BANNER_SETUP + 3] = rs16(s, tp + 0x26);       /* (as the visitors: 1 and 2 shown as 3 and 4) */
     pal[ART_BANNER_SETUP + 4] = rs16(s, tp + 0x28);
-    pal[ART_BANNER_SETUP + 5] = 0xEEE;                    /* (DrawMatchupBitmaps' white) */
+    pal[ART_BANNER_SETUP + 5] = 0xEEE;                    /* (TeamIcons' white) */
     return 0;
 }
 

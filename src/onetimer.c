@@ -47,7 +47,7 @@ void OneTimerPass(struct SortObj *o)
 {
     uint32_t d0 = (uint32_t)0xC * g.onetimerheight;
     d0 = (d0 & 0xFFFF) << 16;
-    uint16_t vz = sroot(d0);
+    uint16_t vz = Sroot(d0);
     g.puckvz[0] = vz;
     uint32_t q = m68k_divu((uint32_t)(int32_t)(int16_t)vz, 3);
     int16_t t = (int16_t)q;

@@ -127,7 +127,7 @@ void ShootoutShooters(struct Team *tm)
         PrintShooterNames(tm);
         PrintShooterBox(tm);
         for (;;) {                                        /* ShootersLoop */
-            vcountwait();
+            MenuWaitVblank();
             uint16_t d0, d1, d2, d3;
             getpzjoy(&d0, &d1, &d2, &d3);
             ProcessInputWithRepeat(&d1, d2, d3);
@@ -204,7 +204,7 @@ void ShooterSelectList(struct Team *tm)
             }
         }
         for (;;) {
-            vcountwait();
+            MenuWaitVblank();
             uint16_t d0, d1, d2, d3;
             getpzjoy(&d0, &d1, &d2, &d3);
             ProcessInputWithRepeat(&d1, d2, d3);

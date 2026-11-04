@@ -247,16 +247,16 @@ void InProgress(void)
         USBoard();
         return;
     }
-    coinsearch(team_struct(0));
-    coinsearch(team_struct(1));
+    InProgress_ap(team_struct(0));
+    InProgress_ap(team_struct(1));
     g.gmode &= (uint8_t)~(1 << gmpen);
     g.BA_PS_flags &= (uint16_t)~HI(6);
     assreplace((g.BA_PS_flags & HI(3)) ? 0x1E : 0x1B, sortobj(puckscnum));   /* puckshootout / puckfaceoff */
 }
 
-/* penalty94.asm:coinsearch. a2 = team. Clears tmpdst bit 5, counts the players kept off the
+/* penalty94.asm:InProgress_ap. a2 = team. Clears tmpdst bit 5, counts the players kept off the
  * ice by penalties (coincidental and bit 4 times do not count, at most 2) and sets tmap. */
-void coinsearch(struct Team *tm)
+void InProgress_ap(struct Team *tm)
 {
     uint16_t d1 = 6;
     for (int16_t d0 = 0x32; d0 >= 0; d0 -= 2) {
@@ -533,8 +533,8 @@ void updatepentime(void)
     g.sflags3 |= 0x40;
     chkatop();
     updatePPTeamTime();
-    ProcessPenaltyList(team_struct(0));
-    ProcessPenaltyList(team_struct(1));
+    updatepentime_ut(team_struct(0));
+    updatepentime_ut(team_struct(1));
 }
 
 /* a player's box time is 5 seconds or less: beep, and release him at 0 */
@@ -549,11 +549,11 @@ static void penbox_check(struct Team *tm, uint16_t d0)
     sfx(snd);
 }
 
-/* penalty94.asm:ProcessPenaltyList. a2 = team. Walk the penalty box list: the first two
+/* penalty94.asm:updatepentime_ut. a2 = team. Walk the penalty box list: the first two
  * players without a coincidental penalty count down one second and the rest wait; beep when
  * the first served time gets to 5 or less and release the player at 0. Coincidental penalties
  * count down on their own. */
-void ProcessPenaltyList(struct Team *tm)
+void updatepentime_ut(struct Team *tm)
 {
     uint8_t *a0 = tm->penbox;
     uint8_t *a1 = g.mesarea;                              /* the serving players (the message area as scratch) */
@@ -759,20 +759,20 @@ void printscores1(void)
     uint16_t d0 = g.gsp;
     uint32_t list = SYM_PerLabels;
     if (g.gmode2 & HI(1)) { d0 = 4; list = SYM_PerLabels2; }
-    PrintStringFromList(list, d0);
+    Fprintsmall(list, d0);
     EASNLogo();
     if (g.sflags3 & (1 << sf3llcs)) return;               /* the lower line change box is up */
     printz(str_printscores1_3, sizeof str_printscores1_3);
     Framer(8, 5);
     printz(str_printscores1_4, sizeof str_printscores1_4);
-    PrintTeamNameAndScore(team_struct(0));
+    printscores1_ps(team_struct(0));
     printz(str_printscores1_5, sizeof str_printscores1_5);
-    PrintTeamNameAndScore(team_struct(1));
+    printscores1_ps(team_struct(1));
 }
 
-/* penalty94.asm:PrintTeamNameAndScore. The abbreviation of team a2 at printx / printy, then its
+/* penalty94.asm:printscores1_ps. The abbreviation of team a2 at printx / printy, then its
  * score as 2 digits at x $1C. */
-void PrintTeamNameAndScore(struct Team *tm)
+void printscores1_ps(struct Team *tm)
 {
     print_p(roster_text(&rosters_team(tm->team)->abbr));
     g.printx = 0x1C;
@@ -1106,7 +1106,7 @@ void NewTicker3(int16_t d3, const struct Matchup *gs)
     g.printx = x;
     d0 = (uint16_t)(1 + g.gamelevel);
     if (g.OptPlayMode == 0) d0 = 0;                       /* not the playoffs: 'EA Hockey Night' */
-    PrintStringFromList(SYM_GameLabels, d0);
+    Fprintsmall(SYM_GameLabels, d0);
     uint32_t a1 = AdvanceStringPtr(SYM_PerLabels, (uint16_t)(gs->per - 1));
     d0 = rd16(rom_ptr(a1)) >> 1;                          /* the period name centered on x + $17 */
     g.printx = (uint16_t)(x + 0x17 - d0);
@@ -1134,8 +1134,8 @@ void SetTickerAreaPosition(uint16_t *d0, uint16_t *d1)
     *d1 = 5;
 }
 
-/* penalty94.asm:PrintStringFromList. Print string d0 of the String list a1 with printsmall. */
-void PrintStringFromList(uint32_t list, uint16_t n)
+/* penalty94.asm:Fprintsmall. Print string d0 of the String list a1 with printsmall. */
+void Fprintsmall(uint32_t list, uint16_t n)
 {
     printsmall(AdvanceStringPtr(list, n));
 }
@@ -1289,7 +1289,7 @@ void StartHL2(struct Matchup *gs, int16_t game)
         setplayercolors();
         SetHor();
         setvideo();
-        SetupPauseScreen();
+        Pausemode_pall();
         DrawMenuScreen();
         g.palcount = 0x18;
         song(SYM_SngEOG);
@@ -1347,7 +1347,7 @@ void Intermission(void)
     uint32_t items = sslist[list];
     if (g.gmode2 & HI(0)) items = SYM_ShootoutIntermissionMenu;
     g.sflags |= HI(sfpz);
-    InitMenuState(items, SYM_SetupPauseScreen);
+    Pausemode_top(items, SYM_Pausemode_pall);
     uint16_t d1;
     g.TickerNum = GetShifter(NULL);
     int skip = 0;

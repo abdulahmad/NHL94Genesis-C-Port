@@ -124,7 +124,7 @@ static void run_ChkOffsides(const Record *r) { ChkOffsides(D16(R_D0), OBJ(R_A3))
 static void run_ClearOffsidesIfAllPlayers(const Record *r) { int16_t d0 = D16(R_D0); ClearOffsidesIfAllPlayers(TEAM(R_A2), &d0); expect_reg16(r, R_D0, (uint16_t)d0, "d0"); }
 static void run_a2offsides(const Record *r) { a2offsides(OBJ(R_A2), OBJ(R_A3)); }
 static void run_a2touchpuck(const Record *r) { a2touchpuck(OBJ(R_A2), OBJ(R_A3)); }
-static void run_puckIChk(const Record *r) { expect_reg16(r, R_D0, (uint16_t)puckIChk(D16(R_D0)), "d0"); }
+static void run_PuckIChk(const Record *r) { expect_reg16(r, R_D0, (uint16_t)PuckIChk(D16(R_D0)), "d0"); }
 static void run_puckflip(const Record *r) { puckflip(D16(R_D0), OBJ(R_A3)); }
 static void run_skateto(const Record *r) { skateto(D16(R_D0), D16(R_D1), aux_from(r->regs_in[R_A0]), OBJ(R_A3)); }
 static void run_avdgoal(const Record *r)
@@ -181,11 +181,11 @@ O(doinput_chkanim)
 static void run_doinput_onetimer(const Record *r) { doinput_onetimer((uint16_t)r->regs_in[R_D1], D16(R_D4), OBJ(R_A3)); }
 static void run_doinput_ispc(const Record *r) { doinput_ispc((uint16_t)r->regs_in[R_D0], (uint16_t)r->regs_in[R_D1], (uint16_t)r->regs_in[R_D2], (uint16_t)r->regs_in[R_D3], D16(R_D4), OBJ(R_A3)); }
 static void run_doinput_islocked(const Record *r) { doinput_islocked((uint16_t)r->regs_in[R_D1], D16(R_D4), OBJ(R_A3)); }
-O(setpassmode) O(holdplayer) O(prepshot) O(doshot) O(shotdiradj)
+O(setpassmode) O(Holdplayer) O(prepshot) O(doshot) O(shotdiradj)
 static void run_passmode(const Record *r) { passmode((uint16_t)r->regs_in[R_D0], (uint16_t)r->regs_in[R_D2], OBJ(R_A3)); }
 static void run_faceoffinput(const Record *r) { faceoffinput((uint16_t)r->regs_in[R_D0], (uint16_t)r->regs_in[R_D1], OBJ(R_A3)); }
 static void run_lineinput(const Record *r) { lineinput((uint16_t)r->regs_in[R_D0], (uint16_t)r->regs_in[R_D1], (uint16_t)r->regs_in[R_D2], OBJ(R_A3)); }
-static void run_lcfound2(const Record *r) { lcfound2(TEAM(R_A2)); }
+static void run_lcfound_close(const Record *r) { lcfound_close(TEAM(R_A2)); }
 static void run_setlccords(const Record *r) { uint16_t d0, d1; setlccords(TEAM(R_A2), &d0, &d1); expect_reg16(r, R_D0, d0, "d0"); expect_reg16(r, R_D1, d1, "d1"); }
 static void run_getlchoice2(const Record *r) { expect_reg16(r, R_D0, (uint16_t)getlchoice2(D16(R_D0), D16(R_D2), TEAM(R_A2)), "d0"); }
 static void run_passto(const Record *r) { passto(OBJ(R_A0), OBJ(R_A3)); }
@@ -201,17 +201,17 @@ V(ClearPenaltyBuffer) V(updatepentime) V(chkatop) V(updatepwrplay) V(ClrHor) V(S
 V(ChkShotStat) V(SetupTeamForIntermission) V(InitScores) V(UpdateScores) V(ClearTickerArea)
 static void run_PenShotChk(const Record *r) { expect_reg16(r, R_D0, PenShotChk((uint16_t)r->regs_in[R_D0], OBJ(R_A2), OBJ(R_A3)), "d0"); }
 static void run_getBAplayerInfo(const Record *r) { uint8_t ccr = getBAplayerInfo((uint16_t)r->regs_in[R_D0], OBJ(R_A3)); if ((ccr & CCR_N) != (r->regs_out[R_SR] & CCR_N)) printf("    N flag: got %d, 68k %d\n", !!(ccr & CCR_N), !!(r->regs_out[R_SR] & CCR_N)); }
-static void run_coinsearch(const Record *r) { coinsearch(TEAM(R_A2)); }
+static void run_InProgress_ap(const Record *r) { InProgress_ap(TEAM(R_A2)); }
 static void run_Stop4Pen(const Record *r) { Stop4Pen(r->regs_in[R_A0], OBJ(R_A3)); }
 static void run_SetPA(const Record *r) { SetPA((uint16_t)r->regs_in[R_D0]); }
 static void run_PushRef(const Record *r) { PushRef((uint16_t)r->regs_in[R_D0]); }
 static void run_prefmes(const Record *r) { prefmes(D16(R_D0)); }
 static void run_PenGoalStuff(const Record *r) { PenGoalStuff(TEAM(R_A1), TEAM(R_A2)); }
-static void run_ProcessPenaltyList(const Record *r) { ProcessPenaltyList(TEAM(R_A2)); }
+static void run_updatepentime_ut(const Record *r) { updatepentime_ut(TEAM(R_A2)); }
 static void run_RemovePlayerFromList(const Record *r) { uint8_t *a0 = RemovePlayerFromList(BYTES_AT(R_A0)); expect_reg16(r, R_A0, (uint16_t)(a0 - (uint8_t *)&g), "a0"); }
 static void run_releasepl(const Record *r) { releasepl(TEAM(R_A2), (uint16_t)r->regs_in[R_D0]); }
 static void run_GetLowestPen(const Record *r) { expect_reg16(r, R_D0, GetLowestPen(TEAM(R_A2), TEAM(R_A3)), "d0"); }
-static void run_PrintTeamNameAndScore(const Record *r) { PrintTeamNameAndScore(TEAM(R_A2)); }
+static void run_printscores1_ps(const Record *r) { printscores1_ps(TEAM(R_A2)); }
 static void run_PrintTeamLogoAndScore(const Record *r) { PrintTeamLogoAndScore(TEAM(R_A2), (uint16_t)r->regs_in[R_D0]); }
 static void run_pplpen(const Record *r) { pplpen(TEAM(R_A2), (uint16_t)r->regs_in[R_D0]); }
 static void run_linebar(const Record *r) { linebar((uint16_t)r->regs_in[R_D0], TEAM(R_A2)); }
@@ -225,7 +225,7 @@ static void run_NewTicker2(const Record *r) { struct Matchup *gs = NULL; expect_
 static void run_CheckGameTickerStatus(const Record *r) { struct Matchup *gs = NULL; expect_reg16(r, R_D3, (uint16_t)CheckGameTickerStatus(D16(R_D3), &gs), "d3"); if (gs) expect_reg16(r, R_A0, (uint16_t)rp_addr(ram_place(gs)), "a0"); }
 static void run_NewTicker3(const Record *r) { NewTicker3(D16(R_D3), MATCHUP(R_A0)); }
 static void run_SetTickerAreaPosition(const Record *r) { uint16_t d0, d1; SetTickerAreaPosition(&d0, &d1); expect_reg16(r, R_D0, d0, "d0"); expect_reg16(r, R_D1, d1, "d1"); }
-static void run_PrintStringFromList(const Record *r) { PrintStringFromList(r->regs_in[R_A1], (uint16_t)r->regs_in[R_D0]); }
+static void run_Fprintsmall(const Record *r) { Fprintsmall(r->regs_in[R_A1], (uint16_t)r->regs_in[R_D0]); }
 static void run_AdvanceStringPtr(const Record *r) { uint32_t a1 = AdvanceStringPtr(r->regs_in[R_A1], (uint16_t)r->regs_in[R_D0]); if (a1 != r->regs_out[R_A1]) printf("    a1: got %06x, 68k %06x\n", a1, r->regs_out[R_A1]); }
 
 /* ---- goalie94, onetimer94, crowd94 ---- */
@@ -252,10 +252,10 @@ static void run_CompareHotColdTotals(const Record *r) { expect_reg16(r, R_D0, Co
 static void run_GetHotColdTotal(const Record *r) { expect_reg16(r, R_D1, GetHotColdTotal(TEAM(R_A0)), "d1"); }
 
 /* ---- period94, hockey94, display94 ---- */
-V(EndShootout) V(ClearGameStats) V(SetStatScroll) V(PrintStatScrollArrows) V(DisplayTeamStatsScreen) V(updatePPTeamTime)
+V(EndShootout) V(ClearGameStats) V(SetStatScroll) V(PrintStatScrollArrows) V(DisplayStats) V(updatePPTeamTime)
 V(ClearShotData) V(restoreteams) V(ResetClock) V(periodicevents) V(CheckInjury) V(RestoreBenchEnergy) V(CheckLateGameSong)
 V(UpdateCwdExcite) V(updatecrowdf) V(clockcont) V(clockcont_0) V(demoread) V(startpause) V(startpause1) V(startpause2) V(startpause3)
-V(startpause4) V(SetupPauseScreen) V(updatesound) V(KillCrowd)
+V(startpause4) V(Pausemode_pall) V(updatesound) V(KillCrowd)
 O(ClampPositionBox) O(ShortenMsgTimer)
 static void run_AddArenaAnimSprite(const Record *r) { uint8_t *sat = ram_bytes(ram_at(r->regs_in[R_A6]), 0); uint16_t link = (uint16_t)r->regs_in[R_D6]; AddArenaAnimSprite(&sat, &link); expect_reg16(r, R_A6, (uint16_t)ram_addr(sat), "a6"); expect_reg16(r, R_D6, link, "d6"); }
 static void run_PrintPlayerNameRight(const Record *r) { PrintPlayerNameRight((uint16_t)r->regs_in[R_D0], TEAM(R_A2)); }
@@ -276,14 +276,14 @@ static void run_VBlank(const Record *r) { VBlank(); }
 static void run_vb2(const Record *r) { vb2(); }
 static void run_DumpSprites(const Record *r) { DumpSprites(); }
 static void run_DumpSprites2(const Record *r) { DumpSprites2(); }
-static void run_DoDMAList(const Record *r) { DoDMAList(); }
+static void run_dodmalist(const Record *r) { dodmalist(); }
 static void run_SetScroll2(const Record *r) { SetScroll2(); }
 static void run_setvideo(const Record *r) { setvideo(); }
 VID_RUN(updatescroll) VID_RUN(showref) VID_RUN(checkfo) VID_RUN(showzam) VID_RUN(showcrowd) VID_RUN(showclock)
 VID_RUN(checksso) VID_RUN(setsortcords) VID_RUN(setffo) VID_RUN(uppads)
 static void run_SetSframe(const Record *r) { VID_IN(v); SetSframe(r->regs_in[R_A0], D16(R_D0), D16(R_D1), (uint16_t)r->regs_in[R_D2], (uint16_t)r->regs_in[R_D3], &v); VID_OUT(v); }
 static void run_QueuePadLabel(const Record *r) { VID_IN(v); QueuePadLabel((uint16_t)r->regs_in[R_D1], RINK(R_A0), &v); VID_OUT(v); }
-static void run_RenderSmallFontChar(const Record *r) { VID_IN(v); RenderSmallFontChar((uint16_t)r->regs_in[R_D2], (uint16_t)r->regs_in[R_D0], RINK(R_A0), &v); VID_OUT(v); }
+static void run_uppads_pd(const Record *r) { VID_IN(v); uppads_pd((uint16_t)r->regs_in[R_D2], (uint16_t)r->regs_in[R_D0], RINK(R_A0), &v); VID_OUT(v); }
 static void run_addframe(const Record *r) { VID_IN(v); addframe(RINK(R_A3), &v); VID_OUT(v); }
 static void run_addframe2(const Record *r) { VID_IN(v); addframe2(D16(R_D0), D16(R_D1), RAM_AT(struct SpriteHead, PLACE(R_A3)), &v); VID_OUT(v); }
 static void run_find3d(const Record *r) { int16_t d0 = D16(R_D0), d1 = D16(R_D1); find3d(&d0, &d1, D16(R_D2)); expect_reg16(r, R_D0, (uint16_t)d0, "d0"); expect_reg16(r, R_D1, (uint16_t)d1, "d1"); }
@@ -313,7 +313,7 @@ static uint16_t stack_word(const Record *r, int off) { const uint8_t *sp = r->ra
 static uint32_t ret_addr(const Record *r) { const uint8_t *sp = r->ram_in + (r->regs_in[R_A7] & 0xFFFF); return be32(sp); }
 static const uint8_t *inline_string(const Record *r) { return rom_ptr(ret_addr(r)); }   /* (the code after the call: the cartridge) */
 static void run_randomd0s(const Record *r) { expect_reg16(r, R_D0, randomd0s(R16(R_D0)), "d0"); }
-static void run_sroot(const Record *r) { expect_reg16(r, R_D0, sroot(r->regs_in[R_D0]), "d0"); }
+static void run_Sroot(const Record *r) { expect_reg16(r, R_D0, Sroot(r->regs_in[R_D0]), "d0"); }
 static void run_sfx(const Record *r) { sfx((int16_t)stack_word(r, 4)); }
 static void run_song(const Record *r) { song((int16_t)stack_word(r, 4)); }
 static void run_UnpackNibbles(const Record *r) { UnpackNibbles(r->regs_in[R_A0], R16(R_D0)); }
@@ -339,7 +339,7 @@ static void run_dobitmap(const Record *r)
 {
     expect_reg16(r, R_D4, dobitmap(r->regs_in[R_A0], r->regs_in[R_A1], r->regs_in[R_A2], R16(R_D0), R16(R_D1), R16(R_D2), R16(R_D3), R16(R_D4), R16(R_D5)), "d4");
 }
-static void run_DecompressGraphicsWithCallback(const Record *r) { expect_reg16(r, R_D4, DecompressGraphicsWithCallback(r->regs_in[R_A2], R16(R_D4), ret_addr(r)), "d4"); }
+static void run_DecompressGraphicsWithRemap(const Record *r) { expect_reg16(r, R_D4, DecompressGraphicsWithRemap(r->regs_in[R_A2], R16(R_D4), ret_addr(r)), "d4"); }
 static void run_DecompressGraphicsPlain(const Record *r) { expect_reg16(r, R_D4, DecompressGraphicsPlain(r->regs_in[R_A2], R16(R_D4)), "d4"); }
 static void run_DecompressGraphics(const Record *r) { expect_reg16(r, R_D4, DecompressGraphics(r->regs_in[R_A2], R16(R_D4)), "d4"); }
 static void run_DecompressBytecode(const Record *r) { DecompressBytecode(r->regs_in[R_A0], R16(R_D1)); }
@@ -350,7 +350,7 @@ static void unpack_out(const Record *r, const struct Unpack *u, int done)
     expect_reg16(r, R_A0, (uint16_t)u->src, "a0"); expect_reg16(r, R_D1, u->idx, "d1"); expect_reg16(r, R_D3, u->vram, "d3");
 }
 #define OP(name) static void run_##name(const Record *r) { struct Unpack u = unpack_in(r); int done = name(&u); unpack_out(r, &u, done); }
-OP(Opcode_CopyLiteral) OP(Opcode_ClearBytes) OP(Opcode_Fillbytes) OP(Opcode_CopyBackwardShort) OP(Opcode_CopyBackwardMedium)
+OP(Opcode_CopyLiteral) OP(Opcode_ClearBytes) OP(Opcode_FillBytes) OP(Opcode_CopyBackwardShort) OP(Opcode_CopyBackwardMedium)
 OP(Opcode_CopyBackwardLong) OP(Opcode_CopyBackwardExtended1) OP(Opcode_CopyBackwardExtended2) OP(Opcode_CopyBackwardReverseShort)
 OP(Opcode_CopyBackwardReverseMedium) OP(Opcode_CopyBackwardReverseLong)
 static void run_CopyBackwardRun(const Record *r) { struct Unpack u = unpack_in(r); CopyBackwardRun(&u, R16(R_D0), (uint8_t)r->regs_in[R_D2]); unpack_out(r, &u, 0); }
@@ -457,13 +457,13 @@ static void run_ReloadCrowdTiles(const Record *r) { expect_reg16(r, R_D4, Reload
 static void run_NextShooter(const Record *r) { NextShooter(OBJ(R_A3)); }
 static void run_Set4WayPlayerStub(const Record *r) { Set4WayPlayerStub(OBJ(R_A3)); }
 static void run_PrintMenuItem(const Record *r) { expect_reg16(r, R_A1, (uint16_t)PrintMenuItem(r->regs_in[R_A1]), "a1"); }
-static void run_UpdateMenuSelection(const Record *r) { expect_reg16(r, R_D1, UpdateMenuSelection(), "d1"); }
+static void run_Pausemode_Pmenu(const Record *r) { expect_reg16(r, R_D1, Pausemode_Pmenu(), "d1"); }
 static void run_DrawMenuScreen(const Record *r) { expect_reg16(r, R_D1, DrawMenuScreen(), "d1"); }
 static void run_HandleMenuInput(const Record *r) { uint16_t d1 = R16(R_D1); expect_z_only(r, HandleMenuInput(&d1)); expect_reg16(r, R_D1, d1, "d1"); }
 static void run_PutTeamBlock(const Record *r) { PutTeamBlock(R16(R_D0)); }
 V(ChooseSong) V(CheckScoreLeader) V(LeadSong) V(ClearLeadSong) V(rtsChgplayer) V(ClearPenalties) V(SetSflags8Bit1) V(box) V(ShowGoalBox)
 V(PenaltyShotBox) V(ShowThreeStars) V(ShowInjuryBox) V(CountGoalies) V(ReloadRinkGraphics) V(PeriodOver) V(resetplstuff) V(SprSort)
-V(setupEASNmap) V(setupIceRinkPal) V(setplayercolors) V(ShootoutModeBox) V(CountShootoutGoals) V(ShootoutWonBy) V(SetMenuPrintX) V(vcountwait)
+V(setupEASportsMap) V(setupIceRinkPal) V(setplayercolors) V(ShootoutModeBox) V(CountShootoutGoals) V(ShootoutWonBy) V(SetMenuPrintX) V(MenuWaitVblank)
 
 
 /* ---- sound94 ---- */
@@ -490,14 +490,14 @@ V(UploadCommandBufferToZ80) V(StopPCMChannel) V(p_initialZ80) V(ClearAllTrackAnd
 
 /* ---- the game loop: hockey94 drivers and the period start ---- */
 static void run_defaultsprites(const Record *r) { expect_reg16(r, R_D4, defaultsprites(R16(R_D4)), "d4"); }
-static void run_defaultsprites2(const Record *r) { expect_reg16(r, R_D4, defaultsprites2(R16(R_D4)), "d4"); }
+static void run_defaultsprites_0(const Record *r) { expect_reg16(r, R_D4, defaultsprites_0(R16(R_D4)), "d4"); }
 static void run_setupTeamBlocksMap(const Record *r) { expect_reg16(r, R_D4, setupTeamBlocksMap(R16(R_D4)), "d4"); }
 static void run_CopyTeamBlockMapData(const Record *r)
 {
     expect_reg16(r, R_A1, (uint16_t)ram_addr(CopyTeamBlockMapData(r->regs_in[R_A0], R16(R_D0), R16(R_D1), ram_bytes(PLACE(R_A1), 0x2C))), "a1");
 }
 static void run_ReloadRefHorTiles(const Record *r) { expect_reg16(r, R_D4, ReloadRefHorTiles(), "d4"); }
-static void run_InitMenuState(const Record *r) { expect_reg16(r, R_D1, InitMenuState(r->regs_in[R_A0], r->regs_in[R_A1]), "d1"); }
+static void run_Pausemode_top(const Record *r) { expect_reg16(r, R_D1, Pausemode_top(r->regs_in[R_A0], r->regs_in[R_A1]), "d1"); }
 static void run_never(const Record *r) { replay_fail("this routine does not return; its record cannot be run"); }
 V(DoGameFrame) V(Pausemode) V(setupice) V(setSlotBit)
 
@@ -510,7 +510,7 @@ static void run_ReloadRefTiles(const Record *r) { expect_reg16(r, R_D4, ReloadRe
 static void run_ReloadFaceOffTiles(const Record *r) { expect_reg16(r, R_D4, ReloadFaceOffTiles(), "d4"); }
 static void run_ReloadFaceOffMap(const Record *r) { expect_reg16(r, R_D4, ReloadFaceOffMap(), "d4"); }
 static void run_SetupScreen(const Record *r) { expect_reg16(r, R_D4, SetupScreen(R16(R_D0), R16(R_D1)), "d4"); }
-static void run_WaitVSyncAndReadInput(const Record *r) { uint16_t d0, d2, d3; expect_reg16(r, R_D1, WaitVSyncAndReadInput(&d0, &d2, &d3), "d1"); }
+static void run_Pausemode_rjoy(const Record *r) { uint16_t d0, d2, d3; expect_reg16(r, R_D1, Pausemode_rjoy(&d0, &d2, &d3), "d1"); }
 static void run_PlayerRecordIO(const Record *r) { PlayerRecordIO(r->regs_in[R_D0], R16(R_D1), r->regs_in[R_A0]); }
 static void run_ReadPlayerRecord(const Record *r) { ReadPlayerRecord(r->regs_in[R_D0], R16(R_D1), r->regs_in[R_A0]); }
 static void run_WritePlayerRecord(const Record *r) { WritePlayerRecord(r->regs_in[R_D0], R16(R_D1), r->regs_in[R_A0]); }
@@ -521,7 +521,7 @@ static void run_WriteCrowdRecord(const Record *r) { WriteCrowdRecord(r->regs_in[
 static void run_UpdatePlayerRecords(const Record *r) { UpdatePlayerRecords(r->regs_in[R_D1], r->regs_in[R_A0], TEAM(R_A2), R16(R_D5), R16(R_D6)); }
 static void run_UpdateTeamRecord(const Record *r) { UpdateTeamRecord(r->regs_in[R_A0], r->regs_in[R_D1], R16(R_D2), R16(R_D3), R16(R_D4), TEAM(R_A1), TEAM(R_A2)); }
 static void run_UpdateCrowdRecord(const Record *r) { UpdateCrowdRecord(r->regs_in[R_A0], r->regs_in[R_D1], R16(R_D2), R16(R_D4), R16(R_D5), R16(R_D6), TEAM(R_A1)); }
-V(Intermission) V(DoHiLights) V(setupice_highlight) V(clearTeamStats) V(setteams) V(ReplayMode) V(PeriodStatsScreen) V(GameStatisticsScreen)
+V(Intermission) V(DoHiLights) V(setupice_highlight) V(clearTeamStats) V(setteams) V(ReplayMode) V(PeriodStatsScreen) V(StatsReport)
 V(rtsStatTables) V(ExitStatsScreen) V(AddPlayoffTeamStats) V(ReadTeamStats) V(CountPlayers) V(UpdateRecords) V(MakeSRAMChecksum)
 
 
@@ -538,7 +538,7 @@ static void run_ValidateSRAM(const Record *r) { ValidateSRAM(); }
 static void run_ClearSRAM(const Record *r) { ClearSRAM(); }
 static void run_ReadLineData(const Record *r) { ReadLineData(); }
 static void run_HiScoreScreen(const Record *r) { HiScoreScreen(); }
-static void run_newTitleScreen(const Record *r) { newTitleScreen(); }
+static void run_TitleScreen(const Record *r) { TitleScreen(); }
 static void run_CreditsPrintRow(const Record *r) { expect_reg16(r, R_A1, (uint16_t)CreditsPrintRow(r->regs_in[R_A1]), "a1"); }
 static void run_CreditsWait(const Record *r) { CreditsWait(); }
 static void run_VBlank_TitleScreen(const Record *r) { VBlank_TitleScreen(); }
@@ -557,13 +557,13 @@ static void run_GetRandomUnusedTeam(const Record *r)
 }
 static void run_InitializeGameStructures(const Record *r) { InitializeGameStructures(); }
 static void run_FigureJoy(const Record *r) { FigureJoy(); }
-static void run_maketree(const Record *r) { maketree(); }
+static void run_MakeTree(const Record *r) { MakeTree(); }
 static void run_NewPO(const Record *r) { NewPO(); }
 static void run_ContinuePlayoffs(const Record *r) { ContinuePlayoffs(); }
 static void run_InitShooters(const Record *r) { InitShooters(); }
 static void run_ClearShootout(const Record *r) { ClearShootout(); }
 static void run_UpdatePlayoffLevel(const Record *r) { UpdatePlayoffLevel(); }
-static void run_DrawMatchupBitmaps(const Record *r) { DrawMatchupBitmaps(); }
+static void run_TeamIcons(const Record *r) { TeamIcons(); }
 static void run_DrawTeamBitmap(const Record *r) { expect_reg16(r, R_D4, DrawTeamBitmap(R16(R_D1), R16(R_D4)), "d4"); }
 static void run_VBlank_SetOptions(const Record *r) { VBlank_SetOptions(); }
 static void run_UnpackPicture(const Record *r) { UnpackPicture(A(R_A2)); }
@@ -649,14 +649,14 @@ static void run_WriteNameLog(const Record *r) { WriteNameLog(); }
 
 /* ---- the playoff screen (setup94) ---- */
 static void run_PlayoffScreen(const Record *r) { PlayoffScreen(); }
-static void run_HandlePlayoffInput(const Record *r) { HandlePlayoffInput(); }
-static void run_UpdatePlayoffScroll(const Record *r) { UpdatePlayoffScroll(); }
-static void run_PlayoffScreen_waitvsync(const Record *r) { PlayoffScreen_waitvsync(); }
-static void run_PrintSeriesScore(const Record *r) { PrintSeriesScore(MATCHUP(R_A2)); }
-static void run_DrawTreeArrow(const Record *r) { DrawTreeArrow(R16(R_D0)); }
-static void run_DrawTeamBlocks(const Record *r) { DrawTeamBlocks(R16(R_D1)); }
+static void run_PlayoffScreen_jin(const Record *r) { PlayoffScreen_jin(); }
+static void run_PlayoffScreen_scrup(const Record *r) { PlayoffScreen_scrup(); }
+static void run_waitxc1(const Record *r) { waitxc1(); }
+static void run_PlayoffScreen_doscores(const Record *r) { PlayoffScreen_doscores(MATCHUP(R_A2)); }
+static void run_PlayoffScreen_doarrow(const Record *r) { PlayoffScreen_doarrow(R16(R_D0)); }
+static void run_PlayoffScreen_doteam(const Record *r) { PlayoffScreen_doteam(R16(R_D1)); }
 static void run_VBlank_Playoff(const Record *r) { VBlank_Playoff(); }
-static void run_PlayoffScreenExit(const Record *r) { PlayoffScreenExit(); }   /* (pops its caller's return: abnormal, never run) */
+static void run_PlayoffScreen_exit(const Record *r) { PlayoffScreen_exit(); }   /* (pops its caller's return: abnormal, never run) */
 static void run_DrawPlayoffSprite(const Record *r) { DrawPlayoffSprite(); }
 
 /* ---- the scouting report (scout94, the text player of setup94, cards94 / title94 helpers) ---- */
@@ -767,8 +767,8 @@ static void run_CrowdMeterScreen(const Record *r) { CrowdMeterScreen(); }
 static void run_PrintCrowdMeter(const Record *r) { PrintCrowdMeter(); }
 static void run_PrintCrowdDB(const Record *r) { PrintCrowdDB(R16(R_D0)); }
 static void run_TimeoutMenu(const Record *r) { TimeoutMenu(TEAM(R_A2)); }
-static void run_SelectGoalieMenu(const Record *r) { SelectGoalieMenu(TEAM(R_A2)); }
-static void run_DrawGoalieSelectList(const Record *r) { DrawGoalieSelectList(TEAM(R_A2)); }
+static void run_Pausemode_go(const Record *r) { Pausemode_go(TEAM(R_A2)); }
+static void run_Pausemode_gnum(const Record *r) { Pausemode_gnum(TEAM(R_A2)); }
 static void run_GetDefenseStart(const Record *r) { expect_reg16(r, R_D0, GetDefenseStart(TEAM(R_A2)), "d0"); }
 static void run_GetForwardCount(const Record *r) { expect_reg16(r, R_D0, GetForwardCount(TEAM(R_A2)), "d0"); }
 static void run_PlayerCards(const Record *r) { PlayerCards(); }
@@ -912,7 +912,7 @@ const Port ports[] = {
     { SYM_ClearOffsidesIfAllPlayers, "ClearOffsidesIfAllPlayers", run_ClearOffsidesIfAllPlayers },
     { SYM_a2offsides, "a2offsides", run_a2offsides },
     { SYM_a2touchpuck, "a2touchpuck", run_a2touchpuck },
-    { SYM_puckIChk, "puckIChk", run_puckIChk },
+    { SYM_PuckIChk, "PuckIChk", run_PuckIChk },
     { SYM_puckunflip, "puckunflip", run_puckunflip },
     { SYM_puckflip, "puckflip", run_puckflip },
     { SYM_puckshadow, "puckshadow", run_puckshadow },
@@ -974,10 +974,10 @@ const Port ports[] = {
     { SYM_doinput_islocked, "doinput_islocked", run_doinput_islocked },
     { SYM_setpassmode, "setpassmode", run_setpassmode },
     { SYM_passmode, "passmode", run_passmode },
-    { SYM_holdplayer, "holdplayer", run_holdplayer },
+    { SYM_Holdplayer, "Holdplayer", run_Holdplayer },
     { SYM_faceoffinput, "faceoffinput", run_faceoffinput },
     { SYM_lineinput, "lineinput", run_lineinput },
-    { SYM_lcfound2, "lcfound2", run_lcfound2 },
+    { SYM_lcfound_close, "lcfound_close", run_lcfound_close },
     { SYM_setlccords, "setlccords", run_setlccords },
     { SYM_getlchoice2, "getlchoice2", run_getlchoice2 },
     { SYM_passto, "passto", run_passto },
@@ -994,7 +994,7 @@ const Port ports[] = {
     { SYM_PenShotChk, "PenShotChk", run_PenShotChk },
     { SYM_getBAplayerInfo, "getBAplayerInfo", run_getBAplayerInfo },
     { SYM_InProgress, "InProgress", run_InProgress },
-    { SYM_coinsearch, "coinsearch", run_coinsearch },
+    { SYM_InProgress_ap, "InProgress_ap", run_InProgress_ap },
     { SYM_checkfornewpen, "checkfornewpen", run_checkfornewpen },
     { SYM_Stop4Pen, "Stop4Pen", run_Stop4Pen },
     { SYM_limitfo, "limitfo", run_limitfo },
@@ -1007,7 +1007,7 @@ const Port ports[] = {
     { SYM_PenGoalStuff, "PenGoalStuff", run_PenGoalStuff },
     { SYM_ClearPenaltyBuffer, "ClearPenaltyBuffer", run_ClearPenaltyBuffer },
     { SYM_updatepentime, "updatepentime", run_updatepentime },
-    { SYM_ProcessPenaltyList, "ProcessPenaltyList", run_ProcessPenaltyList },
+    { SYM_updatepentime_ut, "updatepentime_ut", run_updatepentime_ut },
     { SYM_RemovePlayerFromList, "RemovePlayerFromList", run_RemovePlayerFromList },
     { SYM_chkatop, "chkatop", run_chkatop },
     { SYM_releasepl, "releasepl", run_releasepl },
@@ -1016,7 +1016,7 @@ const Port ports[] = {
     { SYM_ClrHor, "ClrHor", run_ClrHor },
     { SYM_SetHor, "SetHor", run_SetHor },
     { SYM_printscores1, "printscores1", run_printscores1 },
-    { SYM_PrintTeamNameAndScore, "PrintTeamNameAndScore", run_PrintTeamNameAndScore },
+    { SYM_printscores1_ps, "printscores1_ps", run_printscores1_ps },
     { SYM_PrintTeamLogoAndScore, "PrintTeamLogoAndScore", run_PrintTeamLogoAndScore },
     { SYM_EASNLogo, "EASNLogo", run_EASNLogo },
     { SYM_USBoard, "USBoard", run_USBoard },
@@ -1037,7 +1037,7 @@ const Port ports[] = {
     { SYM_NewTicker3, "NewTicker3", run_NewTicker3 },
     { SYM_ClearTickerArea, "ClearTickerArea", run_ClearTickerArea },
     { SYM_SetTickerAreaPosition, "SetTickerAreaPosition", run_SetTickerAreaPosition },
-    { SYM_PrintStringFromList, "PrintStringFromList", run_PrintStringFromList },
+    { SYM_Fprintsmall, "Fprintsmall", run_Fprintsmall },
     { SYM_AdvanceStringPtr, "AdvanceStringPtr", run_AdvanceStringPtr },
     { SYM_ManualGoalieMenu, "ManualGoalieMenu", run_ManualGoalieMenu },
     { SYM_RunArenaAnim, "RunArenaAnim", run_RunArenaAnim },
@@ -1082,7 +1082,7 @@ const Port ports[] = {
     { SYM_StatScrollRow, "StatScrollRow", run_StatScrollRow },
     { SYM_StatScrollRowEnd, "StatScrollRowEnd", run_StatScrollRowEnd },
     { SYM_PrintStatScrollArrows, "PrintStatScrollArrows", run_PrintStatScrollArrows },
-    { SYM_DisplayTeamStatsScreen, "DisplayTeamStatsScreen", run_DisplayTeamStatsScreen },
+    { SYM_DisplayStats, "DisplayStats", run_DisplayStats },
     { SYM_PrintStatValue, "PrintStatValue", run_PrintStatValue },
     { SYM_updatePPTeamTime, "updatePPTeamTime", run_updatePPTeamTime },
     { SYM_GetTeamRating, "GetTeamRating", run_GetTeamRating },
@@ -1106,7 +1106,7 @@ const Port ports[] = {
     { SYM_startpause2, "startpause2", run_startpause2 },
     { SYM_startpause3, "startpause3", run_startpause3 },
     { SYM_startpause4, "startpause4", run_startpause4 },
-    { SYM_SetupPauseScreen, "SetupPauseScreen", run_SetupPauseScreen },
+    { SYM_Pausemode_pall, "Pausemode_pall", run_Pausemode_pall },
     { SYM_seta2, "seta2", run_seta2 },
     { SYM_updatesound, "updatesound", run_updatesound },
     { SYM_KillCrowd, "KillCrowd", run_KillCrowd },
@@ -1114,7 +1114,7 @@ const Port ports[] = {
     { SYM_vb2, "vb2", run_vb2 },
     { SYM_DumpSprites, "DumpSprites", run_DumpSprites },
     { SYM_DumpSprites2, "DumpSprites2", run_DumpSprites2 },
-    { SYM_DoDMAList, "DoDMAList", run_DoDMAList },
+    { SYM_dodmalist, "dodmalist", run_dodmalist },
     { SYM_SetScroll2, "SetScroll2", run_SetScroll2 },
     { SYM_setvideo, "setvideo", run_setvideo },
     { SYM_updatescroll, "updatescroll", run_updatescroll },
@@ -1129,7 +1129,7 @@ const Port ports[] = {
     { SYM_setffo, "setffo", run_setffo },
     { SYM_uppads, "uppads", run_uppads },
     { SYM_QueuePadLabel, "QueuePadLabel", run_QueuePadLabel },
-    { SYM_RenderSmallFontChar, "RenderSmallFontChar", run_RenderSmallFontChar },
+    { SYM_uppads_pd, "uppads_pd", run_uppads_pd },
     { SYM_addframe, "addframe", run_addframe },
     { SYM_addframe2, "addframe2", run_addframe2 },
     { SYM_find3d, "find3d", run_find3d },
@@ -1152,7 +1152,7 @@ const Port ports[] = {
     { SYM_freezewindow, "freezewindow", run_freezewindow },
     { SYM_checkwindow, "checkwindow", run_checkwindow },
     { SYM_randomd0s, "randomd0s", run_randomd0s },
-    { SYM_sroot, "sroot", run_sroot },
+    { SYM_Sroot, "Sroot", run_Sroot },
     { SYM_sfx, "sfx", run_sfx },
     { SYM_song, "song", run_song },
     { SYM_UnpackNibbles, "UnpackNibbles", run_UnpackNibbles },
@@ -1176,13 +1176,13 @@ const Port ports[] = {
     { SYM_setVram, "setVram", run_setVram },
     { SYM_Vmaddr, "Vmaddr", run_Vmaddr },
     { SYM_dobitmap, "dobitmap", run_dobitmap },
-    { SYM_DecompressGraphicsWithCallback, "DecompressGraphicsWithCallback", run_DecompressGraphicsWithCallback },
+    { SYM_DecompressGraphicsWithRemap, "DecompressGraphicsWithRemap", run_DecompressGraphicsWithRemap },
     { SYM_DecompressGraphicsPlain, "DecompressGraphicsPlain", run_DecompressGraphicsPlain },
     { SYM_DecompressGraphics, "DecompressGraphics", run_DecompressGraphics },
     { SYM_DecompressBytecode, "DecompressBytecode", run_DecompressBytecode },
     { SYM_Opcode_CopyLiteral, "Opcode_CopyLiteral", run_Opcode_CopyLiteral },
     { SYM_Opcode_ClearBytes, "Opcode_ClearBytes", run_Opcode_ClearBytes },
-    { SYM_Opcode_Fillbytes, "Opcode_Fillbytes", run_Opcode_Fillbytes },
+    { SYM_Opcode_FillBytes, "Opcode_FillBytes", run_Opcode_FillBytes },
     { SYM_Opcode_CopyBackwardShort, "Opcode_CopyBackwardShort", run_Opcode_CopyBackwardShort },
     { SYM_Opcode_CopyBackwardMedium, "Opcode_CopyBackwardMedium", run_Opcode_CopyBackwardMedium },
     { SYM_Opcode_CopyBackwardLong, "Opcode_CopyBackwardLong", run_Opcode_CopyBackwardLong },
@@ -1276,7 +1276,7 @@ const Port ports[] = {
     { SYM_NextShooter, "NextShooter", run_NextShooter },
     { SYM_Set4WayPlayerStub, "Set4WayPlayerStub", run_Set4WayPlayerStub },
     { SYM_PrintMenuItem, "PrintMenuItem", run_PrintMenuItem },
-    { SYM_UpdateMenuSelection, "UpdateMenuSelection", run_UpdateMenuSelection },
+    { SYM_Pausemode_Pmenu, "Pausemode_Pmenu", run_Pausemode_Pmenu },
     { SYM_DrawMenuScreen, "DrawMenuScreen", run_DrawMenuScreen },
     { SYM_HandleMenuInput, "HandleMenuInput", run_HandleMenuInput },
     { SYM_PutTeamBlock, "PutTeamBlock", run_PutTeamBlock },
@@ -1297,14 +1297,14 @@ const Port ports[] = {
     { SYM_PeriodOver, "PeriodOver", run_PeriodOver },
     { SYM_resetplstuff, "resetplstuff", run_resetplstuff },
     { SYM_SprSort, "SprSort", run_SprSort },
-    { SYM_setupEASNmap, "setupEASNmap", run_setupEASNmap },
+    { SYM_setupEASportsMap, "setupEASportsMap", run_setupEASportsMap },
     { SYM_setupIceRinkPal, "setupIceRinkPal", run_setupIceRinkPal },
     { SYM_setplayercolors, "setplayercolors", run_setplayercolors },
     { SYM_ShootoutModeBox, "ShootoutModeBox", run_ShootoutModeBox },
     { SYM_CountShootoutGoals, "CountShootoutGoals", run_CountShootoutGoals },
     { SYM_ShootoutWonBy, "ShootoutWonBy", run_ShootoutWonBy },
     { SYM_SetMenuPrintX, "SetMenuPrintX", run_SetMenuPrintX },
-    { SYM_vcountwait, "vcountwait", run_vcountwait },
+    { SYM_MenuWaitVblank, "MenuWaitVblank", run_MenuWaitVblank },
     { SYM_play_sfx_or_music_track, "play_sfx_or_music_track", run_play_sfx_or_music_track },
     { SYM_ReadPad4Way1, "ReadPad4Way1", run_ReadPad4Way1 },
     { SYM_ReadPad4Way2, "ReadPad4Way2", run_ReadPad4Way2 },
@@ -1338,18 +1338,18 @@ const Port ports[] = {
     { SYM_p_initialZ80, "p_initialZ80", run_p_initialZ80 },
     { SYM_ClearAllTrackAndSFXSlots, "ClearAllTrackAndSFXSlots", run_ClearAllTrackAndSFXSlots },
     { SYM_defaultsprites, "defaultsprites", run_defaultsprites },
-    { SYM_defaultsprites2, "defaultsprites2", run_defaultsprites2 },
+    { SYM_defaultsprites_0, "defaultsprites_0", run_defaultsprites_0 },
     { SYM_setupTeamBlocksMap, "setupTeamBlocksMap", run_setupTeamBlocksMap },
     { SYM_CopyTeamBlockMapData, "CopyTeamBlockMapData", run_CopyTeamBlockMapData },
     { SYM_ReloadRefHorTiles, "ReloadRefHorTiles", run_ReloadRefHorTiles },
-    { SYM_InitMenuState, "InitMenuState", run_InitMenuState },
+    { SYM_Pausemode_top, "Pausemode_top", run_Pausemode_top },
     { SYM_DoGameFrame, "DoGameFrame", run_DoGameFrame },
     { SYM_Pausemode, "Pausemode", run_Pausemode },
     { SYM_setupice, "setupice", run_setupice },
     { SYM_setSlotBit, "setSlotBit", run_setSlotBit },
     { SYM_Gameloop, "Gameloop", run_never },
     { SYM_StartPer, "StartPer", run_never },
-    { SYM_IntermissionStart, "IntermissionStart", run_never },
+    { SYM_PeriodOver_sp, "PeriodOver_sp", run_never },
     { SYM_StartHL, "StartHL", run_StartHL },
     { SYM_StartHL2, "StartHL2", run_StartHL2 },
     { SYM_InitTeamStructure, "InitTeamStructure", run_InitTeamStructure },
@@ -1357,7 +1357,7 @@ const Port ports[] = {
     { SYM_ReloadFaceOffTiles, "ReloadFaceOffTiles", run_ReloadFaceOffTiles },
     { SYM_ReloadFaceOffMap, "ReloadFaceOffMap", run_ReloadFaceOffMap },
     { SYM_SetupScreen, "SetupScreen", run_SetupScreen },
-    { SYM_WaitVSyncAndReadInput, "WaitVSyncAndReadInput", run_WaitVSyncAndReadInput },
+    { SYM_Pausemode_rjoy, "Pausemode_rjoy", run_Pausemode_rjoy },
     { SYM_PlayerRecordIO, "PlayerRecordIO", run_PlayerRecordIO },
     { SYM_ReadPlayerRecord, "ReadPlayerRecord", run_ReadPlayerRecord },
     { SYM_WritePlayerRecord, "WritePlayerRecord", run_WritePlayerRecord },
@@ -1375,7 +1375,7 @@ const Port ports[] = {
     { SYM_setteams, "setteams", run_setteams },
     { SYM_ReplayMode, "ReplayMode", run_ReplayMode },
     { SYM_PeriodStatsScreen, "PeriodStatsScreen", run_PeriodStatsScreen },
-    { SYM_GameStatisticsScreen, "GameStatisticsScreen", run_GameStatisticsScreen },
+    { SYM_StatsReport, "StatsReport", run_StatsReport },
     { SYM_rtsStatTables, "rtsStatTables", run_rtsStatTables },
     { SYM_ExitStatsScreen, "ExitStatsScreen", run_ExitStatsScreen },
     { SYM_AddPlayoffTeamStats, "AddPlayoffTeamStats", run_AddPlayoffTeamStats },
@@ -1395,7 +1395,7 @@ const Port ports[] = {
     { SYM_ClearSRAM, "ClearSRAM", run_ClearSRAM },
     { SYM_ReadLineData, "ReadLineData", run_ReadLineData },
     { SYM_HiScoreScreen, "HiScoreScreen", run_HiScoreScreen },
-    { SYM_newTitleScreen, "newTitleScreen", run_newTitleScreen },
+    { SYM_TitleScreen, "TitleScreen", run_TitleScreen },
     { SYM_CreditsPrintRow, "CreditsPrintRow", run_CreditsPrintRow },
     { SYM_CreditsWait, "CreditsWait", run_CreditsWait },
     { SYM_VBlank_TitleScreen, "VBlank_TitleScreen", run_VBlank_TitleScreen },
@@ -1406,13 +1406,13 @@ const Port ports[] = {
     { SYM_GetRandomUnusedTeam, "GetRandomUnusedTeam", run_GetRandomUnusedTeam },
     { SYM_InitializeGameStructures, "InitializeGameStructures", run_InitializeGameStructures },
     { SYM_FigureJoy, "FigureJoy", run_FigureJoy },
-    { SYM_maketree, "maketree", run_maketree },
+    { SYM_MakeTree, "MakeTree", run_MakeTree },
     { SYM_NewPO, "NewPO", run_NewPO },
     { SYM_ContinuePlayoffs, "ContinuePlayoffs", run_ContinuePlayoffs },
     { SYM_InitShooters, "InitShooters", run_InitShooters },
     { SYM_ClearShootout, "ClearShootout", run_ClearShootout },
     { SYM_UpdatePlayoffLevel, "UpdatePlayoffLevel", run_UpdatePlayoffLevel },
-    { SYM_DrawMatchupBitmaps, "DrawMatchupBitmaps", run_DrawMatchupBitmaps },
+    { SYM_TeamIcons, "TeamIcons", run_TeamIcons },
     { SYM_DrawTeamBitmap, "DrawTeamBitmap", run_DrawTeamBitmap },
     { SYM_VBlank_SetOptions, "VBlank_SetOptions", run_VBlank_SetOptions },
     { SYM_UnpackPicture, "UnpackPicture", run_UnpackPicture },
@@ -1485,15 +1485,15 @@ const Port ports[] = {
     { SYM_SkipOtherUserName, "SkipOtherUserName", run_SkipOtherUserName },
     { SYM_WriteNameLog, "WriteNameLog", run_WriteNameLog },
     { SYM_PlayoffScreen, "PlayoffScreen", run_PlayoffScreen },
-    { SYM_HandlePlayoffInput, "HandlePlayoffInput", run_HandlePlayoffInput },
-    { SYM_UpdatePlayoffScroll, "UpdatePlayoffScroll", run_UpdatePlayoffScroll },
-    { SYM_PlayoffScreen_waitvsync, "PlayoffScreen_waitvsync", run_PlayoffScreen_waitvsync },
-    { SYM_PrintSeriesScore, "PrintSeriesScore", run_PrintSeriesScore },
-    { SYM_DrawTreeArrow, "DrawTreeArrow", run_DrawTreeArrow },
-    { SYM_DrawTeamBlocks, "DrawTeamBlocks", run_DrawTeamBlocks },
+    { SYM_PlayoffScreen_jin, "PlayoffScreen_jin", run_PlayoffScreen_jin },
+    { SYM_PlayoffScreen_scrup, "PlayoffScreen_scrup", run_PlayoffScreen_scrup },
+    { SYM_waitxc1, "waitxc1", run_waitxc1 },
+    { SYM_PlayoffScreen_doscores, "PlayoffScreen_doscores", run_PlayoffScreen_doscores },
+    { SYM_PlayoffScreen_doarrow, "PlayoffScreen_doarrow", run_PlayoffScreen_doarrow },
+    { SYM_PlayoffScreen_doteam, "PlayoffScreen_doteam", run_PlayoffScreen_doteam },
     { SYM_VBlank_Playoff, "VBlank_Playoff", run_VBlank_Playoff },
     { SYM_DrawPlayoffSprite, "DrawPlayoffSprite", run_DrawPlayoffSprite },
-    { SYM_PlayoffScreenExit, "PlayoffScreenExit", run_PlayoffScreenExit },
+    { SYM_PlayoffScreen_exit, "PlayoffScreen_exit", run_PlayoffScreen_exit },
     { SYM_ScoutingReport, "ScoutingReport", run_ScoutingReport },
     { SYM_ScoutCrowdRecord, "ScoutCrowdRecord", run_ScoutCrowdRecord },
     { SYM_PageMatchup, "PageMatchup", run_PageMatchup },
@@ -1592,8 +1592,8 @@ const Port ports[] = {
     { SYM_PrintCrowdMeter, "PrintCrowdMeter", run_PrintCrowdMeter },
     { SYM_PrintCrowdDB, "PrintCrowdDB", run_PrintCrowdDB },
     { SYM_TimeoutMenu, "TimeoutMenu", run_TimeoutMenu },
-    { SYM_SelectGoalieMenu, "SelectGoalieMenu", run_SelectGoalieMenu },
-    { SYM_DrawGoalieSelectList, "DrawGoalieSelectList", run_DrawGoalieSelectList },
+    { SYM_Pausemode_go, "Pausemode_go", run_Pausemode_go },
+    { SYM_Pausemode_gnum, "Pausemode_gnum", run_Pausemode_gnum },
     { SYM_GetDefenseStart, "GetDefenseStart", run_GetDefenseStart },
     { SYM_GetForwardCount, "GetForwardCount", run_GetForwardCount },
     { SYM_PlayerCards, "PlayerCards", run_PlayerCards },

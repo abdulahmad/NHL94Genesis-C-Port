@@ -1,0 +1,2 @@
+# demo_faceoff.state pad 2: START at frame 600 (CPU vs CPU, the game loop waiting) so startpause2 runs, START at 800 to leave the pause (lockstep.py --state out/states/demo_faceoff.state --script2)
+600:START,606:,800:START,806:

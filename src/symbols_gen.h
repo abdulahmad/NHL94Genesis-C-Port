@@ -31,16 +31,16 @@
 #define SYM_startpause3 0x7CDCu
 #define SYM_startpause4 0x7CEAu
 #define SYM_Pausemode 0x7CF8u
-#define SYM_SetupPauseScreen 0x7DCEu
+#define SYM_Pausemode_pall 0x7DCEu
 #define SYM_seta2 0x7E0Eu
-#define SYM_InitMenuState 0x7E36u
+#define SYM_Pausemode_top 0x7E36u
 #define SYM_DrawMenuScreen 0x7E46u
 #define SYM_SetMenuPrintX 0x7E72u
 #define SYM_HandleMenuInput 0x7E88u
-#define SYM_UpdateMenuSelection 0x7EF2u
+#define SYM_Pausemode_Pmenu 0x7EF2u
 #define SYM_PrintMenuItem 0x8008u
 #define SYM_PutTeamBlock 0x8078u
-#define SYM_vcountwait 0x80BAu
+#define SYM_MenuWaitVblank 0x80BAu
 #define SYM_ShowScores 0x80D4u
 #define SYM_UpdateScoresScroll 0x8198u
 #define SYM_UpdateVertScrollReg 0x81CAu
@@ -111,13 +111,13 @@
 #define SYM_ExitStatsScreen 0x9CD8u
 #define SYM_ReloadRinkGraphics 0x9CDCu
 #define SYM_TimeoutMenu 0x9D7Au
-#define SYM_SelectGoalieMenu 0x9DE6u
-#define SYM_DrawGoalieSelectList 0x9E86u
+#define SYM_Pausemode_go 0x9DE6u
+#define SYM_Pausemode_gnum 0x9E86u
 #define SYM_GetGoalieCount 0x9F40u
 #define SYM_GetDefenseStart 0x9F5Cu
 #define SYM_GetForwardCount 0x9F7Eu
 #define SYM_GetPlayerCount 0x9F9Au
-#define SYM_WaitVSyncAndReadInput 0x9FB8u
+#define SYM_Pausemode_rjoy 0x9FB8u
 #define SYM_ReplayMode 0x9FD0u
 #define SYM_getpzjoy 0xA41Eu
 #define SYM_ShowReplayIcon 0xA448u
@@ -157,9 +157,9 @@
 #define SYM_getlchoice2 0xBA18u
 #define SYM_lineinput 0xBA88u
 #define SYM_lcfound 0xBB06u
-#define SYM_lcfound2 0xBB36u
+#define SYM_lcfound_close 0xBB36u
 #define SYM_burst 0xBB62u
-#define SYM_holdplayer 0xBBB6u
+#define SYM_Holdplayer 0xBBB6u
 #define SYM_Acheck 0xBBD4u
 #define SYM_setpassmode 0xBC06u
 #define SYM_rtss 0xBC3Eu
@@ -254,7 +254,7 @@
 #define SYM_ClearOffsidesIfAllPlayers 0x100A6u
 #define SYM_a2offsides 0x100E6u
 #define SYM_a2touchpuck 0x1013Eu
-#define SYM_puckIChk 0x10246u
+#define SYM_PuckIChk 0x10246u
 #define SYM_puckunflip 0x102A8u
 #define SYM_puckflip 0x102D2u
 #define SYM_puckshadow 0x102ECu
@@ -286,7 +286,7 @@
 #define SYM_CopyPaletteToCRAM 0x11044u
 #define SYM_randomd0s 0x1107Au
 #define SYM_randomd0 0x11086u
-#define SYM_sroot 0x110BEu
+#define SYM_Sroot 0x110BEu
 #define SYM_sfx 0x11132u
 #define SYM_song 0x11156u
 #define SYM_waitx 0x11176u
@@ -309,13 +309,13 @@
 #define SYM_setVram_0 0x115AAu
 #define SYM_Vmaddr 0x11680u
 #define SYM_dobitmap 0x1169Au
-#define SYM_DecompressGraphicsWithCallback 0x1172Cu
+#define SYM_DecompressGraphicsWithRemap 0x1172Cu
 #define SYM_DecompressGraphicsPlain 0x11738u
 #define SYM_DecompressGraphics 0x1173Cu
 #define SYM_DecompressBytecode 0x1177Au
 #define SYM_Opcode_CopyLiteral 0x117D2u
 #define SYM_Opcode_ClearBytes 0x117EEu
-#define SYM_Opcode_Fillbytes 0x1180Au
+#define SYM_Opcode_FillBytes 0x1180Au
 #define SYM_Opcode_CopyBackwardShort 0x1182Au
 #define SYM_CopyBackwardRun 0x11840u
 #define SYM_Opcode_CopyBackwardMedium 0x1185Cu
@@ -362,7 +362,7 @@
 #define SYM_PenShotChk 0x1211Au
 #define SYM_getBAplayerInfo 0x12174u
 #define SYM_InProgress 0x1221Cu
-#define SYM_coinsearch 0x123DEu
+#define SYM_InProgress_ap 0x123DEu
 #define SYM_checkfornewpen 0x12418u
 #define SYM_Stop4Pen 0x124A6u
 #define SYM_limitfo 0x1257Eu
@@ -375,7 +375,7 @@
 #define SYM_PenGoalStuff 0x1284Au
 #define SYM_ClearPenaltyBuffer 0x128A4u
 #define SYM_updatepentime 0x128B2u
-#define SYM_ProcessPenaltyList 0x128ECu
+#define SYM_updatepentime_ut 0x128ECu
 #define SYM_RemovePlayerFromList 0x1298Cu
 #define SYM_chkatop 0x1299Cu
 #define SYM_releasepl 0x129D2u
@@ -384,7 +384,7 @@
 #define SYM_ClrHor 0x12B40u
 #define SYM_SetHor 0x12B94u
 #define SYM_printscores1 0x12C04u
-#define SYM_PrintTeamNameAndScore 0x12D0Eu
+#define SYM_printscores1_ps 0x12D0Eu
 #define SYM_PrintTeamLogoAndScore 0x12D30u
 #define SYM_EASNLogo 0x12D70u
 #define SYM_USBoard 0x12DA6u
@@ -407,7 +407,7 @@
 #define SYM_NewTicker3 0x133B2u
 #define SYM_ClearTickerArea 0x134D8u
 #define SYM_SetTickerAreaPosition 0x134E4u
-#define SYM_PrintStringFromList 0x13508u
+#define SYM_Fprintsmall 0x13508u
 #define SYM_AdvanceStringPtr 0x13510u
 #define SYM_DoHiLights 0x1351Cu
 #define SYM_StartHL 0x1354Cu
@@ -457,7 +457,7 @@
 #define SYM_IRQ7 0x15E6Cu
 #define SYM_DumpSprites 0x15E6Eu
 #define SYM_DumpSprites2 0x15E72u
-#define SYM_DoDMAList 0x15E82u
+#define SYM_dodmalist 0x15E82u
 #define SYM_SetScroll2 0x15EA4u
 #define SYM_setvideo 0x15EC0u
 #define SYM_updatescroll 0x15F34u
@@ -472,7 +472,7 @@
 #define SYM_setffo 0x1661Au
 #define SYM_uppads 0x16648u
 #define SYM_QueuePadLabel 0x166E6u
-#define SYM_RenderSmallFontChar 0x1674Au
+#define SYM_uppads_pd 0x1674Au
 #define SYM_addframe 0x16782u
 #define SYM_addframe2 0x167AAu
 #define SYM_find3d 0x16920u
@@ -481,7 +481,7 @@
 #define SYM_setupice 0x169FAu
 #define SYM_setupice_highlight 0x16BACu
 #define SYM_setupIceRinkPal 0x16C96u
-#define SYM_setupEASNmap 0x16CACu
+#define SYM_setupEASportsMap 0x16CACu
 #define SYM_ReloadEnergyBarTiles 0x16CC4u
 #define SYM_ReloadCrowdTiles 0x16CD2u
 #define SYM_ReloadRefHorTiles 0x16CE0u
@@ -491,7 +491,7 @@
 #define SYM_setupTeamBlocksMap 0x16D18u
 #define SYM_CopyTeamBlockMapData 0x16D64u
 #define SYM_defaultsprites 0x16DA2u
-#define SYM_defaultsprites2 0x16E82u
+#define SYM_defaultsprites_0 0x16E82u
 #define SYM_SprSort 0x1702Eu
 #define SYM_resetplstuff 0x170B0u
 #define SYM_clearTeamStats 0x17102u
@@ -499,27 +499,27 @@
 #define SYM_InitTeamStructure 0x171BEu
 #define SYM_setplayercolors 0x1720Cu
 #define SYM_PeriodOver 0x17236u
-#define SYM_IntermissionStart 0x17278u
+#define SYM_PeriodOver_sp 0x17278u
 #define SYM_GameOver 0x172C8u
 #define SYM_ExitToOpening 0x172E4u
 #define SYM_Opening 0x172F0u
 #define SYM_Opening2 0x172FAu
 #define SYM_Opening3 0x1731Eu
 #define SYM_PlayoffScreen 0x17336u
-#define SYM_HandlePlayoffInput 0x17542u
-#define SYM_UpdatePlayoffScroll 0x17572u
-#define SYM_PlayoffScreenExit 0x175D4u
-#define SYM_PlayoffScreen_waitvsync 0x175D8u
-#define SYM_PrintSeriesScore 0x175FCu
-#define SYM_DrawTreeArrow 0x17626u
-#define SYM_DrawTeamBlocks 0x17652u
+#define SYM_PlayoffScreen_jin 0x17542u
+#define SYM_PlayoffScreen_scrup 0x17572u
+#define SYM_PlayoffScreen_exit 0x175D4u
+#define SYM_waitxc1 0x175D8u
+#define SYM_PlayoffScreen_doscores 0x175FCu
+#define SYM_PlayoffScreen_doarrow 0x17626u
+#define SYM_PlayoffScreen_doteam 0x17652u
 #define SYM_VBlank_Playoff 0x17692u
 #define SYM_InitScoutingDisplay 0x17718u
 #define SYM_UpdateScoutingDisplay 0x17730u
 #define SYM_ScrollDisplayUp 0x179D2u
 #define SYM_EASportsScreen 0x17A18u
 #define SYM_UpdatePlayoffLevel 0x17AC8u
-#define SYM_DrawMatchupBitmaps 0x17AF4u
+#define SYM_TeamIcons 0x17AF4u
 #define SYM_DrawTeamBitmap 0x17B78u
 #define SYM_dotb 0x17B98u
 #define SYM_ClearRosterName 0x17BBAu
@@ -529,7 +529,7 @@
 #define SYM_DefaultMenus 0x17C72u
 #define SYM_ContinuePlayoffs 0x17CA0u
 #define SYM_NewPO 0x17D16u
-#define SYM_maketree 0x17D80u
+#define SYM_MakeTree 0x17D80u
 #define SYM_FigureJoy 0x17E42u
 #define SYM_InitializeGameStructures 0x18002u
 #define SYM_GetRandomUnusedTeam 0x18032u
@@ -1168,13 +1168,13 @@
 #define SYM_PrintPlayerNameRight 0xFD89Au
 #define SYM_SkipNameNumber 0xFD8ECu
 #define SYM_PeriodStatsScreen 0xFD90Cu
-#define SYM_GameStatisticsScreen 0xFDC5Au
+#define SYM_StatsReport 0xFDC5Au
 #define SYM_SetStatScroll 0xFDD6Au
 #define SYM_StatScrollRow 0xFDD92u
 #define SYM_StatScrollRowEnd 0xFDD9Cu
 #define SYM_rtsStatScroll 0xFDDA8u
 #define SYM_PrintStatScrollArrows 0xFDDAAu
-#define SYM_DisplayTeamStatsScreen 0xFDE24u
+#define SYM_DisplayStats 0xFDE24u
 #define SYM_PrintStatValue 0xFDEB4u
 #define SYM_rtsStatTables 0xFE14Au
 #define SYM_updatePPTeamTime 0xFE14Cu
@@ -1225,7 +1225,7 @@
 #define SYM_PuckComingToward 0xFEF8Cu
 #define SYM_ReadGoaliePulled 0xFEFCCu
 #define SYM_EndOneTimer 0xFEFF0u
-#define SYM_newTitleScreen 0xFF042u
+#define SYM_TitleScreen 0xFF042u
 #define SYM_CreditsPrintRow 0xFF2C8u
 #define SYM_CreditsWait 0xFF318u
 #define SYM_VBlank_TitleScreen 0xFF348u
@@ -3352,16 +3352,16 @@ static const struct SymEntry rom_syms[] = {
     {0x7CDCu, "startpause3"},
     {0x7CEAu, "startpause4"},
     {0x7CF8u, "Pausemode"},
-    {0x7DCEu, "SetupPauseScreen"},
+    {0x7DCEu, "Pausemode_pall"},
     {0x7E0Eu, "seta2"},
-    {0x7E36u, "InitMenuState"},
+    {0x7E36u, "Pausemode_top"},
     {0x7E46u, "DrawMenuScreen"},
     {0x7E72u, "SetMenuPrintX"},
     {0x7E88u, "HandleMenuInput"},
-    {0x7EF2u, "UpdateMenuSelection"},
+    {0x7EF2u, "Pausemode_Pmenu"},
     {0x8008u, "PrintMenuItem"},
     {0x8078u, "PutTeamBlock"},
-    {0x80BAu, "vcountwait"},
+    {0x80BAu, "MenuWaitVblank"},
     {0x80D4u, "ShowScores"},
     {0x8198u, "UpdateScoresScroll"},
     {0x81CAu, "UpdateVertScrollReg"},
@@ -3432,13 +3432,13 @@ static const struct SymEntry rom_syms[] = {
     {0x9CD8u, "ExitStatsScreen"},
     {0x9CDCu, "ReloadRinkGraphics"},
     {0x9D7Au, "TimeoutMenu"},
-    {0x9DE6u, "SelectGoalieMenu"},
-    {0x9E86u, "DrawGoalieSelectList"},
+    {0x9DE6u, "Pausemode_go"},
+    {0x9E86u, "Pausemode_gnum"},
     {0x9F40u, "GetGoalieCount"},
     {0x9F5Cu, "GetDefenseStart"},
     {0x9F7Eu, "GetForwardCount"},
     {0x9F9Au, "GetPlayerCount"},
-    {0x9FB8u, "WaitVSyncAndReadInput"},
+    {0x9FB8u, "Pausemode_rjoy"},
     {0x9FD0u, "ReplayMode"},
     {0xA41Eu, "getpzjoy"},
     {0xA448u, "ShowReplayIcon"},
@@ -3478,9 +3478,9 @@ static const struct SymEntry rom_syms[] = {
     {0xBA18u, "getlchoice2"},
     {0xBA88u, "lineinput"},
     {0xBB06u, "lcfound"},
-    {0xBB36u, "lcfound2"},
+    {0xBB36u, "lcfound_close"},
     {0xBB62u, "burst"},
-    {0xBBB6u, "holdplayer"},
+    {0xBBB6u, "Holdplayer"},
     {0xBBD4u, "Acheck"},
     {0xBC06u, "setpassmode"},
     {0xBC3Eu, "rtss"},
@@ -3575,7 +3575,7 @@ static const struct SymEntry rom_syms[] = {
     {0x100A6u, "ClearOffsidesIfAllPlayers"},
     {0x100E6u, "a2offsides"},
     {0x1013Eu, "a2touchpuck"},
-    {0x10246u, "puckIChk"},
+    {0x10246u, "PuckIChk"},
     {0x102A8u, "puckunflip"},
     {0x102D2u, "puckflip"},
     {0x102ECu, "puckshadow"},
@@ -3607,7 +3607,7 @@ static const struct SymEntry rom_syms[] = {
     {0x11044u, "CopyPaletteToCRAM"},
     {0x1107Au, "randomd0s"},
     {0x11086u, "randomd0"},
-    {0x110BEu, "sroot"},
+    {0x110BEu, "Sroot"},
     {0x11132u, "sfx"},
     {0x11156u, "song"},
     {0x11176u, "waitx"},
@@ -3630,13 +3630,13 @@ static const struct SymEntry rom_syms[] = {
     {0x115AAu, "setVram_0"},
     {0x11680u, "Vmaddr"},
     {0x1169Au, "dobitmap"},
-    {0x1172Cu, "DecompressGraphicsWithCallback"},
+    {0x1172Cu, "DecompressGraphicsWithRemap"},
     {0x11738u, "DecompressGraphicsPlain"},
     {0x1173Cu, "DecompressGraphics"},
     {0x1177Au, "DecompressBytecode"},
     {0x117D2u, "Opcode_CopyLiteral"},
     {0x117EEu, "Opcode_ClearBytes"},
-    {0x1180Au, "Opcode_Fillbytes"},
+    {0x1180Au, "Opcode_FillBytes"},
     {0x1182Au, "Opcode_CopyBackwardShort"},
     {0x11840u, "CopyBackwardRun"},
     {0x1185Cu, "Opcode_CopyBackwardMedium"},
@@ -3683,7 +3683,7 @@ static const struct SymEntry rom_syms[] = {
     {0x1211Au, "PenShotChk"},
     {0x12174u, "getBAplayerInfo"},
     {0x1221Cu, "InProgress"},
-    {0x123DEu, "coinsearch"},
+    {0x123DEu, "InProgress_ap"},
     {0x12418u, "checkfornewpen"},
     {0x124A6u, "Stop4Pen"},
     {0x1257Eu, "limitfo"},
@@ -3696,7 +3696,7 @@ static const struct SymEntry rom_syms[] = {
     {0x1284Au, "PenGoalStuff"},
     {0x128A4u, "ClearPenaltyBuffer"},
     {0x128B2u, "updatepentime"},
-    {0x128ECu, "ProcessPenaltyList"},
+    {0x128ECu, "updatepentime_ut"},
     {0x1298Cu, "RemovePlayerFromList"},
     {0x1299Cu, "chkatop"},
     {0x129D2u, "releasepl"},
@@ -3705,7 +3705,7 @@ static const struct SymEntry rom_syms[] = {
     {0x12B40u, "ClrHor"},
     {0x12B94u, "SetHor"},
     {0x12C04u, "printscores1"},
-    {0x12D0Eu, "PrintTeamNameAndScore"},
+    {0x12D0Eu, "printscores1_ps"},
     {0x12D30u, "PrintTeamLogoAndScore"},
     {0x12D70u, "EASNLogo"},
     {0x12DA6u, "USBoard"},
@@ -3728,7 +3728,7 @@ static const struct SymEntry rom_syms[] = {
     {0x133B2u, "NewTicker3"},
     {0x134D8u, "ClearTickerArea"},
     {0x134E4u, "SetTickerAreaPosition"},
-    {0x13508u, "PrintStringFromList"},
+    {0x13508u, "Fprintsmall"},
     {0x13510u, "AdvanceStringPtr"},
     {0x1351Cu, "DoHiLights"},
     {0x1354Cu, "StartHL"},
@@ -3778,7 +3778,7 @@ static const struct SymEntry rom_syms[] = {
     {0x15E6Cu, "IRQ7"},
     {0x15E6Eu, "DumpSprites"},
     {0x15E72u, "DumpSprites2"},
-    {0x15E82u, "DoDMAList"},
+    {0x15E82u, "dodmalist"},
     {0x15EA4u, "SetScroll2"},
     {0x15EC0u, "setvideo"},
     {0x15F34u, "updatescroll"},
@@ -3793,7 +3793,7 @@ static const struct SymEntry rom_syms[] = {
     {0x1661Au, "setffo"},
     {0x16648u, "uppads"},
     {0x166E6u, "QueuePadLabel"},
-    {0x1674Au, "RenderSmallFontChar"},
+    {0x1674Au, "uppads_pd"},
     {0x16782u, "addframe"},
     {0x167AAu, "addframe2"},
     {0x16920u, "find3d"},
@@ -3802,7 +3802,7 @@ static const struct SymEntry rom_syms[] = {
     {0x169FAu, "setupice"},
     {0x16BACu, "setupice_highlight"},
     {0x16C96u, "setupIceRinkPal"},
-    {0x16CACu, "setupEASNmap"},
+    {0x16CACu, "setupEASportsMap"},
     {0x16CC4u, "ReloadEnergyBarTiles"},
     {0x16CD2u, "ReloadCrowdTiles"},
     {0x16CE0u, "ReloadRefHorTiles"},
@@ -3812,7 +3812,7 @@ static const struct SymEntry rom_syms[] = {
     {0x16D18u, "setupTeamBlocksMap"},
     {0x16D64u, "CopyTeamBlockMapData"},
     {0x16DA2u, "defaultsprites"},
-    {0x16E82u, "defaultsprites2"},
+    {0x16E82u, "defaultsprites_0"},
     {0x1702Eu, "SprSort"},
     {0x170B0u, "resetplstuff"},
     {0x17102u, "clearTeamStats"},
@@ -3820,27 +3820,27 @@ static const struct SymEntry rom_syms[] = {
     {0x171BEu, "InitTeamStructure"},
     {0x1720Cu, "setplayercolors"},
     {0x17236u, "PeriodOver"},
-    {0x17278u, "IntermissionStart"},
+    {0x17278u, "PeriodOver_sp"},
     {0x172C8u, "GameOver"},
     {0x172E4u, "ExitToOpening"},
     {0x172F0u, "Opening"},
     {0x172FAu, "Opening2"},
     {0x1731Eu, "Opening3"},
     {0x17336u, "PlayoffScreen"},
-    {0x17542u, "HandlePlayoffInput"},
-    {0x17572u, "UpdatePlayoffScroll"},
-    {0x175D4u, "PlayoffScreenExit"},
-    {0x175D8u, "PlayoffScreen_waitvsync"},
-    {0x175FCu, "PrintSeriesScore"},
-    {0x17626u, "DrawTreeArrow"},
-    {0x17652u, "DrawTeamBlocks"},
+    {0x17542u, "PlayoffScreen_jin"},
+    {0x17572u, "PlayoffScreen_scrup"},
+    {0x175D4u, "PlayoffScreen_exit"},
+    {0x175D8u, "waitxc1"},
+    {0x175FCu, "PlayoffScreen_doscores"},
+    {0x17626u, "PlayoffScreen_doarrow"},
+    {0x17652u, "PlayoffScreen_doteam"},
     {0x17692u, "VBlank_Playoff"},
     {0x17718u, "InitScoutingDisplay"},
     {0x17730u, "UpdateScoutingDisplay"},
     {0x179D2u, "ScrollDisplayUp"},
     {0x17A18u, "EASportsScreen"},
     {0x17AC8u, "UpdatePlayoffLevel"},
-    {0x17AF4u, "DrawMatchupBitmaps"},
+    {0x17AF4u, "TeamIcons"},
     {0x17B78u, "DrawTeamBitmap"},
     {0x17B98u, "dotb"},
     {0x17BBAu, "ClearRosterName"},
@@ -3850,7 +3850,7 @@ static const struct SymEntry rom_syms[] = {
     {0x17C72u, "DefaultMenus"},
     {0x17CA0u, "ContinuePlayoffs"},
     {0x17D16u, "NewPO"},
-    {0x17D80u, "maketree"},
+    {0x17D80u, "MakeTree"},
     {0x17E42u, "FigureJoy"},
     {0x18002u, "InitializeGameStructures"},
     {0x18032u, "GetRandomUnusedTeam"},
@@ -4489,13 +4489,13 @@ static const struct SymEntry rom_syms[] = {
     {0xFD89Au, "PrintPlayerNameRight"},
     {0xFD8ECu, "SkipNameNumber"},
     {0xFD90Cu, "PeriodStatsScreen"},
-    {0xFDC5Au, "GameStatisticsScreen"},
+    {0xFDC5Au, "StatsReport"},
     {0xFDD6Au, "SetStatScroll"},
     {0xFDD92u, "StatScrollRow"},
     {0xFDD9Cu, "StatScrollRowEnd"},
     {0xFDDA8u, "rtsStatScroll"},
     {0xFDDAAu, "PrintStatScrollArrows"},
-    {0xFDE24u, "DisplayTeamStatsScreen"},
+    {0xFDE24u, "DisplayStats"},
     {0xFDEB4u, "PrintStatValue"},
     {0xFE14Au, "rtsStatTables"},
     {0xFE14Cu, "updatePPTeamTime"},
@@ -4546,7 +4546,7 @@ static const struct SymEntry rom_syms[] = {
     {0xFEF8Cu, "PuckComingToward"},
     {0xFEFCCu, "ReadGoaliePulled"},
     {0xFEFF0u, "EndOneTimer"},
-    {0xFF042u, "newTitleScreen"},
+    {0xFF042u, "TitleScreen"},
     {0xFF2C8u, "CreditsPrintRow"},
     {0xFF318u, "CreditsWait"},
     {0xFF348u, "VBlank_TitleScreen"},

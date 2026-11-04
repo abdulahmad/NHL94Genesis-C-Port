@@ -1,0 +1,222 @@
+# Coverage of the original routines by make lockstep alone: the sessions compared with the cartridge at every vblank (tools/coverage.py)
+# 790 of 838 routines ran (94.3%); 11042 of 12131 of their lines (91.0%)
+
+## By module (routines ran / routines, lines ran / lines)
+
+assign       14 / 17       292 / 319     91.5%
+attract       5 / 5         62 / 67      92.5%
+cards        54 / 59       605 / 648     93.4%
+checks       71 / 73      1684 / 1818    92.6%
+checksum      1 / 1          5 / 12      41.7%
+collide      36 / 38       869 / 1034    84.0%
+crowd        17 / 18       169 / 173     97.7%
+data         36 / 38       388 / 467     83.1%
+dispatch      0 / 0          0 / 0      100.0%
+display      25 / 25       356 / 371     96.0%
+fourway       2 / 2         14 / 14     100.0%
+goalie        6 / 7         52 / 63      82.5%
+hockey       25 / 28       233 / 286     81.5%
+input        38 / 38       573 / 613     93.5%
+menu          8 / 8         95 / 95     100.0%
+onetimer      7 / 8        149 / 193     77.2%
+optsetup     29 / 30       437 / 451     96.9%
+penalty      55 / 57       730 / 895     81.6%
+period       15 / 18       196 / 232     84.5%
+ram           0 / 0          0 / 0      100.0%
+records      29 / 30       480 / 505     95.0%
+replay       18 / 19       510 / 547     93.2%
+rom           0 / 0          0 / 0      100.0%
+rosters       0 / 0          0 / 0      100.0%
+rules         0 / 0          0 / 0      100.0%
+scout        17 / 17       255 / 258     98.8%
+setup        35 / 39       451 / 496     90.9%
+shootout     15 / 15       227 / 231     98.3%
+sound        30 / 32       284 / 298     95.3%
+sram          7 / 8         57 / 76      75.0%
+start         2 / 2         29 / 30      96.7%
+stats        75 / 77       929 / 966     96.2%
+title        42 / 50       389 / 430     90.5%
+video        76 / 79       522 / 543     96.1%
+z80           0 / 0          0 / 0      100.0%
+
+## Never ran (48)
+
+assign     assfight                           1 lines
+assign     assfwatch                          1 lines
+assign     assstanley                         12 lines
+cards      AppendRecordHolder                 5 lines
+cards      AppendRecordVs                     7 lines
+cards      PrintCentered                      1 lines
+cards      PrintRecordHolder                  6 lines
+cards      PrintRecordVs                      5 lines
+checks     SkateToTempTarget                  3 lines
+checks     assbreakaway                       7 lines
+collide    TryAddPlayerToList                 7 lines
+collide    setInjuryType                      27 lines
+crowd      Clamp0to100                        4 lines
+data       GetPlayerNumInitial                4 lines
+data       ShowInjuryBox                      8 lines
+goalie     SetCameraTop                       5 lines
+hockey     VBjsr                              1 lines
+hockey     startpause3                        1 lines
+hockey     startpause4                        1 lines
+onetimer   puckvzadj                          22 lines
+optsetup   rtsSetup                           1 lines
+penalty    PenShotChk                         9 lines
+penalty    getBAplayerInfo                    15 lines
+period     ClampPositionBox                   11 lines
+period     EndShootout                        17 lines
+period     SkipNameNumber                     5 lines
+records    rtsNameCursor                      1 lines
+replay     ClampReplayView                    6 lines
+setup      ReloadFaceOffMap                   1 lines
+setup      ReloadFaceOffTiles                 1 lines
+setup      ReloadRefHorTiles                  1 lines
+setup      setupice_highlight                 32 lines
+sound      ResetZ80Bus                        4 lines
+sound      handle_command_30                  8 lines
+sram       SRAMWaitVblank                     3 lines
+stats      AttribFighting                     3 lines
+stats      DisplayPenaltyLineDown             6 lines
+title      ClearPenalties                     8 lines
+title      ClearWinRecords                    7 lines
+title      PSandSOpassdir                     5 lines
+title      chkFgtBit1                         1 lines
+title      clrTmPdst                          4 lines
+title      getFgtbyte                         1 lines
+title      rtsChgplayer                       1 lines
+title      swpchk                             1 lines
+video      Opcode_CopyBackwardExtended2       4 lines
+video      UnpackNibbles                      9 lines
+video      waitjoy                            7 lines
+
+## Partly ran (128): lines ran / lines
+
+penalty    StartHL2                           17 / 102
+penalty    PenGoalStuff                       3 / 16
+data       PenaltyShotBox                     3 / 14
+hockey     clockcont_0                        8 / 37
+penalty    AddPenalty                         2 / 8
+data       ResolveGames                       17 / 45
+input      setpassmode                        4 / 10
+cards      PrintRecordValue                   5 / 12
+checksum   ValidationRoutine                  5 / 12
+hockey     CheckLateGameSong                  4 / 9
+checks     CPgoalie                           5 / 11
+collide    CheckBump                          6 / 13
+stats      DrawStatsRow                       21 / 44
+data       EncodePW                           10 / 20
+hockey     EndDemoOnPress                     2 / 4
+sram       InitSaveRAM                        16 / 32
+title      ShootoutShootCheck                 7 / 13
+input      doinput_onetimer                   6 / 11
+shootout   CountShootoutGoals                 5 / 9
+attract    DrawTeamBitmap                     4 / 7
+checks     chkpuckc                           4 / 7
+records    PrintPlayerRecords                 12 / 21
+replay     getpzjoy                           4 / 7
+collide    checkpuckcoll_sfx                  3 / 5
+records    SkipOtherUserName                  3 / 5
+records    SyncLetterCursor                   3 / 5
+title      PlaceBoardFall                     9 / 15
+collide    SetPlList                          22 / 36
+checks     breakaway                          5 / 8
+collide    Bcheck                             10 / 16
+hockey     demoread                           10 / 16
+penalty    GetLowestPen                       12 / 19
+checks     SelectPenaltyShotSkater            15 / 23
+checks     puckshootout                       34 / 52
+checks     chk4shot                           31 / 47
+data       CalcStarScores                     6 / 9
+data       ContinuePlayoffs                   8 / 12
+display    showzam                            12 / 18
+assign     assepen                            19 / 28
+goalie     ManualGoalieMenu                   13 / 19
+checks     chk4lc                             11 / 16
+collide    checkagr                           16 / 23
+input      SetShotMode                        14 / 20
+collide    wallcollb                          13 / 18
+penalty    ChkShotStat                        26 / 36
+optsetup   ReadSetupPads                      29 / 40
+checks     CompLine                           24 / 33
+setup      PeriodOver                         8 / 11
+collide    checkgoal                          119 / 162
+collide    ClampNibble                        3 / 4
+collide    Setplass                           3 / 4
+hockey     CheckInjury                        3 / 4
+setup      ExitToOpening                      3 / 4
+onetimer   assonetimer                        68 / 90
+checks     assgoaliectrl                      23 / 30
+input      lineinput                          10 / 13
+input      prepshot                           10 / 13
+attract    VBlank_SetOptions                  7 / 9
+records    ReadTeamRecords                    14 / 18
+title      VBlank_TitleScreen                 11 / 14
+collide    puckbody                           19 / 24
+collide    FallDown                           77 / 97
+checks     StartFaceoffLineChange             8 / 10
+hockey     StartPer                           4 / 5
+input      passmode                           4 / 5
+penalty    AddPenalty2                        16 / 20
+penalty    updatepentime_ut                 20 / 25
+records    UserNameEntry                      8 / 10
+setup      Opening                            4 / 5
+setup      Opening3                           4 / 5
+start      Start                              4 / 5
+stats      CheckPenaltyScroll                 4 / 5
+checks     EndPenaltyShotPlay                 9 / 11
+cards      PlayerCardScreen                   57 / 69
+collide    makepde                            5 / 6
+display    setvideo                           20 / 24
+collide    CCStart                            32 / 38
+input      restorepl                          11 / 13
+collide    holdcheck                          18 / 21
+display    uppads                             24 / 28
+penalty    RemovePlayerFromList               6 / 7
+hockey     DoGameFrame                        13 / 15
+checks     asspuckc                           41 / 47
+setup      GameOver                           7 / 8
+setup      Opening2                           7 / 8
+sound      p_music_vblank                     14 / 16
+data       FigureJoy                          44 / 50
+data       MakeTree                           22 / 25
+input      doinput                            67 / 76
+penalty    Intermission                       32 / 36
+replay     adda4                              24 / 27
+collide    puckgoalie                         57 / 64
+replay     ReplayMode                         132 / 147
+checks     dostop                             9 / 10
+input      passto                             9 / 10
+replay     RestoreReplayFrame                 56 / 62
+data       CalcTeamStarScores                 19 / 21
+checks     checkanim                          149 / 164
+replay     updatereplay                       40 / 44
+checks     BreakawayOffsidesFlagSet           21 / 23
+penalty    updatepwrplay                      21 / 23
+stats      DrawStatsList                      44 / 48
+checks     puckpenshot                        79 / 86
+period     PeriodStatsScreen                  35 / 38
+input      doinput_cbut                       24 / 26
+checks     puckfaceoff                        51 / 55
+checks     AdjustFacingDirection              13 / 14
+collide    puckstick                          39 / 42
+setup      PeriodOver_sp                  13 / 14
+checks     goalieacc                          40 / 43
+checks     ChkOffsides                        27 / 29
+records    RecordHoldersScreen                42 / 45
+assign     assbench                           43 / 46
+penalty    InProgress                         66 / 70
+hockey     Pausemode                          34 / 36
+checks     UpdatePenaltyShotEnd               19 / 20
+hockey     Begin                              22 / 23
+checks     checkob                            23 / 24
+video      dobitmap                           24 / 25
+display    VBlank                             25 / 26
+hockey     StartGame                          25 / 26
+setup      UpdateScoutingDisplay              76 / 79
+scout      ScoutingReport                     103 / 106
+optsetup   GameSetUp                          77 / 79
+input      doshot                             80 / 82
+assign     asspenalty                         44 / 45
+checks     assnearest                         120 / 122
+records    NameEntryScreen                    139 / 141

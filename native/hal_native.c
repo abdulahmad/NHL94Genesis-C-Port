@@ -69,6 +69,7 @@ void native_power_on(void)
     assign_d2 = ASSIGN_D2_START;
     le_player = le_attr = 0;
     z80_relay_power_on();
+    clock_reset();
 }
 
 void native_hal_start(mdrt *m, uint64_t start)
@@ -88,7 +89,13 @@ uint16_t vdp_read(void) { return mdrt_vdp_read16(vdp()); }
  * PSG, save RAM, the I/O chip; not the polls): lockstep places the oracle's lag frames by their
  * count */
 static void before(void) { if (!in_vblank) lockstep_before_access(); }
-static void counted(void) { if (!in_vblank) lockstep_access(++accesses); }
+static void counted(void)
+{
+    if (!in_vblank) {
+        lockstep_access(++accesses);
+        clock_on_port();
+    }
+}
 int native_in_vblank(void) { return in_vblank; }
 void native_set_accesses(uint32_t n) { accesses = n; }
 void native_set_sr(uint16_t v) { sr = v; }
@@ -109,11 +116,11 @@ void cpu_set_sr(uint16_t v)
 
 void psg_write(uint8_t v) { before(); t68k += PORT_ACCESS; mdrt_psg_port(native_m, t68k, v); counted(); }
 
-void z80_busreq(uint16_t v) { t68k += BUS_ACCESS; relay_now(); z80_relay_busreq(v); }
-uint8_t z80_busack(void) { t68k += BUS_ACCESS; relay_now(); return 0; }   /* granted at once */
-void z80_reset(uint16_t v) { t68k += BUS_ACCESS; relay_now(); z80_relay_reset(v); }
-uint8_t z80_ram_read8(uint16_t off) { t68k += BUS_ACCESS; relay_now(); return z80_ram[off & 0x1FFF]; }
-void z80_ram_write8(uint16_t off, uint8_t v) { t68k += BUS_ACCESS; relay_now(); z80_ram[off & 0x1FFF] = v; }
+void z80_busreq(uint16_t v) { t68k += BUS_ACCESS; clock_on_bus(); relay_now(); z80_relay_busreq(v); }
+uint8_t z80_busack(void) { t68k += BUS_ACCESS; clock_on_bus(); relay_now(); return 0; }   /* granted at once */
+void z80_reset(uint16_t v) { t68k += BUS_ACCESS; clock_on_bus(); relay_now(); z80_relay_reset(v); }
+uint8_t z80_ram_read8(uint16_t off) { t68k += BUS_ACCESS; clock_on_bus(); relay_now(); return z80_ram[off & 0x1FFF]; }
+void z80_ram_write8(uint16_t off, uint8_t v) { t68k += BUS_ACCESS; clock_on_bus(); relay_now(); z80_ram[off & 0x1FFF] = v; }
 
 uint8_t pad_read(uint32_t port) { before(); uint8_t v = mdrt_pad_read(mdrt_get_pads(native_m), port); counted(); return v; }
 void pad_write(uint32_t port, uint8_t v) { before(); mdrt_pad_write(mdrt_get_pads(native_m), port, v); counted(); }

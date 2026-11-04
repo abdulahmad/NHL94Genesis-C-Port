@@ -67,9 +67,9 @@ void NameEntryScreen(void)
     cpu_set_sr(0x2500);
     orjoy();
     g.framercset = d4;
-    d4 = DecompressGraphicsWithCallback(ART(FramerMap) + 8, d4, rom_find(SYM_NameEntryScreen, SYM_NameLetterGrid, frame1, 8));
+    d4 = DecompressGraphicsWithRemap(ART(FramerMap) + 8, d4, rom_find(SYM_NameEntryScreen, SYM_NameLetterGrid, frame1, 8));
     g.nameframechars = d4;
-    d4 = DecompressGraphicsWithCallback(ART(FramerMap) + 8, d4, rom_find(SYM_NameEntryScreen, SYM_NameLetterGrid, frame2, 8));
+    d4 = DecompressGraphicsWithRemap(ART(FramerMap) + 8, d4, rom_find(SYM_NameEntryScreen, SYM_NameLetterGrid, frame2, 8));
     g.smallfontchars = d4;
     d4 = AddSmallFont(d4);
     PRINTZ(str_NameEntryScreen_1);
@@ -83,7 +83,7 @@ void NameEntryScreen(void)
     g.logobox1chars = d4;
     d4 = DecompressGraphicsPlain(ART(LogoBoxMap) + 8, d4);
     g.BigFontChars = d4;
-    DecompressGraphicsWithCallback(ART(BigFontMap) + 8, d4, rom_find(SYM_NameEntryScreen, SYM_NameLetterGrid, bigfont, 8));
+    DecompressGraphicsWithRemap(ART(BigFontMap) + 8, d4, rom_find(SYM_NameEntryScreen, SYM_NameLetterGrid, bigfont, 8));
     PRINTZ(str_NameEntryScreen_3);                        /* the team's city, centred on x $1F */
     uint16_t team = g.nameentryvis ? g.VisTeam : g.HomeTeam;
     struct Text city = roster_text(&rosters_team(team)->city);
@@ -514,7 +514,7 @@ void RecordHoldersScreen(void)
     PrintRecordTitles();
     PrintWinRecords();
     for (;;) {
-        vcountwait();
+        MenuWaitVblank();
         uint16_t d0, d1, d2, d3;
         getpzjoy(&d0, &d1, &d2, &d3);
         ProcessInputWithRepeat(&d1, d2, d3);

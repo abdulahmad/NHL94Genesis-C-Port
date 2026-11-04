@@ -60,6 +60,19 @@ VECTORS = [
     ('pause_menus3', 'lockstep', dict(frames=10600, state='demo_faceoff', snap='demo_faceoff', script='pause_menus3.txt')),
     ('replay_menu', 'lockstep', dict(frames=4700, state='faceoff', snap='faceoff', script='replay_menu.txt')),
     ('demo1p', 'lockstep', dict(frames=18000, skip=23, state='demo1p_faceoff', snap='demo1p_faceoff', script=RANDOM)),   # skip: to the snapshot's frame
+    # rarer play for coverage (test/coverage_lockstep.txt): CPU against CPU from the faceoff for longer, and a
+    # shootout's shots played out. Each ends before the point where it goes out of step: there the cartridge
+    # slows down (several vblanks a pass, d7) away from the game loop's wait, where lockstep takes its state
+    # (demo_long: frame 11015, lldisp; shootout_full: frame 15966, the screen after the shootout)
+    ('demo_long', 'lockstep', dict(frames=10950, state='demo_faceoff', snap='demo_faceoff')),
+    ('shootout_full', 'lockstep', dict(frames=15940, script='shootout_full.txt')),
+    # coverage part 3 (test/coverage_lockstep.txt): pause items lockstep never opened (Player Stats,
+    # Period Stats, Manual Goalie, Team Roster Weight), and pad 2 Start in the demo (startpause2)
+    ('pause_stats', 'lockstep', dict(frames=3100, state='faceoff', snap='faceoff', script='pause_stats.txt')),
+    ('demo_p2_pause', 'lockstep', dict(frames=1000, state='demo_faceoff', snap='demo_faceoff',
+                                      script2='demo_p2_pause.txt')),
+    # six minutes idle on the setup screen: SetupDemo. Cut after it starts, before the demo ice.
+    ('setup_demo', 'lockstep', dict(frames=23800, script='setup_demo.txt')),
     # EA's 4 Way Play from power on: four players, a period of four pads at random and the next
     ('four_way_game', 'lockstep', dict(frames=6000, four_way=1, script='four_way_p1.txt', script2='four_way_p2.txt',
                                        script3='four_way_p3.txt', script4='four_way_p4.txt')),
@@ -186,7 +199,14 @@ def record(args):
         t = time.time()
         p = subprocess.run(i.command(), cwd=REPO, capture_output=True, text=True)
         if p.returncode:
-            return i, 'FAILED: ' + (p.stderr.strip().splitlines() or ['?'])[-1]
+            err = (p.stderr.strip().splitlines() or p.stdout.strip().splitlines() or [])
+            if p.returncode < 0:
+                why = 'signal %d' % (-p.returncode)
+            elif err:
+                why = err[-1]
+            else:
+                why = 'exit %d' % p.returncode
+            return i, 'FAILED: ' + why
         return i, 'made in %.0f s' % (time.time() - t)
 
     # states and snapshots first (in that order), then the vectors, a few at a time (memory)

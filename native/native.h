@@ -230,12 +230,26 @@ void banner_tiles(const uint8_t px[16][88], uint8_t out[22 * 32]);   /* its 22 t
 const uint8_t *banner_set(int set, int *count, uint32_t *map);       /* a set's tiles (unpacked) and map */
 int banner_selfcheck(int *letters, int *same);           /* -> the banners checked (rosters_test) */
 
+/* Original speed (clock.c): Smooth (the default) is one vblank a game-loop pass; Original is the
+ * cartridge's slowdown, a 68k cost model fitted from lockstep traces (native/costs.inc), off until
+ * --original / --speed original or the menu. --lockstep --original checks lag, it does not resync */
+void clock_cli(int on);                  /* the command line: 0 Smooth, 1 Original (wins over the menu) */
+void clock_set_original(int on);         /* the menu / settings (ignored when clock_cli was used) */
+int clock_original(void);
+void clock_reset(void);                  /* a new power on */
+void clock_on_enter(uint32_t routine);   /* an src/ function entry (0: a C helper); lockstep.c's hooks */
+void clock_on_exit(uint32_t routine);
+void clock_on_port(void);                /* a counted VDP / pad / SRAM / PSG access */
+void clock_on_bus(void);                 /* a 68k byte on the Z80's bus */
+void clock_report(void);                 /* (at the session's end, Original only) */
+
 /* lockstep against the oracle (lockstep.c) */
 int lockstep_load(const char *path, mdrt *m);
 void lockstep_check(long frame);
 void lockstep_report(void);              /* (at the session's end) */
 int lockstep_vblank_again(void);         /* the oracle's next vblank came at the rte of this one's code: run it now */
 int lockstep_result(void);               /* 0 all passed, 1 a check differed, 2 stopped before the recording's end */
+int lockstep_playing(void);              /* a lockstep file is loaded */
 void lockstep_access(uint32_t n);        /* the game's port access n (hal_native.c: not the vblank code's) */
 void lockstep_before_access(void);       /* before the game's next one */
 void lockstep_unmask(uint32_t n);        /* the game unmasked the interrupts after port access n */

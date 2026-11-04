@@ -92,9 +92,13 @@ static const uint8_t presets[3][RULE_COUNT] = {
 };
 
 /* the page: the roster set (who plays: the cartridge's, or a folder of rosters/), the preset, then the
- * rules */
+ * rules, then Game Speed (Smooth the default; Original the cartridge's slowdown). Speed is a host
+ * setting, not a game rule: Classic hashes stay the same. */
 enum { P_ROSTERS, P_PRESET, P_RULES };
-mdrt_sdl_option rule_page[P_RULES + RULE_COUNT];
+#define P_SPEED (P_RULES + RULE_COUNT)
+mdrt_sdl_option rule_page[P_SPEED + 1];
+static const char *const speed_names[] = { "smooth", "original" };
+static const char *const speed_labels[] = { "Smooth", "Original" };
 
 static void page_init(void)
 {
@@ -105,19 +109,22 @@ static void page_init(void)
     rule_page[P_ROSTERS] = (mdrt_sdl_option){ "rules.rosters", "Rosters", n, names, labels, 0, 0, 0, 0, NULL, NULL, &find };
     rule_page[P_PRESET] = (mdrt_sdl_option){ "rules.preset", "Preset", 4, preset_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL };
     memcpy(rule_page + P_RULES, rule_options, sizeof rule_options);
+    rule_page[P_SPEED] = (mdrt_sdl_option){ "game.speed", "Game Speed", 2, speed_names, speed_labels, 0, 0, 0, 0, NULL, NULL, NULL };
 }
 
 const mdrt_sdl_option *rules_page(int *count)
 {
     page_init();
-    *count = P_RULES + RULE_COUNT;
+    *count = P_SPEED + 1;
     return rule_page;
 }
 
-/* the Rosters page (its line, and below it what the roster set chosen holds) and the Game rules page */
-static mdrt_sdl_page pages[2] = {
+/* the Rosters page (its line, and below it what the roster set chosen holds), the Game rules page,
+ * and Speed (Smooth the default) */
+static mdrt_sdl_page pages[3] = {
     { "Rosters", "Teams, players and art", P_ROSTERS, 1 },
     { "Game rules", "Classic: the original game", P_PRESET, 1 + RULE_COUNT },
+    { "Speed", "Smooth: one vblank a pass (the default). Original: the cartridge's slowdown", P_SPEED, 1 },
 };
 
 const mdrt_sdl_page *rules_pages(int *count)
@@ -128,7 +135,7 @@ const mdrt_sdl_page *rules_pages(int *count)
         snprintf(note, sizeof note, "Teams, players and art. %d will not read", rosters_unread());
         pages[0].note = note;
     }
-    *count = 2;
+    *count = 3;
     return pages;
 }
 
@@ -145,7 +152,7 @@ void rules_page_text(int page, const int *values, char *text, size_t size, void 
 int rules_page_changed(int which, int *values, void *user)
 {
     (void)user;
-    if (which == P_ROSTERS) return 0;
+    if (which == P_ROSTERS || which == P_SPEED) return 0;
     if (which == P_PRESET) {
         if (values[P_PRESET] == PRESET_CUSTOM) return 0;
         for (int i = 0; i < RULE_COUNT; i++) if (i != RULE_VIEW) values[P_RULES + i] = presets[values[P_PRESET]][i];
@@ -182,6 +189,8 @@ void rules_page_use(const int *values, void *user)
     char dir[600];
     rosters_next(rosters_list_dir(values[P_ROSTERS], dir, sizeof dir));   /* (NULL: the cartridge's) */
     rules_next(values + P_RULES, user);
+    clock_set_original(values[P_SPEED]);
+    native_net_identity("");                              /* (the session's identity follows Game Speed) */
 }
 
 /* the Rosters line's Files: a roster set the player found (its folder, or a package), made one of the

@@ -301,7 +301,7 @@ void PrintOptions(uint16_t d7)
         if (line == 0x10) break;
     }
     PrintScrollMarks();
-    DrawMatchupBitmaps();
+    TeamIcons();
     if (!(g.setupcardflags & CARD(0))) ResetCardTimer();
 }
 
@@ -407,11 +407,11 @@ void setoptions(void)
     orjoy();
     uint16_t c = LoadSetupTiles();
     g.framercset = c;
-    c = DecompressGraphicsWithCallback(ART(SetupFramerMap) + 8, c, rom_find(SYM_setoptions, SYM_ReadSetupPads, framer, 8));
+    c = DecompressGraphicsWithRemap(ART(SetupFramerMap) + 8, c, rom_find(SYM_setoptions, SYM_ReadSetupPads, framer, 8));
     g.smallfontchars = c;
-    c = DecompressGraphicsWithCallback(ART(SmallFontMap) + 8, c, rom_find(SYM_setoptions, SYM_ReadSetupPads, font, 8));
+    c = DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, c, rom_find(SYM_setoptions, SYM_ReadSetupPads, font, 8));
     g.setupfontchars = c;
-    c = DecompressGraphicsWithCallback(ART(PrintFont2Map) + 8, c, rom_find(SYM_setoptions, SYM_ReadSetupPads, font2, 8));
+    c = DecompressGraphicsWithRemap(ART(PrintFont2Map) + 8, c, rom_find(SYM_setoptions, SYM_ReadSetupPads, font2, 8));
     printz(str_setoptions_1, sizeof str_setoptions_1);
     eraser(0x28, 0x1C, 0x7FF);
     printz(str_setoptions_2, sizeof str_setoptions_2);
@@ -428,8 +428,8 @@ void setoptions(void)
     g.logobox1chars = c;
     c = DecompressGraphicsPlain(ART(LogoBoxMap) + 8, c);
     g.logobox2chars = c;
-    c = DecompressGraphicsWithCallback(ART(LogoBoxMap) + 8, c, rom_find(SYM_setoptions, SYM_ReadSetupPads, logobox, 8));
-    defaultsprites2(c);
+    c = DecompressGraphicsWithRemap(ART(LogoBoxMap) + 8, c, rom_find(SYM_setoptions, SYM_ReadSetupPads, logobox, 8));
+    defaultsprites_0(c);
     sortobj(0)->OldXpos = 0x28;
     sortobj(6)->OldXpos = 0x28;
     ST_W(g.teams[0].shots);
@@ -510,7 +510,7 @@ void SetupDemo(void)
 /* optsetup94.asm:SetupStart. Start: the Goalies option to both teams, pojoy, a new seed;
  * OptLine and OptPlayMode kept in TmpOptLine2 / TempOptPlayMode while Auto line changes play as
  * On (sflags7 bit 4) and Shootout as Regular Season (gmode2 bit 0, ClearShootout); then the
- * playoff tree (maketree). */
+ * playoff tree (MakeTree). */
 void SetupStart(void)
 {
     g.goaliemode1 = g.OptGoalie;
@@ -529,7 +529,7 @@ void SetupStart(void)
         g.gmode2 |= HI(0);
         ClearShootout();
     }
-    maketree();
+    MakeTree();
 }
 
 /* the colour table LoadSetupTiles remaps the visitors' TeamBitmaps with (its 68k address) */
@@ -545,7 +545,7 @@ uint16_t LoadSetupTiles(void)
 {
     uint16_t c = DecompressGraphicsPlain(ART(TeamBitmaps) + 8, 2);
     g.teambitmapchars = c;
-    return DecompressGraphicsWithCallback(ART(TeamBitmaps) + 8, c, SetupTilesRemap());
+    return DecompressGraphicsWithRemap(ART(TeamBitmaps) + 8, c, SetupTilesRemap());
 }
 
 /* optsetup94.asm:UpdateRosterPlayers. Empty. */

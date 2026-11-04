@@ -84,7 +84,7 @@ flash:
 /* sram94.asm:SRAMWaitVblank. Wait for the next vblank. */
 void SRAMWaitVblank(void)
 {
-    vcountwait();
+    MenuWaitVblank();
 }
 
 /* sram94.asm:VBcount. The vblank while InitSaveRAM runs: vcount + 1 only. */

@@ -156,17 +156,17 @@ void PrintStatScrollArrows(void)
     printsmallz(str_PrintStatScrollArrows_6, sizeof str_PrintStatScrollArrows_6);
 }
 
-/* period94.asm:DisplayTeamStatsScreen. The team logos, then each stat row (without the power
+/* period94.asm:DisplayStats. The team logos, then each stat row (without the power
  * play rows when penalties are off) centred, with the home value at x $22 and the visitors'
  * at x 9. */
-void DisplayTeamStatsScreen(void)
+void DisplayStats(void)
 {
-    printz(str_DisplayTeamStatsScreen_1, sizeof str_DisplayTeamStatsScreen_1);
+    printz(str_DisplayStats_1, sizeof str_DisplayStats_1);
     PutTeamBlock(0x2C);
-    printz(str_DisplayTeamStatsScreen_2, sizeof str_DisplayTeamStatsScreen_2);
+    printz(str_DisplayStats_2, sizeof str_DisplayStats_2);
     PutTeamBlock(0);
     SetStatScroll();
-    printz(str_DisplayTeamStatsScreen_3, sizeof str_DisplayTeamStatsScreen_3);
+    printz(str_DisplayStats_3, sizeof str_DisplayStats_3);
     int rows = 0xE;
     uint32_t a1 = SYM_TeamStatTextTbl;
     if (g.OptPen == 0) { rows = 0xA; a1 = SYM_TeamStatTextTblNoPen; }
@@ -338,7 +338,7 @@ void PeriodStatsScreen(void)
     g.palcount = 0x18;
     for (;;) {
         uint16_t d0, d2, d3;
-        uint16_t d1 = WaitVSyncAndReadInput(&d0, &d2, &d3);
+        uint16_t d1 = Pausemode_rjoy(&d0, &d2, &d3);
         if (d1 & 0x80) break;
         if (d1 & 4) {
             if (!g.matchup) continue;
@@ -358,7 +358,7 @@ void PeriodStatsScreen(void)
 /* period94.asm:rtsStatTables. The scroll step's rts. */
 void rtsStatTables(void) {}
 
-/* GameStatisticsScreen's .scroll: move the rows by PlayerScrollCtr within 0..matchupvis,
+/* StatsReport's .scroll: move the rows by PlayerScrollCtr within 0..matchupvis,
  * stopping at a row boundary; at the boundaries print the row that scrolls in */
 static void stats_scroll(void)
 {
@@ -377,15 +377,15 @@ static void stats_scroll(void)
     SetStatScroll();
 }
 
-/* period94.asm:GameStatisticsScreen. The "Game Statistics" menu item: both teams' totals
- * (DisplayTeamStatsScreen) under the team blocks; up / down scroll the rows (to $70, or $30
+/* period94.asm:StatsReport. The "Game Statistics" menu item: both teams' totals
+ * (DisplayStats) under the team blocks; up / down scroll the rows (to $70, or $30
  * without penalties), start leaves. */
-void GameStatisticsScreen(void)
+void StatsReport(void)
 {
     SetupScreen(9, 0x1A);
-    printz(str_GameStatisticsScreen_1, sizeof str_GameStatisticsScreen_1);
+    printz(str_StatsReport_1, sizeof str_StatsReport_1);
     Framer(0x20, 6);
-    printbigz(str_GameStatisticsScreen_2, sizeof str_GameStatisticsScreen_2);
+    printbigz(str_StatsReport_2, sizeof str_StatsReport_2);
     PutTeamBlock(0x2C);
     g.printx += 4;
     PutTeamBlock(0);
@@ -394,10 +394,10 @@ void GameStatisticsScreen(void)
     g.PlayerScrollCtr = 0;
     g.matchupvis = 0x70;
     if (g.OptPen == 0) g.matchupvis = 0x30;
-    DisplayTeamStatsScreen();
+    DisplayStats();
     PrintStatScrollArrows();
     for (;;) {
-        vcountwait();
+        MenuWaitVblank();
         uint16_t d0, d1, d2, d3;
         getpzjoy(&d0, &d1, &d2, &d3);
         if (d3 & 0x80) { ExitStatsScreen(); return; }

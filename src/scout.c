@@ -52,12 +52,12 @@ void ScoutingReport(void)
     g.vispicchars = c;
     c += 0x24;
     g.BigFontChars = c;
-    c = DecompressGraphicsWithCallback(ART(BigFontMap) + 8, c, rom_find(SYM_ScoutingReport, SYM_PageMatchup, bigfont, 8));
+    c = DecompressGraphicsWithRemap(ART(BigFontMap) + 8, c, rom_find(SYM_ScoutingReport, SYM_PageMatchup, bigfont, 8));
     c = AddSmallFont(c);
     g.smallfont2chars = c;
-    c = DecompressGraphicsWithCallback(ART(SmallFontMap) + 8, c, rom_find(SYM_ScoutingReport, SYM_PageMatchup, smallfont, 8));
+    c = DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, c, rom_find(SYM_ScoutingReport, SYM_PageMatchup, smallfont, 8));
     g.framercset = c;
-    c = DecompressGraphicsWithCallback(ART(FramerMap) + 8, c, rom_find(SYM_ScoutingReport, SYM_PageMatchup, framer, 8));
+    c = DecompressGraphicsWithRemap(ART(FramerMap) + 8, c, rom_find(SYM_ScoutingReport, SYM_PageMatchup, framer, 8));
     PRINTZ(str_ScoutingReport_1);
     uint32_t img = ART(ScoutMap);
     c = dobitmap(img + rd32(rom_ptr(img)), img + rd32(rom_ptr(img + 4)), img + 8, 0, 0, 0x28, 0x1C, c, 3);

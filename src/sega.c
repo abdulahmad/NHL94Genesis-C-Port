@@ -1,7 +1,6 @@
-/* main94.asm:Start and sega/SegaInit.asm: power on. Sega's hardware init (the VDP's registers,
- * VRAM cleared by a DMA fill, the Z80's startup program, work RAM, CRAM, VSRAM and the PSG
- * cleared), the ROM checksum (checksum94.asm), then Begin. */
-#include <string.h>
+/* sega/SegaInit.asm: Sega's standard startup code. It runs from reset before anything
+ * else, checks the hardware, sets up the video chip, the Z80 and the sound chip, clears
+ * RAM and then starts the game. */
 #include "game.h"
 #include "hal.h"
 #include "rom.h"
@@ -35,12 +34,4 @@ void SegaInit(void)
         z80_reset(0);
     }
     vdp_status();                                         /* CHECK_VDP */
-}
-
-/* main94.asm:Start. Power on: SegaInit, the checksum, then the game. */
-void Start(void)
-{
-    SegaInit();
-    ValidationRoutine();
-    Begin();
 }

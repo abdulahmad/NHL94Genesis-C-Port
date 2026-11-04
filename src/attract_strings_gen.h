@@ -3,6 +3,6 @@
 #include <stdint.h>
 
 static const uint8_t str_EASportsScreen_1[6] = { 0, 6, 254, 0, 0, 0 };   /* attract94.asm:21 printz */
-static const uint8_t str_DrawMatchupBitmaps_1[6] = { 0, 6, 191, 7, 1, 0 };   /* attract94.asm:71 printz */
-static const uint8_t str_DrawMatchupBitmaps_2[6] = { 0, 6, 191, 22, 1, 0 };   /* attract94.asm:81 printz */
+static const uint8_t str_TeamIcons_1[6] = { 0, 6, 191, 7, 1, 0 };   /* attract94.asm:71 printz */
+static const uint8_t str_TeamIcons_2[6] = { 0, 6, 191, 22, 1, 0 };   /* attract94.asm:81 printz */
 static const uint8_t str_setoptions_printpos2_1[6] = { 0, 6, 191, 2, 10, 0 };   /* attract94.asm:132 printz */

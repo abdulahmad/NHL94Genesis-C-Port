@@ -37,10 +37,10 @@ uint32_t PrintMenuItem(uint32_t item)
     return skip_string(item);
 }
 
-/* menu94.asm:UpdateMenuSelection. Clamp the selection to the items, scroll the four rows shown,
+/* menu94.asm:Pausemode_Pmenu. Clamp the selection to the items, scroll the four rows shown,
  * and print the menu: the title, the rows (the selected one marked), { and } when there are
  * items above / below. -> d1 = the row counter as the 68k leaves it. */
-uint16_t UpdateMenuSelection(void)
+uint16_t Pausemode_Pmenu(void)
 {
     int16_t sel = (int16_t)menu_item();
     if (sel < 0) { set_menu_item(0); sel = 0; }
@@ -59,18 +59,18 @@ uint16_t UpdateMenuSelection(void)
     SetMenuPrintX();
     g.printy = 0xD;
     uint32_t item = printsmall(g.menulist);                /* the title */
-    PRINTSMALLZ(str_UpdateMenuSelection_1);              /* clear the four rows */
+    PRINTSMALLZ(str_Pausemode_Pmenu_1);              /* clear the four rows */
     item = skip_string(item);
     for (uint16_t n = menu_top(); n; n--) item = skip_string(item) + 4;
     uint16_t rows = 3;
     g.printy = 0xC;
     SetMenuPrintX();
     uint16_t row = menu_top();
-    if (row != 0) PRINTSMALLZ(str_UpdateMenuSelection_2);   /* { */
+    if (row != 0) PRINTSMALLZ(str_Pausemode_Pmenu_2);   /* { */
     int last;
     do {
         SetMenuPrintX();
-        PRINTSMALLZ(str_UpdateMenuSelection_3);
+        PRINTSMALLZ(str_Pausemode_Pmenu_3);
         uint32_t marker = printsmall(g.menulist);
         if (row == menu_item()) printsmall(marker);
         item = PrintMenuItem(item);
@@ -80,27 +80,27 @@ uint16_t UpdateMenuSelection(void)
     } while (!last && rows-- != 0);
     if (!last) {
         SetMenuPrintX();
-        PRINTSMALLZ(str_UpdateMenuSelection_4);           /* } */
+        PRINTSMALLZ(str_Pausemode_Pmenu_4);           /* } */
     }
     return rows;
 }
 
 /* menu94.asm:DrawMenuScreen. Draw the screen behind the menu (menudraw), frame the menu box,
- * print it and fade in. -> d1 as UpdateMenuSelection leaves it. */
+ * print it and fade in. -> d1 as Pausemode_Pmenu leaves it. */
 uint16_t DrawMenuScreen(void)
 {
     call68k(g.menudraw);
     PRINTSMALLZ(str_DrawMenuScreen_1);
     SetMenuPrintX();
     Framer(0x16, 6);
-    uint16_t d1 = UpdateMenuSelection();
+    uint16_t d1 = Pausemode_Pmenu();
     g.palcount = 0x18;
     return d1;
 }
 
-/* menu94.asm:InitMenuState. Start a menu: a0 = item list, a1 = screen draw routine, item 0
+/* menu94.asm:Pausemode_top. Start a menu: a0 = item list, a1 = screen draw routine, item 0
  * selected and shown first; falls into DrawMenuScreen -> d1. */
-uint16_t InitMenuState(uint32_t items, uint32_t draw)
+uint16_t Pausemode_top(uint32_t items, uint32_t draw)
 {
     g.menulist = items;
     g.menudraw = draw;
@@ -116,8 +116,8 @@ uint16_t InitMenuState(uint32_t items, uint32_t draw)
 int HandleMenuInput(uint16_t *d1)
 {
     if (*d1 & 0x80) return 1;
-    if (*d1 & 2) { set_menu_item((uint16_t)(menu_item() + 1)); *d1 = UpdateMenuSelection(); return 0; }
-    if (*d1 & 1) { set_menu_item((uint16_t)(menu_item() - 1)); *d1 = UpdateMenuSelection(); return 0; }
+    if (*d1 & 2) { set_menu_item((uint16_t)(menu_item() + 1)); *d1 = Pausemode_Pmenu(); return 0; }
+    if (*d1 & 1) { set_menu_item((uint16_t)(menu_item() - 1)); *d1 = Pausemode_Pmenu(); return 0; }
     if (!(*d1 & 0x20)) return 0;
     seta2();
     uint32_t a = skip_string(skip_string(g.menulist));
@@ -147,8 +147,8 @@ void PutTeamBlock(uint16_t off)
     g.disflags = saved;
 }
 
-/* menu94.asm:vcountwait. Wait until vcount moves off oldvcount, then put it back. */
-void vcountwait(void)
+/* menu94.asm:MenuWaitVblank. Wait until vcount moves off oldvcount, then put it back. */
+void MenuWaitVblank(void)
 {
     uint16_t v = g.oldvcount;
     while (g.vcount == v) hal_wait_vblank();

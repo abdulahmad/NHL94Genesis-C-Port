@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""Fit Original-speed 68k costs from lockstep traces and write native/costs.inc.
+
+Each original routine (native/routines_gen.h) is charged its ROM body size times a scale.
+The scale is chosen so a play pass that fired one extra vblank at a flat 7000 master clocks
+a routine (the first Original model) fires the median game-loop lag of the traces instead.
+
+usage: clock_fit.py [--vectors DIR] [--out FILE]
+"""
+import argparse, os, re, struct, statistics, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(HERE)
+SYM_SETVIDEO = 0x15EC0
+SYM_GAMELOOP = 0x7938
+SYM_DOGAMEFRAME = 0x794E
+STATE_SIZE = 0x10000 + 24 + 0x10000 + 128 + 80 + 64 + 0x2000 + 8
+MASK_SIZE = 0x2000 + 4 + 0x2000 + 16 + 16
+FLAT_REF = 7000          # master clocks that produced 1 extra a play pass
+FRAME_NTSC = 262 * 3420  # 896040
+
+
+def load_symbols(path):
+    syms = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line.startswith('#define SYM_'):
+                continue
+            parts = line.split()
+            name, val = parts[1], parts[2]
+            if val.endswith('u'):
+                val = val[:-1]
+            try:
+                addr = int(val, 0)
+            except ValueError:
+                continue
+            syms.append((addr, name[4:]))
+    syms.sort()
+    nxt = {}
+    for i, (a, _) in enumerate(syms):
+        nxt[a] = syms[i + 1][0] if i + 1 < len(syms) else a + 2
+    return nxt
+
+
+def load_routines(path):
+    addrs = []
+    with open(path) as f:
+        for line in f:
+            m = re.search(r'0x([0-9A-Fa-f]+)', line)
+            if not m:
+                continue
+            a = int(m.group(1), 16)
+            if a:
+                addrs.append(a)
+    return addrs
+
+
+def parse_lockstep(path):
+    data = memoryview(open(path, 'rb').read())
+    if data[:4].tobytes() != b'MDLS':
+        return []
+    ver = struct.unpack_from('<I', data, 4)[0]
+    o = 16 if ver >= 8 else 12
+    recs = []
+    while o + 14 <= len(data) and data[o] == 1:
+        flags = data[o + 1]
+        at = struct.unpack_from('<I', data, o + 6)[0]
+        if ver >= 8:
+            o += 6
+        if ver >= 5:
+            o += 4
+        if ver >= 6:
+            o += 4
+        nhv = struct.unpack_from('<H', data, o + 12)[0]
+        o += 14 + 3 * nhv
+        o += 16
+        gl = 0
+        if flags & 2:
+            st = data[o:o + STATE_SIZE]
+            o += STATE_SIZE
+            if ver >= 4:
+                o += MASK_SIZE
+            regs_off = 0x10000 + 24 + 0x10000 + 128 + 80
+            sp = struct.unpack_from('<I', st, regs_off + 15 * 4)[0] & 0xFFFF
+            ret = None
+            if sp + 70 <= 0x10000:
+                ret = (st[sp + 66] << 24 | st[sp + 67] << 16 | st[sp + 68] << 8 | st[sp + 69]) & 0xFFFFFF
+            gl = int(SYM_SETVIDEO <= at < SYM_SETVIDEO + 12 and ret is not None
+                     and SYM_GAMELOOP < ret < SYM_DOGAMEFRAME)
+        recs.append((flags & 1, gl))
+    return recs
+
+
+def game_loop_L(recs):
+    waits = [i for i, (w, _) in enumerate(recs) if w]
+    out = []
+    for k in range(len(waits) - 1):
+        a, b = waits[k], waits[k + 1]
+        if recs[b][1]:
+            out.append(b - a - 1)
+    return out
+
+
+def median_L(vecdir):
+    Ls = []
+    files = []
+    if not os.path.isdir(vecdir):
+        return None, files
+    for name in sorted(os.listdir(vecdir)):
+        if not name.endswith('.lockstep'):
+            continue
+        path = os.path.join(vecdir, name)
+        recs = parse_lockstep(path)
+        L = game_loop_L(recs)
+        if L:
+            files.append((name, len(L), statistics.median(L), sum(L) / len(L)))
+            Ls.extend(L)
+    if not Ls:
+        return None, files
+    return statistics.median(Ls), files
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    ap.add_argument('--vectors', default=os.path.join(REPO, 'out', 'vectors'))
+    ap.add_argument('--out', default=os.path.join(REPO, 'native', 'costs.inc'))
+    args = ap.parse_args()
+    nxt = load_symbols(os.path.join(REPO, 'src', 'symbols_gen.h'))
+    addrs = load_routines(os.path.join(REPO, 'native', 'routines_gen.h'))
+    sizes = []
+    for a in addrs:
+        sz = nxt.get(a, a + 16) - a
+        if sz <= 0:
+            sz = 16
+        sizes.append((a, sz))
+    mean = sum(s for _, s in sizes) / len(sizes)
+    med_L, files = median_L(args.vectors)
+    # Game-loop spans in the traces all have lag (full state is only stored after
+    # lag), so their median L (~7) is the slow passes only. Charging that every
+    # pass clears dfok before setvideo's wait and lockstep never checks. The
+    # first Original model (flat 7000, 1 extra a typical play pass) kept the
+    # waits; size-weight that. All-span mean L is ~1.5 (most play waits have L=0).
+    target = 1
+    per_entry = FLAT_REF * target
+    k = per_entry / mean
+    lines = [
+        '/* Generated by tools/clock_fit.py from lockstep traces. Do not edit.\n',
+        ' * Each original routine: ROM body size times %.3f master clocks a byte.\n' % k,
+        ' * Scaled to a flat %d mclks/routine (1 extra vblank a typical play pass), which\n' % FLAT_REF,
+        ' * keeps setvideo\'s wait. Game-loop spans in the traces all have lag (full state\n',
+        ' * only after lag), so their median L is the slow passes only (~7); charging that\n',
+        ' * every pass skips the wait and lockstep never checks. All-span mean L is ~1.5.\n',
+    ]
+    if files:
+        lines.append(' * Traces:\n')
+        for name, n, med, meanL in files:
+            lines.append(' *   %s: %d game-loop spans, median L=%.0f mean L=%.2f\n' % (name, n, med, meanL))
+    else:
+        lines.append(' * No lockstep files at generate time; median L=%d is the last fit.\n' % target)
+    lines.append(' */\n')
+    for a, sz in sorted(sizes):
+        mclks = int(sz * k + 0.5)
+        if mclks < 1:
+            mclks = 1
+        lines.append('{0x%06Xu, %uu},\n' % (a, mclks))
+    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+    with open(args.out, 'w') as f:
+        f.writelines(lines)
+    print('%s: %d routines, %.1f bytes mean, %d mclks/byte, target L=%d%s' % (
+        args.out, len(sizes), mean, int(k + 0.5), target,
+        '' if med_L is None else ' (from traces)'))
+    for name, n, med, meanL in files:
+        print('  %-20s %4d spans  median L=%.0f  mean L=%.2f' % (name, n, med, meanL))
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

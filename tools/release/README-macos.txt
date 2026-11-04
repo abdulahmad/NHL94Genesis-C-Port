@@ -1,5 +1,8 @@
 ninety-four v@VERSION@: NHL '94, rebuilt in C
 https://github.com/1nputs/ninety-four
+Credits: built on the byte-matching disassembly NHL94Genesis by abdulahmad
+(https://github.com/abdulahmad/NHL94Genesis), with help from chaos, StaticEck, McMarkis (Mhopkinsinc) and Drezz,
+and special thanks to smozoma and kingraph.
 
 You need your own NHL '94 ROM (the 1 MB US/Europe retail cartridge dump). Open ninety-four.app:
 the first time it asks for the ROM in a file browser and remembers it.

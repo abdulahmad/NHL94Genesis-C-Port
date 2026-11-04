@@ -15,6 +15,7 @@
  *              [--extract-rom HACK DIR] [--pack-rosters DIR FILE.zip] [--art-check | --art-map]
  *              [--hashes FILE] [--host [PORT] | --join ADDR[:PORT] | --peer ADDR[:PORT]] [--port PORT]
  *              [--delay N] [--name NAME] [--here N] [--players N] [--net-sim MS,MS,%,%]
+ *              [--smooth | --original | --speed smooth|original]
  *
  * --art-check (headless) counts every byte the VDP takes by DMA from the game's data and those in
  * no piece of the art map (art.c: every piece of art the game reads by number, the cartridge's
@@ -60,7 +61,11 @@
  * (mdrt_sim_hash: all a state holds, which netplay's desync checks compare), frames a rollback plays
  * again included (tools/netplay_check.py compares the last of each with a solo run's).
  * Headless, the save RAM is a new cartridge's unless --sram FILE names one (read at power on and
- * written back if the game changed it); a player's out/nhl94.srm is never touched otherwise. */
+ * written back if the game changed it); a player's out/nhl94.srm is never touched otherwise.
+ * --smooth (the default) is one vblank a game-loop pass. --original / --slowdown / --speed original
+ * is the cartridge's slowdown (a 68k cost model: a pass can take extra vblanks, elapsed > 1). The
+ * window's Speed page and settings.ini game.speed keep the same choice (Smooth until changed).
+ * --lockstep with --original checks lag frames (plan E6) instead of resyncing; Smooth still resyncs. */
 #include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -363,7 +368,7 @@ void native_game(mdrt *m, void *user)
     native_net_power_on(m);
     rules_power_on();                                     /* (this game's rules and roster set; a state loaded brings its own) */
     rosters_power_on();
-    if (setjmp(out)) { lockstep_report(); record(m, -1); return; }
+    if (setjmp(out)) { lockstep_report(); clock_report(); record(m, -1); return; }
     if (!load_state_path) record(m, MDRT_TRACE_SOUND);    /* (from the first frame: the chips' every write) */
     if (boot) { record(m, MDRT_TRACE_VDP); record(m, MDRT_TRACE_PADS); }
     if (states) native_states_init(m, rewind_states ? state_file : NULL, rewind_states);
@@ -730,6 +735,14 @@ int main(int argc, char **argv)
             net_load_frame = atol(argv[++i]);
             net_load_path = strchr(argv[i], ':') + 1;
         }
+        else if (!strcmp(argv[i], "--original") || !strcmp(argv[i], "--slowdown")) clock_cli(1);
+        else if (!strcmp(argv[i], "--smooth")) clock_cli(0);
+        else if (!strcmp(argv[i], "--speed") && i + 1 < argc) {
+            const char *v = argv[++i];
+            if (!strcmp(v, "original") || !strcmp(v, "slowdown")) clock_cli(1);
+            else if (!strcmp(v, "smooth")) clock_cli(0);
+            else { fprintf(stderr, "--speed: original or smooth (smooth is the default)\n"); return 2; }
+        }
         else {
             fprintf(stderr, "usage: %s [--rom FILE] [--snap FILE | --boot] [--scale N] [--aspect] [--sram FILE] [--headless]\n"
                             "       [--frames N] [--shot FILE.ppm] [--shots DIR --every N] [--wav FILE] [--input FILE]\n"
@@ -740,6 +753,7 @@ int main(int argc, char **argv)
                             "       [--rule NAME=VALUE ...] (the game rules: native/rules.c) [--rosters DIR] (rosters.c)\n"
                             "       [--check-rosters DIR] [--export-rosters DIR] [--extract-rom HACK DIR] [--pack-rosters DIR FILE.zip]\n"
                             "       [--art-check | --art-map] (the art map: art.c) [--hashes FILE]\n"
+                            "       [--smooth | --original | --speed smooth|original] (Original: the cartridge's slowdown)\n"
                             "       %s (netplay: net.c)\n", argv[0], MDRT_NET_USAGE);
             return 2;
         }
@@ -773,6 +787,7 @@ int main(int argc, char **argv)
         inputs = 1;
     }
     if (snap && load_state_path) { fprintf(stderr, "--snap or --load-state, not both\n"); return 2; }
+    /* --lockstep --original: E6, lag frames checked (not resynced) at the game loop */
     if (lockstep_path && !rules_classic()) { fprintf(stderr, "--lockstep: the original is played by the Classic rules only\n"); return 2; }
     if (lockstep_path && !rosters_next_is_cartridge()) { fprintf(stderr, "--lockstep: the original is played by the cartridge's teams only\n"); return 2; }
     if (netopt.on && (snap || load_state_path || lockstep_path || restart_frame >= 0 || script_requests || load_at_path)) {

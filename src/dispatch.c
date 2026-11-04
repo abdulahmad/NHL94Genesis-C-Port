@@ -12,7 +12,7 @@ static void player_stats(void) { PlayerStatsScreen(seta2()); }
 static void line_editor(void) { LineEditor(seta2()); }
 static void team_roster(void) { TeamRosterScreen(seta2()); }
 static void timeout_menu(void) { TimeoutMenu(seta2()); }
-static void select_goalie(void) { SelectGoalieMenu(seta2()); }
+static void select_goalie(void) { Pausemode_go(seta2()); }
 static void shootout_shooters(void) { ShootoutShooters(seta2()); }
 static void encode_lines(void) { EncodeTeamLines(seta2()); }
 static void decode_lines(void) { DecodeTeamLines(seta2()); }
@@ -27,7 +27,7 @@ static const struct { uint32_t addr; void (*fn)(void); } routines[] = {
     { SYM_LineEditor, line_editor },
     { SYM_TeamRosterScreen, team_roster },
     { SYM_TimeoutMenu, timeout_menu },
-    { SYM_SelectGoalieMenu, select_goalie },
+    { SYM_Pausemode_go, select_goalie },
     { SYM_ShootoutShooters, shootout_shooters },
     { SYM_EncodeTeamLines, encode_lines },
     { SYM_DecodeTeamLines, decode_lines },
@@ -39,7 +39,7 @@ static const struct { uint32_t addr; void (*fn)(void); } routines[] = {
     { SYM_PlayerCards, PlayerCards },
     { SYM_RecordHoldersScreen, RecordHoldersScreen },
     { SYM_ReloadRinkGraphics, ReloadRinkGraphics },
-    { SYM_SetupPauseScreen, SetupPauseScreen },
+    { SYM_Pausemode_pall, Pausemode_pall },
     { SYM_VBlank, VBlank },
     { SYM_vb2, vb2 },
     { SYM_VBcount, VBcount },
@@ -48,7 +48,7 @@ static const struct { uint32_t addr; void (*fn)(void); } routines[] = {
     { SYM_VBlank_Playoff, VBlank_Playoff },
     { SYM_ReplayMode, ReplayMode },
     { SYM_PeriodStatsScreen, PeriodStatsScreen },
-    { SYM_GameStatisticsScreen, GameStatisticsScreen },
+    { SYM_StatsReport, StatsReport },
 };
 
 /* an address the table does not know: a bug in the port (the tests replay the recorded call) */
@@ -66,7 +66,7 @@ void call68k(uint32_t addr)
 }
 
 /* movea.w #Stack,sp: StartPer and Opening2 restart the program with an empty stack, from
- * however deep the 68k was (IntermissionStart is reached from inside puckfaceoff). The C does
+ * however deep the 68k was (PeriodOver_sp is reached from inside puckfaceoff). The C does
  * the same with a longjmp back to run68k, which then calls the routine. */
 #include <setjmp.h>
 static jmp_buf top;

@@ -1,12 +1,14 @@
 # ninety-four 🏒
 
+> **Credits:** built on [NHL94Genesis](https://github.com/abdulahmad/NHL94Genesis) by abdulahmad, with chaos, StaticEck, McMarkis (Mhopkinsinc) and Drezz, and special thanks to smozoma and kingraph. See [Credits](#credits).
+
 *NHL '94, rebuilt in C.*
 
 **The greatest hockey game ever made, running natively on your machine, with no emulator in
 sight.** All of the roughly 1,500 routines of EA's 1993 Sega Genesis classic have been rewritten
 by hand in C and checked against the original, frame by frame, until the two can't be told
 apart. The same one-timers, the same diving saves, the same organ, the same Gretzky. Smooth 60
-frames a second, without the cartridge's slowdown.
+frames a second by default; the cartridge's slowdown is an option (`--original`).
 
 And things the cartridge never had:
 
@@ -339,7 +341,9 @@ a whole under its bundle identifier, so macOS can ask it for the local network.
   map (`native/art.c`) says what every number is: `--art-map` prints it, and every golden run checks
   that each byte the VDP takes by DMA is in a piece of it (`--art-check`), for texture packs later.
 - **Deferred by the owner.** WebAssembly (the game's code compiles for it now; a browser platform
-  for pulseman is the job) and the cartridge's slowdown (it needs a 68k cost model).
+  for pulseman is the job). The cartridge's slowdown is an option (`--original`); the 68k cost
+  model is size-weighted from lockstep traces (`native/costs.inc`). Lockstep lag-check in Original
+  is parked (play hashes still fail; Smooth still resyncs).
 - **Read first.** `ext/pulseman/README.md` and `docs/API.md` there; the comments at the top
   of `tools/oracle/vectors.py`, `tools/golden.py` and `tools/hybrid/oracle_shim.c`. The working
   notes (the handoff guide, the plan, the playbook for another game) are kept outside the
@@ -397,7 +401,9 @@ From the least ambitious to the most.
 - [ ] Save states anywhere, menus and pauses included
 - [ ] Debug overlay: VRAM, palettes, sprites, a RAM watch and cheat search
 - [ ] Run-ahead for lower input latency
-- [ ] The cartridge's slowdown as an option, with an "overclock" slider
+- [x] The cartridge's slowdown as an option (`--original` / Speed page; Smooth remains the default)
+- [ ] An "overclock" slider on Original
+- [ ] Lockstep with lag frames checked (not resynced) in Original — parked, 2026-11-04: three play failures; menus pass; need GPGX cycle traces
 - [x] Four players with EA's 4 Way Play adaptor
 - [ ] Play in the browser (WebAssembly)
 - [ ] A per-game manifest: named RAM, roster and ratings tables to CSV and back, a hack diff tool
@@ -453,3 +459,14 @@ MIT (`LICENSE`), for the code written for this project. It grants nothing over N
 its name or its data, which belong to Electronic Arts: bring your own copy of the game.
 pulseman is MIT too; its FM chip cores are Nuked-OPN2 (LGPL-2.1) and ymfm (BSD-3), and its MMPX
 and xBR upscalers follow their authors' MIT-licensed code.
+
+## Credits
+
+This port is built on the community's byte-matching disassembly **NHL94Genesis** by
+**abdulahmad** (https://github.com/abdulahmad/NHL94Genesis): every routine, RAM and file name here comes from it. Thanks to
+**chaos**, **StaticEck**, **McMarkis (Mhopkinsinc)** and **Drezz** for their help with that
+disassembly, with special thanks to **smozoma** and **kingraph**. The C, its runtime (pulseman) and its verification tools are by **1nput** ([ninety-four](https://github.com/1nputs/ninety-four), MIT).
+
+Anyone building on this repository (a mod, hack, port, fork or release) must carry this credit,
+near the top of their README and in the notes of every release and any text file shipped in a
+release archive. See AGENTS.md.
