@@ -397,7 +397,7 @@ void StatsReport(void)
     DisplayStats();
     PrintStatScrollArrows();
     for (;;) {
-        vcountwait();
+        MenuWaitVblank();
         uint16_t d0, d1, d2, d3;
         getpzjoy(&d0, &d1, &d2, &d3);
         if (d3 & 0x80) { ExitStatsScreen(); return; }

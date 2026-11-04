@@ -374,9 +374,9 @@ void Pausemode(void)
     uint32_t items = SYM_PauseText;
     if (g.gmode2 & HI(0)) items = SYM_PauseMenuItems;
     else if (tm->flags & 4) items = SYM_PauseText2;
-    InitMenuState(items, SYM_Pausemode_pall);
+    Pausemode_top(items, SYM_Pausemode_pall);
     for (;;) {
-        vcountwait();
+        MenuWaitVblank();
         uint16_t d0, d1, d2, d3;
         getpzjoy(&d0, &d1, &d2, &d3);
         struct Vid vid = { g.DMAList + (g.DMAlistend - ram_addr(g.DMAList)), g.Satt, 1 };                           /* a5 as setvideo left it */

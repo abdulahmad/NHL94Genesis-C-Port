@@ -457,13 +457,13 @@ static void run_ReloadCrowdTiles(const Record *r) { expect_reg16(r, R_D4, Reload
 static void run_NextShooter(const Record *r) { NextShooter(OBJ(R_A3)); }
 static void run_Set4WayPlayerStub(const Record *r) { Set4WayPlayerStub(OBJ(R_A3)); }
 static void run_PrintMenuItem(const Record *r) { expect_reg16(r, R_A1, (uint16_t)PrintMenuItem(r->regs_in[R_A1]), "a1"); }
-static void run_UpdateMenuSelection(const Record *r) { expect_reg16(r, R_D1, UpdateMenuSelection(), "d1"); }
+static void run_Pausemode_Pmenu(const Record *r) { expect_reg16(r, R_D1, Pausemode_Pmenu(), "d1"); }
 static void run_DrawMenuScreen(const Record *r) { expect_reg16(r, R_D1, DrawMenuScreen(), "d1"); }
 static void run_HandleMenuInput(const Record *r) { uint16_t d1 = R16(R_D1); expect_z_only(r, HandleMenuInput(&d1)); expect_reg16(r, R_D1, d1, "d1"); }
 static void run_PutTeamBlock(const Record *r) { PutTeamBlock(R16(R_D0)); }
 V(ChooseSong) V(CheckScoreLeader) V(LeadSong) V(ClearLeadSong) V(rtsChgplayer) V(ClearPenalties) V(SetSflags8Bit1) V(box) V(ShowGoalBox)
 V(PenaltyShotBox) V(ShowThreeStars) V(ShowInjuryBox) V(CountGoalies) V(ReloadRinkGraphics) V(PeriodOver) V(resetplstuff) V(SprSort)
-V(setupEASNmap) V(setupIceRinkPal) V(setplayercolors) V(ShootoutModeBox) V(CountShootoutGoals) V(ShootoutWonBy) V(SetMenuPrintX) V(vcountwait)
+V(setupEASNmap) V(setupIceRinkPal) V(setplayercolors) V(ShootoutModeBox) V(CountShootoutGoals) V(ShootoutWonBy) V(SetMenuPrintX) V(MenuWaitVblank)
 
 
 /* ---- sound94 ---- */
@@ -497,7 +497,7 @@ static void run_CopyTeamBlockMapData(const Record *r)
     expect_reg16(r, R_A1, (uint16_t)ram_addr(CopyTeamBlockMapData(r->regs_in[R_A0], R16(R_D0), R16(R_D1), ram_bytes(PLACE(R_A1), 0x2C))), "a1");
 }
 static void run_ReloadRefHorTiles(const Record *r) { expect_reg16(r, R_D4, ReloadRefHorTiles(), "d4"); }
-static void run_InitMenuState(const Record *r) { expect_reg16(r, R_D1, InitMenuState(r->regs_in[R_A0], r->regs_in[R_A1]), "d1"); }
+static void run_Pausemode_top(const Record *r) { expect_reg16(r, R_D1, Pausemode_top(r->regs_in[R_A0], r->regs_in[R_A1]), "d1"); }
 static void run_never(const Record *r) { replay_fail("this routine does not return; its record cannot be run"); }
 V(DoGameFrame) V(Pausemode) V(setupice) V(setSlotBit)
 
@@ -1276,7 +1276,7 @@ const Port ports[] = {
     { SYM_NextShooter, "NextShooter", run_NextShooter },
     { SYM_Set4WayPlayerStub, "Set4WayPlayerStub", run_Set4WayPlayerStub },
     { SYM_PrintMenuItem, "PrintMenuItem", run_PrintMenuItem },
-    { SYM_UpdateMenuSelection, "UpdateMenuSelection", run_UpdateMenuSelection },
+    { SYM_Pausemode_Pmenu, "Pausemode_Pmenu", run_Pausemode_Pmenu },
     { SYM_DrawMenuScreen, "DrawMenuScreen", run_DrawMenuScreen },
     { SYM_HandleMenuInput, "HandleMenuInput", run_HandleMenuInput },
     { SYM_PutTeamBlock, "PutTeamBlock", run_PutTeamBlock },
@@ -1304,7 +1304,7 @@ const Port ports[] = {
     { SYM_CountShootoutGoals, "CountShootoutGoals", run_CountShootoutGoals },
     { SYM_ShootoutWonBy, "ShootoutWonBy", run_ShootoutWonBy },
     { SYM_SetMenuPrintX, "SetMenuPrintX", run_SetMenuPrintX },
-    { SYM_vcountwait, "vcountwait", run_vcountwait },
+    { SYM_MenuWaitVblank, "MenuWaitVblank", run_MenuWaitVblank },
     { SYM_play_sfx_or_music_track, "play_sfx_or_music_track", run_play_sfx_or_music_track },
     { SYM_ReadPad4Way1, "ReadPad4Way1", run_ReadPad4Way1 },
     { SYM_ReadPad4Way2, "ReadPad4Way2", run_ReadPad4Way2 },
@@ -1342,7 +1342,7 @@ const Port ports[] = {
     { SYM_setupTeamBlocksMap, "setupTeamBlocksMap", run_setupTeamBlocksMap },
     { SYM_CopyTeamBlockMapData, "CopyTeamBlockMapData", run_CopyTeamBlockMapData },
     { SYM_ReloadRefHorTiles, "ReloadRefHorTiles", run_ReloadRefHorTiles },
-    { SYM_InitMenuState, "InitMenuState", run_InitMenuState },
+    { SYM_Pausemode_top, "Pausemode_top", run_Pausemode_top },
     { SYM_DoGameFrame, "DoGameFrame", run_DoGameFrame },
     { SYM_Pausemode, "Pausemode", run_Pausemode },
     { SYM_setupice, "setupice", run_setupice },

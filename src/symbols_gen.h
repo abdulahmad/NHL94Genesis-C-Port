@@ -33,14 +33,14 @@
 #define SYM_Pausemode 0x7CF8u
 #define SYM_Pausemode_pall 0x7DCEu
 #define SYM_seta2 0x7E0Eu
-#define SYM_InitMenuState 0x7E36u
+#define SYM_Pausemode_top 0x7E36u
 #define SYM_DrawMenuScreen 0x7E46u
 #define SYM_SetMenuPrintX 0x7E72u
 #define SYM_HandleMenuInput 0x7E88u
-#define SYM_UpdateMenuSelection 0x7EF2u
+#define SYM_Pausemode_Pmenu 0x7EF2u
 #define SYM_PrintMenuItem 0x8008u
 #define SYM_PutTeamBlock 0x8078u
-#define SYM_vcountwait 0x80BAu
+#define SYM_MenuWaitVblank 0x80BAu
 #define SYM_ShowScores 0x80D4u
 #define SYM_UpdateScoresScroll 0x8198u
 #define SYM_UpdateVertScrollReg 0x81CAu
@@ -3354,14 +3354,14 @@ static const struct SymEntry rom_syms[] = {
     {0x7CF8u, "Pausemode"},
     {0x7DCEu, "Pausemode_pall"},
     {0x7E0Eu, "seta2"},
-    {0x7E36u, "InitMenuState"},
+    {0x7E36u, "Pausemode_top"},
     {0x7E46u, "DrawMenuScreen"},
     {0x7E72u, "SetMenuPrintX"},
     {0x7E88u, "HandleMenuInput"},
-    {0x7EF2u, "UpdateMenuSelection"},
+    {0x7EF2u, "Pausemode_Pmenu"},
     {0x8008u, "PrintMenuItem"},
     {0x8078u, "PutTeamBlock"},
-    {0x80BAu, "vcountwait"},
+    {0x80BAu, "MenuWaitVblank"},
     {0x80D4u, "ShowScores"},
     {0x8198u, "UpdateScoresScroll"},
     {0x81CAu, "UpdateVertScrollReg"},

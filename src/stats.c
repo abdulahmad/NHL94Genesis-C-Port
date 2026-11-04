@@ -164,7 +164,7 @@ void PlayerStatsList(struct Team *tm, int playoff)
         DrawStatsList(tm, playoff);
         DrawStatsListArrows();
         for (;;) {
-            vcountwait();
+            MenuWaitVblank();
             uint16_t d0, d1, d2, d3;
             getpzjoy(&d0, &d1, &d2, &d3);
             if (d3 & 0x80) { ExitStatsScreen(); return; }
@@ -419,7 +419,7 @@ void ShowScores(void)
         DrawScrollArrows();
     }
     for (;;) {
-        vcountwait();
+        MenuWaitVblank();
         uint16_t d0, d1, d2, d3;
         getpzjoy(&d0, &d1, &d2, &d3);
         if (d3 & 0x80) { ExitStatsScreen(); return; }
@@ -536,7 +536,7 @@ int LineEditorMenu(struct Team *tm)
     DrawTeamScreen(tm);
     DrawLineIcons(tm);
     for (;;) {
-        vcountwait();
+        MenuWaitVblank();
         uint16_t d0, d1, d2, d3;
         getpzjoy(&d0, &d1, &d2, &d3);
         ProcessInputWithRepeat(&d1, d2, d3);
@@ -584,7 +584,7 @@ int SelectLinePlayer(struct Team *tm)
     int16_t d0 = 0;
     goto vert;
     for (;;) {
-        vcountwait();
+        MenuWaitVblank();
         uint16_t j0, d1, d2, d3;
         getpzjoy(&j0, &d1, &d2, &d3);
         ProcessInputWithRepeat(&d1, d2, d3);
@@ -752,9 +752,9 @@ int LineEditorExit(struct Team *tm)
     uint32_t items = SYM_LineEditorMenuText;
     if ((uint8_t)(tm->team + 1) != g.databuffer[0]) items = SYM_LineEditorMenuNoLoad;
     printsmallz(str_LineEditorExit_1, sizeof str_LineEditorExit_1);
-    InitMenuState(items, SYM_rtss2);
+    Pausemode_top(items, SYM_rtss2);
     for (;;) {
-        vcountwait();
+        MenuWaitVblank();
         uint16_t d0, d1, d2, d3;
         getpzjoy(&d0, &d1, &d2, &d3);
         ProcessInputWithRepeat(&d1, d2, d3);
@@ -845,7 +845,7 @@ void TeamRosterScreen(struct Team *tm)
         UpdatePlayerListScroll(g.VertLineScrolling, tm);
         g.PlayerScrollCtr = 0;
         for (;;) {
-            vcountwait();
+            MenuWaitVblank();
             uint16_t d0, d1, d2, d3;
             getpzjoy(&d0, &d1, &d2, &d3);
             ProcessInputWithRepeat(&d1, d2, d3);
@@ -1036,7 +1036,7 @@ void AttribWeight(uint16_t v)
 /* the summaries' input: Start leaves (-> 1), up / down set the scroll */
 static int summary_input(void)
 {
-    vcountwait();
+    MenuWaitVblank();
     uint16_t d0, d1, d2, d3;
     getpzjoy(&d0, &d1, &d2, &d3);
     if (d3 & 0x80) return 1;
@@ -1064,7 +1064,7 @@ void ScoringSummaryScreen(void)
     g.SelectedPlayerIdx = (uint16_t)max;
     v = g.VertLineScrolling;
     do {                                                  /* up 2 lines a frame to the last screenful */
-        vcountwait();
+        MenuWaitVblank();
         UpdateScoringScroll(v);
         v = (uint16_t)(g.VertLineScrolling - 2);
     } while ((int16_t)v >= (int16_t)g.SelectedPlayerIdx);
@@ -1182,7 +1182,7 @@ void PenaltySummaryScreen(void)
     g.SelectedPlayerIdx = (uint16_t)max;
     v = g.VertLineScrolling;
     do {                                                  /* up 2 lines a frame to the last screenful */
-        vcountwait();
+        MenuWaitVblank();
         UpdatePenaltyScroll(v);
         v = (uint16_t)(g.VertLineScrolling - 2);
     } while ((int16_t)v >= (int16_t)g.SelectedPlayerIdx);

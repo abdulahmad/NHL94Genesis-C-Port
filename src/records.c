@@ -514,7 +514,7 @@ void RecordHoldersScreen(void)
     PrintRecordTitles();
     PrintWinRecords();
     for (;;) {
-        vcountwait();
+        MenuWaitVblank();
         uint16_t d0, d1, d2, d3;
         getpzjoy(&d0, &d1, &d2, &d3);
         ProcessInputWithRepeat(&d1, d2, d3);

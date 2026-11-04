@@ -1013,12 +1013,12 @@ void PrintShooterNames(struct Team *tm);
 /* ---- menu94.asm: the menus ---- */
 void SetMenuPrintX(void);
 uint32_t PrintMenuItem(uint32_t item);                  /* a1 -> a1 */
-uint16_t UpdateMenuSelection(void);                     /* -> d1 */
+uint16_t Pausemode_Pmenu(void);                     /* -> d1 */
 uint16_t DrawMenuScreen(void);                          /* -> d1 */
 int HandleMenuInput(uint16_t *d1);                      /* d1 = pad -> Z (1 = leave the menu), d1 */
 void PutTeamBlock(uint16_t off);                        /* d0 */
-void vcountwait(void);
-uint16_t InitMenuState(uint32_t items, uint32_t draw);  /* a0, a1 (falls into DrawMenuScreen) -> d1 */
+void MenuWaitVblank(void);
+uint16_t Pausemode_top(uint32_t items, uint32_t draw);  /* a0, a1 (falls into DrawMenuScreen) -> d1 */
 
 /* ---- sram94.asm: save RAM ---- */
 void ReadSRAM(uint32_t at, uint32_t count, uint32_t dst);   /* d0, d1, a0 */

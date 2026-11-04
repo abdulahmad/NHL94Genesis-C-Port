@@ -94,17 +94,17 @@ uint16_t adda4(uint32_t *frame, struct RinkObj *cam)
         g.sflags4 ^= HI(4);
         uint16_t hpos = g.Hpos, vpos = g.Vpos;
         forceblack2();
-        vcountwait();
-        vcountwait();
+        MenuWaitVblank();
+        MenuWaitVblank();
         ReloadRinkGraphics();
         g.Hpos = 0;
         g.Vpos = 0;
         g.Oldrow = 0x7D0;
-        for (int i = 0; i < 2; i++) { setvideo(); vcountwait(); }
+        for (int i = 0; i < 2; i++) { setvideo(); MenuWaitVblank(); }
         g.Vpos = vpos;
         g.Hpos = hpos;
         setvideo();
-        for (int i = 0; i < 2; i++) vcountwait();
+        for (int i = 0; i < 2; i++) MenuWaitVblank();
         sortobj(12)->oldframe = 1;                            /* the nets resend their tiles */
         sortobj(13)->oldframe = 1;
         RevReplayAdj(*frame, cam);

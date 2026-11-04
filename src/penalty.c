@@ -1347,7 +1347,7 @@ void Intermission(void)
     uint32_t items = sslist[list];
     if (g.gmode2 & HI(0)) items = SYM_ShootoutIntermissionMenu;
     g.sflags |= HI(sfpz);
-    InitMenuState(items, SYM_Pausemode_pall);
+    Pausemode_top(items, SYM_Pausemode_pall);
     uint16_t d1;
     g.TickerNum = GetShifter(NULL);
     int skip = 0;

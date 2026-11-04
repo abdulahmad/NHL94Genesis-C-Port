@@ -590,7 +590,7 @@ void PlayerCards(void)
     g.cardvis = (uint16_t)(side & 1);
     DrawPlayerCard(g.cardvis ? RAM_OFF_awaycardidx : RAM_OFF_homecardidx);
     for (;;) {
-        vcountwait();
+        MenuWaitVblank();
         uint16_t d0, d1, d2, d3;
         getpzjoy(&d0, &d1, &d2, &d3);
         ProcessInputWithRepeat(&d1, d2, d3);
