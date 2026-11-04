@@ -1,43 +1,14 @@
-/* display94.asm: game play display. Every frame the vertical blank code builds the sprite list,
- * sends it and other graphics to video memory and scrolls the rink. This file also draws the
- * sprites for the rink, the referee, faceoffs, the zamboni and the crowd. */
+/* video94.asm: game play display. Every frame the vertical blank code builds the sprite
+ * list, sends it and other graphics to video memory and scrolls the rink. This file also
+ * draws the sprites for the rink, the referee, faceoffs, the zamboni and the crowd. */
 #include "game.h"
 #include "hal.h"
 #include "rom.h"
 #include "symbols_gen.h"
 #include "view.h"
-
-/* display94.asm:updatesound. Move the crowd noise volume (psg noise channel, asv) toward
- * crowdlevel. */
-void updatesound(void)
-{
-    uint16_t d0 = (uint16_t)((g.crowdlevel << 3) + 0x400);
-    if (d0 > 0xEFF) d0 = 0xEFF;
-    int16_t d2 = 0x28;
-    int16_t diff = (int16_t)(d0 - g.asv);
-    if (diff > d2 || diff < -d2) {
-        if (!(diff > d2)) d2 = (int16_t)-d2;
-        g.asv = (uint16_t)(g.asv + d2);
-        if ((int16_t)g.asv < 0) g.asv = 0;
-    }
-    psg_write(0xC8);
-    psg_write(1);
-    psg_write((uint8_t)(((g.asv >> 8) ^ 0xF) | 0xF0));
-}
-
-/* display94.asm:KillCrowd. Silence the crowd noise (psg). */
-void KillCrowd(void)
-{
-    psg_write(0xE7);
-    psg_write(0xDF);
-    psg_write(0xC8);
-    psg_write(1);
-    psg_write(0xFF);
-}
-
-#include "display_tables_gen.h"
-#include "display_strings_gen.h"
 #include <string.h>
+#include "display_strings_gen.h"
+#include "display_tables_gen.h"
 
 /* The sprite builders share three registers: a5 = the DMA list being filled (long source, word
  * length in words, word VRAM address per entry), a6 = the sprite attribute table being filled,
@@ -65,7 +36,93 @@ static inline void sat_entry(struct Vid *v, uint16_t y, uint8_t size, uint16_t t
     v->link++;
 }
 
-/* display94.asm:VBlank. The main vblank code for game play: DumpSprites when the frame is
+/* one crowd frame (0 = none) from CrowdFrameList, clipped to the view; horizontal frames are
+ * 31 later */
+static void crowd_frame(int16_t d0, const uint8_t *a1, int16_t d4, int16_t d5, struct Vid *v)
+{
+    d0 = (int8_t)d0;
+    if (d0 == 0) return;
+    if (g.sflags & HI(sfhor)) d0 = (int16_t)(d0 + 0x1F);
+    if ((int16_t)v->link >= SAT_MAX) return;
+    unsigned idx = (unsigned)d0 * 2;
+    int16_t n = (int16_t)(((rd16(a1 + idx + 2) - rd16(a1 + idx)) >> 3) - 1);
+    const uint8_t *a0 = a1 + rd16(a1 + idx);
+    int16_t x0 = (int16_t)(d4 + 0xC0 - 0x90), x1 = (int16_t)(d4 + 0xC0 + 0x80);
+    int16_t y0 = (int16_t)(0x170 - d5 - 0x80), y1 = (int16_t)(0x170 - d5 + 0x70);
+    for (; n >= 0; n--, a0 += 8) {
+        int16_t sx = (int16_t)rd16(a0), sy = (int16_t)rd16(a0 + 2);
+        if (y0 > sy || y1 < sy || x0 - view_more() > sx || x1 + view_more() < sx) continue;
+        uint16_t tile = (uint16_t)((rd16(a0 + 6) & 0xF800) + rd16(a0 + 4) + g.animchars);
+        sat_entry(v, (uint16_t)(sy + 0x70 - y0), a0[7], tile, (uint16_t)(sx + 0x70 - x0));
+        if (v->link == SAT_MAX) return;
+    }
+}
+
+/* the ROM address of the '0'..'9' Strings inside showclock (a local label, not in the symbol
+ * table): the first "\0\4" "0" "\0" after the routine's entry */
+static uint32_t clock_digits(void)
+{
+    static uint32_t addr;
+    if (!addr) {
+        const uint8_t pat[8] = { 0, 4, '0', 0, 0, 4, '1', 0 };
+        for (uint32_t a = SYM_showclock; a < SYM_checksso; a += 2)
+            if (memcmp(rom_ptr(a), pat, 8) == 0) { addr = a; break; }
+    }
+    return addr;
+}
+/* one clock digit of the horizontal rink */
+static void clock_digit(uint16_t d)
+{
+    print(clock_digits() + d * 4);
+}
+/* one tile of the vertical clock, written backward from a0: the high word of the divu result */
+static void clock_char(uint32_t *d0, const uint8_t *font, int k)
+{
+    uint16_t digit = (uint16_t)(*d0 >> 16);
+    uint16_t tile = (uint16_t)(rd16(font + 0x64 + (int16_t)(digit << 1)) + g.smallfontchars);
+    tile |= 0x8000;
+    g.clocktiles[k] = tile;
+    *d0 = (uint32_t)(int32_t)(int16_t)*d0;
+}
+
+/* the off-screen arrow of one controlled player: a0 = the object, a3 = the sso entry, d3 = its
+ * first arrow frame */
+static void sso_arrow(const struct RinkObj *a0, struct SpriteHead *a3, uint16_t d3, struct Vid *v)
+{
+    if (a0->Zpos < 0) return;                             /* not on the ice */
+    ST_W(a3->frame);                                      /* a3 is an sso entry: x 0, y 2, attribute 4, frame 6, oldframe 8, VRoffs $A, VRchar $12 */
+    int16_t d0 = a0->Xpos;
+    if ((g.gmode2 & HI(0)) || (g.sflags2 & HI(sf2replay)) || (g.BA_PS_flags & HI(2))) {
+        int16_t ax = d0 < 0 ? (int16_t)-d0 : d0;
+        if (!(ax < 0xA6)) return;
+    }
+    int16_t d1 = a0->Ypos;
+    if (g.sflags & HI(sfhor)) {
+        int16_t t = d0; d0 = (int16_t)-d1; d1 = (int16_t)(t - 0xC5);
+    } else {
+        d0 = (int16_t)(d0 - (int16_t)g.Hpos);
+        d1 = (int16_t)(d1 - (int16_t)g.Vpos);
+    }
+    unsigned d2 = 0;
+    if (!(d0 < 0x74 + view_more())) d2 |= 8;
+    if (!(d0 > -0x74 - view_more())) d2 |= 4;
+    if (!(d1 < 0x64)) d2 |= 1;
+    if (!(d1 > -0x64)) d2 |= 2;
+    if (d2 == 0) return;
+    d2 = rom_ptr(SYM_jdtab)[d2];
+    const uint16_t *t = sso_tab + d2 * 4;
+    if (t[0] != 0) d0 = (int16_t)((int16_t)t[0] + ((int16_t)t[0] < 0 ? -view_more() : view_more()));
+    d0 = (int16_t)(d0 + 0x100);
+    a3->Xpos = d0;
+    if (t[1] != 0) d1 = (int16_t)t[1];
+    d1 = (int16_t)(-d1 + 0xF0);
+    a3->Xfrac = (uint16_t)d1;                             /* (an arrow's y) */
+    a3->frame = (uint16_t)(d3 + t[2]);
+    a3->attribute = t[3];
+    addframe2(d0, d1, a3, v);
+}
+
+/* video94.asm:VBlank. The main vblank code for game play: DumpSprites when the frame is
  * ready (dfok), the palette fade, then the game clock (a second every $AAA jiffies, the
  * shootout clock instead in a penalty shot / shootout, a beep at 60 seconds), vcount and the
  * music. */
@@ -106,7 +163,7 @@ void VBlank(void)
     p_music_vblank();
 }
 
-/* display94.asm:vb2. The vblank used for palette fades only, no DMAs. */
+/* video94.asm:vb2. The vblank used for palette fades only, no DMAs. */
 void vb2(void)
 {
     if (!(g.disflags & HI(dfng))) cramfade();
@@ -114,21 +171,21 @@ void vb2(void)
     p_music_vblank();
 }
 
-/* display94.asm:DumpSprites. Transfer the scroll values, the sprite table and the DMA list. */
+/* video94.asm:DumpSprites. Transfer the scroll values, the sprite table and the DMA list. */
 void DumpSprites(void)
 {
     SetScroll2();
     DumpSprites2();
 }
 
-/* display94.asm:DumpSprites2. The sprite table, then the DMA list. */
+/* video94.asm:DumpSprites2. The sprite table, then the DMA list. */
 void DumpSprites2(void)
 {
     DoDMA(ram_addr(g.Satt), g.Sattsize, g.VSPRITES);
     dodmalist();
 }
 
-/* display94.asm:dodmalist. Transfer every entry of the DMA list, last first. */
+/* video94.asm:dodmalist. Transfer every entry of the DMA list, last first. */
 void dodmalist(void)
 {
     const uint8_t *base = dmalist(), *a6 = base + (g.DMAlistend - ram_addr(base));   /* (DMAlistend: the 68000 address of its end) */
@@ -138,7 +195,7 @@ void dodmalist(void)
     }
 }
 
-/* display94.asm:SetScroll2. Write Hscroll / Vscroll to the VDP. */
+/* video94.asm:SetScroll2. Write Hscroll / Vscroll to the VDP. */
 void SetScroll2(void)
 {
     Vmaddr((uint16_t)(g.VSCRLPM + 2));
@@ -147,7 +204,7 @@ void SetScroll2(void)
     vdp_data(g.Vscroll);
 }
 
-/* display94.asm:setvideo. Not vblank code: set up RAM for the vblank transfers. Called once per
+/* video94.asm:setvideo. Not vblank code: set up RAM for the vblank transfers. Called once per
  * game frame. Builds the DMA list and the sprite table from every object on the ice, then
  * hands them to the vblank (dfok). */
 void setvideo(void)
@@ -175,7 +232,7 @@ void setvideo(void)
     g.disflags |= HI(dfok);
 }
 
-/* display94.asm:updatescroll. Scroll from Hpos / Vpos; when the view moves to a new rink row
+/* video94.asm:updatescroll. Scroll from Hpos / Vpos; when the view moves to a new rink row
  * queue the map rows that scrolled in (from Rinktilelist, or RevRinkTilelist in a reverse angle
  * replay), up to $20 of them. */
 void updatescroll(struct Vid *v)
@@ -203,7 +260,7 @@ void updatescroll(struct Vid *v)
     }
 }
 
-/* display94.asm:showref. Queue the 8 rows of the ref window map (RefRamMap) when it changed. */
+/* video94.asm:showref. Queue the 8 rows of the ref window map (RefRamMap) when it changed. */
 void showref(struct Vid *v)
 {
     if (!(g.sflags2 & HI(sf2refref))) return;
@@ -223,7 +280,7 @@ void showref(struct Vid *v)
     }
 }
 
-/* display94.asm:checkfo. The faceoff sprites: 3 entries of fofdata2 (word frame, word flags)
+/* video94.asm:checkfo. The faceoff sprites: 3 entries of fofdata2 (word frame, word flags)
  * from FaceOffSprites at fodropx / fodropy. */
 void checkfo(struct Vid *v)
 {
@@ -255,7 +312,7 @@ void checkfo(struct Vid *v)
     }
 }
 
-/* display94.asm:showzam. The zamboni: frame 1, frame 2-4 by x, then frame 5 (home not ahead)
+/* video94.asm:showzam. The zamboni: frame 1, frame 2-4 by x, then frame 5 (home not ahead)
  * or a frame by x. */
 void showzam(struct Vid *v)
 {
@@ -278,7 +335,7 @@ void showzam(struct Vid *v)
     SetSframe(ART(ZamFrameList), d0, d1, zam_ftab[t / 2], d3, v);
 }
 
-/* display94.asm:SetSframe. Draw one sprite frame: a0 = frame list, d0 / d1 = x / y, d2 = the
+/* video94.asm:SetSframe. Draw one sprite frame: a0 = frame list, d0 / d1 = x / y, d2 = the
  * frame, d3 = its start char in VRAM. */
 void SetSframe(uint32_t list, int16_t x, int16_t y, uint16_t frame, uint16_t startchar, struct Vid *v)
 {
@@ -294,29 +351,7 @@ void SetSframe(uint32_t list, int16_t x, int16_t y, uint16_t frame, uint16_t sta
     }
 }
 
-/* one crowd frame (0 = none) from CrowdFrameList, clipped to the view; horizontal frames are
- * 31 later */
-static void crowd_frame(int16_t d0, const uint8_t *a1, int16_t d4, int16_t d5, struct Vid *v)
-{
-    d0 = (int8_t)d0;
-    if (d0 == 0) return;
-    if (g.sflags & HI(sfhor)) d0 = (int16_t)(d0 + 0x1F);
-    if ((int16_t)v->link >= SAT_MAX) return;
-    unsigned idx = (unsigned)d0 * 2;
-    int16_t n = (int16_t)(((rd16(a1 + idx + 2) - rd16(a1 + idx)) >> 3) - 1);
-    const uint8_t *a0 = a1 + rd16(a1 + idx);
-    int16_t x0 = (int16_t)(d4 + 0xC0 - 0x90), x1 = (int16_t)(d4 + 0xC0 + 0x80);
-    int16_t y0 = (int16_t)(0x170 - d5 - 0x80), y1 = (int16_t)(0x170 - d5 + 0x70);
-    for (; n >= 0; n--, a0 += 8) {
-        int16_t sx = (int16_t)rd16(a0), sy = (int16_t)rd16(a0 + 2);
-        if (y0 > sy || y1 < sy || x0 - view_more() > sx || x1 + view_more() < sx) continue;
-        uint16_t tile = (uint16_t)((rd16(a0 + 6) & 0xF800) + rd16(a0 + 4) + g.animchars);
-        sat_entry(v, (uint16_t)(sy + 0x70 - y0), a0[7], tile, (uint16_t)(sx + 0x70 - x0));
-        if (v->link == SAT_MAX) return;
-    }
-}
-
-/* display94.asm:showcrowd. The crowd sprites: up to 3 frames per penalty box nibble, then the
+/* video94.asm:showcrowd. The crowd sprites: up to 3 frames per penalty box nibble, then the
  * two crowdframe frames. None in a reverse angle replay. */
 void showcrowd(struct Vid *v)
 {
@@ -335,34 +370,7 @@ void showcrowd(struct Vid *v)
     crowd_frame((int8_t)g.crowdframe, a1, d4, d5, v);
 }
 
-/* the ROM address of the '0'..'9' Strings inside showclock (a local label, not in the symbol
- * table): the first "\0\4" "0" "\0" after the routine's entry */
-static uint32_t clock_digits(void)
-{
-    static uint32_t addr;
-    if (!addr) {
-        const uint8_t pat[8] = { 0, 4, '0', 0, 0, 4, '1', 0 };
-        for (uint32_t a = SYM_showclock; a < SYM_checksso; a += 2)
-            if (memcmp(rom_ptr(a), pat, 8) == 0) { addr = a; break; }
-    }
-    return addr;
-}
-/* one clock digit of the horizontal rink */
-static void clock_digit(uint16_t d)
-{
-    print(clock_digits() + d * 4);
-}
-/* one tile of the vertical clock, written backward from a0: the high word of the divu result */
-static void clock_char(uint32_t *d0, const uint8_t *font, int k)
-{
-    uint16_t digit = (uint16_t)(*d0 >> 16);
-    uint16_t tile = (uint16_t)(rd16(font + 0x64 + (int16_t)(digit << 1)) + g.smallfontchars);
-    tile |= 0x8000;
-    g.clocktiles[k] = tile;
-    *d0 = (uint32_t)(int32_t)(int16_t)*d0;
-}
-
-/* display94.asm:showclock. The game clock on screen. Horizontal rink: printed with the big
+/* video94.asm:showclock. The game clock on screen. Horizontal rink: printed with the big
  * digits (not in a shootout). Vertical rink: the 5 tiles go in the DMA list when dfclock is
  * set, the shootout clock instead in a penalty shot / shootout. */
 void showclock(struct Vid *v)
@@ -413,44 +421,7 @@ void showclock(struct Vid *v)
     dma_entry(v, src, words, dest);
 }
 
-/* the off-screen arrow of one controlled player: a0 = the object, a3 = the sso entry, d3 = its
- * first arrow frame */
-static void sso_arrow(const struct RinkObj *a0, struct SpriteHead *a3, uint16_t d3, struct Vid *v)
-{
-    if (a0->Zpos < 0) return;                             /* not on the ice */
-    ST_W(a3->frame);                                      /* a3 is an sso entry: x 0, y 2, attribute 4, frame 6, oldframe 8, VRoffs $A, VRchar $12 */
-    int16_t d0 = a0->Xpos;
-    if ((g.gmode2 & HI(0)) || (g.sflags2 & HI(sf2replay)) || (g.BA_PS_flags & HI(2))) {
-        int16_t ax = d0 < 0 ? (int16_t)-d0 : d0;
-        if (!(ax < 0xA6)) return;
-    }
-    int16_t d1 = a0->Ypos;
-    if (g.sflags & HI(sfhor)) {
-        int16_t t = d0; d0 = (int16_t)-d1; d1 = (int16_t)(t - 0xC5);
-    } else {
-        d0 = (int16_t)(d0 - (int16_t)g.Hpos);
-        d1 = (int16_t)(d1 - (int16_t)g.Vpos);
-    }
-    unsigned d2 = 0;
-    if (!(d0 < 0x74 + view_more())) d2 |= 8;
-    if (!(d0 > -0x74 - view_more())) d2 |= 4;
-    if (!(d1 < 0x64)) d2 |= 1;
-    if (!(d1 > -0x64)) d2 |= 2;
-    if (d2 == 0) return;
-    d2 = rom_ptr(SYM_jdtab)[d2];
-    const uint16_t *t = sso_tab + d2 * 4;
-    if (t[0] != 0) d0 = (int16_t)((int16_t)t[0] + ((int16_t)t[0] < 0 ? -view_more() : view_more()));
-    d0 = (int16_t)(d0 + 0x100);
-    a3->Xpos = d0;
-    if (t[1] != 0) d1 = (int16_t)t[1];
-    d1 = (int16_t)(-d1 + 0xF0);
-    a3->Xfrac = (uint16_t)d1;                             /* (an arrow's y) */
-    a3->frame = (uint16_t)(d3 + t[2]);
-    a3->attribute = t[3];
-    addframe2(d0, d1, a3, v);
-}
-
-/* display94.asm:checksso. Arrows for the controlled players when they are off screen (pads 3
+/* video94.asm:checksso. Arrows for the controlled players when they are off screen (pads 3
  * and 4 too on the four way play). Nothing on the horizontal rink. */
 void checksso(struct Vid *v)
 {
@@ -463,14 +434,14 @@ void checksso(struct Vid *v)
     sso_arrow(&g.pads[5], &g.sso[3], 0x349, v);
 }
 
-/* display94.asm:setsortcords. addframe for the 16 objects in OOlist order. */
+/* video94.asm:setsortcords. addframe for the 16 objects in OOlist order. */
 void setsortcords(struct Vid *v)
 {
     for (int i = 0; i < 16; i++)
         addframe(&sortobj(g.OOlist[i] / 2)->rink, v);
 }
 
-/* display94.asm:setffo. The 7 objects tied to the rink scrolling (the gloves and the pads),
+/* video94.asm:setffo. The 7 objects tied to the rink scrolling (the gloves and the pads),
  * each moved by its x offset. */
 void setffo(struct Vid *v)
 {
@@ -486,7 +457,7 @@ void setffo(struct Vid *v)
     }
 }
 
-/* display94.asm:uppads. Update the gloves object and the 6 pad objects from the pad nibbles
+/* video94.asm:uppads. Update the gloves object and the 6 pad objects from the pad nibbles
  * of PadControlBits / PadControlBits34 ($E = no change, $F = none), queueing new labels. */
 void uppads(struct Vid *v)
 {
@@ -522,7 +493,7 @@ void uppads(struct Vid *v)
     }
 }
 
-/* display94.asm:QueuePadLabel. Queue the 3 character label of a pad object: two digits (bits
+/* video94.asm:QueuePadLabel. Queue the 3 character label of a pad object: two digits (bits
  * 7-4 and 3-0, $F = blank) and a letter by bits 10-8 (none while sflags7 bit 7 is set). */
 void QueuePadLabel(uint16_t code, struct RinkObj *pad, struct Vid *v)
 {
@@ -543,7 +514,7 @@ void QueuePadLabel(uint16_t code, struct RinkObj *pad, struct Vid *v)
     uppads_pd((uint8_t)letters[d], 2, pad, v);
 }
 
-/* display94.asm:uppads_pd. DMA one small font tile to the object's chars: d2 = the
+/* video94.asm:uppads_pd. DMA one small font tile to the object's chars: d2 = the
  * character, d0 = the char slot. */
 void uppads_pd(uint16_t ch, uint16_t slot, const struct RinkObj *pad, struct Vid *v)
 {
@@ -554,7 +525,7 @@ void uppads_pd(uint16_t ch, uint16_t slot, const struct RinkObj *pad, struct Vid
     dma_entry(v, src, 0x10, dest);
 }
 
-/* display94.asm:addframe. Project object a3 with find3d, then addframe2. */
+/* video94.asm:addframe. Project object a3 with find3d, then addframe2. */
 void addframe(struct RinkObj *o, struct Vid *v)
 {
     if (o->Zpos < 0) return;
@@ -564,7 +535,7 @@ void addframe(struct RinkObj *o, struct Vid *v)
     addframe2(d0, d1, &o->head, v);
 }
 
-/* display94.asm:addframe2. d0 / d1 = the object's screen position. Queue the sprite tiles of its
+/* video94.asm:addframe2. d0 / d1 = the object's screen position. Queue the sprite tiles of its
  * frame (once per frame change, sharing tiles already sent) and write its sprites. */
 void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
 {
@@ -617,7 +588,7 @@ void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
     o->attribute = attr_saved;
 }
 
-/* display94.asm:find3d. Input d0 / d1 = field x / y, d2 = height. Output the screen position,
+/* video94.asm:find3d. Input d0 / d1 = field x / y, d2 = height. Output the screen position,
  * or d1 = $4E20 when off screen. */
 void find3d(int16_t *x, int16_t *y, int16_t z)
 {
@@ -634,4 +605,32 @@ void find3d(int16_t *x, int16_t *y, int16_t z)
     if (d1 > 0x90 || d1 < -0x90) { *x = d0; *y = 0x4E20; return; }
     *x = d0;
     *y = (int16_t)(-d1 + 0xF0);
+}
+
+/* video94.asm:updatesound. Move the crowd noise volume (psg noise channel, asv) toward
+ * crowdlevel. */
+void updatesound(void)
+{
+    uint16_t d0 = (uint16_t)((g.crowdlevel << 3) + 0x400);
+    if (d0 > 0xEFF) d0 = 0xEFF;
+    int16_t d2 = 0x28;
+    int16_t diff = (int16_t)(d0 - g.asv);
+    if (diff > d2 || diff < -d2) {
+        if (!(diff > d2)) d2 = (int16_t)-d2;
+        g.asv = (uint16_t)(g.asv + d2);
+        if ((int16_t)g.asv < 0) g.asv = 0;
+    }
+    psg_write(0xC8);
+    psg_write(1);
+    psg_write((uint8_t)(((g.asv >> 8) ^ 0xF) | 0xF0));
+}
+
+/* video94.asm:KillCrowd. Silence the crowd noise (psg). */
+void KillCrowd(void)
+{
+    psg_write(0xE7);
+    psg_write(0xDF);
+    psg_write(0xC8);
+    psg_write(1);
+    psg_write(0xFF);
 }
