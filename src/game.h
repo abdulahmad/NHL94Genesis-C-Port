@@ -263,7 +263,7 @@ void startpause1(void);
 void startpause2(void);
 void startpause3(void);
 void startpause4(void);
-void SetupPauseScreen(void);
+void Pausemode_pall(void);
 struct Team *seta2(void);                               /* -> a2 */
 void DoGameFrame(void);
 void Gameloop(void);                                    /* does not return */

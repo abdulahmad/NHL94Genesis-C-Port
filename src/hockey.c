@@ -258,9 +258,9 @@ void startpause2(void) { g.pausepad = 0; g.sflags |= HI(sfpj); startpause(); }
 void startpause3(void) { g.pausepad = 3; g.sflags &= (uint16_t)~HI(sfpj); startpause(); }
 void startpause4(void) { g.pausepad = 4; g.sflags |= HI(sfpj); startpause(); }
 
-/* hockey94.asm:SetupPauseScreen. The draw routine of the pause menu: the window plane over
+/* hockey94.asm:Pausemode_pall. The draw routine of the pause menu: the window plane over
  * the horizontal rink, the crowd silenced, plane 3 erased. */
-void SetupPauseScreen(void)
+void Pausemode_pall(void)
 {
     if (view_wide()) vdp_ctrl16(SYM_VDPR_MODE4);         /* (the wide view: the window plane is 32 columns) */
     vdp_ctrl16(SYM_VDPR_WINX);
@@ -268,7 +268,7 @@ void SetupPauseScreen(void)
     SetHor();
     setvideo();
     KillCrowd();
-    printsmallz(str_SetupPauseScreen_1, sizeof str_SetupPauseScreen_1);
+    printsmallz(str_Pausemode_pall_1, sizeof str_Pausemode_pall_1);
     eraser(0x20, 0x1C, 0x7FF);
 }
 
@@ -374,7 +374,7 @@ void Pausemode(void)
     uint32_t items = SYM_PauseText;
     if (g.gmode2 & HI(0)) items = SYM_PauseMenuItems;
     else if (tm->flags & 4) items = SYM_PauseText2;
-    InitMenuState(items, SYM_SetupPauseScreen);
+    InitMenuState(items, SYM_Pausemode_pall);
     for (;;) {
         vcountwait();
         uint16_t d0, d1, d2, d3;

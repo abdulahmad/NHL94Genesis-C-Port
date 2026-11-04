@@ -1289,7 +1289,7 @@ void StartHL2(struct Matchup *gs, int16_t game)
         setplayercolors();
         SetHor();
         setvideo();
-        SetupPauseScreen();
+        Pausemode_pall();
         DrawMenuScreen();
         g.palcount = 0x18;
         song(SYM_SngEOG);
@@ -1347,7 +1347,7 @@ void Intermission(void)
     uint32_t items = sslist[list];
     if (g.gmode2 & HI(0)) items = SYM_ShootoutIntermissionMenu;
     g.sflags |= HI(sfpz);
-    InitMenuState(items, SYM_SetupPauseScreen);
+    InitMenuState(items, SYM_Pausemode_pall);
     uint16_t d1;
     g.TickerNum = GetShifter(NULL);
     int skip = 0;

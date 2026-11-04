@@ -39,7 +39,7 @@ static const struct { uint32_t addr; void (*fn)(void); } routines[] = {
     { SYM_PlayerCards, PlayerCards },
     { SYM_RecordHoldersScreen, RecordHoldersScreen },
     { SYM_ReloadRinkGraphics, ReloadRinkGraphics },
-    { SYM_SetupPauseScreen, SetupPauseScreen },
+    { SYM_Pausemode_pall, Pausemode_pall },
     { SYM_VBlank, VBlank },
     { SYM_vb2, vb2 },
     { SYM_VBcount, VBcount },

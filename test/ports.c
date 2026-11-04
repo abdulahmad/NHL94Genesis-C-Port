@@ -255,7 +255,7 @@ static void run_GetHotColdTotal(const Record *r) { expect_reg16(r, R_D1, GetHotC
 V(EndShootout) V(ClearGameStats) V(SetStatScroll) V(PrintStatScrollArrows) V(DisplayTeamStatsScreen) V(updatePPTeamTime)
 V(ClearShotData) V(restoreteams) V(ResetClock) V(periodicevents) V(CheckInjury) V(RestoreBenchEnergy) V(CheckLateGameSong)
 V(UpdateCwdExcite) V(updatecrowdf) V(clockcont) V(clockcont_0) V(demoread) V(startpause) V(startpause1) V(startpause2) V(startpause3)
-V(startpause4) V(SetupPauseScreen) V(updatesound) V(KillCrowd)
+V(startpause4) V(Pausemode_pall) V(updatesound) V(KillCrowd)
 O(ClampPositionBox) O(ShortenMsgTimer)
 static void run_AddArenaAnimSprite(const Record *r) { uint8_t *sat = ram_bytes(ram_at(r->regs_in[R_A6]), 0); uint16_t link = (uint16_t)r->regs_in[R_D6]; AddArenaAnimSprite(&sat, &link); expect_reg16(r, R_A6, (uint16_t)ram_addr(sat), "a6"); expect_reg16(r, R_D6, link, "d6"); }
 static void run_PrintPlayerNameRight(const Record *r) { PrintPlayerNameRight((uint16_t)r->regs_in[R_D0], TEAM(R_A2)); }
@@ -1106,7 +1106,7 @@ const Port ports[] = {
     { SYM_startpause2, "startpause2", run_startpause2 },
     { SYM_startpause3, "startpause3", run_startpause3 },
     { SYM_startpause4, "startpause4", run_startpause4 },
-    { SYM_SetupPauseScreen, "SetupPauseScreen", run_SetupPauseScreen },
+    { SYM_Pausemode_pall, "Pausemode_pall", run_Pausemode_pall },
     { SYM_seta2, "seta2", run_seta2 },
     { SYM_updatesound, "updatesound", run_updatesound },
     { SYM_KillCrowd, "KillCrowd", run_KillCrowd },

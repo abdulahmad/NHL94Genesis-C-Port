@@ -32,7 +32,7 @@ static const struct { void (*fn)(void); uint32_t addr; } routine_fns[] = {
     { (void (*)(void))startpause3, 0x7CDCu },
     { (void (*)(void))startpause4, 0x7CEAu },
     { (void (*)(void))Pausemode, 0x7CF8u },
-    { (void (*)(void))SetupPauseScreen, 0x7DCEu },
+    { (void (*)(void))Pausemode_pall, 0x7DCEu },
     { (void (*)(void))seta2, 0x7E0Eu },
     { (void (*)(void))InitMenuState, 0x7E36u },
     { (void (*)(void))DrawMenuScreen, 0x7E46u },

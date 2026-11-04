@@ -31,7 +31,7 @@
 #define SYM_startpause3 0x7CDCu
 #define SYM_startpause4 0x7CEAu
 #define SYM_Pausemode 0x7CF8u
-#define SYM_SetupPauseScreen 0x7DCEu
+#define SYM_Pausemode_pall 0x7DCEu
 #define SYM_seta2 0x7E0Eu
 #define SYM_InitMenuState 0x7E36u
 #define SYM_DrawMenuScreen 0x7E46u
@@ -3352,7 +3352,7 @@ static const struct SymEntry rom_syms[] = {
     {0x7CDCu, "startpause3"},
     {0x7CEAu, "startpause4"},
     {0x7CF8u, "Pausemode"},
-    {0x7DCEu, "SetupPauseScreen"},
+    {0x7DCEu, "Pausemode_pall"},
     {0x7E0Eu, "seta2"},
     {0x7E36u, "InitMenuState"},
     {0x7E46u, "DrawMenuScreen"},
