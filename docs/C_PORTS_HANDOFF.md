@@ -34,6 +34,8 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 
 **gens94-c is ignored from 2026-11-03 (Abdul)**: no work or cross-checks on it; the E1/E3 results above are history. `test/crosscheck.sh` is not run any more.
 
+2026-11-04: CONTRIBUTING.md added. Work stays on `claude/project-thread-4gad59`; do not merge to main.
+
 ## Next, in order
 
 1. **Coverage, part 3** (plan E5): new lockstep vectors for the 53 routines lockstep never reaches
