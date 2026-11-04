@@ -28,5 +28,6 @@ cartridge does.
   `src/` is the same code in both builds. Gate: the lockstep vectors pass on it against the cartridge (2026-11-04: 20 of 20).
 * Slowdown: an option, off by default (`--original` / `--speed original`, or the window's Speed page
   / `game.speed` in settings.ini). Smooth (the default) is one vblank a pass; Original uses a 68k
-  cost model so a pass can take extra vblanks. Lockstep stays Smooth. The overclock slider is not
-  this unit.
+  cost model so a pass can take extra vblanks (`native/costs.inc`, fitted from lockstep traces).
+  `--lockstep --original` is allowed (E6 parked: play hashes still fail; Smooth still resyncs).
+  The overclock slider is not this unit.

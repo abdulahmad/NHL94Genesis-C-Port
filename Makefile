@@ -99,6 +99,7 @@ $(OBJ)/src/%.o: src/%.c $(HDR) $(MDRTHDR)
 $(OBJ)/native/%.o: native/%.c $(HDR) native/native.h native/routines_gen.h $(MDRTHDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -c $< -o $@
+$(OBJ)/native/clock.o: native/costs.inc
 $(OBJ)/native/net.o: build/build_id.h
 NFLAGS += -Ibuild
 # the build's identity, which netplay's peers compare (the same code on both): the commit, "-dirty"

@@ -65,7 +65,7 @@
  * --smooth (the default) is one vblank a game-loop pass. --original / --slowdown / --speed original
  * is the cartridge's slowdown (a 68k cost model: a pass can take extra vblanks, elapsed > 1). The
  * window's Speed page and settings.ini game.speed keep the same choice (Smooth until changed).
- * --lockstep is Smooth only. */
+ * --lockstep with --original checks lag frames (plan E6) instead of resyncing; Smooth still resyncs. */
 #include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -787,7 +787,7 @@ int main(int argc, char **argv)
         inputs = 1;
     }
     if (snap && load_state_path) { fprintf(stderr, "--snap or --load-state, not both\n"); return 2; }
-    if (lockstep_path && clock_original()) { fprintf(stderr, "--lockstep: Smooth only (Original lag frames are not checked yet)\n"); return 2; }
+    /* --lockstep --original: E6, lag frames checked (not resynced) at the game loop */
     if (lockstep_path && !rules_classic()) { fprintf(stderr, "--lockstep: the original is played by the Classic rules only\n"); return 2; }
     if (lockstep_path && !rosters_next_is_cartridge()) { fprintf(stderr, "--lockstep: the original is played by the cartridge's teams only\n"); return 2; }
     if (netopt.on && (snap || load_state_path || lockstep_path || restart_frame >= 0 || script_requests || load_at_path)) {

@@ -6,11 +6,12 @@
  * work fits in a frame. When it does not (a lag frame: the oracle's interrupt lands in the game's
  * logic), the oracle runs the vblank code an extra time mid-logic and the two part. The
  * recording marks those interrupts and keeps the oracle's whole state at the next one in a wait
- * loop. When that one is the game loop's (setvideo's wait for dfok, called from DoGameFrame from
- * Gameloop: its stack says), the player takes the state (work RAM, the VDP, and `elapsed`, the d7
- * the game loop keeps) and restarts the native game there (restart_at, as the 68k's own restarts
- * do), wherever the native game was: then it checks again. Other resync points in the game are
- * passed over. Outside the game's logic (DoGameFrame not on the native function stack: the front
+ * loop. Smooth (the default): when that wait is the game loop's (setvideo's wait for dfok, called
+ * from DoGameFrame from Gameloop: its stack says), the player takes the state (work RAM, the VDP,
+ * and `elapsed`, the d7 the game loop keeps) and restarts the native game there (restart_at, as
+ * the 68k's own restarts do), wherever the native game was: then it checks again. Original (plan
+ * E6): the cost model has already fired the extra vblanks mid-logic, so that wait is checked
+ * (hashes) and the oracle's state is not taken. Other resync points in the game are passed over. Outside the game's logic (DoGameFrame not on the native function stack: the front
  * end, whose screens load for frames with the vblank on, and the intermission) the player compares the native state with the
  * oracle's there, but for what the oracle's vblank code changed in the lag frames (the
  * recording's lag mask, version 4), then takes the oracle's state in place and goes on.
@@ -47,7 +48,7 @@ static size_t nrecs, next;              /* the oracle's next record */
 static size_t span_lo, span_hi;         /* the records whose HV reads this span replays */
 static size_t hv_rec, hv_used;
 static int hv_over;
-static long checked, lagged, resynced, skipped, masked, placed;
+static long checked, lagged, resynced, skipped, masked, placed, original_held;
 static int insync = 1;                  /* checking: the native game and the oracle are in step */
 static int restarted;                   /* the wait after a restart is the same moment again */
 static int tracking;                    /* following the routines the game is in: lockstep, or states */
@@ -303,6 +304,8 @@ int lockstep_result(void)
     return failed ? 1 : span_lo < nrecs ? 2 : 0;
 }
 
+int lockstep_playing(void) { return recs != NULL; }
+
 static int reported;
 void lockstep_report(void)
 {
@@ -311,8 +314,11 @@ void lockstep_report(void)
     printf("lockstep: %zu of %zu vblanks: %ld of the game's vblank waits checked, all the same as the oracle's; %ld lag "
            "frames (the oracle's vblank in the game's logic); the oracle's state taken %ld times in the game loop "
            "(%ld times out of step until a point in the game loop) and %ld times elsewhere after a check but for "
-           "what its lag frames' vblank code changed; %ld lag frames placed in the game's work (by its port accesses)\n",
+           "what its lag frames' vblank code changed; %ld lag frames placed in the game's work (by its port accesses)",
            span_lo, nrecs, checked, lagged, resynced, skipped, masked, placed);
+    if (original_held)
+        printf("; Original: %ld game-loop waits after lag checked, not resynced", original_held);
+    printf("\n");
 }
 
 static uint32_t accesses_now;            /* the game's port accesses so far */
@@ -454,7 +460,7 @@ static NI int in_game_logic(void)
 static NI int due(uint32_t n, int unmask)
 {
     if (!recs || lag_next + 1 >= span_hi) return 0;
-    if (in_game_logic()) {                                /* the span ends where the oracle is still in it: not placed */
+    if (in_game_logic() && !clock_original()) {           /* Smooth: not placed in game logic (resync at the game loop) */
         if (span_end_logic < 0) span_end_logic = !oracle_out_of_game_logic(&recs[span_hi - 1]);
         if (span_end_logic) return 0;
     }
@@ -532,6 +538,12 @@ void lockstep_check(long frame)
         return;
     }
     int lag = span_hi - span_lo > 1 && lag_next + 1 < span_hi;   /* lag frames not placed */
+    /* E6: Original's cost model fires extras mid-logic; check this wait, do not take the oracle */
+    if (clock_original() && at_game_loop(r)) {
+        if (lag) original_held++;
+        lag = 0;
+        insync = 1;
+    }
     if (lag || !insync) {
         if (at_game_loop(r)) {                            /* take the oracle's state and go on from there */
             advance(r);
