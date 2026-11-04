@@ -25,6 +25,5 @@ cartridge does.
   They are opt-in. **`make VANILLA=1 nhl94`** builds `build/nhl94-vanilla` without them: native/rules.c, rosters.c,
   romsrc.c, art.c, banner.c, ratings.c, state.c and net.c are left out, and `native/vanilla/stubs.c` stands in for
   them (the original's rules, the cartridge's teams, no pages, a plain error for the options that need them).
-  `src/` is the same code in both builds. Gate: the lockstep vectors pass on it against the cartridge (2026-11-03: 18 of 18;
-  it also played gens94-c's 8 scripts identically, a check no longer run).
+  `src/` is the same code in both builds. Gate: the lockstep vectors pass on it against the cartridge (2026-11-04: 20 of 20).
 * Slowdown: not implemented yet (upstream deferred it); it will be an option, off by default.

@@ -192,7 +192,14 @@ def record(args):
         t = time.time()
         p = subprocess.run(i.command(), cwd=REPO, capture_output=True, text=True)
         if p.returncode:
-            return i, 'FAILED: ' + (p.stderr.strip().splitlines() or ['?'])[-1]
+            err = (p.stderr.strip().splitlines() or p.stdout.strip().splitlines() or [])
+            if p.returncode < 0:
+                why = 'signal %d' % (-p.returncode)
+            elif err:
+                why = err[-1]
+            else:
+                why = 'exit %d' % p.returncode
+            return i, 'FAILED: ' + why
         return i, 'made in %.0f s' % (time.time() - t)
 
     # states and snapshots first (in that order), then the vectors, a few at a time (memory)

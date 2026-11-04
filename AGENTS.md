@@ -15,9 +15,9 @@ a mod, hack, port or fork from this repository, carry the credit over and tell t
 This repository is the **Genesis base** of the C ports (decided 2026-11-03): 1nput's ninety-four,
 kept as close to upstream as the work allows. Its game code (`src/`) is checked against the cartridge by the
 oracle tools here (`tools/oracle`, `native/lockstep.c`). The vanilla game is the default (Classic rules, the
-cartridge's rosters); the extras (rules, roster sets, save states, netplay) are host features on top, and a
-vanilla build without them is planned (docs/C_PORTS_HANDOFF.md). gens94-c (INDIO's cut of v0.3.6) is the cross-check:
-its 8 scripted runs must give the same hashes as this repository's Classic runs.
+cartridge's rosters); the extras (rules, roster sets, save states, netplay) are host features on top, and
+`make VANILLA=1` builds without them (docs/C_PORTS_HANDOFF.md). gens94-c is ignored (Abdul, 2026-11-03).
+Keep 1nput's names in `src/` until he takes a rename/re-cut.
 
 Upstream is https://github.com/1nputs/ninety-four. Renames and file re-cuts (docs/RULES.md) move this
 repository away from upstream, so they wait for 1nput's answer; until then the names gate only reports.

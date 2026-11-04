@@ -11,7 +11,7 @@ DEFS := -DUSE_LIBTREMOR -DUSE_LIBCHDR -DHAVE_LROUND -DHAVE_STDINT_H -DZ7_ST -DHA
 INCS := -I$(GPGX)/core -I$(GPGX)/core/z80 -I$(GPGX)/core/m68k -I$(GPGX)/core/ntsc -I$(GPGX)/core/sound \
   -I$(GPGX)/core/input_hw -I$(GPGX)/core/cd_hw -I$(GPGX)/core/cart_hw -I$(GPGX)/core/cart_hw/svp -I$(GPGX)/core/debug \
   -I$(GPGX)/core/cd_hw/libchdr/include -I$(GPGX)/libretro -I$(GPGX)/libretro/libretro-common/include
-CFLAGS := -O2 -fPIC -std=gnu11 -Wall $(DEFS) $(INCS)
+CFLAGS := -O2 -fno-tree-vectorize -fPIC -std=gnu11 -Wall $(DEFS) $(INCS)
 
 all: $(OUT)
 $(ROOT)/build/oracle_shim.o: $(ROOT)/tools/hybrid/oracle_shim.c
