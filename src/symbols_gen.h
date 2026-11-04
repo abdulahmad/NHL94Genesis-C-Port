@@ -1168,13 +1168,13 @@
 #define SYM_PrintPlayerNameRight 0xFD89Au
 #define SYM_SkipNameNumber 0xFD8ECu
 #define SYM_PeriodStatsScreen 0xFD90Cu
-#define SYM_GameStatisticsScreen 0xFDC5Au
+#define SYM_StatsReport 0xFDC5Au
 #define SYM_SetStatScroll 0xFDD6Au
 #define SYM_StatScrollRow 0xFDD92u
 #define SYM_StatScrollRowEnd 0xFDD9Cu
 #define SYM_rtsStatScroll 0xFDDA8u
 #define SYM_PrintStatScrollArrows 0xFDDAAu
-#define SYM_DisplayTeamStatsScreen 0xFDE24u
+#define SYM_DisplayStats 0xFDE24u
 #define SYM_PrintStatValue 0xFDEB4u
 #define SYM_rtsStatTables 0xFE14Au
 #define SYM_updatePPTeamTime 0xFE14Cu
@@ -4489,13 +4489,13 @@ static const struct SymEntry rom_syms[] = {
     {0xFD89Au, "PrintPlayerNameRight"},
     {0xFD8ECu, "SkipNameNumber"},
     {0xFD90Cu, "PeriodStatsScreen"},
-    {0xFDC5Au, "GameStatisticsScreen"},
+    {0xFDC5Au, "StatsReport"},
     {0xFDD6Au, "SetStatScroll"},
     {0xFDD92u, "StatScrollRow"},
     {0xFDD9Cu, "StatScrollRowEnd"},
     {0xFDDA8u, "rtsStatScroll"},
     {0xFDDAAu, "PrintStatScrollArrows"},
-    {0xFDE24u, "DisplayTeamStatsScreen"},
+    {0xFDE24u, "DisplayStats"},
     {0xFDEB4u, "PrintStatValue"},
     {0xFE14Au, "rtsStatTables"},
     {0xFE14Cu, "updatePPTeamTime"},

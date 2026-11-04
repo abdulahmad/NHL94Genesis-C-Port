@@ -48,7 +48,7 @@ static const struct { uint32_t addr; void (*fn)(void); } routines[] = {
     { SYM_VBlank_Playoff, VBlank_Playoff },
     { SYM_ReplayMode, ReplayMode },
     { SYM_PeriodStatsScreen, PeriodStatsScreen },
-    { SYM_GameStatisticsScreen, GameStatisticsScreen },
+    { SYM_StatsReport, StatsReport },
 };
 
 /* an address the table does not know: a bug in the port (the tests replay the recorded call) */

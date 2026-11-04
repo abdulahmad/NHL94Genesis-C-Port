@@ -252,7 +252,7 @@ static void run_CompareHotColdTotals(const Record *r) { expect_reg16(r, R_D0, Co
 static void run_GetHotColdTotal(const Record *r) { expect_reg16(r, R_D1, GetHotColdTotal(TEAM(R_A0)), "d1"); }
 
 /* ---- period94, hockey94, display94 ---- */
-V(EndShootout) V(ClearGameStats) V(SetStatScroll) V(PrintStatScrollArrows) V(DisplayTeamStatsScreen) V(updatePPTeamTime)
+V(EndShootout) V(ClearGameStats) V(SetStatScroll) V(PrintStatScrollArrows) V(DisplayStats) V(updatePPTeamTime)
 V(ClearShotData) V(restoreteams) V(ResetClock) V(periodicevents) V(CheckInjury) V(RestoreBenchEnergy) V(CheckLateGameSong)
 V(UpdateCwdExcite) V(updatecrowdf) V(clockcont) V(clockcont_0) V(demoread) V(startpause) V(startpause1) V(startpause2) V(startpause3)
 V(startpause4) V(Pausemode_pall) V(updatesound) V(KillCrowd)
@@ -521,7 +521,7 @@ static void run_WriteCrowdRecord(const Record *r) { WriteCrowdRecord(r->regs_in[
 static void run_UpdatePlayerRecords(const Record *r) { UpdatePlayerRecords(r->regs_in[R_D1], r->regs_in[R_A0], TEAM(R_A2), R16(R_D5), R16(R_D6)); }
 static void run_UpdateTeamRecord(const Record *r) { UpdateTeamRecord(r->regs_in[R_A0], r->regs_in[R_D1], R16(R_D2), R16(R_D3), R16(R_D4), TEAM(R_A1), TEAM(R_A2)); }
 static void run_UpdateCrowdRecord(const Record *r) { UpdateCrowdRecord(r->regs_in[R_A0], r->regs_in[R_D1], R16(R_D2), R16(R_D4), R16(R_D5), R16(R_D6), TEAM(R_A1)); }
-V(Intermission) V(DoHiLights) V(setupice_highlight) V(clearTeamStats) V(setteams) V(ReplayMode) V(PeriodStatsScreen) V(GameStatisticsScreen)
+V(Intermission) V(DoHiLights) V(setupice_highlight) V(clearTeamStats) V(setteams) V(ReplayMode) V(PeriodStatsScreen) V(StatsReport)
 V(rtsStatTables) V(ExitStatsScreen) V(AddPlayoffTeamStats) V(ReadTeamStats) V(CountPlayers) V(UpdateRecords) V(MakeSRAMChecksum)
 
 
@@ -1082,7 +1082,7 @@ const Port ports[] = {
     { SYM_StatScrollRow, "StatScrollRow", run_StatScrollRow },
     { SYM_StatScrollRowEnd, "StatScrollRowEnd", run_StatScrollRowEnd },
     { SYM_PrintStatScrollArrows, "PrintStatScrollArrows", run_PrintStatScrollArrows },
-    { SYM_DisplayTeamStatsScreen, "DisplayTeamStatsScreen", run_DisplayTeamStatsScreen },
+    { SYM_DisplayStats, "DisplayStats", run_DisplayStats },
     { SYM_PrintStatValue, "PrintStatValue", run_PrintStatValue },
     { SYM_updatePPTeamTime, "updatePPTeamTime", run_updatePPTeamTime },
     { SYM_GetTeamRating, "GetTeamRating", run_GetTeamRating },
@@ -1375,7 +1375,7 @@ const Port ports[] = {
     { SYM_setteams, "setteams", run_setteams },
     { SYM_ReplayMode, "ReplayMode", run_ReplayMode },
     { SYM_PeriodStatsScreen, "PeriodStatsScreen", run_PeriodStatsScreen },
-    { SYM_GameStatisticsScreen, "GameStatisticsScreen", run_GameStatisticsScreen },
+    { SYM_StatsReport, "StatsReport", run_StatsReport },
     { SYM_rtsStatTables, "rtsStatTables", run_rtsStatTables },
     { SYM_ExitStatsScreen, "ExitStatsScreen", run_ExitStatsScreen },
     { SYM_AddPlayoffTeamStats, "AddPlayoffTeamStats", run_AddPlayoffTeamStats },

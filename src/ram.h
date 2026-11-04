@@ -784,7 +784,7 @@ struct RAM_PACKED Ram {
     uint16_t matchup;  /* $FFFFD598 */
     uint16_t scoutunused;  /* $FFFFD59A: cleared by ScoutingReport, never read */
     uint16_t matchuphome;  /* $FFFFD59C */
-    uint16_t matchupvis;  /* $FFFFD59E: the visitors player of the matchup; also the scroll limit of GameStatisticsScreen */
+    uint16_t matchupvis;  /* $FFFFD59E: the visitors player of the matchup; also the scroll limit of StatsReport */
     uint16_t homerating;  /* $FFFFD5A0 */
     uint16_t visrating;  /* $FFFFD5A2 */
     uint16_t advframe;  /* $FFFFD5A4 */

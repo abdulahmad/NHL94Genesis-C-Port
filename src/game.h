@@ -616,13 +616,13 @@ void SetStatScroll(void);
 uint16_t StatScrollRow(void);                           /* -> d3 */
 uint16_t StatScrollRowEnd(void);
 void PrintStatScrollArrows(void);
-void DisplayTeamStatsScreen(void);
+void DisplayStats(void);
 void PrintStatValue(const uint8_t *a0, struct Team *tm);
 void updatePPTeamTime(void);
 uint16_t GetTeamRating(struct Team *tm);                /* a2 -> d0 */
 void ShortenMsgTimer(struct SortObj *o);
 void PeriodStatsScreen(void);
-void GameStatisticsScreen(void);
+void StatsReport(void);
 void rtsStatTables(void);
 
 /* ---- title94.asm: the title and credits, songs, shootout paths, record lines and other 94 helpers ---- */
