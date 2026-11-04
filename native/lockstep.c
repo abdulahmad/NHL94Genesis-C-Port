@@ -370,8 +370,13 @@ void __cyg_profile_func_exit(void *fn, void *site);
 void NI __cyg_profile_func_enter(void *fn, void *site)
 {
     (void)site;
-    if (!tracking || native_in_vblank()) return;
-    if (depth < 512) where[depth] = routine_of(fn);
+    if (native_in_vblank()) return;
+    if (clock_original() || tracking) {
+        uint32_t r = routine_of(fn);
+        if (clock_original()) clock_on_enter(r);
+        if (tracking && depth < 512) where[depth] = r;
+    }
+    if (!tracking) return;
     depth++;
     if (fn == (void *)run68k) run68k_depth = depth;
     if (armed) try_place();
@@ -382,8 +387,11 @@ void NI run68k_unwind(void) { depth = run68k_depth; }
 
 void NI __cyg_profile_func_exit(void *fn, void *site)
 {
-    (void)fn; (void)site;
-    if (!tracking || native_in_vblank()) return;
+    (void)site;
+    if (native_in_vblank()) return;
+    if (clock_original()) clock_on_exit(routine_of(fn));
+    if (!tracking) return;
+    (void)fn;
     if (depth > 0) depth--;
     while (armed && recs[lag_next].at_rts && depth > 0 && depth <= 512 && where[depth - 1] == recs[lag_next].ret_routine) {
         place_next("at the return");                      /* the oracle was at an rts: the return into its caller */

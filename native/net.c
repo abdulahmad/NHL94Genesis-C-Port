@@ -52,8 +52,8 @@ const char *native_net_identity(const char *setup)
     static char identity[256];
     uint64_t h = 0xCBF29CE484222325ull;                   /* (the command line's part, hashed: the string stays short) */
     for (const char *s = setup ? setup : ""; *s; s++) h = (h ^ (uint8_t)*s) * 0x100000001B3ull;
-    snprintf(identity, sizeof identity, "ninety-four %s, NHL 94 (UE) %08x, setup %016llx", NHL94_BUILD, NATIVE_ROM_CRC32,
-             (unsigned long long)h);
+    snprintf(identity, sizeof identity, "ninety-four %s, NHL 94 (UE) %08x, setup %016llx, %s", NHL94_BUILD, NATIVE_ROM_CRC32,
+             (unsigned long long)h, clock_original() ? "original" : "smooth");
     return identity;
 }
 

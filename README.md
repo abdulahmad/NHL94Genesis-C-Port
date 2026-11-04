@@ -8,7 +8,7 @@
 sight.** All of the roughly 1,500 routines of EA's 1993 Sega Genesis classic have been rewritten
 by hand in C and checked against the original, frame by frame, until the two can't be told
 apart. The same one-timers, the same diving saves, the same organ, the same Gretzky. Smooth 60
-frames a second, without the cartridge's slowdown.
+frames a second by default; the cartridge's slowdown is an option (`--original`).
 
 And things the cartridge never had:
 
@@ -341,7 +341,8 @@ a whole under its bundle identifier, so macOS can ask it for the local network.
   map (`native/art.c`) says what every number is: `--art-map` prints it, and every golden run checks
   that each byte the VDP takes by DMA is in a piece of it (`--art-check`), for texture packs later.
 - **Deferred by the owner.** WebAssembly (the game's code compiles for it now; a browser platform
-  for pulseman is the job) and the cartridge's slowdown (it needs a 68k cost model).
+  for pulseman is the job). The cartridge's slowdown is an option (`--original`); fitting the 68k
+  cost model from traces (lockstep lag checked, not resynced) is still to come.
 - **Read first.** `ext/pulseman/README.md` and `docs/API.md` there; the comments at the top
   of `tools/oracle/vectors.py`, `tools/golden.py` and `tools/hybrid/oracle_shim.c`. The working
   notes (the handoff guide, the plan, the playbook for another game) are kept outside the
@@ -399,7 +400,8 @@ From the least ambitious to the most.
 - [ ] Save states anywhere, menus and pauses included
 - [ ] Debug overlay: VRAM, palettes, sprites, a RAM watch and cheat search
 - [ ] Run-ahead for lower input latency
-- [ ] The cartridge's slowdown as an option, with an "overclock" slider
+- [x] The cartridge's slowdown as an option (`--original` / Speed page; Smooth remains the default)
+- [ ] An "overclock" slider on Original; lockstep with lag frames checked (not resynced)
 - [x] Four players with EA's 4 Way Play adaptor
 - [ ] Play in the browser (WebAssembly)
 - [ ] A per-game manifest: named RAM, roster and ratings tables to CSV and back, a hack diff tool
