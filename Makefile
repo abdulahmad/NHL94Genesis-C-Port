@@ -77,6 +77,8 @@ MDRTLIBS := $(MDRT)/$(MDRTB)/libmdrt_sdl2.a $(MDRT)/$(MDRTB)/libmdrt.a
 ifeq ($(OS),Windows_NT)
 EXE    ?= .exe
 NETLIB ?= -lws2_32                                       # (pulseman's online play: Winsock)
+WINDRES ?= $(patsubst %gcc,%windres,$(CC))
+ICONO  := $(OBJ)/icon.o                                  # (the exe's icon, res/icon.ico)
 # (Windows: the C++ runtime linked in, so the game needs only SDL2.dll beside it)
 CXXLIB ?= -static-libgcc -Wl,-Bstatic -lstdc++ -Wl,--whole-archive -lwinpthread -Wl,--no-whole-archive -Wl,-Bdynamic
 endif
@@ -110,9 +112,12 @@ build/build_id.h: FORCE
 	    id='#define NHL94_BUILD "'"$${c:-unknown}"'"'; \
 	    [ "$$(cat $@ 2>/dev/null)" = "$$id" ] || echo "$$id" > $@
 FORCE:
-$(BIN): $(NOBJ) mdrt
+$(OBJ)/icon.o: res/icon.rc res/icon.ico
+	@mkdir -p $(dir $@)
+	$(WINDRES) -I res $< -O coff -o $@
+$(BIN): $(NOBJ) $(ICONO) mdrt
 	@mkdir -p $(dir $@) out
-	$(CC) $(CFLAGS) $(SANITIZE) -O2 $(LDFLAGS) -o $@ $(NOBJ) $(MDRTLIBS) $(SDLLIBS) -lm $(CXXLIB) $(NETLIB)
+	$(CC) $(CFLAGS) $(SANITIZE) -O2 $(LDFLAGS) -o $@ $(NOBJ) $(ICONO) $(MDRTLIBS) $(SDLLIBS) -lm $(CXXLIB) $(NETLIB)
 mdrt:
 	@test -f $(MDRT)/Makefile || { echo "no pulseman at $(MDRT): git submodule update --init (or make MDRT=path/to/pulseman)"; exit 1; }
 	$(MAKE) -C $(MDRT) MODE=release B=$(MDRTB) sdl
