@@ -158,7 +158,7 @@ checks     StartFaceoffLineChange             8 / 10
 hockey     StartPer                           4 / 5
 input      passmode                           4 / 5
 penalty    AddPenalty2                        16 / 20
-penalty    ProcessPenaltyList                 20 / 25
+penalty    updatepentime_ut                 20 / 25
 records    UserNameEntry                      8 / 10
 setup      Opening                            4 / 5
 setup      Opening3                           4 / 5

@@ -362,7 +362,7 @@
 #define SYM_PenShotChk 0x1211Au
 #define SYM_getBAplayerInfo 0x12174u
 #define SYM_InProgress 0x1221Cu
-#define SYM_coinsearch 0x123DEu
+#define SYM_InProgress_ap 0x123DEu
 #define SYM_checkfornewpen 0x12418u
 #define SYM_Stop4Pen 0x124A6u
 #define SYM_limitfo 0x1257Eu
@@ -375,7 +375,7 @@
 #define SYM_PenGoalStuff 0x1284Au
 #define SYM_ClearPenaltyBuffer 0x128A4u
 #define SYM_updatepentime 0x128B2u
-#define SYM_ProcessPenaltyList 0x128ECu
+#define SYM_updatepentime_ut 0x128ECu
 #define SYM_RemovePlayerFromList 0x1298Cu
 #define SYM_chkatop 0x1299Cu
 #define SYM_releasepl 0x129D2u
@@ -384,7 +384,7 @@
 #define SYM_ClrHor 0x12B40u
 #define SYM_SetHor 0x12B94u
 #define SYM_printscores1 0x12C04u
-#define SYM_PrintTeamNameAndScore 0x12D0Eu
+#define SYM_printscores1_ps 0x12D0Eu
 #define SYM_PrintTeamLogoAndScore 0x12D30u
 #define SYM_EASNLogo 0x12D70u
 #define SYM_USBoard 0x12DA6u
@@ -407,7 +407,7 @@
 #define SYM_NewTicker3 0x133B2u
 #define SYM_ClearTickerArea 0x134D8u
 #define SYM_SetTickerAreaPosition 0x134E4u
-#define SYM_PrintStringFromList 0x13508u
+#define SYM_Fprintsmall 0x13508u
 #define SYM_AdvanceStringPtr 0x13510u
 #define SYM_DoHiLights 0x1351Cu
 #define SYM_StartHL 0x1354Cu
@@ -3683,7 +3683,7 @@ static const struct SymEntry rom_syms[] = {
     {0x1211Au, "PenShotChk"},
     {0x12174u, "getBAplayerInfo"},
     {0x1221Cu, "InProgress"},
-    {0x123DEu, "coinsearch"},
+    {0x123DEu, "InProgress_ap"},
     {0x12418u, "checkfornewpen"},
     {0x124A6u, "Stop4Pen"},
     {0x1257Eu, "limitfo"},
@@ -3696,7 +3696,7 @@ static const struct SymEntry rom_syms[] = {
     {0x1284Au, "PenGoalStuff"},
     {0x128A4u, "ClearPenaltyBuffer"},
     {0x128B2u, "updatepentime"},
-    {0x128ECu, "ProcessPenaltyList"},
+    {0x128ECu, "updatepentime_ut"},
     {0x1298Cu, "RemovePlayerFromList"},
     {0x1299Cu, "chkatop"},
     {0x129D2u, "releasepl"},
@@ -3705,7 +3705,7 @@ static const struct SymEntry rom_syms[] = {
     {0x12B40u, "ClrHor"},
     {0x12B94u, "SetHor"},
     {0x12C04u, "printscores1"},
-    {0x12D0Eu, "PrintTeamNameAndScore"},
+    {0x12D0Eu, "printscores1_ps"},
     {0x12D30u, "PrintTeamLogoAndScore"},
     {0x12D70u, "EASNLogo"},
     {0x12DA6u, "USBoard"},
@@ -3728,7 +3728,7 @@ static const struct SymEntry rom_syms[] = {
     {0x133B2u, "NewTicker3"},
     {0x134D8u, "ClearTickerArea"},
     {0x134E4u, "SetTickerAreaPosition"},
-    {0x13508u, "PrintStringFromList"},
+    {0x13508u, "Fprintsmall"},
     {0x13510u, "AdvanceStringPtr"},
     {0x1351Cu, "DoHiLights"},
     {0x1354Cu, "StartHL"},

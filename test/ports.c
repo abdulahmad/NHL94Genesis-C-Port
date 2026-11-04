@@ -201,17 +201,17 @@ V(ClearPenaltyBuffer) V(updatepentime) V(chkatop) V(updatepwrplay) V(ClrHor) V(S
 V(ChkShotStat) V(SetupTeamForIntermission) V(InitScores) V(UpdateScores) V(ClearTickerArea)
 static void run_PenShotChk(const Record *r) { expect_reg16(r, R_D0, PenShotChk((uint16_t)r->regs_in[R_D0], OBJ(R_A2), OBJ(R_A3)), "d0"); }
 static void run_getBAplayerInfo(const Record *r) { uint8_t ccr = getBAplayerInfo((uint16_t)r->regs_in[R_D0], OBJ(R_A3)); if ((ccr & CCR_N) != (r->regs_out[R_SR] & CCR_N)) printf("    N flag: got %d, 68k %d\n", !!(ccr & CCR_N), !!(r->regs_out[R_SR] & CCR_N)); }
-static void run_coinsearch(const Record *r) { coinsearch(TEAM(R_A2)); }
+static void run_InProgress_ap(const Record *r) { InProgress_ap(TEAM(R_A2)); }
 static void run_Stop4Pen(const Record *r) { Stop4Pen(r->regs_in[R_A0], OBJ(R_A3)); }
 static void run_SetPA(const Record *r) { SetPA((uint16_t)r->regs_in[R_D0]); }
 static void run_PushRef(const Record *r) { PushRef((uint16_t)r->regs_in[R_D0]); }
 static void run_prefmes(const Record *r) { prefmes(D16(R_D0)); }
 static void run_PenGoalStuff(const Record *r) { PenGoalStuff(TEAM(R_A1), TEAM(R_A2)); }
-static void run_ProcessPenaltyList(const Record *r) { ProcessPenaltyList(TEAM(R_A2)); }
+static void run_updatepentime_ut(const Record *r) { updatepentime_ut(TEAM(R_A2)); }
 static void run_RemovePlayerFromList(const Record *r) { uint8_t *a0 = RemovePlayerFromList(BYTES_AT(R_A0)); expect_reg16(r, R_A0, (uint16_t)(a0 - (uint8_t *)&g), "a0"); }
 static void run_releasepl(const Record *r) { releasepl(TEAM(R_A2), (uint16_t)r->regs_in[R_D0]); }
 static void run_GetLowestPen(const Record *r) { expect_reg16(r, R_D0, GetLowestPen(TEAM(R_A2), TEAM(R_A3)), "d0"); }
-static void run_PrintTeamNameAndScore(const Record *r) { PrintTeamNameAndScore(TEAM(R_A2)); }
+static void run_printscores1_ps(const Record *r) { printscores1_ps(TEAM(R_A2)); }
 static void run_PrintTeamLogoAndScore(const Record *r) { PrintTeamLogoAndScore(TEAM(R_A2), (uint16_t)r->regs_in[R_D0]); }
 static void run_pplpen(const Record *r) { pplpen(TEAM(R_A2), (uint16_t)r->regs_in[R_D0]); }
 static void run_linebar(const Record *r) { linebar((uint16_t)r->regs_in[R_D0], TEAM(R_A2)); }
@@ -225,7 +225,7 @@ static void run_NewTicker2(const Record *r) { struct Matchup *gs = NULL; expect_
 static void run_CheckGameTickerStatus(const Record *r) { struct Matchup *gs = NULL; expect_reg16(r, R_D3, (uint16_t)CheckGameTickerStatus(D16(R_D3), &gs), "d3"); if (gs) expect_reg16(r, R_A0, (uint16_t)rp_addr(ram_place(gs)), "a0"); }
 static void run_NewTicker3(const Record *r) { NewTicker3(D16(R_D3), MATCHUP(R_A0)); }
 static void run_SetTickerAreaPosition(const Record *r) { uint16_t d0, d1; SetTickerAreaPosition(&d0, &d1); expect_reg16(r, R_D0, d0, "d0"); expect_reg16(r, R_D1, d1, "d1"); }
-static void run_PrintStringFromList(const Record *r) { PrintStringFromList(r->regs_in[R_A1], (uint16_t)r->regs_in[R_D0]); }
+static void run_Fprintsmall(const Record *r) { Fprintsmall(r->regs_in[R_A1], (uint16_t)r->regs_in[R_D0]); }
 static void run_AdvanceStringPtr(const Record *r) { uint32_t a1 = AdvanceStringPtr(r->regs_in[R_A1], (uint16_t)r->regs_in[R_D0]); if (a1 != r->regs_out[R_A1]) printf("    a1: got %06x, 68k %06x\n", a1, r->regs_out[R_A1]); }
 
 /* ---- goalie94, onetimer94, crowd94 ---- */
@@ -994,7 +994,7 @@ const Port ports[] = {
     { SYM_PenShotChk, "PenShotChk", run_PenShotChk },
     { SYM_getBAplayerInfo, "getBAplayerInfo", run_getBAplayerInfo },
     { SYM_InProgress, "InProgress", run_InProgress },
-    { SYM_coinsearch, "coinsearch", run_coinsearch },
+    { SYM_InProgress_ap, "InProgress_ap", run_InProgress_ap },
     { SYM_checkfornewpen, "checkfornewpen", run_checkfornewpen },
     { SYM_Stop4Pen, "Stop4Pen", run_Stop4Pen },
     { SYM_limitfo, "limitfo", run_limitfo },
@@ -1007,7 +1007,7 @@ const Port ports[] = {
     { SYM_PenGoalStuff, "PenGoalStuff", run_PenGoalStuff },
     { SYM_ClearPenaltyBuffer, "ClearPenaltyBuffer", run_ClearPenaltyBuffer },
     { SYM_updatepentime, "updatepentime", run_updatepentime },
-    { SYM_ProcessPenaltyList, "ProcessPenaltyList", run_ProcessPenaltyList },
+    { SYM_updatepentime_ut, "updatepentime_ut", run_updatepentime_ut },
     { SYM_RemovePlayerFromList, "RemovePlayerFromList", run_RemovePlayerFromList },
     { SYM_chkatop, "chkatop", run_chkatop },
     { SYM_releasepl, "releasepl", run_releasepl },
@@ -1016,7 +1016,7 @@ const Port ports[] = {
     { SYM_ClrHor, "ClrHor", run_ClrHor },
     { SYM_SetHor, "SetHor", run_SetHor },
     { SYM_printscores1, "printscores1", run_printscores1 },
-    { SYM_PrintTeamNameAndScore, "PrintTeamNameAndScore", run_PrintTeamNameAndScore },
+    { SYM_printscores1_ps, "printscores1_ps", run_printscores1_ps },
     { SYM_PrintTeamLogoAndScore, "PrintTeamLogoAndScore", run_PrintTeamLogoAndScore },
     { SYM_EASNLogo, "EASNLogo", run_EASNLogo },
     { SYM_USBoard, "USBoard", run_USBoard },
@@ -1037,7 +1037,7 @@ const Port ports[] = {
     { SYM_NewTicker3, "NewTicker3", run_NewTicker3 },
     { SYM_ClearTickerArea, "ClearTickerArea", run_ClearTickerArea },
     { SYM_SetTickerAreaPosition, "SetTickerAreaPosition", run_SetTickerAreaPosition },
-    { SYM_PrintStringFromList, "PrintStringFromList", run_PrintStringFromList },
+    { SYM_Fprintsmall, "Fprintsmall", run_Fprintsmall },
     { SYM_AdvanceStringPtr, "AdvanceStringPtr", run_AdvanceStringPtr },
     { SYM_ManualGoalieMenu, "ManualGoalieMenu", run_ManualGoalieMenu },
     { SYM_RunArenaAnim, "RunArenaAnim", run_RunArenaAnim },

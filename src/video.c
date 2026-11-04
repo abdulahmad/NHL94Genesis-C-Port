@@ -953,7 +953,7 @@ void printz(const uint8_t *s, unsigned n) { (void)n; print_p((struct Text){ s, 0
  * period label (" 1", " 2", " 3", "OT"), two columns on, the time as m:ss. */
 void FormatAndPrintTime(uint16_t v)
 {
-    PrintStringFromList(SYM_PeriodLabelTable, (uint16_t)(v >> 14));
+    Fprintsmall(SYM_PeriodLabelTable, (uint16_t)(v >> 14));
     g.printx += 2;
     print(PushTime(v & 0x3FFF));
 }

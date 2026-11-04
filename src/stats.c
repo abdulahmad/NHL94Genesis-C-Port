@@ -262,7 +262,7 @@ void DrawStatsList(struct Team *tm, int playoff)
     Framer(0x16, 3);
     printz(str_DrawStatsList_3, sizeof str_DrawStatsList_3);
     if (more_stats(playoff) && (int16_t)g.DispAttribCtr >= 4) printsmallz(more_titles[g.DispAttribCtr - 4], 22);
-    else PrintStringFromList(SYM_StatSortTitles, (uint16_t)(1 + g.DispAttribCtr));
+    else Fprintsmall(SYM_StatSortTitles, (uint16_t)(1 + g.DispAttribCtr));
     g.printfontset = 0;
     uint8_t *a3 = SATT;
     uint32_t done = 0;                                    /* d6: the players placed (or left out) */
@@ -390,7 +390,7 @@ void DrawStatsListArrows(void)
     printsmallz(str_DrawStatsListArrows_1, sizeof str_DrawStatsListArrows_1);
     uint16_t n = (int16_t)g.VertLineScrolling > 0;
     n = (uint16_t)(n + 2 * ((int16_t)g.VertLineScrolling < (int16_t)g.SelectedPlayerIdx));
-    PrintStringFromList(SYM_ScrollArrowTbl2, n);
+    Fprintsmall(SYM_ScrollArrowTbl2, n);
 }
 
 /* ---- the menu screens: Other Scores ------------------------------------------------------------ */
@@ -465,7 +465,7 @@ void DisplayGameInfo(uint16_t n)
     g.printy++;
     PrintGameInfo(gs->team1, gs->score1);
     g.printx = 0x1C;
-    PrintStringFromList(SYM_PerLabels, (uint16_t)(gs->per - 1));
+    Fprintsmall(SYM_PerLabels, (uint16_t)(gs->per - 1));
     g.printy += 2;
 }
 
@@ -485,7 +485,7 @@ void DrawScrollArrows(void)
     printsmallz(str_DrawScrollArrows_1, sizeof str_DrawScrollArrows_1);
     uint16_t n = (int16_t)g.VertLineScrolling > 0;
     n = (uint16_t)(n + 2 * ((int16_t)g.VertLineScrolling < (int16_t)g.SelectedPlayerIdx));
-    PrintStringFromList(SYM_ScrollArrowTable, n);
+    Fprintsmall(SYM_ScrollArrowTable, n);
 }
 
 /* ---- the menu screens: the line editor ---------------------------------------------------------- */
@@ -680,7 +680,7 @@ void DrawLineIcon(uint16_t line, struct Team *tm)
     g.printx = rd16(pos);
     g.printy = rd16(pos + 2);
     g.printa = 0x8000;
-    PrintStringFromList(SYM_linelist, line);
+    Fprintsmall(SYM_linelist, line);
     printsmallz(str_DrawLineIcon_1, sizeof str_DrawLineIcon_1);
     g.printx = rd16(pos);
     uint16_t slot = (uint16_t)((line << 3) + 1);
@@ -987,7 +987,7 @@ void AttribStatus(uint16_t player, struct Team *tm)
         print(PushTime(st & 0xFFF));
         n = (st & 0x4000) ? 5 : 4;
     }
-    PrintStringFromList(SYM_StatusTextTbl, n);
+    Fprintsmall(SYM_StatusTextTbl, n);
 }
 
 /* stats94.asm:AttribEnergy. Energy: his word at $32 of the team struct / 40, at most 100. */
@@ -1021,7 +1021,7 @@ void AttribPrintPct(uint16_t v)
 /* stats94.asm:AttribHanded. Bit 0 of the sum: Righty / Lefty. */
 void AttribHanded(uint16_t v)
 {
-    PrintStringFromList(SYM_HandedTextTbl, (uint16_t)((v & 1) ^ 1));
+    Fprintsmall(SYM_HandedTextTbl, (uint16_t)((v & 1) ^ 1));
 }
 
 /* stats94.asm:AttribWeight. Weight: 140 + 8 x the rating, in lb. */
@@ -1145,7 +1145,7 @@ void DrawScoringRow(uint16_t at)
     FormatAndPrintTime(rd16(e));
     summary_team(e[2]);
     g.printx = 0x23;
-    PrintStringFromList(SYM_GoalTypeTbl, e[2] & 0x7F);
+    Fprintsmall(SYM_GoalTypeTbl, e[2] & 0x7F);
     struct Team *tm = team_struct(e[2] & 0x80);
     g.printx = 0x10;
     PrintScorerName(e[3], tm);
@@ -1272,7 +1272,7 @@ void DrawScrollArrowsPenalty(void)
     printsmallz(str_DrawScrollArrowsPenalty_1, sizeof str_DrawScrollArrowsPenalty_1);
     uint16_t n = (int16_t)g.VertLineScrolling > 0;
     n = (uint16_t)(n + 2 * ((int16_t)g.VertLineScrolling < (int16_t)g.SelectedPlayerIdx));
-    PrintStringFromList(SYM_ScrollArrowTbl, n);
+    Fprintsmall(SYM_ScrollArrowTbl, n);
 }
 
 /* ---- the menu screens: the crowd meter, the timeout, the goalie ------------------------------- */

@@ -1766,9 +1766,9 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
         uint16_t l0 = team_struct(0)->line, l1 = team_struct(1)->line;
         if (!(g.gmode & (1 << gmdir))) { uint16_t t = l0; l0 = l1; l1 = t; }
         printsmallz(str_puckfaceoff2_3, sizeof str_puckfaceoff2_3);
-        PrintStringFromList(SYM_linelist, l0);
+        Fprintsmall(SYM_linelist, l0);
         g.printx += 4;
-        PrintStringFromList(SYM_linelist, l1);
+        Fprintsmall(SYM_linelist, l1);
     }
     d0 = (int16_t)(randomd0(0x78) + 0xB4);                /* time to the drop */
     {

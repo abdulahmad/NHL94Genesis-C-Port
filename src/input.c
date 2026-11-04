@@ -320,7 +320,7 @@ void SetLCmode2(struct Team *tm)
         wr32(mes, 0x00044120);
         mes[2] = (uint8_t)(mes[2] + d4);
         print(ram_addr(mes));
-        PrintStringFromList(SYM_linelist, (uint16_t)line);
+        Fprintsmall(SYM_linelist, (uint16_t)line);
         linebar((uint16_t)line, tm);
         g.printx -= 5;
         g.printy -= 1;

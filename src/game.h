@@ -516,7 +516,7 @@ void chkprogress(void);
 uint16_t PenShotChk(uint16_t pen, struct SortObj *hit, struct SortObj *o);   /* d0, a2 = player hit, a3 = checker -> d0 */
 uint8_t getBAplayerInfo(uint16_t skater, const struct SortObj *o);          /* d0, a3 -> ccr (N = no penalty shot) */
 void InProgress(void);
-void coinsearch(struct Team *tm);                       /* a2 */
+void InProgress_ap(struct Team *tm);                       /* a2 */
 void checkfornewpen(void);
 void Stop4Pen(uint32_t a0, struct SortObj *o);          /* a0 = PenBuf entry + 2 (or the caller's own code), a3 */
 void limitfo(void);
@@ -529,7 +529,7 @@ void ClearPenaltyMessage(void);
 void PenGoalStuff(struct Team *a1, struct Team *a2);    /* a1 = scored on team, a2 = scoring team */
 void ClearPenaltyBuffer(void);
 void updatepentime(void);
-void ProcessPenaltyList(struct Team *tm);               /* a2 */
+void updatepentime_ut(struct Team *tm);               /* a2 */
 uint8_t *RemovePlayerFromList(uint8_t *a0);             /* a0 -> a0 */
 void chkatop(void);
 void releasepl(struct Team *tm, uint16_t d0);           /* a2, d0 = player * 2 */
@@ -538,7 +538,7 @@ void updatepwrplay(void);
 void ClrHor(void);
 void SetHor(void);
 void printscores1(void);
-void PrintTeamNameAndScore(struct Team *tm);            /* a2 */
+void printscores1_ps(struct Team *tm);            /* a2 */
 void PrintTeamLogoAndScore(struct Team *tm, uint16_t logo);    /* a2, d0 */
 void EASNLogo(void);
 void USBoard(void);
@@ -559,7 +559,7 @@ int16_t CheckGameTickerStatus(int16_t d3, struct Matchup **gs);
 void NewTicker3(int16_t d3, const struct Matchup *gs);
 void ClearTickerArea(void);
 void SetTickerAreaPosition(uint16_t *d0, uint16_t *d1);
-void PrintStringFromList(uint32_t list, uint16_t n);    /* a1, d0 */
+void Fprintsmall(uint32_t list, uint16_t n);    /* a1, d0 */
 uint32_t AdvanceStringPtr(uint32_t list, uint16_t n);   /* a1, d0 -> a1 */
 void Intermission(void);
 void DoHiLights(void);
