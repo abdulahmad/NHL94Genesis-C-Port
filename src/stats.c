@@ -1324,7 +1324,7 @@ void PrintCrowdDB(uint16_t level)
 {
     uint32_t v = (uint32_t)(int32_t)(int16_t)level;
     v = (v & 0xFFFF0000u) | (uint16_t)(v << 2);           /* (ext.l, asl.w) */
-    print(PushNumberWidth((uint16_t)(sroot(v) + 0x41), 3));
+    print(PushNumberWidth((uint16_t)(Sroot(v) + 0x41), 3));
     printz(str_PrintCrowdDB_1, sizeof str_PrintCrowdDB_1);
 }
 

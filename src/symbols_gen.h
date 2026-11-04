@@ -286,7 +286,7 @@
 #define SYM_CopyPaletteToCRAM 0x11044u
 #define SYM_randomd0s 0x1107Au
 #define SYM_randomd0 0x11086u
-#define SYM_sroot 0x110BEu
+#define SYM_Sroot 0x110BEu
 #define SYM_sfx 0x11132u
 #define SYM_song 0x11156u
 #define SYM_waitx 0x11176u
@@ -3607,7 +3607,7 @@ static const struct SymEntry rom_syms[] = {
     {0x11044u, "CopyPaletteToCRAM"},
     {0x1107Au, "randomd0s"},
     {0x11086u, "randomd0"},
-    {0x110BEu, "sroot"},
+    {0x110BEu, "Sroot"},
     {0x11132u, "sfx"},
     {0x11156u, "song"},
     {0x11176u, "waitx"},

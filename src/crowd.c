@@ -49,7 +49,7 @@ void Crowd_Noise(void)
     g.CwdChkCnt[0]++;
     int32_t lv = (int16_t)g.CwdExciteLvl;
     lv = (int32_t)((lv & 0xFFFF0000u) | (uint16_t)(lv << 2));
-    uint16_t m = (uint16_t)(sroot((uint32_t)lv) + 0x41);  /* decibels */
+    uint16_t m = (uint16_t)(Sroot((uint32_t)lv) + 0x41);  /* decibels */
     g.CurCrowdMeter = m;
     if ((int16_t)m > (int16_t)g.CrowdPeak) g.CrowdPeak = m;
 }
@@ -95,7 +95,7 @@ void checkcornercoll(int16_t x, int16_t y, struct SortObj *o)
         int16_t c = dy, s = (int16_t)-dx;
         int32_t dist = (int32_t)dy * dy + (int32_t)dx * dx;
         if ((uint32_t)dist > 0x1000) {
-            int16_t r = (int16_t)sroot((uint32_t)dist);
+            int16_t r = (int16_t)Sroot((uint32_t)dist);
             c = (int16_t)m68k_divs((int32_t)c * 256, r);     /* (asl.l #8; a negative's shift undefined in C) */
             s = (int16_t)m68k_divs((int32_t)s * 256, r);
             wallcollb(c, s, o);

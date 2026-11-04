@@ -276,7 +276,7 @@ static const struct { void (*fn)(void); uint32_t addr; } routine_fns[] = {
     { (void (*)(void))CopyPaletteToCRAM, 0x11044u },
     { (void (*)(void))randomd0s, 0x1107Au },
     { (void (*)(void))randomd0, 0x11086u },
-    { (void (*)(void))sroot, 0x110BEu },
+    { (void (*)(void))Sroot, 0x110BEu },
     { (void (*)(void))sfx, 0x11132u },
     { (void (*)(void))song, 0x11156u },
     { (void (*)(void))waitx, 0x11176u },

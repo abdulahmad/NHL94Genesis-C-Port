@@ -158,9 +158,9 @@ uint16_t randomd0(uint16_t range)
     return (uint16_t)(((scaled & 0xFFFF) * range) >> 16);      /* mulu.w, swap */
 }
 
-/* video94.asm:sroot. d0.l -> d0 = its square root. Up to $640 by subtracting odd numbers, up to
+/* video94.asm:Sroot. d0.l -> d0 = its square root. Up to $640 by subtracting odd numbers, up to
  * $F00000 by Newton steps from v/256 (at most ten), above that by bisection. */
-uint16_t sroot(uint32_t v)
+uint16_t Sroot(uint32_t v)
 {
     if (v == 0) return 0;
     if (v <= 0x640) {

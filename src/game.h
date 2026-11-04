@@ -108,7 +108,7 @@ uint16_t randomd0(uint16_t range);        /* d0 = range -> d0 = random 0..range-
 uint16_t randomd0s(uint16_t range);       /* d0 -> d0, signed random */
 void sfx(int16_t n);                       /* word on stack: sound effect, -1 = none */
 void song(int16_t n);                      /* word on stack: song number */
-uint16_t sroot(uint32_t v);                /* d0.l -> d0 */
+uint16_t Sroot(uint32_t v);                /* d0.l -> d0 */
 void forceblack(void);
 void forcefade(void);
 void CopyPaletteToCRAM(void);

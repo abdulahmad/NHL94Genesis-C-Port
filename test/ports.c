@@ -313,7 +313,7 @@ static uint16_t stack_word(const Record *r, int off) { const uint8_t *sp = r->ra
 static uint32_t ret_addr(const Record *r) { const uint8_t *sp = r->ram_in + (r->regs_in[R_A7] & 0xFFFF); return be32(sp); }
 static const uint8_t *inline_string(const Record *r) { return rom_ptr(ret_addr(r)); }   /* (the code after the call: the cartridge) */
 static void run_randomd0s(const Record *r) { expect_reg16(r, R_D0, randomd0s(R16(R_D0)), "d0"); }
-static void run_sroot(const Record *r) { expect_reg16(r, R_D0, sroot(r->regs_in[R_D0]), "d0"); }
+static void run_Sroot(const Record *r) { expect_reg16(r, R_D0, Sroot(r->regs_in[R_D0]), "d0"); }
 static void run_sfx(const Record *r) { sfx((int16_t)stack_word(r, 4)); }
 static void run_song(const Record *r) { song((int16_t)stack_word(r, 4)); }
 static void run_UnpackNibbles(const Record *r) { UnpackNibbles(r->regs_in[R_A0], R16(R_D0)); }
@@ -1152,7 +1152,7 @@ const Port ports[] = {
     { SYM_freezewindow, "freezewindow", run_freezewindow },
     { SYM_checkwindow, "checkwindow", run_checkwindow },
     { SYM_randomd0s, "randomd0s", run_randomd0s },
-    { SYM_sroot, "sroot", run_sroot },
+    { SYM_Sroot, "Sroot", run_Sroot },
     { SYM_sfx, "sfx", run_sfx },
     { SYM_song, "song", run_song },
     { SYM_UnpackNibbles, "UnpackNibbles", run_UnpackNibbles },

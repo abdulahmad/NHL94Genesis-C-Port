@@ -384,7 +384,7 @@ de1:
     {
         int32_t dsq = sq(d0) + sq(d1);
         if ((uint32_t)dsq > 0x384) {                      /* far: scale the move down */
-            d2 = (int16_t)(1 + (int16_t)sroot((uint32_t)dsq));
+            d2 = (int16_t)(1 + (int16_t)Sroot((uint32_t)dsq));
             int16_t d4 = 0x12;
             if (g.sflags & HI(sfssdir)) d4 = (int16_t)(d4 + 8);
             int32_t p1 = (int32_t)d1 * d4;

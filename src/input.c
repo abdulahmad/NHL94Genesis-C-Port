@@ -143,7 +143,7 @@ void ClampTargetY(int16_t *d0, int16_t *d1, int16_t d3, const struct SortObj *o)
 
 /* input94.asm:doinput_cbut. C button (bit 5) for the goalie: a press reads the shot and
  * starts a save (goaliesave); held, it holds the save pose (SPAcnt). The shot reading repeats
- * checkanim's arithmetic for nothing but its sroot call. */
+ * checkanim's arithmetic for nothing but its Sroot call. */
 void doinput_cbut(uint16_t d1, uint16_t d3, struct SortObj *o)
 {
     if (!(d1 & BUT_C)) {
@@ -167,7 +167,7 @@ void doinput_cbut(uint16_t d1, uint16_t d3, struct SortObj *o)
         dy = (int16_t)((int16_t)(((int32_t)dy * puckvy()) >> 16) + pucky());
         ClampTargetY(&d0, &dy, (int16_t)d3, o);           /* d3 is the held buttons here: dead values */
         if ((uint32_t)(sq(d0) + sq(dy)) > 0x384)
-            sroot((uint32_t)(sq(d0) + sq(dy)));
+            Sroot((uint32_t)(sq(d0) + sq(dy)));
     }
     if (o->pflags2 & 2) { doinput_chkanim(o); return; }
     o->pflags2 |= 2;
@@ -594,7 +594,7 @@ void passtoa0(struct SortObj *rcv, struct SortObj *o)
     int32_t kasq = (int32_t)(int16_t)asq * (int16_t)k;
     kasq = (int32_t)((uint32_t)kasq << 2);                /* (asl.l #2, wrapping) */
     int32_t disc = sq(j) - kasq;
-    int16_t r = (int16_t)sroot((uint32_t)disc);
+    int16_t r = (int16_t)Sroot((uint32_t)disc);
     int16_t div = (int16_t)((int16_t)k >> 2);
     if (div == 0) div = 1;                                /* no divide by zero */
     int16_t t = 0, d0 = r;
@@ -789,7 +789,7 @@ void doshot(struct SortObj *o)
     int16_t dx = (int16_t)((int16_t)shotsets[idx] - puckx());
     int16_t dz = (int16_t)shotsets[idx + 1];
     dy = (int16_t)(dy - pucky());
-    int16_t d3 = (int16_t)sroot((uint32_t)(sq(dx) + sq(dy)));
+    int16_t d3 = (int16_t)Sroot((uint32_t)(sq(dx) + sq(dy)));
     if (d3 == 0) d3 = 1;                                  /* distance to the spot */
     int perfect = 0;
     if (g.gmode & (1 << gmhl)) perfect = 1;
@@ -867,7 +867,7 @@ void shotdiradj(struct SortObj *o)
     if (found) {
         int16_t dx = (int16_t)((HIB(gk->Xvel) >> 1) + gk->Xpos - puckx());
         int16_t dy = (int16_t)((HIB(gk->Yvel) >> 1) + gk->Ypos - pucky());
-        int16_t d2 = (int16_t)sroot((uint32_t)(sq(dx) + sq(dy) + 1));
+        int16_t d2 = (int16_t)Sroot((uint32_t)(sq(dx) + sq(dy) + 1));
         int16_t d3 = 0x12;
         int16_t d4 = PFLAG(o, pfgoal) ? 0x108 : -0x108;
         int16_t d5 = CalcAngleOffset(dx, dy, d2, d3, d4);
