@@ -96,14 +96,14 @@ static inline int32_t m68k_divs(int32_t dividend, int16_t divisor)
 /* d7 on the 68k: frames since the last game loop pass; set once per frame by DoGameFrame */
 extern int16_t elapsed;
 
-/* ---- main94.asm: power on (src/start.c) ---- */
+/* ---- main94.asm: power on (src/main.c); sega/SegaInit.asm ---- */
 void Start(void);                                       /* power on; does not return */
 void SegaInit(void);
 
 /* ---- checksum94.asm: the ROM check ---- */
 void ValidationRoutine(void);
 
-/* ---- video94.asm: shared helpers: palettes, random numbers, joysticks, VRAM, unpacking, printing ---- */
+/* ---- middle94.asm: shared helpers: palettes, random numbers, joysticks, VRAM ---- */
 uint16_t randomd0(uint16_t range);        /* d0 = range -> d0 = random 0..range-1; advances seed */
 uint16_t randomd0s(uint16_t range);       /* d0 -> d0, signed random */
 void sfx(int16_t n);                       /* word on stack: sound effect, -1 = none */
@@ -126,6 +126,7 @@ void DoDMA_nd2(uint16_t words, uint16_t dst, uint16_t src);      /* d0, d1, d2 (
 void WaitDMA(void);
 void setVram(uint16_t colour);             /* d0 */
 void setVram_0(void);
+/* ---- decompress94.asm: graphics decompression ---- */
 uint16_t DecompressGraphicsWithRemap(uint32_t tiles, uint16_t start, uint32_t cb);  /* a2, d4, table after the call -> d4 */
 uint16_t DecompressGraphics(uint32_t tiles, uint16_t start);     /* a2, d4 -> d4 */
 /* DecompressBytecode's registers: a0 = data, d1 = ring buffer index, d3 = VRAM address */
@@ -147,6 +148,7 @@ int Opcode_CopyBackwardReverseLong(struct Unpack *u);
 int CopyBackwardRun(struct Unpack *u, uint16_t count, uint8_t dist);        /* d0 = count-1, d2 = distance */
 int CopyBackwardReverseRun(struct Unpack *u, uint16_t count, uint8_t dist);
 void FlushOutputBuffer(struct Unpack *u);
+/* ---- print94.asm: text printing ---- */
 void xyVmMap(void);
 /* a String's bytes read one at a time: the code's own (host bytes) or at a 68000 address, the
  * cartridge's or RAM's */
@@ -273,7 +275,7 @@ void VBjsr(void);                                       /* the vblank interrupt:
 void Begin(void);                                       /* does not return */
 void StartGame(void);                                   /* does not return */
 
-/* ---- display94.asm: the game play display: sprites, scroll, the vblank ---- */
+/* ---- video94.asm: the game play display: sprites, scroll, the vblank ---- */
 /* The sprite builders share three registers: a5 = the DMA list being filled (long
  * source, word length in words, word VRAM address per entry), a6 = the sprite attribute table
  * being filled, d6 = the sprite link counter. */
@@ -304,7 +306,7 @@ void find3d(int16_t *x, int16_t *y, int16_t z);          /* d0, d1, d2 -> d0, d1
 void updatesound(void);
 void KillCrowd(void);
 
-/* ---- replay94.asm: the replay recorder and viewer, the per-object update loop, the camera ---- */
+/* ---- replay94.asm: the replay recorder and viewer ---- */
 void getpzjoy(uint16_t *d0, uint16_t *d1, uint16_t *d2, uint16_t *d3);   /* the pausing pad's joystick */
 void ShowReplayIcon(void);
 void EraseReplayIcon(void);
@@ -319,14 +321,13 @@ uint16_t RevReplayAdj(uint32_t frame, struct RinkObj *cam);   /* a4, a5 -> d7 */
 uint16_t RestoreReplayFrame(uint32_t frame, struct RinkObj *cam);   /* a4, a5 -> d7 (the frame's elapsed count) */
 void ClampReplayView(void);
 void updatereplay(void);                                 /* d7 = elapsed */
+void ReplayMode(void);
+
+/* ---- logic94.asm: player update, input, assignments, the camera ---- */
 void updateplayers(void);                                /* d7 = elapsed */
 void updateanim(struct SortObj *o);                      /* a3 */
-void ReplayMode(void);
 void freezewindow(void);                                /* lock the view */
 void checkwindow(void);                                 /* scroll the view after the puck */
-
-/* ---- checks94.asm: skater, goalie and puck assignments, acceleration ---- */
-/* checks94 */
 typedef uint16_t (*skate_aux)(uint16_t dir, struct SortObj *o);   /* a0 callback of skateto: d0 -> d0 */
 void asswingo(struct Team *tm, struct SortObj *o);    /* a2 = team, a3 = player */
 void asscenterd(struct Team *tm, struct SortObj *o);
@@ -407,7 +408,7 @@ void playeracc(int16_t dir, struct SortObj *o);        /* d2 */
 void dostop(struct SortObj *o);
 void stopna(struct SortObj *o);
 
-/* ---- assign94.asm: the bench, penalty box, faceoff and celebration assignments ---- */
+/* logic94: the bench, penalty box, faceoff and celebration assignments */
 int check4bench(struct SortObj *o);                    /* a3; 1 = the calling assignment is over (it pops the return) */
 void assbench(struct Team *tm, struct SortObj *o);
 void asseben(struct Team *tm, struct SortObj *o);
@@ -426,7 +427,7 @@ void assdefo(struct Team *tm, struct SortObj *o);
 void assdefd(struct Team *tm, struct SortObj *o);
 void asswingd(struct Team *tm, struct SortObj *o);
 
-/* ---- input94.asm: controller input for skaters ---- */
+/* logic94: controller input for skaters */
 void doinput(uint16_t d0, uint16_t d1, uint16_t d2, uint16_t d3, int16_t d4, struct SortObj *o); /* dpad, new, changed, held, pad, a3 */
 void ClampTargetY(int16_t *d0, int16_t *d1, int16_t d3, const struct SortObj *o);
 int16_t getGoalieSCnum(int16_t last);                  /* d0 -> d0 */
@@ -677,7 +678,7 @@ uint16_t GetLeagueCrowdRecord(void);                    /* -> d0 */
 void ClearWinRecords(void);
 struct Team *GetTeamStruct(uint16_t team);              /* d2 -> a2 */
 
-/* ---- data94.asm: the boxes over the rink, player names, the playoff tree and password ---- */
+/* setup94: the boxes over the rink, player names, the playoff tree and password */
 void box(void);
 void ShowGoalBox(void);
 void PenaltyShotBox(void);
@@ -792,7 +793,7 @@ void LogoBoxLeft(void);
 void LogoBoxVis(void);
 void DrawLogoBox(uint16_t chars);                       /* d4 */
 
-/* ---- attract94.asm: the EA screen, matchup pictures, option screen helpers ---- */
+/* setup94: the EA screen, matchup pictures, option screen helpers */
 void EASportsScreen(void);
 void UpdatePlayoffLevel(void);
 void TeamIcons(void);

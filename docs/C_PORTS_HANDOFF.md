@@ -64,18 +64,28 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
   Smooth gates after the names: `make lockstep` **23 of 23**; `make test` 10,276 of 10,276, 0 failed,
   570 skipped, 29 captures; `make golden-check` 20 of 20 identical, 2 of 2 roster-set LIKE, 7 of 7
   states, keys / restart / reset OK.
+* **File recut** (2026-11-04): one C file per 94G asm file. 280 `other_module` routines moved
+  (logic from checks/input/assign/replay; setup from data/attract; middle/print/decompress from
+  the old video.c; video from display; SegaInit into sega.c; start.c renamed main.c). Kept `src/`
+  (already flat, same as 94G). Names gate **838 ok / 0 other_module / 0 renamed / 0 missing**.
+  Smooth gates after the recut: `make lockstep` **23 of 23**; `make test` 10,276 of 10,276, 0 failed,
+  570 skipped, 29 captures; `make golden-check` 20 of 20 identical, 2 of 2 roster-set LIKE, 7 of 7
+  states, keys / restart / reset OK. Generated `*_tables_gen.h` / `*_strings_gen.h` names stay
+  (they match the pin `make gen` still reads). Capture `--fn` lists still use pinned vasm names
+  (`af1b6f2`).
 
 **gens94-c is ignored from 2026-11-03 (Abdul)**: no work or cross-checks on it; the E1/E3 results above are history. `test/crosscheck.sh` is not run any more.
 
-2026-11-04: NHL94Genesis names applied on `claude/project-thread-4gad59`; do not merge to main. E6 stays parked. SNES Smooth was not flipped. File re-cut (`other_module` 280) is the next names-related unit.
+2026-11-04: file recut on `claude/project-thread-4gad59`; do not merge to main. E6 stays parked. SNES Smooth was not flipped.
 
 ## Next, in order
 
 1. ~~Coverage, part 3~~ (done 2026-11-04; lockstep 23 of 23, 790/838, 48 never reached).
 2. ~~`VANILLA=1` build~~ (done 2026-11-03; lockstep 20 of 20 re-checked 2026-11-04).
 3. ~~**Slowdown option**~~ (done 2026-11-04): `--original` / `--speed original` / Speed page / `game.speed` in settings.ini. Smooth remains the default.
-4. ~~**NHL94Genesis names**~~ (done 2026-11-04): 0 renamed, 0 missing. **File re-cut** of the 280 `other_module` routines still waits (rename OR move, never both).
-5. ~~**E6**~~ parked 2026-11-04 (3 Original lockstep failures; see Results). Overclock slider still to come. SNES Smooth was not flipped.
+4. ~~**NHL94Genesis names**~~ (done 2026-11-04): 0 renamed, 0 missing.
+5. ~~**File recut**~~ (done 2026-11-04): 0 other_module. One `src/<module>.c` per 94G asm file.
+6. ~~**E6**~~ parked 2026-11-04 (3 Original lockstep failures; see Results). Overclock slider still to come. SNES Smooth was not flipped.
 
 ## Needs
 
