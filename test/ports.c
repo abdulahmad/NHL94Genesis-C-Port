@@ -538,7 +538,7 @@ static void run_ValidateSRAM(const Record *r) { ValidateSRAM(); }
 static void run_ClearSRAM(const Record *r) { ClearSRAM(); }
 static void run_ReadLineData(const Record *r) { ReadLineData(); }
 static void run_HiScoreScreen(const Record *r) { HiScoreScreen(); }
-static void run_newTitleScreen(const Record *r) { newTitleScreen(); }
+static void run_TitleScreen(const Record *r) { TitleScreen(); }
 static void run_CreditsPrintRow(const Record *r) { expect_reg16(r, R_A1, (uint16_t)CreditsPrintRow(r->regs_in[R_A1]), "a1"); }
 static void run_CreditsWait(const Record *r) { CreditsWait(); }
 static void run_VBlank_TitleScreen(const Record *r) { VBlank_TitleScreen(); }
@@ -1395,7 +1395,7 @@ const Port ports[] = {
     { SYM_ClearSRAM, "ClearSRAM", run_ClearSRAM },
     { SYM_ReadLineData, "ReadLineData", run_ReadLineData },
     { SYM_HiScoreScreen, "HiScoreScreen", run_HiScoreScreen },
-    { SYM_newTitleScreen, "newTitleScreen", run_newTitleScreen },
+    { SYM_TitleScreen, "TitleScreen", run_TitleScreen },
     { SYM_CreditsPrintRow, "CreditsPrintRow", run_CreditsPrintRow },
     { SYM_CreditsWait, "CreditsWait", run_CreditsWait },
     { SYM_VBlank_TitleScreen, "VBlank_TitleScreen", run_VBlank_TitleScreen },

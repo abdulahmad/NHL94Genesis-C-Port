@@ -443,7 +443,7 @@ void ExitToOpening(void)
 void Opening(void)
 {
     KillCrowd();
-    newTitleScreen();
+    TitleScreen();
     Opening2();
 }
 

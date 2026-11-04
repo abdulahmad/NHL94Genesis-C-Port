@@ -658,7 +658,7 @@ void PrintPlayerGoals(uint16_t player, struct Team *tm);   /* d0, a2 */
 void PrintPlayerAssists(uint16_t player, struct Team *tm);   /* d0, a2 */
 void ReadLineData(void);
 void HiScoreScreen(void);
-void newTitleScreen(void);
+void TitleScreen(void);
 uint32_t CreditsPrintRow(uint32_t a1);                  /* a1 -> a1 */
 int CreditsWait(void);                                  /* -> Start pressed (the 68k returns from its caller too) */
 void VBlank_TitleScreen(void);

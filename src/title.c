@@ -414,10 +414,10 @@ void HiScoreScreen(void)
     cpu_set_sr(0x2700);
 }
 
-/* title94.asm:newTitleScreen. The title screen (TitleScreenImg, the NHL shield, the NHLPA logo,
+/* title94.asm:TitleScreen. The title screen (TitleScreenImg, the NHL shield, the NHLPA logo,
  * the title) with its own vblank (VBlank_TitleScreen: a line scroll), the title song, then the
  * credits (Credits, then CreditsList) scrolling up a row at a time until they end or Start. */
-void newTitleScreen(void)
+void TitleScreen(void)
 {
     static const uint8_t font[8] = { 0x0D, 0x10, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
     cpu_set_sr(0x2700);
@@ -431,24 +431,24 @@ void newTitleScreen(void)
     vdp_ctrl16(SYM_VDPR_WINY + 0x17);
     vdp_ctrl16(SYM_VDPR_MODE3 + 3);                       /* line hscroll */
     g.Vscroll = 0;
-    printz(str_newTitleScreen_1, sizeof str_newTitleScreen_1);
+    printz(str_TitleScreen_1, sizeof str_TitleScreen_1);
     eraser(0x80, 0x20, 0x7FF);
-    printz(str_newTitleScreen_2, sizeof str_newTitleScreen_2);
+    printz(str_TitleScreen_2, sizeof str_TitleScreen_2);
     eraser(0x80, 0x20, 0x7FF);
-    printz(str_newTitleScreen_3, sizeof str_newTitleScreen_3);
+    printz(str_TitleScreen_3, sizeof str_TitleScreen_3);
     struct Picture p = picture(ART(TitleScreenImg));
     g.TempWord1 = dobitmap(p.pal, p.map, p.tiles, 0, 0, p.w, 0x17, 0, 0xF);
-    printz(str_newTitleScreen_4, sizeof str_newTitleScreen_4);   /* its last 5 rows on plane B */
+    printz(str_TitleScreen_4, sizeof str_TitleScreen_4);   /* its last 5 rows on plane B */
     g.sflags6 |= HI(0);
     dobitmap(p.pal, p.map, p.tiles, 0, 0x17, p.w, 5, 0, 0);
     g.sflags6 &= (uint16_t)~HI(0);
-    printz(str_newTitleScreen_5, sizeof str_newTitleScreen_5);
+    printz(str_TitleScreen_5, sizeof str_TitleScreen_5);
     p = picture(ART(NHLShieldImg));
     uint16_t c = dobitmap(p.pal, p.map, p.tiles, 0, 0, p.w, p.h, g.TempWord1, 8);
-    printz(str_newTitleScreen_6, sizeof str_newTitleScreen_6);
+    printz(str_TitleScreen_6, sizeof str_TitleScreen_6);
     p = picture(ART(PAlogoImg));
     c = dobitmap(p.pal, p.map, p.tiles, 0, 0, p.w, p.h, c, 0);
-    printz(str_newTitleScreen_7, sizeof str_newTitleScreen_7);
+    printz(str_TitleScreen_7, sizeof str_TitleScreen_7);
     p = picture(ART(TitleImg));
     c = dobitmap(p.pal, p.map, p.tiles, 0, 0, p.w, p.h, c, 8);
     g.palfadenew[0] = 0;
@@ -456,8 +456,8 @@ void newTitleScreen(void)
     g.fomen[0].attribute = 0;
     g.fomen[1].frame = 0;
     g.smallfontchars = c;
-    DecompressGraphicsWithCallback(ART(SmallFontMap) + 8, c, rom_find(SYM_newTitleScreen, SYM_CreditsPrintRow, font, 8));
-    printz(str_newTitleScreen_8, sizeof str_newTitleScreen_8);
+    DecompressGraphicsWithCallback(ART(SmallFontMap) + 8, c, rom_find(SYM_TitleScreen, SYM_CreditsPrintRow, font, 8));
+    printz(str_TitleScreen_8, sizeof str_TitleScreen_8);
     CreditsPrintRow(SYM_Credits);
     g.Vscroll += 0x20;
     g.clampcounter = 0x104;
@@ -471,7 +471,7 @@ void newTitleScreen(void)
     cpu_set_sr(0x2500);
     do if (CreditsWait()) return; while (g.clampcounter != 0);
     for (int i = 0; i <= 0x3C; i++) if (CreditsWait()) return;
-    printz(str_newTitleScreen_9, sizeof str_newTitleScreen_9);
+    printz(str_TitleScreen_9, sizeof str_TitleScreen_9);
     uint32_t a1 = SYM_CreditsList;
     do {
         a1 = CreditsPrintRow(a1);

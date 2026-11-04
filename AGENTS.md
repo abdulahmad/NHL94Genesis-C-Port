@@ -17,10 +17,11 @@ kept as close to upstream as the work allows. Its game code (`src/`) is checked 
 oracle tools here (`tools/oracle`, `native/lockstep.c`). The vanilla game is the default (Classic rules, the
 cartridge's rosters); the extras (rules, roster sets, save states, netplay) are host features on top, and
 `make VANILLA=1` builds without them (docs/C_PORTS_HANDOFF.md). gens94-c is ignored (Abdul, 2026-11-03).
-Keep 1nput's names in `src/` until he takes a rename/re-cut.
+C function names follow the current labels in NHL94Genesis (Abdul, 2026-11-04: 1nput forked that
+disassembly before the cleanup). File re-cuts still wait.
 
-Upstream is https://github.com/1nputs/ninety-four. Renames and file re-cuts (docs/RULES.md) move this
-repository away from upstream, so they wait for 1nput's answer; until then the names gate only reports.
+Upstream is https://github.com/1nputs/ninety-four. File re-cuts (docs/RULES.md) move this repository
+away from upstream; names that match NHL94Genesis are authorized.
 
 Plan: `alignment-plan/c_ports_plan.md` in the project files. Where the work stands: [docs/C_PORTS_HANDOFF.md](docs/C_PORTS_HANDOFF.md).
 Alignment rules: [docs/RULES.md](docs/RULES.md). What "vanilla" allows: [docs/VANILLA.md](docs/VANILLA.md).

@@ -1225,7 +1225,7 @@
 #define SYM_PuckComingToward 0xFEF8Cu
 #define SYM_ReadGoaliePulled 0xFEFCCu
 #define SYM_EndOneTimer 0xFEFF0u
-#define SYM_newTitleScreen 0xFF042u
+#define SYM_TitleScreen 0xFF042u
 #define SYM_CreditsPrintRow 0xFF2C8u
 #define SYM_CreditsWait 0xFF318u
 #define SYM_VBlank_TitleScreen 0xFF348u
@@ -4546,7 +4546,7 @@ static const struct SymEntry rom_syms[] = {
     {0xFEF8Cu, "PuckComingToward"},
     {0xFEFCCu, "ReadGoaliePulled"},
     {0xFEFF0u, "EndOneTimer"},
-    {0xFF042u, "newTitleScreen"},
+    {0xFF042u, "TitleScreen"},
     {0xFF2C8u, "CreditsPrintRow"},
     {0xFF318u, "CreditsWait"},
     {0xFF348u, "VBlank_TitleScreen"},

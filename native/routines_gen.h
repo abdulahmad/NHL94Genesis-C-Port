@@ -824,7 +824,7 @@ static const struct { void (*fn)(void); uint32_t addr; } routine_fns[] = {
     { (void (*)(void))AttribAdjust, 0xFEF7Cu },
     { (void (*)(void))ReadGoaliePulled, 0xFEFCCu },
     { (void (*)(void))EndOneTimer, 0xFEFF0u },
-    { (void (*)(void))newTitleScreen, 0xFF042u },
+    { (void (*)(void))TitleScreen, 0xFF042u },
     { (void (*)(void))CreditsPrintRow, 0xFF2C8u },
     { (void (*)(void))CreditsWait, 0xFF318u },
     { (void (*)(void))VBlank_TitleScreen, 0xFF348u },
