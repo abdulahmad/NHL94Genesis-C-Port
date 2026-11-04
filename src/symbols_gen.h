@@ -309,13 +309,13 @@
 #define SYM_setVram_0 0x115AAu
 #define SYM_Vmaddr 0x11680u
 #define SYM_dobitmap 0x1169Au
-#define SYM_DecompressGraphicsWithCallback 0x1172Cu
+#define SYM_DecompressGraphicsWithRemap 0x1172Cu
 #define SYM_DecompressGraphicsPlain 0x11738u
 #define SYM_DecompressGraphics 0x1173Cu
 #define SYM_DecompressBytecode 0x1177Au
 #define SYM_Opcode_CopyLiteral 0x117D2u
 #define SYM_Opcode_ClearBytes 0x117EEu
-#define SYM_Opcode_Fillbytes 0x1180Au
+#define SYM_Opcode_FillBytes 0x1180Au
 #define SYM_Opcode_CopyBackwardShort 0x1182Au
 #define SYM_CopyBackwardRun 0x11840u
 #define SYM_Opcode_CopyBackwardMedium 0x1185Cu
@@ -3630,13 +3630,13 @@ static const struct SymEntry rom_syms[] = {
     {0x115AAu, "setVram_0"},
     {0x11680u, "Vmaddr"},
     {0x1169Au, "dobitmap"},
-    {0x1172Cu, "DecompressGraphicsWithCallback"},
+    {0x1172Cu, "DecompressGraphicsWithRemap"},
     {0x11738u, "DecompressGraphicsPlain"},
     {0x1173Cu, "DecompressGraphics"},
     {0x1177Au, "DecompressBytecode"},
     {0x117D2u, "Opcode_CopyLiteral"},
     {0x117EEu, "Opcode_ClearBytes"},
-    {0x1180Au, "Opcode_Fillbytes"},
+    {0x1180Au, "Opcode_FillBytes"},
     {0x1182Au, "Opcode_CopyBackwardShort"},
     {0x11840u, "CopyBackwardRun"},
     {0x1185Cu, "Opcode_CopyBackwardMedium"},

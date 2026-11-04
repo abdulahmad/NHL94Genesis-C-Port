@@ -10,7 +10,7 @@
 #include "setup_tables_gen.h"
 #include "setup_strings_gen.h"
 
-/* the remap table that follows a DecompressGraphicsWithCallback call in routine [from, to) */
+/* the remap table that follows a DecompressGraphicsWithRemap call in routine [from, to) */
 static uint32_t inline_table(uint32_t from, uint32_t to, const uint8_t table[8])
 {
     return rom_find(from, to, table, 8);
@@ -84,7 +84,7 @@ void SprSort(void)
 uint16_t setupEASNmap(void)
 {
     static const uint8_t table[8] = { 0x71, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
-    return DecompressGraphicsWithCallback(ART(EASNmap) + 8, g.EASNcset, inline_table(SYM_setupEASNmap, SYM_setupEASNmap + 0x20, table));
+    return DecompressGraphicsWithRemap(ART(EASNmap) + 8, g.EASNcset, inline_table(SYM_setupEASNmap, SYM_setupEASNmap + 0x20, table));
 }
 
 /* setup94.asm:setupIceRinkPal. The ice rink palettes 0 and 1 (Rinktilelist) to palfadenew. */
@@ -299,9 +299,9 @@ void setupice(void)
     setupIceRinkPal();
     c = AddFramer(c);
     g.smallfontchars = c;
-    c = DecompressGraphicsWithCallback(ART(SmallFontMap) + 8, c, inline_table(SYM_setupice, SYM_setupice + 0x200, small));
+    c = DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, c, inline_table(SYM_setupice, SYM_setupice + 0x200, small));
     g.BigFontChars = c;
-    c = DecompressGraphicsWithCallback(ART(BigFontMap) + 8, c, inline_table(SYM_setupice + 1, SYM_setupice + 0x200, big));
+    c = DecompressGraphicsWithRemap(ART(BigFontMap) + 8, c, inline_table(SYM_setupice + 1, SYM_setupice + 0x200, big));
     c = setupTeamBlocksMap(c);
     if (view_wide()) DoFill(0x80, g.maps[0].vram, 0x7FF);       /* (its unpacking ran over plane A's first two rows: the wide view shows their other half) */
     g.ExtraChars = c;

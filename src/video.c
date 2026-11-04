@@ -566,9 +566,9 @@ uint16_t dobitmap(uint32_t pal, uint32_t map, uint32_t tiles, uint16_t x, uint16
     return start;
 }
 
-/* video94.asm:DecompressGraphicsWithCallback. DecompressGraphics with the 8-byte colour table
+/* video94.asm:DecompressGraphicsWithRemap. DecompressGraphics with the 8-byte colour table
  * that follows the call (cb, its 68k address) as the remap table. */
-uint16_t DecompressGraphicsWithCallback(uint32_t tiles, uint16_t start, uint32_t cb)
+uint16_t DecompressGraphicsWithRemap(uint32_t tiles, uint16_t start, uint32_t cb)
 {
     g.callbackPtr = cb;
     return DecompressGraphics(tiles, start);
@@ -610,7 +610,7 @@ uint16_t DecompressGraphics(uint32_t tiles, uint16_t start)
 void DecompressBytecode(uint32_t src, uint16_t vram)
 {
     static int (*const jump_table[16])(struct Unpack *) = {
-        Opcode_CopyLiteral, Opcode_CopyLiteral, Opcode_ClearBytes, Opcode_Fillbytes,
+        Opcode_CopyLiteral, Opcode_CopyLiteral, Opcode_ClearBytes, Opcode_FillBytes,
         Opcode_CopyBackwardShort, Opcode_CopyBackwardShort, Opcode_CopyBackwardShort, Opcode_CopyBackwardShort,
         Opcode_CopyBackwardMedium, Opcode_CopyBackwardLong, Opcode_CopyBackwardExtended1, Opcode_CopyBackwardExtended2,
         Opcode_CopyBackwardReverseShort, Opcode_CopyBackwardReverseShort, Opcode_CopyBackwardReverseMedium, Opcode_CopyBackwardReverseLong,
@@ -645,8 +645,8 @@ int Opcode_ClearBytes(struct Unpack *u)
     return 0;
 }
 
-/* video94.asm:Opcode_Fillbytes. Opcode 3: the next byte (low 4 bits)+3 times. */
-int Opcode_Fillbytes(struct Unpack *u)
+/* video94.asm:Opcode_FillBytes. Opcode 3: the next byte (low 4 bits)+3 times. */
+int Opcode_FillBytes(struct Unpack *u)
 {
     int n = (op_byte(u) & 0xF) + 3;
     uint8_t b = next_byte(u);

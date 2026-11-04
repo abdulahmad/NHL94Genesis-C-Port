@@ -339,7 +339,7 @@ static void run_dobitmap(const Record *r)
 {
     expect_reg16(r, R_D4, dobitmap(r->regs_in[R_A0], r->regs_in[R_A1], r->regs_in[R_A2], R16(R_D0), R16(R_D1), R16(R_D2), R16(R_D3), R16(R_D4), R16(R_D5)), "d4");
 }
-static void run_DecompressGraphicsWithCallback(const Record *r) { expect_reg16(r, R_D4, DecompressGraphicsWithCallback(r->regs_in[R_A2], R16(R_D4), ret_addr(r)), "d4"); }
+static void run_DecompressGraphicsWithRemap(const Record *r) { expect_reg16(r, R_D4, DecompressGraphicsWithRemap(r->regs_in[R_A2], R16(R_D4), ret_addr(r)), "d4"); }
 static void run_DecompressGraphicsPlain(const Record *r) { expect_reg16(r, R_D4, DecompressGraphicsPlain(r->regs_in[R_A2], R16(R_D4)), "d4"); }
 static void run_DecompressGraphics(const Record *r) { expect_reg16(r, R_D4, DecompressGraphics(r->regs_in[R_A2], R16(R_D4)), "d4"); }
 static void run_DecompressBytecode(const Record *r) { DecompressBytecode(r->regs_in[R_A0], R16(R_D1)); }
@@ -350,7 +350,7 @@ static void unpack_out(const Record *r, const struct Unpack *u, int done)
     expect_reg16(r, R_A0, (uint16_t)u->src, "a0"); expect_reg16(r, R_D1, u->idx, "d1"); expect_reg16(r, R_D3, u->vram, "d3");
 }
 #define OP(name) static void run_##name(const Record *r) { struct Unpack u = unpack_in(r); int done = name(&u); unpack_out(r, &u, done); }
-OP(Opcode_CopyLiteral) OP(Opcode_ClearBytes) OP(Opcode_Fillbytes) OP(Opcode_CopyBackwardShort) OP(Opcode_CopyBackwardMedium)
+OP(Opcode_CopyLiteral) OP(Opcode_ClearBytes) OP(Opcode_FillBytes) OP(Opcode_CopyBackwardShort) OP(Opcode_CopyBackwardMedium)
 OP(Opcode_CopyBackwardLong) OP(Opcode_CopyBackwardExtended1) OP(Opcode_CopyBackwardExtended2) OP(Opcode_CopyBackwardReverseShort)
 OP(Opcode_CopyBackwardReverseMedium) OP(Opcode_CopyBackwardReverseLong)
 static void run_CopyBackwardRun(const Record *r) { struct Unpack u = unpack_in(r); CopyBackwardRun(&u, R16(R_D0), (uint8_t)r->regs_in[R_D2]); unpack_out(r, &u, 0); }
@@ -1176,13 +1176,13 @@ const Port ports[] = {
     { SYM_setVram, "setVram", run_setVram },
     { SYM_Vmaddr, "Vmaddr", run_Vmaddr },
     { SYM_dobitmap, "dobitmap", run_dobitmap },
-    { SYM_DecompressGraphicsWithCallback, "DecompressGraphicsWithCallback", run_DecompressGraphicsWithCallback },
+    { SYM_DecompressGraphicsWithRemap, "DecompressGraphicsWithRemap", run_DecompressGraphicsWithRemap },
     { SYM_DecompressGraphicsPlain, "DecompressGraphicsPlain", run_DecompressGraphicsPlain },
     { SYM_DecompressGraphics, "DecompressGraphics", run_DecompressGraphics },
     { SYM_DecompressBytecode, "DecompressBytecode", run_DecompressBytecode },
     { SYM_Opcode_CopyLiteral, "Opcode_CopyLiteral", run_Opcode_CopyLiteral },
     { SYM_Opcode_ClearBytes, "Opcode_ClearBytes", run_Opcode_ClearBytes },
-    { SYM_Opcode_Fillbytes, "Opcode_Fillbytes", run_Opcode_Fillbytes },
+    { SYM_Opcode_FillBytes, "Opcode_FillBytes", run_Opcode_FillBytes },
     { SYM_Opcode_CopyBackwardShort, "Opcode_CopyBackwardShort", run_Opcode_CopyBackwardShort },
     { SYM_Opcode_CopyBackwardMedium, "Opcode_CopyBackwardMedium", run_Opcode_CopyBackwardMedium },
     { SYM_Opcode_CopyBackwardLong, "Opcode_CopyBackwardLong", run_Opcode_CopyBackwardLong },

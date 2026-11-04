@@ -456,7 +456,7 @@ void TitleScreen(void)
     g.fomen[0].attribute = 0;
     g.fomen[1].frame = 0;
     g.smallfontchars = c;
-    DecompressGraphicsWithCallback(ART(SmallFontMap) + 8, c, rom_find(SYM_TitleScreen, SYM_CreditsPrintRow, font, 8));
+    DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, c, rom_find(SYM_TitleScreen, SYM_CreditsPrintRow, font, 8));
     printz(str_TitleScreen_8, sizeof str_TitleScreen_8);
     CreditsPrintRow(SYM_Credits);
     g.Vscroll += 0x20;

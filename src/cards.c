@@ -564,7 +564,7 @@ void PlayerCards(void)
     g.disflags &= (uint16_t)~HI(df32c);
     CountGoalies();
     CountPlayers();
-    DecompressGraphicsWithCallback(ART(SmallFontMap) + 8, g.smallfontchars, rom_find(SYM_PlayerCards, SYM_PlayerCards + 0x100, remap, 8));
+    DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, g.smallfontchars, rom_find(SYM_PlayerCards, SYM_PlayerCards + 0x100, remap, 8));
     printz(str_PlayerCards_1, sizeof str_PlayerCards_1);
     uint32_t pic = ART(PlayerCardsScreenPic);
     uint16_t c = dobitmap(pic + rd32(rom_ptr(pic)), pic + rd32(rom_ptr(pic + 4)), pic + 8, 0, 0, 0x28, 0x1C, 1, 0xD);

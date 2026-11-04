@@ -42,7 +42,7 @@ void ReloadRinkGraphics(void)
     view_rink_mode();                                     /* (the wide view's 40 columns) */
     uint16_t c = DecompressGraphicsPlain(g.sflags4 & HI(4) ? ART(RevRinkTiles) : ART(Rinktiles), g.rinkvrcset);
     LoadHomeTeamGfx(c);
-    DecompressGraphicsWithCallback(ART(SmallFontMap) + 8, g.smallfontchars,
+    DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, g.smallfontchars,
                                    rom_find(SYM_ReloadRinkGraphics, SYM_ReloadRinkGraphics + 0x80, table, 8));
     AddFramer(g.framercset);
     setupEASNmap();
@@ -72,7 +72,7 @@ uint16_t SetupScreen(uint16_t row, uint16_t rows)
     vdp_data32(0);
     g.disflags = saved;
     g.disflags &= (uint16_t)~HI(df32c);
-    DecompressGraphicsWithCallback(ART(FramerMap) + 8, g.framercset, rom_find(SYM_SetupScreen, SYM_SetupScreen + 0x100, framer, 8));
+    DecompressGraphicsWithRemap(ART(FramerMap) + 8, g.framercset, rom_find(SYM_SetupScreen, SYM_SetupScreen + 0x100, framer, 8));
     AddSmallFont(g.smallfontchars);
     printz(str_SetupScreen_1, sizeof str_SetupScreen_1);
     uint32_t map = ART(ScoutMap) + rd32(rom_ptr(ART(ScoutMap) + 4));
@@ -83,7 +83,7 @@ uint16_t SetupScreen(uint16_t row, uint16_t rows)
     uint32_t pal = ART(ScoutMap) + rd32(rom_ptr(ART(ScoutMap)));
     c = dobitmap(pal, map, ART(ScoutMap) + 8, 0, row, 0x28, (uint16_t)(rows - row), c, 0xD);
     g.smallfont2chars = c;
-    c = DecompressGraphicsWithCallback(ART(SmallFontMap) + 8, c, rom_find(SYM_SetupScreen, SYM_SetupScreen + 0x100, font2, 8));
+    c = DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, c, rom_find(SYM_SetupScreen, SYM_SetupScreen + 0x100, font2, 8));
     printz(str_SetupScreen_3, sizeof str_SetupScreen_3);
     eraser(0x40, 0x20, 0x7FF);
     g.palcount = 0x18;

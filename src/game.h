@@ -126,7 +126,7 @@ void DoDMA_nd2(uint16_t words, uint16_t dst, uint16_t src);      /* d0, d1, d2 (
 void WaitDMA(void);
 void setVram(uint16_t colour);             /* d0 */
 void setVram_0(void);
-uint16_t DecompressGraphicsWithCallback(uint32_t tiles, uint16_t start, uint32_t cb);  /* a2, d4, table after the call -> d4 */
+uint16_t DecompressGraphicsWithRemap(uint32_t tiles, uint16_t start, uint32_t cb);  /* a2, d4, table after the call -> d4 */
 uint16_t DecompressGraphics(uint32_t tiles, uint16_t start);     /* a2, d4 -> d4 */
 /* DecompressBytecode's registers: a0 = data, d1 = ring buffer index, d3 = VRAM address */
 struct Unpack { uint32_t src; uint8_t idx; uint16_t vram; uint8_t *ring; };   /* ring: the 256 bytes it unpacks into (unpack_ring) */
@@ -135,7 +135,7 @@ static inline uint8_t *unpack_ring(void) { return ram_bytes(RAM(ThreeStars), 0x1
 void DecompressBytecode(uint32_t src, uint16_t vram);            /* a0, d1 */
 int Opcode_CopyLiteral(struct Unpack *u);                        /* the handlers return 1 at the end code */
 int Opcode_ClearBytes(struct Unpack *u);
-int Opcode_Fillbytes(struct Unpack *u);
+int Opcode_FillBytes(struct Unpack *u);
 int Opcode_CopyBackwardShort(struct Unpack *u);
 int Opcode_CopyBackwardMedium(struct Unpack *u);
 int Opcode_CopyBackwardLong(struct Unpack *u);
