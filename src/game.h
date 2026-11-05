@@ -567,14 +567,14 @@ void DoHiLights(void);
 void StartHL(struct Matchup *gs, int16_t game);         /* a0 = the game's gsstruct, d1 = its number */
 void StartHL2(struct Matchup *gs, int16_t game);
 
-/* ---- goalie94.asm: Manual Goalie, arena and faceoff animations ---- */
-void ManualGoalieMenu(void);
+/* ---- arena94.asm: arena / faceoff animations and ChooseSong ---- */
 void RunArenaAnim(void);
 void NextArenaFrame(void);
 void SetCameraTop(void);
 void StartArenaAnim(uint16_t n);                        /* d0 */
 void SetFaceoffAnim(uint16_t n);                        /* d0 */
 void EndArenaAnim(void);
+void ChooseSong(void);
 
 /* ---- onetimer94.asm: the one-timer ---- */
 void puckvzadj(struct SortObj *o);                      /* a3 */
@@ -625,58 +625,68 @@ void ShortenMsgTimer(struct SortObj *o);
 void PeriodStatsScreen(void);
 void StatsReport(void);
 void rtsStatTables(void);
+void ManualGoalieMenu(void);
 
-/* ---- title94.asm: the title and credits, songs, shootout paths, record lines and other 94 helpers ---- */
-void ChooseSong(void);
-void EndOneTimer(struct SortObj *o);                    /* a3 */
-uint16_t getFgtbyte(struct SortObj *a2, struct SortObj *a3);   /* -> d0 */
-int chkFgtBit1(struct SortObj *a2, struct SortObj *a3);        /* -> Z flag (1 = zero) */
-uint8_t ReadGoaliePulled(struct SortObj *o);            /* a3 -> ccr of tst.w tmgoalie */
-int ShootoutShootCheck(struct SortObj *o);              /* a3 -> Z */
-void SkatePath(int16_t *x, int16_t *y, struct SortObj *o); /* d0, d1, a3 -> d0, d1 */
-void NextPathPoint(struct SortObj *o);                  /* a3 */
-void StartShootoutPath(struct SortObj *o);              /* a3 passes through to NextPathPoint */
-void CheckScoreLeader(void);
-uint16_t RandomFaceoffAnim(void);                       /* -> d0 */
-void LeadSong(void);
-void ClearLeadSong(void);
-void LeadSongExit(uint16_t sflags2);                    /* the sflags2 LeadSong saved */
-void chgplayer(uint16_t pad, struct SortObj *o);        /* d4, a3 */
-void rtsChgplayer(void);
-void swpchk(struct SortObj *o);                         /* a3 */
-void j_setc1player(uint16_t player);                    /* d0 */
-void j_setc2player(uint16_t player);                    /* d0 */
-void CountButtonPress(int16_t pad, struct SortObj *o);  /* d4, a3 */
+/* ---- shootoutpath94.asm: saved lines and shootout skate paths ---- */
+void ReadLineData(void);
+void WriteLineData(void);
+void ClearWinRecords(void);
 void PSandSOpassdir(struct SortObj *o);                 /* a3 */
+void StartShootoutPath(struct SortObj *o);              /* a3 passes through to NextPathPoint */
+void NextPathPoint(struct SortObj *o);                  /* a3 */
+void SkatePath(int16_t *x, int16_t *y, struct SortObj *o); /* d0, d1, a3 -> d0, d1 */
+int ShootoutShootCheck(struct SortObj *o);              /* a3 -> Z */
+
+/* ---- ui94.asm: unpack, rink gfx, HiScore, played-by ---- */
+void UnpackPicture(uint32_t pic);                       /* a2 */
 uint16_t LoadHomeTeamGfx(uint16_t start);               /* d4 -> d4 */
-void HotColdIcon(struct Team *tm);                      /* a2 */
-void clrTmPdst(struct Team *tm);                        /* a0 */
-void ClearPenalties(void);
-void PlaceBoardFall(struct SortObj *o);                 /* a3 */
-void SetSflags8Bit1(void);
 void PrintParenNumber(const uint8_t *table, uint16_t player);   /* a2 = team + table offset, d0 */
 void PrintPlayerGoals(uint16_t player, struct Team *tm);   /* d0, a2 */
 void PrintPlayerAssists(uint16_t player, struct Team *tm);   /* d0, a2 */
-void ReadLineData(void);
+void PlaceBoardFall(struct SortObj *o);                 /* a3 */
+uint16_t GetLeagueCrowdRecord(void);                    /* -> d0 */
+uint16_t getFgtbyte(struct SortObj *a2, struct SortObj *a3);   /* -> d0 */
+int chkFgtBit1(struct SortObj *a2, struct SortObj *a3);        /* -> Z flag (1 = zero) */
+uint16_t RandomFaceoffAnim(void);                       /* -> d0 */
+void CheckScoreLeader(void);
+void DrawPlayoffSprite(void);
 void HiScoreScreen(void);
+struct Team *GetTeamStruct(uint16_t team);              /* d2 -> a2 */
+void CountButtonPress(int16_t pad, struct SortObj *o);  /* d4, a3 */
+uint32_t PlayedByHome(void);                            /* -> a1 */
+uint32_t PlayedByAway(void);
+uint32_t PlayedByText(uint16_t user);                   /* d0 -> a1 */
+uint32_t PlayedByNone(void);
+uint32_t PlayedByExit(uint32_t a1);
+
+/* ---- helpers94.asm: leftover helpers before the title ---- */
+void SetSflags8Bit1(void);
+uint16_t AttribAdjust(uint16_t v);                      /* d0 -> d0 */
+uint8_t ReadGoaliePulled(struct SortObj *o);            /* a3 -> ccr of tst.w tmgoalie */
+void EndOneTimer(struct SortObj *o);                    /* a3 */
+
+/* ---- title94.asm: the title and credits ---- */
 void TitleScreen(void);
 uint32_t CreditsPrintRow(uint32_t a1);                  /* a1 -> a1 */
 int CreditsWait(void);                                  /* -> Start pressed (the 68k returns from its caller too) */
 void VBlank_TitleScreen(void);
 void CreditsLineScroll(void);
 void CreditsScrollStep(void);
-void UnpackPicture(uint32_t pic);                       /* a2 */
-void DrawPlayoffSprite(void);
-uint32_t PlayedByHome(void);                            /* -> a1 */
-uint32_t PlayedByAway(void);
-uint32_t PlayedByText(uint16_t user);                   /* d0 -> a1 */
-uint32_t PlayedByNone(void);
-uint32_t PlayedByExit(uint32_t a1);
-uint16_t AttribAdjust(uint16_t v);                      /* d0 -> d0 */
-void WriteLineData(void);
-uint16_t GetLeagueCrowdRecord(void);                    /* -> d0 */
-void ClearWinRecords(void);
-struct Team *GetTeamStruct(uint16_t team);              /* d2 -> a2 */
+
+/* ---- logos94.asm: logo palettes, LeadSong, HotColdIcon ---- */
+void LeadSong(void);
+void ClearLeadSong(void);
+void LeadSongExit(uint16_t sflags2);                    /* the sflags2 LeadSong saved */
+void clrTmPdst(struct Team *tm);                        /* a0 */
+void ClearPenalties(void);
+void HotColdIcon(struct Team *tm);                      /* a2 */
+
+/* ---- chgplayer94.asm: chgplayer and far thunks ---- */
+void chgplayer(uint16_t pad, struct SortObj *o);        /* d4, a3 */
+void rtsChgplayer(void);
+void swpchk(struct SortObj *o);                         /* a3 */
+void j_setc1player(uint16_t player);                    /* d0 */
+void j_setc2player(uint16_t player);                    /* d0 */
 
 /* setup94: the boxes over the rink, player names, the playoff tree and password */
 void box(void);

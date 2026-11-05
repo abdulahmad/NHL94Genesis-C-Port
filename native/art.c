@@ -474,7 +474,7 @@ int art_own_palette(const char *path, const mdrt_png *p, uint16_t pal[16], uint8
  * setup screens, fonts, the rinks, whose header is followed by their tiles), sprites (palette,
  * frames, tiles: shown as a sheet of their tiles in order), a stock photo. tiles: where the
  * tiles another address names are (Rinktiles, Spritetiles: of the asset before them); sub: a
- * picture inside it at that offset (title.c draws PlayoffSprite's at +$12E0) */
+ * picture inside it at that offset (ui.c draws PlayoffSprite's at +$12E0) */
 enum { PICTURE, SPRITES, PHOTO };
 static const struct shared { int art; const char *name; int kind; int tiles_art, tiles_at; uint32_t sub; } shared[] = {
     { ART_TitleScreenImg, "TitleScreenImg", PICTURE, -1, 0, 0 }, { ART_TitleImg, "TitleImg", PICTURE, -1, 0, 0 },

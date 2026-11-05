@@ -228,7 +228,7 @@ static void run_SetTickerAreaPosition(const Record *r) { uint16_t d0, d1; SetTic
 static void run_Fprintsmall(const Record *r) { Fprintsmall(r->regs_in[R_A1], (uint16_t)r->regs_in[R_D0]); }
 static void run_AdvanceStringPtr(const Record *r) { uint32_t a1 = AdvanceStringPtr(r->regs_in[R_A1], (uint16_t)r->regs_in[R_D0]); if (a1 != r->regs_out[R_A1]) printf("    a1: got %06x, 68k %06x\n", a1, r->regs_out[R_A1]); }
 
-/* ---- goalie94, onetimer94, crowd94 ---- */
+/* ---- period94 (ManualGoalieMenu), onetimer94, crowd94 ---- */
 V(ManualGoalieMenu) V(RunArenaAnim) V(NextArenaFrame) V(SetCameraTop) V(EndArenaAnim) V(LoadCrowdRec) V(Crowd_Noise) V(BuildHotColdLists)
 static void run_StartArenaAnim(const Record *r) { StartArenaAnim((uint16_t)r->regs_in[R_D0]); }
 static void run_SetFaceoffAnim(const Record *r) { SetFaceoffAnim((uint16_t)r->regs_in[R_D0]); }

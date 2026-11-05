@@ -1,6 +1,7 @@
-/* period94.asm: period and game statistics. Ends a shootout, clears the game stats, animates
- * the arena sprites and shows the Period Stats and Game Statistics screens, with the power play
- * time and team ratings they report. */
+/* period94.asm: period and game statistics, the shootout-end celebration, and the
+ * Manual Goalie pause item. Ends a shootout, clears the game stats, animates
+ * the arena sprites and shows the Period Stats and Game Statistics screens.
+ */
 #include <string.h>
 #include "game.h"
 #include "hal.h"
@@ -407,4 +408,32 @@ void StatsReport(void)
         stats_scroll();
         PrintStatScrollArrows();
     }
+}
+
+/* period94.asm:ManualGoalieMenu. The "Manual Goalie" menu item: toggle the goalie mode of the
+ * pause pad; in a penalty shot or shootout the pad then takes the skater or the goalie on its
+ * side by that mode. */
+void ManualGoalieMenu(void)
+{
+    if (g.OptNOP != 0) {
+        if (g.cont1team == g.cont2team) {                 /* both pads on one team: both modes */
+            g.goaliemode2 ^= 1;
+            g.goaliemode1 ^= 1;
+        } else if (g.sflags & HI(sfpj))
+            g.goaliemode2 ^= 1;
+        else
+            g.goaliemode1 ^= 1;
+    }
+    if (!(g.gmode2 & HI(0)) && !(g.BA_PS_flags & HI(2))) return;
+    if (!(g.sflags & HI(sfpj))) {
+        if (g.OptNOP == 2) { if ((int16_t)g.BA_Sktr_SCnum > 5) return; }
+        else if ((int16_t)g.BA_Sktr_SCnum <= 5) return;
+        uint16_t d0 = g.OptNOP == 2 ? 6 : 0;
+        if (g.goaliemode1 == 0) d0 = g.OptNOP == 2 ? 0xB : 5;
+        setc1player(d0);
+        return;
+    }
+    if (g.OptNOP == 2) { if ((int16_t)g.BA_Sktr_SCnum <= 5) return; }
+    else if ((int16_t)g.BA_Sktr_SCnum > 5) return;
+    setc2player(g.goaliemode2 != 0 ? 6 : 0xB);
 }

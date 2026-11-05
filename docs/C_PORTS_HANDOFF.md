@@ -86,6 +86,7 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 4. ~~**NHL94Genesis names**~~ (done 2026-11-04): 0 renamed, 0 missing.
 5. ~~**File recut**~~ (done 2026-11-04): 0 other_module. One `src/<module>.c` per 94G asm file.
 6. ~~**E6**~~ parked 2026-11-04 (3 Original lockstep failures; see Results). Overclock slider still to come. SNES Smooth was not flipped.
+7. ~~**Leftover recut**~~ (2026-11-05): C files follow Abdul's leftover 94G includes (`arena.c`, `shootoutpath.c`, `ui.c`, `helpers.c`, `logos.c`, `chgplayer.c`; `ManualGoalieMenu` in `period.c`; `title.c` is TitleScreen/credits). Names gate 838/0/0/0.
 
 ## Needs
 
