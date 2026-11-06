@@ -14,6 +14,18 @@ uint16_t AttribAdjust(uint16_t v)
     return (uint16_t)(((int16_t)v >> 1) + 0x19);
 }
 
+/* helpers94.asm:PuckComingToward. Unreferenced: Z clear when the puck is within $1E of player a3
+ * and moving toward him (x, then y). */
+int PuckComingToward(struct SortObj *o)
+{
+    int16_t d0 = (int16_t)((int16_t)g.puckx[0] - o->Xpos);
+    if (d0 > 0x1E) return 0;
+    if ((int16_t)(d0 ^ (int16_t)g.puckvx) >= 0) return 0;
+    d0 = (int16_t)((int16_t)g.pucky - o->Ypos);
+    if (d0 > 0x1E) return 0;
+    return (int16_t)(d0 ^ (int16_t)g.puckvy) < 0;
+}
+
 /* helpers94.asm:ReadGoaliePulled. -> the flags of tst.w on the goalie word of a3's team (Z: the
  * goalie is pulled). */
 uint8_t ReadGoaliePulled(struct SortObj *o)

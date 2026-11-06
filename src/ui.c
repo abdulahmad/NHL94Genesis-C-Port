@@ -217,6 +217,15 @@ void CountButtonPress(int16_t pad, struct SortObj *o)
     if (pad) g.awaydirpresses++; else g.homedirpresses++;
 }
 
+/* ui94.asm:TerminateLogName. Unreferenced. The GetLogName String at lognametext, ended with 0 at
+ * namelength and its length word made even. */
+void TerminateLogName(void)
+{
+    GetLogName(RAM_BASE + RAM_OFF_lognametext);
+    g.lognametext[(int16_t)g.namelength] = 0;
+    w16(RAM(lognametext), -2, (uint16_t)((g.namelength + 1) & 0xFFFE));
+}
+
 /* ui94.asm:PlayedByHome. The text player's '#' -> a1 = "(played by NAME)" for homeuser
  * (PlayedByText), or an empty String. */
 uint32_t PlayedByHome(void) { return PlayedByText(g.homeuser); }

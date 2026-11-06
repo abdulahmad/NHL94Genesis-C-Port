@@ -7,7 +7,7 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 
 ## Now
 
-G2 capture `--fn` lists + G3 leftover comments stacked on G1 [#6](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/6). Session output names stay; helpers leftover names stay; no re-record. Next: G4 unused ports. Do not merge to main. Frame gates not run here (no captures/vectors/golden).
+G4 unused leftover ports stacked on G2/G3 [#7](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/7). `PuckComingToward` and `TerminateLogName` ported; `rtsStatScroll` parked. Names 840/0/0/0. Next: G5 rest-of-tree ROM order (G0 checker already proven). Do not merge to main. Frame gates not run here (no captures/vectors/golden).
 
 ## Done
 
@@ -96,7 +96,8 @@ G2 capture `--fn` lists + G3 leftover comments stacked on G1 [#6](https://github
 10. ~~**G1 gen inputs**~~ (2026-11-06): `make gen` tables/strings from current 94G (`logic94` / `video94` / `setup94` / `title94`+`ui94`; `defaultsprites_0` for dslist). Output `*_gen.h` names stay; committed array values unchanged. Oracle pin not rewritten (`make gen-pin` when present).
 11. ~~**G2** capture `--fn` lists~~ (2026-11-06): `tools/hybrid/capture_all.sh` uses current 94G file names (`logic94` / `video94`; boot `TitleScreen`; drop `goalie94`). Session output names stay. helpers leftover names stay.
 12. ~~**G3** leftover comments~~ (2026-11-06): `src/logic.c` `tables94.asm:asstab`; `test/ports.c` section comments name current modules.
-13. **G4** unused leftover code (`TerminateLogName`, `PuckComingToward`; park `rtsStatScroll`) and rest-of-tree ROM order (G5) still wait.
+13. ~~**G4** unused leftover code~~ (2026-11-06): `PuckComingToward` in `helpers.c`, `TerminateLogName` in `ui.c`. `rtsStatScroll` parked (no empty stub). Names 840/0/0/0. No `test/ports.c` runners.
+14. **G5** rest-of-tree ROM order (13 modules) still waits. G0 checker is proven (arena/title green, fourway/menu red).
 
 ## Needs
 

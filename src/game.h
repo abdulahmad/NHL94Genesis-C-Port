@@ -653,6 +653,7 @@ void DrawPlayoffSprite(void);
 void HiScoreScreen(void);
 struct Team *GetTeamStruct(uint16_t team);              /* d2 -> a2 */
 void CountButtonPress(int16_t pad, struct SortObj *o);  /* d4, a3 */
+void TerminateLogName(void);
 uint32_t PlayedByHome(void);                            /* -> a1 */
 uint32_t PlayedByText(uint16_t user);                   /* d0 -> a1 */
 uint32_t PlayedByExit(uint32_t a1);
@@ -662,6 +663,7 @@ uint32_t PlayedByAway(void);
 /* ---- helpers94.asm: leftover helpers before the title ---- */
 void SetSflags8Bit1(void);
 uint16_t AttribAdjust(uint16_t v);                      /* d0 -> d0 */
+int PuckComingToward(struct SortObj *o);                /* a3 -> Z clear */
 uint8_t ReadGoaliePulled(struct SortObj *o);            /* a3 -> ccr of tst.w tmgoalie */
 void EndOneTimer(struct SortObj *o);                    /* a3 */
 
