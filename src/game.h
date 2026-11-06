@@ -307,6 +307,7 @@ void updatesound(void);
 void KillCrowd(void);
 
 /* ---- replay94.asm: the replay recorder and viewer ---- */
+void ReplayMode(void);
 void getpzjoy(uint16_t *d0, uint16_t *d1, uint16_t *d2, uint16_t *d3);   /* the pausing pad's joystick */
 void ShowReplayIcon(void);
 void EraseReplayIcon(void);
@@ -321,7 +322,6 @@ uint16_t RevReplayAdj(uint32_t frame, struct RinkObj *cam);   /* a4, a5 -> d7 */
 uint16_t RestoreReplayFrame(uint32_t frame, struct RinkObj *cam);   /* a4, a5 -> d7 (the frame's elapsed count) */
 void ClampReplayView(void);
 void updatereplay(void);                                 /* d7 = elapsed */
-void ReplayMode(void);
 
 /* ---- logic94.asm: player update, input, assignments, the camera ---- */
 void updateplayers(void);                                /* d7 = elapsed */
