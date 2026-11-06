@@ -8,129 +8,9 @@
 #include "view.h"
 #include "stats_strings_gen.h"
 
-/* stats94.asm:GetPlayerCount. a2 = team -> d0 = its players. */
-uint16_t GetPlayerCount(struct Team *tm) { return rosters_team(tm->team)->players; }
-
-/* stats94.asm:GetGoalieCount. a2 = team -> d0 = its goalies (the nibbles of its start odds). */
-uint16_t GetGoalieCount(struct Team *tm) { return rosters_team(tm->team)->goalies; }
-
-/* stats94.asm:GetDefenseStart. d0 = the roster index of team a2's first defenseman: its goalies
- * (GetGoalieCount) and forwards (GetForwardCount). */
-uint16_t GetDefenseStart(struct Team *tm)
-{
-    return (uint16_t)(GetGoalieCount(tm) + GetForwardCount(tm));
-}
-
-/* stats94.asm:GetForwardCount. d0 = team a2's forwards. */
-uint16_t GetForwardCount(struct Team *tm) { return rosters_team(tm->team)->forwards; }
-
-/* stats94.asm:ReloadRinkGraphics. After a screen over the rink: back to 32 columns, then reload
- * the rink (reversed in a reverse angle replay), team, font, framer, EASN, energy bar and crowd
- * tiles and the palettes. */
-void ReloadRinkGraphics(void)
-{
-    static const uint8_t table[8] = { 0x43, 0x43, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
-    uint16_t saved = g.disflags;
-    g.disflags |= HI(dfng);
-    Vmaddr(g.VSCRLPM);
-    vdp_data32(0);
-    vdp_ctrl16((uint16_t)(0x8D00 | (g.VSCRLPM >> 8 >> 2)));
-    vdp_ctrl16(SYM_VDPR_MODE4);
-    g.maps[2].colshift = 5;
-    g.disflags = saved;
-    g.disflags |= HI(df32c);
-    view_rink_mode();                                     /* (the wide view's 40 columns) */
-    uint16_t c = DecompressGraphicsPlain(g.sflags4 & HI(4) ? ART(RevRinkTiles) : ART(Rinktiles), g.rinkvrcset);
-    LoadHomeTeamGfx(c);
-    DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, g.smallfontchars,
-                                   rom_find(SYM_ReloadRinkGraphics, SYM_ReloadRinkGraphics + 0x80, table, 8));
-    AddFramer(g.framercset);
-    setupEASportsMap();
-    ReloadEnergyBarTiles();
-    ReloadCrowdTiles();
-    setupIceRinkPal();
-    setplayercolors();
-}
-
-/* stats94.asm:SetupScreen. The common start of the stats screens: fade out, 40 columns, the
- * framer and small font tiles, the background (ScoutMap) once plain and once rows d0 to d1
- * with its palettes, a second small font, and plane A cleared -> d4 = the char after them. */
-uint16_t SetupScreen(uint16_t row, uint16_t rows)
-{
-    static const uint8_t framer[8] = { 0x91, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
-    static const uint8_t font2[8] = { 0xD1, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
-    forceblack();
-    g.disflags &= (uint16_t)~HI(dfok);
-    uint16_t saved = g.disflags;
-    g.disflags |= HI(dfng);
-    Vmaddr(g.VSPRITES);
-    vdp_data32(0);
-    vdp_ctrl16(SYM_VDPR_MODE4 + 0x81);
-    g.maps[2].colshift = 6;
-    vdp_ctrl16(SYM_VDPR_HSCROLL);
-    Vmaddr(0);
-    vdp_data32(0);
-    g.disflags = saved;
-    g.disflags &= (uint16_t)~HI(df32c);
-    DecompressGraphicsWithRemap(ART(FramerMap) + 8, g.framercset, rom_find(SYM_SetupScreen, SYM_SetupScreen + 0x100, framer, 8));
-    AddSmallFont(g.smallfontchars);
-    printz(str_SetupScreen_1, sizeof str_SetupScreen_1);
-    uint32_t map = ART(ScoutMap) + rd32(rom_ptr(ART(ScoutMap) + 4));
-    const uint8_t *m = rom_ptr(map);
-    uint16_t c = dobitmap(0, map, SYM_NoTiles, 0, 0, rd16(m), rd16(m + 2), 1, 0);
-    printz(str_SetupScreen_2, sizeof str_SetupScreen_2);
-    g.printy += row;
-    uint32_t pal = ART(ScoutMap) + rd32(rom_ptr(ART(ScoutMap)));
-    c = dobitmap(pal, map, ART(ScoutMap) + 8, 0, row, 0x28, (uint16_t)(rows - row), c, 0xD);
-    g.smallfont2chars = c;
-    c = DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, c, rom_find(SYM_SetupScreen, SYM_SetupScreen + 0x100, font2, 8));
-    printz(str_SetupScreen_3, sizeof str_SetupScreen_3);
-    eraser(0x40, 0x20, 0x7FF);
-    g.palcount = 0x18;
-    return c;
-}
-
-/* stats94.asm:ExitStatsScreen. Leave a stats screen: fade out, then ReloadRinkGraphics. */
-void ExitStatsScreen(void)
-{
-    forceblack();
-    ReloadRinkGraphics();
-}
-
-/* stats94.asm:Pausemode_rjoy. Wait for the next vblank and a new button press -> d1 (and
- * the other pad words). */
-uint16_t Pausemode_rjoy(uint16_t *d0, uint16_t *d2, uint16_t *d3)
-{
-    uint16_t d1;
-    do {
-        uint16_t v = g.vcount;
-        while (g.vcount == v) hal_wait_vblank();
-        getpzjoy(d0, &d1, d2, d3);
-        nodiag(&d1, *d3);
-    } while ((d1 & 0xFF) == 0);
-    return d1;
-}
-
 /* ---- the player stats list (Player Stats in the pause menu, Playoff Stats after a playoff game) */
 
 #define SATT g.Satt                                      /* (the sorted player order, in the sprite table) */
-
-/* stats94.asm:PlayoffStatsScreen. Playoff Stats: the playoff totals (ReadTeamStats) of the user's
- * playoff team, as PlayerStatsList with d7 = 1. */
-void PlayoffStatsScreen(void)
-{
-    ReadTeamStats();
-    uint16_t team = (uint16_t)((g.potreeteam & 0xFF00) | g.potree[g.potreeteam]);
-    struct Team *tm = team_struct(0);
-    if (team != tm->team) tm = team_struct(1);
-    PlayerStatsList(tm, 1);
-}
-
-/* stats94.asm:PlayerStatsScreen. Player Stats (a menu item): PlayerStatsList with d7 = 0. */
-void PlayerStatsScreen(struct Team *tm)
-{
-    PlayerStatsList(tm, 0);
-}
 
 /* (rules: more stats) this game's list gets two more columns, plus/minus (5) and body checks
  * (6); the sort can go to them, the five columns shown sliding with it */
@@ -142,255 +22,47 @@ static const uint8_t more_titles[3][23] = {                /* for columns 4 to 6
     STRING("\x16[ Penalty Minutes  ]"), STRING("\x16[    Plus/Minus    ]"), STRING("\x16[   Body Checks     "),
 };
 
-/* stats94.asm:PlayerStatsList. The stats of team a2's players, this game's (d7 = 0) or the
- * playoffs' (1): sorted by the column chosen with left / right, scrolled with up / down; A shows
- * the other team (game stats only), Start leaves (ExitStatsScreen). */
-void PlayerStatsList(struct Team *tm, int playoff)
+/* ---- the menu screens: the line editor ---------------------------------------------------------- */
+
+/* the line editor's registers, kept across its routines as the 68k keeps them: d6, the player of
+ * the slot under the cursor, and d7, the attribute he was printed with (DrawLineIcon) */
+uint16_t le_player, le_attr;
+#define LE_SLOT() g.TestList[0]                               /* the cursor's line slot (TestList's first word) */
+enum { LE_REDRAW, LE_MENU, LE_SELECT, LE_EXIT, LE_DONE };
+
+/* the attribute column entry n of a column list (PAttribColumns / GAttribColumns: a header String,
+ * then its selector long), stepping DispAttribCtr back when the list is shorter */
+static uint32_t attrib_column(uint32_t list)
 {
-    SetupScreen(0xD, 0x16);
-    g.DispAttribCtr = 0;
-    g.VertLineScrolling = 0;
-    for (;;) {                                            /* .redraw */
-        g.PlayerScrollCtr = 0;
-        printz(str_PlayerStatsList_1, sizeof str_PlayerStatsList_1);
-        Framer(0x1E, 6);
-        if (playoff) {
-            printbigz(str_PlayerStatsList_2, sizeof str_PlayerStatsList_2);
-        } else {
-            printsmallz(str_PlayerStatsList_3, sizeof str_PlayerStatsList_3);
-            printbigz(str_PlayerStatsList_4, sizeof str_PlayerStatsList_4);
-        }
-        PutTeamBlock(tm == team_struct(0) ? 0 : 0x2C);
-        DrawStatsList(tm, playoff);
-        DrawStatsListArrows();
-        for (;;) {
-            MenuWaitVblank();
-            uint16_t d0, d1, d2, d3;
-            getpzjoy(&d0, &d1, &d2, &d3);
-            if (d3 & 0x80) { ExitStatsScreen(); return; }
-            if (d1 & 0x40) {                              /* A: the other team */
-                if (playoff) { UpdateStatsListScroll(tm, playoff); continue; }
-                tm = tm == team_struct(0) ? team_struct(1) : team_struct(0);
-                break;
-            }
-            nodiag(&d1, d3);
-            int16_t by = 0;
-            if (d1 & 8) by = 1;
-            else if (d1 & 4) by = -1;
-            if (by) {                                     /* the sort column */
-                by = (int16_t)(by + g.DispAttribCtr);
-                if (by >= -1 && by <= (more_stats(playoff) ? 6 : 4)) {
-                    g.DispAttribCtr = (uint16_t)by;
-                    DrawStatsList(tm, playoff);
-                    DrawStatsListArrows();
-                }
-            } else if (d3 & 1) {
-                g.PlayerScrollCtr = 0xFFFE;
-            } else if (d3 & 2) {
-                g.PlayerScrollCtr = 2;
-            }
-            UpdateStatsListScroll(tm, playoff);
-        }
+    for (;;) {
+        uint32_t a1 = list;
+        int16_t n = (int16_t)g.DispAttribCtr;
+        while ((int16_t)rd16(rom_ptr(a1)) >= 0 && n-- != 0) a1 += (uint32_t)(int16_t)rd16(rom_ptr(a1)) + 4;   /* (dbmi) */
+        if ((int16_t)rd16(rom_ptr(a1)) >= 0) return a1;
+        g.DispAttribCtr--;
     }
 }
 
-/* stats94.asm:UpdateStatsListScroll. Each frame: the list scrolls by PlayerScrollCtr within 0 ...
- * SelectedPlayerIdx, stopping on a 16 line boundary (the arrows then); off a boundary the row
- * coming into view is drawn. */
-void UpdateStatsListScroll(struct Team *tm, int playoff)
+/* ---- the menu screens: the scoring and penalty summaries ---------------------------------------- */
+
+/* the summaries' input: Start leaves (-> 1), up / down set the scroll */
+static int summary_input(void)
 {
-    if (g.PlayerScrollCtr == 0) return;
-    int16_t d0 = (int16_t)(g.PlayerScrollCtr + g.VertLineScrolling);
-    if (d0 < 0 || d0 > (int16_t)g.SelectedPlayerIdx) return;
-    uint16_t old = g.VertLineScrolling;
-    g.VertLineScrolling = (uint16_t)d0;
-    d0 &= 0xF;
-    if (d0 == 0) {
-        DrawStatsListArrows();
-        g.PlayerScrollCtr = 0;
-    }
-    if ((old & 0xF) == 0) {
-        if (d0 == 0xE) DrawStatsRowUp(tm, playoff);
-        if (d0 == 2) DrawStatsRowDown(tm, playoff);
-    }
-    SetStatsListScrollReg();
+    MenuWaitVblank();
+    uint16_t d0, d1, d2, d3;
+    getpzjoy(&d0, &d1, &d2, &d3);
+    if (d3 & 0x80) return 1;
+    if (d3 & 1) g.PlayerScrollCtr = 0xFFFE;
+    else if (d3 & 2) g.PlayerScrollCtr = 2;
+    return 0;
 }
 
-/* stats94.asm:SetStatsListScrollReg. The list's vertical scroll: VSRAM word 1 = VertLineScrolling
- * - $68. */
-void SetStatsListScrollReg(void)
+/* the abbreviation of the team of a summary entry (bit 7 of its byte 2: the visitors) at x $C */
+static void summary_team(uint8_t flags)
 {
-    uint16_t saved = g.disflags;
-    g.disflags |= HI(dfng);
-    vdp_ctrl(VSRAM_W + (2u << 16));
-    vdp_data((uint16_t)(0xFF98 + g.VertLineScrolling));
-    g.disflags = saved;
-}
-
-/* stats94.asm:DrawStatsRowUp. The row at the top of the window. */
-void DrawStatsRowUp(struct Team *tm, int playoff) { DrawStatsRow((uint16_t)(g.VertLineScrolling >> 4), tm, playoff); }
-
-/* stats94.asm:DrawStatsRowDown. The row below the window. */
-void DrawStatsRowDown(struct Team *tm, int playoff) { DrawStatsRow((uint16_t)((g.VertLineScrolling >> 4) + 6), tm, playoff); }
-
-/* stats94.asm:DrawStatsList. The column headers (the sort column highlighted; the goalie columns
- * for DispAttribCtr -1), the sort column's title, then the players by that column (ties by
- * lower number; goalies only for the goalie column) into Satt, ended by $FF, and the window's six
- * rows. */
-void DrawStatsList(struct Team *tm, int playoff)
-{
-    printsmallz(str_DrawStatsList_1, sizeof str_DrawStatsList_1);
-    uint32_t a1 = SYM_StatColumnHeaders;
-    int16_t col = 5;
-    if (more_stats(playoff) && (int16_t)g.DispAttribCtr >= 0) {   /* (rules: the five from the first shown) */
-        for (uint16_t c = first_column(playoff); c < first_column(playoff) + 5; c++) {
-            g.printa = g.DispAttribCtr == c ? 0xC000 : 0x8000;
-            if (c < 5) printsmall(AdvanceStringPtr(SYM_StatColumnHeaders, (uint16_t)(c + 1)));
-            else printsmallz(more_headers[c - 5], 6);
-        }
-        col = 5;
-    } else if ((int16_t)g.DispAttribCtr >= 0) {
-        a1 += (uint32_t)(int16_t)rd16(rom_ptr(a1));
-        col = 0;
-    }
-    while (col < 5 || (col == 5 && (int16_t)g.DispAttribCtr < 0)) {
-        g.printa = (int16_t)g.DispAttribCtr == col ? 0xC000 : 0x8000;
-        a1 = printsmall(a1);
-        col++;
-    }
-    printsmallz(str_DrawStatsList_2, sizeof str_DrawStatsList_2);
-    Framer(0x16, 3);
-    printz(str_DrawStatsList_3, sizeof str_DrawStatsList_3);
-    if (more_stats(playoff) && (int16_t)g.DispAttribCtr >= 4) printsmallz(more_titles[g.DispAttribCtr - 4], 22);
-    else Fprintsmall(SYM_StatSortTitles, (uint16_t)(1 + g.DispAttribCtr));
-    g.printfontset = 0;
-    uint8_t *a3 = SATT;
-    uint32_t done = 0;                                    /* d6: the players placed (or left out) */
-    if ((int16_t)g.DispAttribCtr < 0) done = ~((1u << (GetGoalieCount(tm) & 31)) - 1);   /* the goalies only */
-    uint8_t best;
-    do {
-        int32_t top = -1;
-        best = 0xFF;
-        const struct RosterTeam *T = rosters_team(tm->team);
-        for (int16_t p = (int16_t)GetPlayerCount(tm) - 1; p >= 0; p--) {
-            if (done & (1u << (p & 31))) continue;
-            uint16_t v = 0;
-            if ((int16_t)g.DispAttribCtr >= 0) v = GetStatColumn((uint16_t)p, g.DispAttribCtr, tm, playoff);
-            if (g.DispAttribCtr == 5 && more_stats(playoff)) v = (uint16_t)(v + 0x80);   /* (plus/minus: sorted above zero) */
-            int32_t key = (int32_t)((uint32_t)(int32_t)(int16_t)v << 8 & 0xFFFFFF00u) | (uint8_t)(0xFF - T->player[p].number);
-            if (key > top) { top = key; best = (uint8_t)p; }
-        }
-        done |= 1u << (best & 31);
-        *a3++ = best;
-    } while (!(best & 0x80));
-    for (int i = 5; i >= 0; i--) a3[i] = 0xFF;
-    int16_t max = (int16_t)(a3 - SATT - 6);
-    if (max < 0) max = 0;
-    g.SelectedPlayerIdx = (uint16_t)(max << 4);
-    if (g.SelectedPlayerIdx < g.VertLineScrolling) g.VertLineScrolling = g.SelectedPlayerIdx;
-    for (int16_t r = 5; r >= 0; r--) DrawStatsRow((uint16_t)((g.VertLineScrolling >> 4) + r), tm, playoff);
-    SetStatsListScrollReg();
-}
-
-/* stats94.asm:DrawStatsRow. Row d3 of the sorted list (Satt): its rank, the player's name, then his
- * five columns (the sort column highlighted) or, in the goalie column, his saves, shots and save
- * %; nothing past the list's end. */
-void DrawStatsRow(uint16_t row, struct Team *tm, int playoff)
-{
-    const uint8_t *a4 = SATT + row;
-    printz(str_DrawStatsRow_1, sizeof str_DrawStatsRow_1);
-    g.printy = (uint16_t)((row * 2) & 0x1F);
-    eraser(0x28, 1, 0x7FF);
-    if (a4[0] & 0x80) return;
-    g.printy--;
-    g.printx = 1;
-    g.printa = 0xE000;
-    print(PushNumberWidth((uint16_t)((uint16_t)ram_addr(a4) - 0xC017), 2));   /* the rank */
-    uint32_t name = FormatPlayerName(a4[0], tm);
-    g.printx++;
-    g.printa = 0x8000;
-    print(name);
-    g.printx = 0x11;
-    if ((int16_t)g.DispAttribCtr >= 0) {
-        for (uint16_t c = first_column(playoff); c < first_column(playoff) + 5; c++) {
-            uint16_t v = GetStatColumn(a4[0], c, tm, playoff);
-            g.printa = g.DispAttribCtr == c ? 0xC000 : 0x8000;
-            if (c == 5) {                                 /* (rules: plus/minus, signed) */
-                static uint8_t pm[6] = { 0, 6 };
-                int16_t n = (int16_t)v;
-                pm[2] = ' ';
-                pm[3] = n > 9 || n < -9 ? (n < 0 ? '-' : '+') : ' ';
-                pm[4] = n > 9 || n < -9 ? (uint8_t)('0' + (n < 0 ? -n : n) / 10) : n < 0 ? '-' : n > 0 ? '+' : ' ';
-                pm[5] = (uint8_t)('0' + (n < 0 ? -n : n) % 10);
-                printz(pm, sizeof pm);
-                continue;
-            }
-            print(PushNumberWidth(v, 4));
-        }
-        return;
-    }
-    uint16_t shots = ReadStatColumn(a4[0], 3, tm, playoff), goals = ReadStatColumn(a4[0], 0, tm, playoff);
-    int16_t saves = (int16_t)(shots - goals);
-    if (saves < 0) saves = 0;
-    uint16_t v = (uint16_t)saves;
-    uint32_t s = PushNumberWidth(v, 4);
-    g.printx++;
-    print(s);
-    s = PushNumberWidth(shots, 4);
-    g.printx += 2;
-    print(s);
-    if (shots != 0) v = (uint16_t)m68k_divu((uint32_t)v * 100u, shots);
-    s = PushNumberWidth(v, 4);
-    g.printx += 2;
-    print(s);
-    printz(str_DrawStatsRow_2, sizeof str_DrawStatsRow_2);
-}
-
-/* stats94.asm:GetStatColumn. -> d2 = stat column d1 of player d0 (ReadStatColumn); a goalie has
- * only columns 1 and 2, both his assists. */
-uint16_t GetStatColumn(uint16_t player, uint16_t col, struct Team *tm, int playoff)
-{
-    if ((int16_t)player >= (int16_t)GetGoalieCount(tm)) return ReadStatColumn(player, col, tm, playoff);
-    if (!(6 & (1u << (col & 7)))) return 0;               /* (btst d1,#6) */
-    return ReadStatColumn(player, 1, tm, playoff);
-}
-
-/* stats94.asm:ReadStatColumn. -> d2 = stat column d1 of player d0: this game's from the team
- * struct's byte arrays (StatColumnOffsets: one or two of them), the playoffs' (d7) from their RAM
- * tables (GetStatsValue). */
-uint16_t ReadStatColumn(uint16_t player, uint16_t col, struct Team *tm, int playoff)
-{
-    if (!playoff && col == 5) return (uint16_t)(int16_t)rule_plusminus[tm == team_struct(1)][player & 31];          /* (rules) */
-    if (!playoff && col == 6) return tm->pchecks[player];                                                           /* (rules) */
-    if (!playoff) {
-        const uint8_t *a1 = rom_ptr(SYM_StatColumnOffsets) + (uint16_t)(col << 2);
-        uint16_t v = r8(team_place(tm), (int16_t)(uint16_t)(rd16(a1) + player));
-        int16_t second = (int16_t)rd16(a1 + 2);
-        if (second < 0) return v;
-        return (uint16_t)(v + r8(team_place(tm), (int16_t)(uint16_t)(second + player)));
-    }
-    uint16_t at = (uint16_t)(col << 2), off = (uint16_t)(player << 1), v = 0;
-    v = GetStatsValue(at, off, v);
-    return GetStatsValue((uint16_t)(at + 2), off, v);
-}
-
-/* stats94.asm:GetStatsValue. d2 + word d0 of the playoff RAM table at StatsOffsetTbl2 + d1 (0:
- * none). */
-uint16_t GetStatsValue(uint16_t at, uint16_t off, uint16_t v)
-{
-    uint16_t table = rd16(rom_ptr(SYM_StatsOffsetTbl2) + (int16_t)at);
-    if (table == 0) return v;
-    return (uint16_t)(v + m16(RAM_BASE + (uint16_t)(table + off)));
-}
-
-/* stats94.asm:DrawStatsListArrows. The up / down arrows (ScrollArrowTbl2): up when scrolled, down
- * when more rows follow. */
-void DrawStatsListArrows(void)
-{
-    printsmallz(str_DrawStatsListArrows_1, sizeof str_DrawStatsListArrows_1);
-    uint16_t n = (int16_t)g.VertLineScrolling > 0;
-    n = (uint16_t)(n + 2 * ((int16_t)g.VertLineScrolling < (int16_t)g.SelectedPlayerIdx));
-    Fprintsmall(SYM_ScrollArrowTbl2, n);
+    struct Team *tm = team_struct(flags & 0x80);
+    g.printx = 0xC;
+    print_p(roster_text(&rosters_team(tm->team)->abbr));
 }
 
 /* ---- the menu screens: Other Scores ------------------------------------------------------------ */
@@ -487,14 +159,6 @@ void DrawScrollArrows(void)
     n = (uint16_t)(n + 2 * ((int16_t)g.VertLineScrolling < (int16_t)g.SelectedPlayerIdx));
     Fprintsmall(SYM_ScrollArrowTable, n);
 }
-
-/* ---- the menu screens: the line editor ---------------------------------------------------------- */
-
-/* the line editor's registers, kept across its routines as the 68k keeps them: d6, the player of
- * the slot under the cursor, and d7, the attribute he was printed with (DrawLineIcon) */
-uint16_t le_player, le_attr;
-#define LE_SLOT() g.TestList[0]                               /* the cursor's line slot (TestList's first word) */
-enum { LE_REDRAW, LE_MENU, LE_SELECT, LE_EXIT, LE_DONE };
 
 /* stats94.asm:LineEditor. The Line Editor for team a2 (a menu item): the slot cursor, C picks a
  * player for the slot (SelectLinePlayer), Start the exit menu (LineEditorExit). The 68k branches
@@ -612,19 +276,6 @@ int SelectLinePlayer(struct Team *tm)
         d0 = (int16_t)(d0 - 5);
         if (d0 > (int16_t)g.PlayerScrollCtr) g.PlayerScrollCtr = (uint16_t)d0;
         PrintAttribHeader(tm);
-    }
-}
-
-/* the attribute column entry n of a column list (PAttribColumns / GAttribColumns: a header String,
- * then its selector long), stepping DispAttribCtr back when the list is shorter */
-static uint32_t attrib_column(uint32_t list)
-{
-    for (;;) {
-        uint32_t a1 = list;
-        int16_t n = (int16_t)g.DispAttribCtr;
-        while ((int16_t)rd16(rom_ptr(a1)) >= 0 && n-- != 0) a1 += (uint32_t)(int16_t)rd16(rom_ptr(a1)) + 4;   /* (dbmi) */
-        if ((int16_t)rd16(rom_ptr(a1)) >= 0) return a1;
-        g.DispAttribCtr--;
     }
 }
 
@@ -1031,20 +682,6 @@ void AttribWeight(uint16_t v)
     printz(str_AttribWeight_1, sizeof str_AttribWeight_1);
 }
 
-/* ---- the menu screens: the scoring and penalty summaries ---------------------------------------- */
-
-/* the summaries' input: Start leaves (-> 1), up / down set the scroll */
-static int summary_input(void)
-{
-    MenuWaitVblank();
-    uint16_t d0, d1, d2, d3;
-    getpzjoy(&d0, &d1, &d2, &d3);
-    if (d3 & 0x80) return 1;
-    if (d3 & 1) g.PlayerScrollCtr = 0xFFFE;
-    else if (d3 & 2) g.PlayerScrollCtr = 2;
-    return 0;
-}
-
 /* stats94.asm:ScoringSummaryScreen. The Scoring Summary (a menu item): a 4 row entry a goal
  * (ScoreSum), scrolled to the last, then with up / down; Start leaves. */
 void ScoringSummaryScreen(void)
@@ -1123,14 +760,6 @@ void DrawScoringRowDown(uint16_t entry)
     printz(str_DrawScoringRowDown_1, sizeof str_DrawScoringRowDown_1);
     g.printy = (uint16_t)(((g.VertLineScrolling >> 3) + 0x10) & 0x1F);
     DrawScoringRow(at);
-}
-
-/* the abbreviation of the team of a summary entry (bit 7 of its byte 2: the visitors) at x $C */
-static void summary_team(uint8_t flags)
-{
-    struct Team *tm = team_struct(flags & 0x80);
-    g.printx = 0xC;
-    print_p(roster_text(&rosters_team(tm->team)->abbr));
 }
 
 /* stats94.asm:DrawScoringRow. ScoreSum entry d3: the time, the team, the goal type (GoalTypeTbl),
@@ -1275,6 +904,274 @@ void DrawScrollArrowsPenalty(void)
     Fprintsmall(SYM_ScrollArrowTbl, n);
 }
 
+/* stats94.asm:PlayoffStatsScreen. Playoff Stats: the playoff totals (ReadTeamStats) of the user's
+ * playoff team, as PlayerStatsList with d7 = 1. */
+void PlayoffStatsScreen(void)
+{
+    ReadTeamStats();
+    uint16_t team = (uint16_t)((g.potreeteam & 0xFF00) | g.potree[g.potreeteam]);
+    struct Team *tm = team_struct(0);
+    if (team != tm->team) tm = team_struct(1);
+    PlayerStatsList(tm, 1);
+}
+
+/* stats94.asm:PlayerStatsScreen. Player Stats (a menu item): PlayerStatsList with d7 = 0. */
+void PlayerStatsScreen(struct Team *tm)
+{
+    PlayerStatsList(tm, 0);
+}
+
+/* stats94.asm:PlayerStatsList. The stats of team a2's players, this game's (d7 = 0) or the
+ * playoffs' (1): sorted by the column chosen with left / right, scrolled with up / down; A shows
+ * the other team (game stats only), Start leaves (ExitStatsScreen). */
+void PlayerStatsList(struct Team *tm, int playoff)
+{
+    SetupScreen(0xD, 0x16);
+    g.DispAttribCtr = 0;
+    g.VertLineScrolling = 0;
+    for (;;) {                                            /* .redraw */
+        g.PlayerScrollCtr = 0;
+        printz(str_PlayerStatsList_1, sizeof str_PlayerStatsList_1);
+        Framer(0x1E, 6);
+        if (playoff) {
+            printbigz(str_PlayerStatsList_2, sizeof str_PlayerStatsList_2);
+        } else {
+            printsmallz(str_PlayerStatsList_3, sizeof str_PlayerStatsList_3);
+            printbigz(str_PlayerStatsList_4, sizeof str_PlayerStatsList_4);
+        }
+        PutTeamBlock(tm == team_struct(0) ? 0 : 0x2C);
+        DrawStatsList(tm, playoff);
+        DrawStatsListArrows();
+        for (;;) {
+            MenuWaitVblank();
+            uint16_t d0, d1, d2, d3;
+            getpzjoy(&d0, &d1, &d2, &d3);
+            if (d3 & 0x80) { ExitStatsScreen(); return; }
+            if (d1 & 0x40) {                              /* A: the other team */
+                if (playoff) { UpdateStatsListScroll(tm, playoff); continue; }
+                tm = tm == team_struct(0) ? team_struct(1) : team_struct(0);
+                break;
+            }
+            nodiag(&d1, d3);
+            int16_t by = 0;
+            if (d1 & 8) by = 1;
+            else if (d1 & 4) by = -1;
+            if (by) {                                     /* the sort column */
+                by = (int16_t)(by + g.DispAttribCtr);
+                if (by >= -1 && by <= (more_stats(playoff) ? 6 : 4)) {
+                    g.DispAttribCtr = (uint16_t)by;
+                    DrawStatsList(tm, playoff);
+                    DrawStatsListArrows();
+                }
+            } else if (d3 & 1) {
+                g.PlayerScrollCtr = 0xFFFE;
+            } else if (d3 & 2) {
+                g.PlayerScrollCtr = 2;
+            }
+            UpdateStatsListScroll(tm, playoff);
+        }
+    }
+}
+
+/* stats94.asm:UpdateStatsListScroll. Each frame: the list scrolls by PlayerScrollCtr within 0 ...
+ * SelectedPlayerIdx, stopping on a 16 line boundary (the arrows then); off a boundary the row
+ * coming into view is drawn. */
+void UpdateStatsListScroll(struct Team *tm, int playoff)
+{
+    if (g.PlayerScrollCtr == 0) return;
+    int16_t d0 = (int16_t)(g.PlayerScrollCtr + g.VertLineScrolling);
+    if (d0 < 0 || d0 > (int16_t)g.SelectedPlayerIdx) return;
+    uint16_t old = g.VertLineScrolling;
+    g.VertLineScrolling = (uint16_t)d0;
+    d0 &= 0xF;
+    if (d0 == 0) {
+        DrawStatsListArrows();
+        g.PlayerScrollCtr = 0;
+    }
+    if ((old & 0xF) == 0) {
+        if (d0 == 0xE) DrawStatsRowUp(tm, playoff);
+        if (d0 == 2) DrawStatsRowDown(tm, playoff);
+    }
+    SetStatsListScrollReg();
+}
+
+/* stats94.asm:SetStatsListScrollReg. The list's vertical scroll: VSRAM word 1 = VertLineScrolling
+ * - $68. */
+void SetStatsListScrollReg(void)
+{
+    uint16_t saved = g.disflags;
+    g.disflags |= HI(dfng);
+    vdp_ctrl(VSRAM_W + (2u << 16));
+    vdp_data((uint16_t)(0xFF98 + g.VertLineScrolling));
+    g.disflags = saved;
+}
+
+/* stats94.asm:DrawStatsRowUp. The row at the top of the window. */
+void DrawStatsRowUp(struct Team *tm, int playoff) { DrawStatsRow((uint16_t)(g.VertLineScrolling >> 4), tm, playoff); }
+
+/* stats94.asm:DrawStatsRowDown. The row below the window. */
+void DrawStatsRowDown(struct Team *tm, int playoff) { DrawStatsRow((uint16_t)((g.VertLineScrolling >> 4) + 6), tm, playoff); }
+
+/* stats94.asm:DrawStatsList. The column headers (the sort column highlighted; the goalie columns
+ * for DispAttribCtr -1), the sort column's title, then the players by that column (ties by
+ * lower number; goalies only for the goalie column) into Satt, ended by $FF, and the window's six
+ * rows. */
+void DrawStatsList(struct Team *tm, int playoff)
+{
+    printsmallz(str_DrawStatsList_1, sizeof str_DrawStatsList_1);
+    uint32_t a1 = SYM_StatColumnHeaders;
+    int16_t col = 5;
+    if (more_stats(playoff) && (int16_t)g.DispAttribCtr >= 0) {   /* (rules: the five from the first shown) */
+        for (uint16_t c = first_column(playoff); c < first_column(playoff) + 5; c++) {
+            g.printa = g.DispAttribCtr == c ? 0xC000 : 0x8000;
+            if (c < 5) printsmall(AdvanceStringPtr(SYM_StatColumnHeaders, (uint16_t)(c + 1)));
+            else printsmallz(more_headers[c - 5], 6);
+        }
+        col = 5;
+    } else if ((int16_t)g.DispAttribCtr >= 0) {
+        a1 += (uint32_t)(int16_t)rd16(rom_ptr(a1));
+        col = 0;
+    }
+    while (col < 5 || (col == 5 && (int16_t)g.DispAttribCtr < 0)) {
+        g.printa = (int16_t)g.DispAttribCtr == col ? 0xC000 : 0x8000;
+        a1 = printsmall(a1);
+        col++;
+    }
+    printsmallz(str_DrawStatsList_2, sizeof str_DrawStatsList_2);
+    Framer(0x16, 3);
+    printz(str_DrawStatsList_3, sizeof str_DrawStatsList_3);
+    if (more_stats(playoff) && (int16_t)g.DispAttribCtr >= 4) printsmallz(more_titles[g.DispAttribCtr - 4], 22);
+    else Fprintsmall(SYM_StatSortTitles, (uint16_t)(1 + g.DispAttribCtr));
+    g.printfontset = 0;
+    uint8_t *a3 = SATT;
+    uint32_t done = 0;                                    /* d6: the players placed (or left out) */
+    if ((int16_t)g.DispAttribCtr < 0) done = ~((1u << (GetGoalieCount(tm) & 31)) - 1);   /* the goalies only */
+    uint8_t best;
+    do {
+        int32_t top = -1;
+        best = 0xFF;
+        const struct RosterTeam *T = rosters_team(tm->team);
+        for (int16_t p = (int16_t)GetPlayerCount(tm) - 1; p >= 0; p--) {
+            if (done & (1u << (p & 31))) continue;
+            uint16_t v = 0;
+            if ((int16_t)g.DispAttribCtr >= 0) v = GetStatColumn((uint16_t)p, g.DispAttribCtr, tm, playoff);
+            if (g.DispAttribCtr == 5 && more_stats(playoff)) v = (uint16_t)(v + 0x80);   /* (plus/minus: sorted above zero) */
+            int32_t key = (int32_t)((uint32_t)(int32_t)(int16_t)v << 8 & 0xFFFFFF00u) | (uint8_t)(0xFF - T->player[p].number);
+            if (key > top) { top = key; best = (uint8_t)p; }
+        }
+        done |= 1u << (best & 31);
+        *a3++ = best;
+    } while (!(best & 0x80));
+    for (int i = 5; i >= 0; i--) a3[i] = 0xFF;
+    int16_t max = (int16_t)(a3 - SATT - 6);
+    if (max < 0) max = 0;
+    g.SelectedPlayerIdx = (uint16_t)(max << 4);
+    if (g.SelectedPlayerIdx < g.VertLineScrolling) g.VertLineScrolling = g.SelectedPlayerIdx;
+    for (int16_t r = 5; r >= 0; r--) DrawStatsRow((uint16_t)((g.VertLineScrolling >> 4) + r), tm, playoff);
+    SetStatsListScrollReg();
+}
+
+/* stats94.asm:DrawStatsRow. Row d3 of the sorted list (Satt): its rank, the player's name, then his
+ * five columns (the sort column highlighted) or, in the goalie column, his saves, shots and save
+ * %; nothing past the list's end. */
+void DrawStatsRow(uint16_t row, struct Team *tm, int playoff)
+{
+    const uint8_t *a4 = SATT + row;
+    printz(str_DrawStatsRow_1, sizeof str_DrawStatsRow_1);
+    g.printy = (uint16_t)((row * 2) & 0x1F);
+    eraser(0x28, 1, 0x7FF);
+    if (a4[0] & 0x80) return;
+    g.printy--;
+    g.printx = 1;
+    g.printa = 0xE000;
+    print(PushNumberWidth((uint16_t)((uint16_t)ram_addr(a4) - 0xC017), 2));   /* the rank */
+    uint32_t name = FormatPlayerName(a4[0], tm);
+    g.printx++;
+    g.printa = 0x8000;
+    print(name);
+    g.printx = 0x11;
+    if ((int16_t)g.DispAttribCtr >= 0) {
+        for (uint16_t c = first_column(playoff); c < first_column(playoff) + 5; c++) {
+            uint16_t v = GetStatColumn(a4[0], c, tm, playoff);
+            g.printa = g.DispAttribCtr == c ? 0xC000 : 0x8000;
+            if (c == 5) {                                 /* (rules: plus/minus, signed) */
+                static uint8_t pm[6] = { 0, 6 };
+                int16_t n = (int16_t)v;
+                pm[2] = ' ';
+                pm[3] = n > 9 || n < -9 ? (n < 0 ? '-' : '+') : ' ';
+                pm[4] = n > 9 || n < -9 ? (uint8_t)('0' + (n < 0 ? -n : n) / 10) : n < 0 ? '-' : n > 0 ? '+' : ' ';
+                pm[5] = (uint8_t)('0' + (n < 0 ? -n : n) % 10);
+                printz(pm, sizeof pm);
+                continue;
+            }
+            print(PushNumberWidth(v, 4));
+        }
+        return;
+    }
+    uint16_t shots = ReadStatColumn(a4[0], 3, tm, playoff), goals = ReadStatColumn(a4[0], 0, tm, playoff);
+    int16_t saves = (int16_t)(shots - goals);
+    if (saves < 0) saves = 0;
+    uint16_t v = (uint16_t)saves;
+    uint32_t s = PushNumberWidth(v, 4);
+    g.printx++;
+    print(s);
+    s = PushNumberWidth(shots, 4);
+    g.printx += 2;
+    print(s);
+    if (shots != 0) v = (uint16_t)m68k_divu((uint32_t)v * 100u, shots);
+    s = PushNumberWidth(v, 4);
+    g.printx += 2;
+    print(s);
+    printz(str_DrawStatsRow_2, sizeof str_DrawStatsRow_2);
+}
+
+/* stats94.asm:GetStatColumn. -> d2 = stat column d1 of player d0 (ReadStatColumn); a goalie has
+ * only columns 1 and 2, both his assists. */
+uint16_t GetStatColumn(uint16_t player, uint16_t col, struct Team *tm, int playoff)
+{
+    if ((int16_t)player >= (int16_t)GetGoalieCount(tm)) return ReadStatColumn(player, col, tm, playoff);
+    if (!(6 & (1u << (col & 7)))) return 0;               /* (btst d1,#6) */
+    return ReadStatColumn(player, 1, tm, playoff);
+}
+
+/* stats94.asm:ReadStatColumn. -> d2 = stat column d1 of player d0: this game's from the team
+ * struct's byte arrays (StatColumnOffsets: one or two of them), the playoffs' (d7) from their RAM
+ * tables (GetStatsValue). */
+uint16_t ReadStatColumn(uint16_t player, uint16_t col, struct Team *tm, int playoff)
+{
+    if (!playoff && col == 5) return (uint16_t)(int16_t)rule_plusminus[tm == team_struct(1)][player & 31];          /* (rules) */
+    if (!playoff && col == 6) return tm->pchecks[player];                                                           /* (rules) */
+    if (!playoff) {
+        const uint8_t *a1 = rom_ptr(SYM_StatColumnOffsets) + (uint16_t)(col << 2);
+        uint16_t v = r8(team_place(tm), (int16_t)(uint16_t)(rd16(a1) + player));
+        int16_t second = (int16_t)rd16(a1 + 2);
+        if (second < 0) return v;
+        return (uint16_t)(v + r8(team_place(tm), (int16_t)(uint16_t)(second + player)));
+    }
+    uint16_t at = (uint16_t)(col << 2), off = (uint16_t)(player << 1), v = 0;
+    v = GetStatsValue(at, off, v);
+    return GetStatsValue((uint16_t)(at + 2), off, v);
+}
+
+/* stats94.asm:GetStatsValue. d2 + word d0 of the playoff RAM table at StatsOffsetTbl2 + d1 (0:
+ * none). */
+uint16_t GetStatsValue(uint16_t at, uint16_t off, uint16_t v)
+{
+    uint16_t table = rd16(rom_ptr(SYM_StatsOffsetTbl2) + (int16_t)at);
+    if (table == 0) return v;
+    return (uint16_t)(v + m16(RAM_BASE + (uint16_t)(table + off)));
+}
+
+/* stats94.asm:DrawStatsListArrows. The up / down arrows (ScrollArrowTbl2): up when scrolled, down
+ * when more rows follow. */
+void DrawStatsListArrows(void)
+{
+    printsmallz(str_DrawStatsListArrows_1, sizeof str_DrawStatsListArrows_1);
+    uint16_t n = (int16_t)g.VertLineScrolling > 0;
+    n = (uint16_t)(n + 2 * ((int16_t)g.VertLineScrolling < (int16_t)g.SelectedPlayerIdx));
+    Fprintsmall(SYM_ScrollArrowTbl2, n);
+}
+
 /* ---- the menu screens: the crowd meter, the timeout, the goalie ------------------------------- */
 
 /* stats94.asm:CrowdMeterScreen. The Crowd Meter (a menu item): the levels and records
@@ -1326,6 +1223,79 @@ void PrintCrowdDB(uint16_t level)
     v = (v & 0xFFFF0000u) | (uint16_t)(v << 2);           /* (ext.l, asl.w) */
     print(PushNumberWidth((uint16_t)(Sroot(v) + 0x41), 3));
     printz(str_PrintCrowdDB_1, sizeof str_PrintCrowdDB_1);
+}
+
+/* stats94.asm:SetupScreen. The common start of the stats screens: fade out, 40 columns, the
+ * framer and small font tiles, the background (ScoutMap) once plain and once rows d0 to d1
+ * with its palettes, a second small font, and plane A cleared -> d4 = the char after them. */
+uint16_t SetupScreen(uint16_t row, uint16_t rows)
+{
+    static const uint8_t framer[8] = { 0x91, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
+    static const uint8_t font2[8] = { 0xD1, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
+    forceblack();
+    g.disflags &= (uint16_t)~HI(dfok);
+    uint16_t saved = g.disflags;
+    g.disflags |= HI(dfng);
+    Vmaddr(g.VSPRITES);
+    vdp_data32(0);
+    vdp_ctrl16(SYM_VDPR_MODE4 + 0x81);
+    g.maps[2].colshift = 6;
+    vdp_ctrl16(SYM_VDPR_HSCROLL);
+    Vmaddr(0);
+    vdp_data32(0);
+    g.disflags = saved;
+    g.disflags &= (uint16_t)~HI(df32c);
+    DecompressGraphicsWithRemap(ART(FramerMap) + 8, g.framercset, rom_find(SYM_SetupScreen, SYM_SetupScreen + 0x100, framer, 8));
+    AddSmallFont(g.smallfontchars);
+    printz(str_SetupScreen_1, sizeof str_SetupScreen_1);
+    uint32_t map = ART(ScoutMap) + rd32(rom_ptr(ART(ScoutMap) + 4));
+    const uint8_t *m = rom_ptr(map);
+    uint16_t c = dobitmap(0, map, SYM_NoTiles, 0, 0, rd16(m), rd16(m + 2), 1, 0);
+    printz(str_SetupScreen_2, sizeof str_SetupScreen_2);
+    g.printy += row;
+    uint32_t pal = ART(ScoutMap) + rd32(rom_ptr(ART(ScoutMap)));
+    c = dobitmap(pal, map, ART(ScoutMap) + 8, 0, row, 0x28, (uint16_t)(rows - row), c, 0xD);
+    g.smallfont2chars = c;
+    c = DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, c, rom_find(SYM_SetupScreen, SYM_SetupScreen + 0x100, font2, 8));
+    printz(str_SetupScreen_3, sizeof str_SetupScreen_3);
+    eraser(0x40, 0x20, 0x7FF);
+    g.palcount = 0x18;
+    return c;
+}
+
+/* stats94.asm:ExitStatsScreen. Leave a stats screen: fade out, then ReloadRinkGraphics. */
+void ExitStatsScreen(void)
+{
+    forceblack();
+    ReloadRinkGraphics();
+}
+
+/* stats94.asm:ReloadRinkGraphics. After a screen over the rink: back to 32 columns, then reload
+ * the rink (reversed in a reverse angle replay), team, font, framer, EASN, energy bar and crowd
+ * tiles and the palettes. */
+void ReloadRinkGraphics(void)
+{
+    static const uint8_t table[8] = { 0x43, 0x43, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
+    uint16_t saved = g.disflags;
+    g.disflags |= HI(dfng);
+    Vmaddr(g.VSCRLPM);
+    vdp_data32(0);
+    vdp_ctrl16((uint16_t)(0x8D00 | (g.VSCRLPM >> 8 >> 2)));
+    vdp_ctrl16(SYM_VDPR_MODE4);
+    g.maps[2].colshift = 5;
+    g.disflags = saved;
+    g.disflags |= HI(df32c);
+    view_rink_mode();                                     /* (the wide view's 40 columns) */
+    uint16_t c = DecompressGraphicsPlain(g.sflags4 & HI(4) ? ART(RevRinkTiles) : ART(Rinktiles), g.rinkvrcset);
+    LoadHomeTeamGfx(c);
+    DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, g.smallfontchars,
+                                   rom_find(SYM_ReloadRinkGraphics, SYM_ReloadRinkGraphics + 0x80, table, 8));
+    AddFramer(g.framercset);
+    setupEASportsMap();
+    ReloadEnergyBarTiles();
+    ReloadCrowdTiles();
+    setupIceRinkPal();
+    setplayercolors();
 }
 
 /* stats94.asm:TimeoutMenu. Timeout for team a2 (a pause menu item): the menu now PauseText2 (no
@@ -1411,4 +1381,34 @@ void Pausemode_gnum(struct Team *tm)
         }
         g.printy++;
     }
+}
+
+/* stats94.asm:GetGoalieCount. a2 = team -> d0 = its goalies (the nibbles of its start odds). */
+uint16_t GetGoalieCount(struct Team *tm) { return rosters_team(tm->team)->goalies; }
+
+/* stats94.asm:GetDefenseStart. d0 = the roster index of team a2's first defenseman: its goalies
+ * (GetGoalieCount) and forwards (GetForwardCount). */
+uint16_t GetDefenseStart(struct Team *tm)
+{
+    return (uint16_t)(GetGoalieCount(tm) + GetForwardCount(tm));
+}
+
+/* stats94.asm:GetForwardCount. d0 = team a2's forwards. */
+uint16_t GetForwardCount(struct Team *tm) { return rosters_team(tm->team)->forwards; }
+
+/* stats94.asm:GetPlayerCount. a2 = team -> d0 = its players. */
+uint16_t GetPlayerCount(struct Team *tm) { return rosters_team(tm->team)->players; }
+
+/* stats94.asm:Pausemode_rjoy. Wait for the next vblank and a new button press -> d1 (and
+ * the other pad words). */
+uint16_t Pausemode_rjoy(uint16_t *d0, uint16_t *d2, uint16_t *d3)
+{
+    uint16_t d1;
+    do {
+        uint16_t v = g.vcount;
+        while (g.vcount == v) hal_wait_vblank();
+        getpzjoy(d0, &d1, d2, d3);
+        nodiag(&d1, *d3);
+    } while ((d1 & 0xFF) == 0);
+    return d1;
 }

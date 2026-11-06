@@ -925,25 +925,6 @@ void BuildCardPlayerLists(void);
 void BuildCardPlayerList(struct Team *tm, uint8_t *list);     /* a0, a1 */
 
 /* ---- stats94.asm: the statistics and menu screens ---- */
-uint16_t GetPlayerCount(struct Team *team);             /* a2 -> d0 */
-uint16_t GetGoalieCount(struct Team *team);             /* a2 -> d0 */
-void ReloadRinkGraphics(void);
-uint16_t SetupScreen(uint16_t row, uint16_t rows);      /* d0, d1 -> d4 */
-void ExitStatsScreen(void);                             /* falls into ReloadRinkGraphics */
-uint16_t Pausemode_rjoy(uint16_t *d0, uint16_t *d2, uint16_t *d3);   /* -> d1 */
-void PlayoffStatsScreen(void);                          /* the player stats lists */
-void PlayerStatsScreen(struct Team *tm);                /* a2 */
-void PlayerStatsList(struct Team *tm, int playoff);     /* a2, d7 */
-void UpdateStatsListScroll(struct Team *tm, int playoff);
-void SetStatsListScrollReg(void);
-void DrawStatsRowUp(struct Team *tm, int playoff);
-void DrawStatsRowDown(struct Team *tm, int playoff);
-void DrawStatsList(struct Team *tm, int playoff);       /* a2, d7 */
-void DrawStatsRow(uint16_t row, struct Team *tm, int playoff);   /* d3, a2, d7 */
-uint16_t GetStatColumn(uint16_t player, uint16_t col, struct Team *tm, int playoff);   /* d0, d1, a2, d7 -> d2 */
-uint16_t ReadStatColumn(uint16_t player, uint16_t col, struct Team *tm, int playoff);   /* d0, d1, a2, d7 -> d2 */
-uint16_t GetStatsValue(uint16_t at, uint16_t off, uint16_t v);   /* d1, d0, d2 -> d2 */
-void DrawStatsListArrows(void);
 void ShowScores(void);                                  /* the other scores */
 void UpdateScoresScroll(void);
 void UpdateVertScrollReg(void);
@@ -957,7 +938,6 @@ void LineEditor(struct Team *tm);                       /* a2: the line editor *
 int LineEditorRedraw(struct Team *tm);
 int LineEditorMenu(struct Team *tm);
 int SelectLinePlayer(struct Team *tm);
-int LineEditorExit(struct Team *tm);
 void PrintAttribHeader(struct Team *tm);
 void DrawLineIcons(struct Team *tm);
 void DrawLineIcon(uint16_t line, struct Team *tm);
@@ -965,6 +945,7 @@ void ClearLineArea(void);
 void DrawTeamScreen(struct Team *tm);
 void ClearLineEditorTop(void);
 void ClearMenuFlags(void);
+int LineEditorExit(struct Team *tm);
 void SetLineSlot(uint8_t player, uint16_t slot, struct Team *tm);
 void DecodeTeamLines(struct Team *tm);                  /* a2 */
 void EncodeTeamLines(struct Team *tm);                  /* a2 */
@@ -997,14 +978,33 @@ void DisplayPenaltyLineUp(uint16_t entry);
 void DisplayPenaltyLineDown(uint16_t entry);
 void DisplayPenaltyEntry(uint16_t at);                  /* d3 */
 void DrawScrollArrowsPenalty(void);
+void PlayoffStatsScreen(void);                          /* the player stats lists */
+void PlayerStatsScreen(struct Team *tm);                /* a2 */
+void PlayerStatsList(struct Team *tm, int playoff);     /* a2, d7 */
+void UpdateStatsListScroll(struct Team *tm, int playoff);
+void SetStatsListScrollReg(void);
+void DrawStatsRowUp(struct Team *tm, int playoff);
+void DrawStatsRowDown(struct Team *tm, int playoff);
+void DrawStatsList(struct Team *tm, int playoff);       /* a2, d7 */
+void DrawStatsRow(uint16_t row, struct Team *tm, int playoff);   /* d3, a2, d7 */
+uint16_t GetStatColumn(uint16_t player, uint16_t col, struct Team *tm, int playoff);   /* d0, d1, a2, d7 -> d2 */
+uint16_t ReadStatColumn(uint16_t player, uint16_t col, struct Team *tm, int playoff);   /* d0, d1, a2, d7 -> d2 */
+uint16_t GetStatsValue(uint16_t at, uint16_t off, uint16_t v);   /* d1, d0, d2 -> d2 */
+void DrawStatsListArrows(void);
 void CrowdMeterScreen(void);
 void PrintCrowdMeter(void);
 void PrintCrowdDB(uint16_t level);                      /* d0 */
+uint16_t SetupScreen(uint16_t row, uint16_t rows);      /* d0, d1 -> d4 */
+void ExitStatsScreen(void);                             /* falls into ReloadRinkGraphics */
+void ReloadRinkGraphics(void);
 void TimeoutMenu(struct Team *tm);                      /* a2 */
 void Pausemode_go(struct Team *tm);                 /* a2 */
 void Pausemode_gnum(struct Team *tm);
+uint16_t GetGoalieCount(struct Team *team);             /* a2 -> d0 */
 uint16_t GetDefenseStart(struct Team *tm);              /* a2 -> d0 */
 uint16_t GetForwardCount(struct Team *tm);              /* a2 -> d0 */
+uint16_t GetPlayerCount(struct Team *team);             /* a2 -> d0 */
+uint16_t Pausemode_rjoy(uint16_t *d0, uint16_t *d2, uint16_t *d3);   /* -> d1 */
 
 /* ---- shootout94.asm: the shootout ---- */
 void ShootoutModeBox(void);
