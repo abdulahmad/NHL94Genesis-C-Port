@@ -591,16 +591,16 @@ void LoadCrowdRec(void);
 void Crowd_Noise(void);
 void stopna2(struct SortObj *o);
 void checkcornercoll(int16_t x, int16_t y, struct SortObj *o);   /* d2, d3, a3 */
-void HotColdLoop(struct Team *tm, int16_t d1);          /* a0, d1 */
 void Create_HotCold_Table(struct Team *tm);             /* a0 */
+void HotColdLoop(struct Team *tm, int16_t d1);          /* a0, d1 */
 uint16_t Clamp0to100(int16_t v);                        /* d3 -> d3 */
 uint8_t AttributeCalc(uint8_t v, struct SortObj *o);    /* d3, a3 -> d3 */
 uint16_t NextHomeHotPlayer(struct Team **team);         /* -> d1, a1 */
 uint16_t NextAwayHotPlayer(struct Team **team);
-uint16_t NextHomeColdPlayer(struct Team **team);
-uint16_t NextAwayColdPlayer(struct Team **team);
 void BuildHotColdLists(void);
 void SortHotColdStarters(struct Team *tm);              /* a0 */
+uint16_t NextHomeColdPlayer(struct Team **team);
+uint16_t NextAwayColdPlayer(struct Team **team);
 uint16_t CopyHottestPlayer(void);
 uint16_t CopyColdestPlayer(void);
 uint16_t CompareHotColdTotals(void);                    /* -> d0 */

@@ -114,19 +114,19 @@ void checkcornercoll(int16_t x, int16_t y, struct SortObj *o)
     if (x <= d4) wallcollb(d0, d1, o);
 }
 
+/* crowd94.asm:Create_HotCold_Table. Fill the hot / cold table of team a0 with 416 random
+ * values (-9 ... 8). */
+void Create_HotCold_Table(struct Team *tm)
+{
+    HotColdLoop(tm, 0x19F);
+}
+
 /* crowd94.asm:HotColdLoop. The loop of Create_HotCold_Table from entry d1 down. */
 void HotColdLoop(struct Team *tm, int16_t d1)
 {
     uint8_t *hc = tm->hotcold[0];                         /* (the table, row after row) */
     for (; d1 >= 0; d1--)
         hc[d1] = (uint8_t)randomd0s(9);
-}
-
-/* crowd94.asm:Create_HotCold_Table. Fill the hot / cold table of team a0 with 416 random
- * values (-9 ... 8). */
-void Create_HotCold_Table(struct Team *tm)
-{
-    HotColdLoop(tm, 0x19F);
 }
 
 /* crowd94.asm:Clamp0to100. Unused. */
@@ -166,20 +166,6 @@ uint16_t NextAwayHotPlayer(struct Team **team)
     *team = team_struct(1);
     uint16_t d1 = listed(RAM_OFF_awayhotplayer, g.awayhotidx);
     if ((int16_t)g.awayhotidx < 0) g.awayhotidx++;
-    return d1;
-}
-uint16_t NextHomeColdPlayer(struct Team **team)
-{
-    *team = team_struct(0);
-    uint16_t d1 = listed(RAM_OFF_homecoldplayer, g.homecoldidx);
-    if ((int16_t)g.homecoldidx < 0) g.homecoldidx++;
-    return d1;
-}
-uint16_t NextAwayColdPlayer(struct Team **team)
-{
-    *team = team_struct(1);
-    uint16_t d1 = listed(RAM_OFF_awaycoldplayer, g.awaycoldidx);
-    if ((int16_t)g.awaycoldidx < 0) g.awaycoldidx++;
     return d1;
 }
 
@@ -227,6 +213,20 @@ void SortHotColdStarters(struct Team *tm)
             a1[2] = t0; a1[3] = t1;
         }
     } while (swapped);
+}
+uint16_t NextHomeColdPlayer(struct Team **team)
+{
+    *team = team_struct(0);
+    uint16_t d1 = listed(RAM_OFF_homecoldplayer, g.homecoldidx);
+    if ((int16_t)g.homecoldidx < 0) g.homecoldidx++;
+    return d1;
+}
+uint16_t NextAwayColdPlayer(struct Team **team)
+{
+    *team = team_struct(1);
+    uint16_t d1 = listed(RAM_OFF_awaycoldplayer, g.awaycoldidx);
+    if ((int16_t)g.awaycoldidx < 0) g.awaycoldidx++;
+    return d1;
 }
 
 /* crowd94.asm:CopyHottestPlayer / CopyColdestPlayer. The hottest (first) or coldest (sixth)
