@@ -17,24 +17,6 @@ static uint32_t inline_table(uint32_t from, uint32_t to, const uint8_t table[8])
     return rom_find(from, to, table, 8);
 }
 
-/* setup94.asm:PeriodOver. The period is over: count it (gsp) and flip the ends; after the third
- * period a tied game goes to overtime, after overtime only a tied playoff game goes on; else
- * the game is over (gsp 4). Fade out and fall into PeriodOver_sp, which does not return. */
-void PeriodOver(void)
-{
-    g.gsp++;
-    g.gmode ^= 1 << gmdir;
-    if (g.gsp >= 3) {
-        if (g.gsp > 3) {
-            g.gsp = 3;
-            if (g.OptPlayMode == 0) g.gsp = 4;
-        }
-        if (team_struct(0)->score != team_struct(1)->score) g.gsp = 4;
-    }
-    forceblack();
-    PeriodOver_sp();
-}
-
 /* resetplstuff's .top: team a2's skaters lose their flags and glide again */
 static void reset_team(struct Team *tm)
 {
@@ -50,166 +32,6 @@ static void reset_team(struct Team *tm)
     }
 }
 
-/* setup94.asm:resetplstuff. Reset the team variables and the players of both teams. */
-void resetplstuff(void)
-{
-    reset_team(team_struct(0));
-    reset_team(team_struct(1));
-}
-
-/* setup94.asm:SprSort. Sort the sort objects by y (x in horizontal mode): Ylist = the
- * coordinates, OOlist = the order (byte offsets into Ylist), OOlistpos = each one's place.
- * A bubble sort over the 16 entries until nothing moves. */
-void SprSort(void)
-{
-    for (int i = 0; i < 0x10; i++) {
-        struct SortObj *o = sortobj(i);
-        g.Ylist[i] = (uint16_t)(g.sflags & HI(sfhor) ? o->Xpos : o->Ypos);
-    }
-    int moved;
-    do {
-        moved = 0;
-        for (int i = 0; i < 0xF; i++) {
-            uint8_t a = g.OOlist[i], b = g.OOlist[i + 1];    /* (byte offsets: the object * 2) */
-            if ((int16_t)g.Ylist[a / 2] <= (int16_t)g.Ylist[b / 2]) continue;
-            g.OOlist[i + 1] = a;
-            g.OOlist[i] = b;
-            g.OOlistpos[a / 2] = (uint16_t)(i + 1);
-            g.OOlistpos[b / 2] = (uint16_t)i;
-            moved = 1;
-        }
-    } while (moved);
-}
-
-/* setup94.asm:setupEASportsMap. Load the EASN logo tiles at EASNcset, colours remapped -> d4. */
-uint16_t setupEASportsMap(void)
-{
-    static const uint8_t table[8] = { 0x71, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
-    return DecompressGraphicsWithRemap(ART(EASNmap) + 8, g.EASNcset, inline_table(SYM_setupEASportsMap, SYM_setupEASportsMap + 0x20, table));
-}
-
-/* setup94.asm:setupIceRinkPal. The ice rink palettes 0 and 1 (Rinktilelist) to palfadenew. */
-void setupIceRinkPal(void)
-{
-    uint32_t pal = ART(Rinktilelist) + rd32(rom_ptr(ART(Rinktilelist)));
-    pal_load(0, rom_ptr(pal), 0x20);
-}
-
-/* setup94.asm:ReloadEnergyBarTiles. -> d4 = the char after them */
-uint16_t ReloadEnergyBarTiles(void) { return DecompressGraphicsPlain(ART(EnergyBarMap) + 8, g.energybarchars); }
-
-/* setup94.asm:ReloadCrowdTiles. -> d4 = the char after them */
-uint16_t ReloadCrowdTiles(void) { return DecompressGraphicsPlain(ART(CrowdFrameList) + 8, g.animchars); }
-
-/* setup94.asm:setplayercolors. Each team's colours (team data + its palette offset) to
- * palfadenew palettes 2 (home) and 3 (visitors). */
-void setplayercolors(void)
-{
-    for (int away = 0; away < 2; away++) {
-        pal_load_w(0x20 + 0x10 * away, rosters_team(team_struct(away)->team)->colours[away], 0x10);
-    }
-}
-
-/* setup94.asm:PeriodOver_sp. Between periods: reset the clock, two vblanks with the sound
- * off between, the end of period song, the ticker scores (and the playoff team stats at the end
- * of the game), the intermission, then the next period or the game over. Does not return. */
-void PeriodOver_sp(void)
-{
-    ResetClock();
-    uint16_t v = g.vcount;
-    while (g.vcount == v) hal_wait_vblank();
-    p_turnoff();
-    v = g.vcount;
-    while (g.vcount == v) hal_wait_vblank();
-    song(SYM_SngEOG);
-    UpdateScores();
-    if (g.gsp == 4) AddPlayoffTeamStats();
-    Intermission();
-    if (g.gsp == 4) GameOver();
-    else StartPer();
-}
-
-/* setup94.asm:ReloadRefHorTiles. The horizontal referee tiles at ExtraChars -> d4. */
-uint16_t ReloadRefHorTiles(void) { return DecompressGraphicsPlain(ART(RefMap2) + 8, g.ExtraChars); }
-
-/* setup94.asm:defaultsprites. d4 = first char: the 4 screen objects (sso, 0x14 bytes) and the 7
- * objects tied to the rink scrolling (pads, 0x1C bytes) from their tables, each given its
- * chars, then defaultsprites_0 -> d4. */
-uint16_t defaultsprites(uint16_t chars)
-{
-    const uint16_t *t = listsso;
-    for (int i = 0; i < 4; i++) {
-        struct SpriteHead *o = &g.sso[i];
-        o->oldframe = 0xFFFF;                             /* not locked to the rink scroll */
-        o->Xpos = (int16_t)*t++;
-        o->Xfrac = *t++;                                  /* (an arrow's y) */
-        o->frame = *t++;
-        o->attribute = *t++;
-        o->VRchar = chars;
-        chars += *t++;
-    }
-    t = listffo;
-    for (int i = 0; i < 7; i++) {
-        struct RinkObj *o = &g.pads[i];
-        ST_W(o->oldframe);                                /* tied to the rink scroll */
-        o->Xpos = (int16_t)*t++;
-        o->Ypos = (int16_t)*t++;
-        o->Zpos = (int16_t)*t++;
-        o->frame = *t++;
-        o->attribute = *t++;
-        o->VRchar = chars;
-        chars += *t++;
-    }
-    return defaultsprites_0(chars);
-}
-
-/* setup94.asm:defaultsprites_0. The 16 sort objects (players, nets, puck, shadow) cleared and set
- * from the table (position, frame, attribute, chars, radius, first assignment, flags), with
- * the sort order lists, then SprSort -> d4. */
-uint16_t defaultsprites_0(uint16_t chars)
-{
-    const uint16_t *t = dslist;
-    for (uint16_t n = 0; n < 0x10; n++) {
-        struct SortObj *o = sortobj(n);
-        memset(o, 0, sizeof *o);
-        o->SCnum = (int16_t)n;
-        ST_W(o->oldframe);
-        o->pnum = 0xFF;
-        o->Xpos = (int16_t)*t++;
-        o->Ypos = (int16_t)*t++;
-        o->Zpos = (int16_t)*t++;
-        o->frame = *t++;
-        o->attribute = *t++;
-        o->VRchar = chars;
-        chars += *t++;
-        o->radiusx = (int16_t)*t++;
-        o->radiusy = (int16_t)*t++;
-        o->asslist[0] = (uint8_t)*t++;
-        o->pflags = (uint8_t)*t++;
-        g.OOlist[n] = (uint8_t)(n << 1);
-        g.OOlistpos[n] = n;
-    }
-    SprSort();
-    return chars;
-}
-
-/* setup94.asm:CopyTeamBlockMapData. a0 = the TeamBlocks map, d0 = team, d1 = VRAM address,
- * a1 = map word buffer: copy the team's 22 block chars from the loaded tiles to d1 on (VRAM to
- * VRAM DMA) and store their map words (priority, palette of the map word, the char) -> a1. */
-uint8_t *CopyTeamBlockMapData(uint32_t map, uint16_t team, uint16_t vram, uint8_t *dst)
-{
-    const uint8_t *src = rom_ptr(map + 4 + (uint16_t)(team * 0x2C));
-    for (int i = 0; i < 0x16; i++, src += 2, dst += 2) {
-        dst[0] = src[0];
-        dst[1] = 0;
-        wr16(dst, (uint16_t)((rd16(dst) & 0xF800) | (vram >> 5) | 0x8000));
-        uint16_t from = (uint16_t)((((rd16(src) & 0x7FF) + g.basetileoffset + 0x2C)) << 5);
-        DoDMA_nd2(0x20, vram, from);
-        vram += 0x20;
-    }
-    return dst;
-}
-
 /* a team's block for setupTeamBlocksMap: its row of the cartridge's (CopyTeamBlockMapData), or a
  * banner of the roster set's own, its 22 tiles straight from the roster set to vram (native/banner.c) */
 static uint8_t *CopyTeamBlock(uint32_t map, uint16_t team, uint16_t vram, uint8_t *dst)
@@ -221,43 +43,67 @@ static uint8_t *CopyTeamBlock(uint32_t map, uint16_t team, uint16_t vram, uint8_
     return dst;
 }
 
-/* setup94.asm:setupTeamBlocksMap. d4 = first char: the TeamBlocks tiles at d4 + $2C, then the
- * home and visitor blocks copied to basetileoffset and basetileoffset + $16 -> d4 =
- * basetileoffset + $2C. */
-uint16_t setupTeamBlocksMap(uint16_t chars)
+#include "attract_strings_gen.h"
+#include "data_strings_gen.h"
+
+#define PRINTZ(s) printz(s, sizeof s)
+
+/* the goal entry of the last goal: ChkCnt + ScoreSumbytes (byte 2 bit 7 away, 3 scorer, 4 / 5
+ * assists, negative when none) */
+static const uint8_t *last_goal(void) { return ram_bytes(rp_add(RAM(ScoreSum), (int16_t)(g.ScoreSumbytes - 6)), 6); }
+
+/* the star scores: a long per roster slot of both teams from ThreeStars (52, past it into
+ * teamrecbuf), big-endian as the 68000 keeps them in that scratch buffer */
+static uint8_t *star_scores(void) { return ram_bytes(RAM(ThreeStars), 0x34 * 4); }
+
+/* the number of the player whose name that is (the byte after it, on the cartridge) */
+static uint8_t name_number(const struct RosterText *name) { return ((const struct RosterPlayer *)(const void *)name)->number; }
+
+/* FormatPlayerName / FormatPlayerNumInitial: "NN " then the name from after the first space
+ * (the first name), optionally after the first initial and ". " */
+static uint32_t format_name(uint16_t player, struct Team *tm, int initial)
 {
-    g.basetileoffset = chars;
-    uint8_t *buf = g.TeamBlockMap;
-    DecompressGraphicsPlain(SYM_Teamblocksmap + 8, (uint16_t)(chars + 0x2C));
-    uint32_t map = SYM_Teamblocksmap + rd32(rom_ptr(SYM_Teamblocksmap + 4));
-    buf = CopyTeamBlock(map, g.HomeTeam, (uint16_t)(g.basetileoffset << 5), buf);   /* (the roster set's: its art's, or its own) */
-    CopyTeamBlock(map, g.VisTeam, (uint16_t)((g.basetileoffset + 0x16) << 5), buf);
-    return (uint16_t)(g.basetileoffset + 0x2C);
+    const struct RosterText *name = GetPlayerNamePointer(player, tm);
+    const uint8_t *p = name->s;
+    uint8_t *out = text_buffer();
+    out = ConvertByteToDigits(name_number(name), out);    /* his jersey number */
+    *out++ = ' ';
+    const uint8_t *end = p + rd16(p);
+    p += 2;
+    if (initial) { *out++ = *p++; *out++ = '.'; *out++ = ' '; }
+    while (*p++ != ' ') {}
+    do *out++ = *p++; while (p != end);
+    return FinalizeTextBuffer(out);
 }
 
-/* the wide view (view.h): the rink in 40 columns, plane A's overlays VIEW_SHIFT to the right */
-void view_rink_mode(void)
+/* the player of TempPlOffset (bit 15 set: the away team) */
+static struct Team *temp_player(uint16_t *player)
 {
-    if (!view_wide()) return;
-    uint16_t saved = g.disflags;
-    g.disflags |= HI(dfng);
-    vdp_ctrl16(SYM_VDPR_MODE4 + 0x81);
-    Vmaddr(g.VSCRLPM);
-    vdp_data(VIEW_SHIFT);
-    g.disflags = saved;
+    uint16_t p = g.TempPlOffset;
+    if ((int16_t)p >= 0) { *player = p; return team_struct(0); }
+    *player = p & 0xFF;
+    return team_struct(1);
 }
 
-/* the wide view on a rink set up in 32 columns (a snapshot's): 40 columns, the camera within the
- * wide rink's reach, and plane A's first two rows' right halves, which setupTeamBlocksMap's
- * unpacking ran over, cleared */
-void view_rink_resume(void)
+/* the playoff stat bit stream runs down in words from outputbuffer + $DE: the long holding bit
+ * pos of it */
+static uint8_t *stat_long(uint16_t pos) { return g.outputbuffer + 0xDE - (uint16_t)((pos >> 4) << 1); }
+
+/* ---- the playoff password (after a playoff game) --------------------------------------------- */
+
+/* the long at p (two words of a 5-word number) plus v, the carry run up through at most n words
+ * above it (dbcc: n counts down to -1) */
+static void add_long_carry(uint8_t *p, uint32_t v, int16_t n)
 {
-    if (!view_wide()) return;
-    view_rink_mode();
-    if ((int16_t)g.Hpos > VIEW_HPOS) g.Hpos = VIEW_HPOS;  /* (and the camera within the wide rink) */
-    if ((int16_t)g.Hpos < -VIEW_HPOS) g.Hpos = (uint16_t)-VIEW_HPOS;
-    DoFill(0x20, (uint16_t)(g.maps[0].vram + 0x40), 0x7FF);
-    DoFill(0x20, (uint16_t)(g.maps[0].vram + 0xC0), 0x7FF);
+    uint32_t old = rd32(p), sum = old + v;
+    wr32(p, sum);
+    int carry = sum < old;
+    while (carry && --n != -1) {
+        p -= 2;
+        uint16_t w = (uint16_t)(rd16(p) + 1);
+        wr16(p, w);
+        carry = w == 0;
+    }
 }
 
 /* setup94.asm:setupice. Set up the rink: the VDP layout (32 columns, maps at $C000 / $E000 /
@@ -324,66 +170,6 @@ void setupice(void)
     cpu_set_sr(0x2300);
 }
 
-/* setup94.asm:InitTeamStructure. Team struct a2 for team d0: the team number ($28), its data
- * (tmdata, from TeamList) and its line sets at $16A (the layout by OptLine). */
-void InitTeamStructure(uint16_t team, struct Team *tm)
-{
-    tm->team = team;
-    tm->data = rosters_team(team)->data;
-    InitTeamLines(tm);
-}
-
-/* setup94.asm:InitTeamStructure+$10. Team struct a2's line sets at $16A from its data's (the
- * layout by OptLine); the line editor's "Set Original lines". */
-void InitTeamLines(struct Team *tm)
-{
-    const uint8_t *src = rosters_team(tm->team)->lines[0];
-    uint8_t *dst = tm->lines[0];                          /* (the 7 line sets, row after row) */
-    if (g.OptLine != 0) {
-        memcpy(dst, src, 8);
-        memcpy(dst + 8, src + 16, 12 * 4);
-    } else {
-        memcpy(dst, src + 8, 14 * 4);
-    }
-}
-
-/* setup94.asm:setteams. Both team structs from HomeTeam / VisTeam, with their sort objects. */
-void setteams(void)
-{
-    team_struct(0)->sort = RAM_OFF_SortCords;
-    InitTeamStructure(g.HomeTeam, team_struct(0));
-    team_struct(1)->sort = RAM_OFF_SortCords + 6 * 0x80;
-    InitTeamStructure(g.VisTeam, team_struct(1));
-}
-
-/* setup94.asm:clearTeamStats. Clear both team structs, keeping the first $1A0 bytes of each
- * hot / cold table (+$1A2, through homehotcoldsave / awayhotcoldsave) and the goalie words; the
- * last roster slot's place is -1. Falls into setteams. */
-void clearTeamStats(void)
-{
-    struct Team *home = team_struct(0), *away = team_struct(1);
-    uint16_t hg = home->goalie, ag = away->goalie;
-    memcpy(g.homehotcoldsave, home->hotcold, 0x1A0);
-    memcpy(g.awayhotcoldsave, away->hotcold, 0x1A0);
-    memset(home, 0, sizeof *home);
-    memset(away, 0, sizeof *away);
-    rules_clear_stats();                                  /* (the rules' own, beside the RAM) */
-    memcpy(home->hotcold, g.homehotcoldsave, 0x1A0);
-    memcpy(away->hotcold, g.awayhotcoldsave, 0x1A0);
-    away->goalie = ag;
-    home->goalie = hg;
-    home->penbox[0] = 0xFF;                               /* (st tmpdst+$34: the penalty box empty) */
-    away->penbox[0] = 0xFF;
-    setteams();
-}
-
-/* setup94.asm:ReloadRefTiles. The referee tiles (RefsMap) at ExtraChars -> d4. */
-uint16_t ReloadRefTiles(void) { return DecompressGraphicsPlain(ART(RefsMap) + 8, g.ExtraChars); }
-/* setup94.asm:ReloadFaceOffTiles. The faceoff sprite tiles at faceoffvrcset -> d4. */
-uint16_t ReloadFaceOffTiles(void) { return DecompressGraphicsPlain(ART(FaceOffSprites) + 8, g.faceoffvrcset); }
-/* setup94.asm:ReloadFaceOffMap. The faceoff map tiles at ExtraChars -> d4. */
-uint16_t ReloadFaceOffMap(void) { return DecompressGraphicsPlain(ART(FaceOffMap) + 8, g.ExtraChars); }
-
 /* setup94.asm:setupice_highlight. Rebuild the rink objects for a highlight without reloading
  * the tiles (the sprite chars setupice kept in spritechars), then the game vblank and a fade
  * in. */
@@ -417,6 +203,283 @@ void setupice_highlight(void)
     g.vbint = SYM_VBlank;
     g.disflags &= (uint16_t)~(HI(dfok) | HI(dfng));
     cpu_set_sr(0x2300);
+}
+
+/* setup94.asm:setupIceRinkPal. The ice rink palettes 0 and 1 (Rinktilelist) to palfadenew. */
+void setupIceRinkPal(void)
+{
+    uint32_t pal = ART(Rinktilelist) + rd32(rom_ptr(ART(Rinktilelist)));
+    pal_load(0, rom_ptr(pal), 0x20);
+}
+
+/* setup94.asm:setupEASportsMap. Load the EASN logo tiles at EASNcset, colours remapped -> d4. */
+uint16_t setupEASportsMap(void)
+{
+    static const uint8_t table[8] = { 0x71, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
+    return DecompressGraphicsWithRemap(ART(EASNmap) + 8, g.EASNcset, inline_table(SYM_setupEASportsMap, SYM_setupEASportsMap + 0x20, table));
+}
+
+/* setup94.asm:ReloadEnergyBarTiles. -> d4 = the char after them */
+uint16_t ReloadEnergyBarTiles(void) { return DecompressGraphicsPlain(ART(EnergyBarMap) + 8, g.energybarchars); }
+
+/* setup94.asm:ReloadCrowdTiles. -> d4 = the char after them */
+uint16_t ReloadCrowdTiles(void) { return DecompressGraphicsPlain(ART(CrowdFrameList) + 8, g.animchars); }
+
+/* setup94.asm:ReloadRefHorTiles. The horizontal referee tiles at ExtraChars -> d4. */
+uint16_t ReloadRefHorTiles(void) { return DecompressGraphicsPlain(ART(RefMap2) + 8, g.ExtraChars); }
+
+/* setup94.asm:ReloadRefTiles. The referee tiles (RefsMap) at ExtraChars -> d4. */
+uint16_t ReloadRefTiles(void) { return DecompressGraphicsPlain(ART(RefsMap) + 8, g.ExtraChars); }
+/* setup94.asm:ReloadFaceOffTiles. The faceoff sprite tiles at faceoffvrcset -> d4. */
+uint16_t ReloadFaceOffTiles(void) { return DecompressGraphicsPlain(ART(FaceOffSprites) + 8, g.faceoffvrcset); }
+/* setup94.asm:ReloadFaceOffMap. The faceoff map tiles at ExtraChars -> d4. */
+uint16_t ReloadFaceOffMap(void) { return DecompressGraphicsPlain(ART(FaceOffMap) + 8, g.ExtraChars); }
+
+/* setup94.asm:setupTeamBlocksMap. d4 = first char: the TeamBlocks tiles at d4 + $2C, then the
+ * home and visitor blocks copied to basetileoffset and basetileoffset + $16 -> d4 =
+ * basetileoffset + $2C. */
+uint16_t setupTeamBlocksMap(uint16_t chars)
+{
+    g.basetileoffset = chars;
+    uint8_t *buf = g.TeamBlockMap;
+    DecompressGraphicsPlain(SYM_Teamblocksmap + 8, (uint16_t)(chars + 0x2C));
+    uint32_t map = SYM_Teamblocksmap + rd32(rom_ptr(SYM_Teamblocksmap + 4));
+    buf = CopyTeamBlock(map, g.HomeTeam, (uint16_t)(g.basetileoffset << 5), buf);   /* (the roster set's: its art's, or its own) */
+    CopyTeamBlock(map, g.VisTeam, (uint16_t)((g.basetileoffset + 0x16) << 5), buf);
+    return (uint16_t)(g.basetileoffset + 0x2C);
+}
+
+/* the wide view (view.h): the rink in 40 columns, plane A's overlays VIEW_SHIFT to the right */
+void view_rink_mode(void)
+{
+    if (!view_wide()) return;
+    uint16_t saved = g.disflags;
+    g.disflags |= HI(dfng);
+    vdp_ctrl16(SYM_VDPR_MODE4 + 0x81);
+    Vmaddr(g.VSCRLPM);
+    vdp_data(VIEW_SHIFT);
+    g.disflags = saved;
+}
+
+/* the wide view on a rink set up in 32 columns (a snapshot's): 40 columns, the camera within the
+ * wide rink's reach, and plane A's first two rows' right halves, which setupTeamBlocksMap's
+ * unpacking ran over, cleared */
+void view_rink_resume(void)
+{
+    if (!view_wide()) return;
+    view_rink_mode();
+    if ((int16_t)g.Hpos > VIEW_HPOS) g.Hpos = VIEW_HPOS;  /* (and the camera within the wide rink) */
+    if ((int16_t)g.Hpos < -VIEW_HPOS) g.Hpos = (uint16_t)-VIEW_HPOS;
+    DoFill(0x20, (uint16_t)(g.maps[0].vram + 0x40), 0x7FF);
+    DoFill(0x20, (uint16_t)(g.maps[0].vram + 0xC0), 0x7FF);
+}
+
+/* setup94.asm:CopyTeamBlockMapData. a0 = the TeamBlocks map, d0 = team, d1 = VRAM address,
+ * a1 = map word buffer: copy the team's 22 block chars from the loaded tiles to d1 on (VRAM to
+ * VRAM DMA) and store their map words (priority, palette of the map word, the char) -> a1. */
+uint8_t *CopyTeamBlockMapData(uint32_t map, uint16_t team, uint16_t vram, uint8_t *dst)
+{
+    const uint8_t *src = rom_ptr(map + 4 + (uint16_t)(team * 0x2C));
+    for (int i = 0; i < 0x16; i++, src += 2, dst += 2) {
+        dst[0] = src[0];
+        dst[1] = 0;
+        wr16(dst, (uint16_t)((rd16(dst) & 0xF800) | (vram >> 5) | 0x8000));
+        uint16_t from = (uint16_t)((((rd16(src) & 0x7FF) + g.basetileoffset + 0x2C)) << 5);
+        DoDMA_nd2(0x20, vram, from);
+        vram += 0x20;
+    }
+    return dst;
+}
+
+/* setup94.asm:defaultsprites. d4 = first char: the 4 screen objects (sso, 0x14 bytes) and the 7
+ * objects tied to the rink scrolling (pads, 0x1C bytes) from their tables, each given its
+ * chars, then defaultsprites_0 -> d4. */
+uint16_t defaultsprites(uint16_t chars)
+{
+    const uint16_t *t = listsso;
+    for (int i = 0; i < 4; i++) {
+        struct SpriteHead *o = &g.sso[i];
+        o->oldframe = 0xFFFF;                             /* not locked to the rink scroll */
+        o->Xpos = (int16_t)*t++;
+        o->Xfrac = *t++;                                  /* (an arrow's y) */
+        o->frame = *t++;
+        o->attribute = *t++;
+        o->VRchar = chars;
+        chars += *t++;
+    }
+    t = listffo;
+    for (int i = 0; i < 7; i++) {
+        struct RinkObj *o = &g.pads[i];
+        ST_W(o->oldframe);                                /* tied to the rink scroll */
+        o->Xpos = (int16_t)*t++;
+        o->Ypos = (int16_t)*t++;
+        o->Zpos = (int16_t)*t++;
+        o->frame = *t++;
+        o->attribute = *t++;
+        o->VRchar = chars;
+        chars += *t++;
+    }
+    return defaultsprites_0(chars);
+}
+
+/* setup94.asm:defaultsprites_0. The 16 sort objects (players, nets, puck, shadow) cleared and set
+ * from the table (position, frame, attribute, chars, radius, first assignment, flags), with
+ * the sort order lists, then SprSort -> d4. */
+uint16_t defaultsprites_0(uint16_t chars)
+{
+    const uint16_t *t = dslist;
+    for (uint16_t n = 0; n < 0x10; n++) {
+        struct SortObj *o = sortobj(n);
+        memset(o, 0, sizeof *o);
+        o->SCnum = (int16_t)n;
+        ST_W(o->oldframe);
+        o->pnum = 0xFF;
+        o->Xpos = (int16_t)*t++;
+        o->Ypos = (int16_t)*t++;
+        o->Zpos = (int16_t)*t++;
+        o->frame = *t++;
+        o->attribute = *t++;
+        o->VRchar = chars;
+        chars += *t++;
+        o->radiusx = (int16_t)*t++;
+        o->radiusy = (int16_t)*t++;
+        o->asslist[0] = (uint8_t)*t++;
+        o->pflags = (uint8_t)*t++;
+        g.OOlist[n] = (uint8_t)(n << 1);
+        g.OOlistpos[n] = n;
+    }
+    SprSort();
+    return chars;
+}
+
+/* setup94.asm:SprSort. Sort the sort objects by y (x in horizontal mode): Ylist = the
+ * coordinates, OOlist = the order (byte offsets into Ylist), OOlistpos = each one's place.
+ * A bubble sort over the 16 entries until nothing moves. */
+void SprSort(void)
+{
+    for (int i = 0; i < 0x10; i++) {
+        struct SortObj *o = sortobj(i);
+        g.Ylist[i] = (uint16_t)(g.sflags & HI(sfhor) ? o->Xpos : o->Ypos);
+    }
+    int moved;
+    do {
+        moved = 0;
+        for (int i = 0; i < 0xF; i++) {
+            uint8_t a = g.OOlist[i], b = g.OOlist[i + 1];    /* (byte offsets: the object * 2) */
+            if ((int16_t)g.Ylist[a / 2] <= (int16_t)g.Ylist[b / 2]) continue;
+            g.OOlist[i + 1] = a;
+            g.OOlist[i] = b;
+            g.OOlistpos[a / 2] = (uint16_t)(i + 1);
+            g.OOlistpos[b / 2] = (uint16_t)i;
+            moved = 1;
+        }
+    } while (moved);
+}
+
+/* setup94.asm:resetplstuff. Reset the team variables and the players of both teams. */
+void resetplstuff(void)
+{
+    reset_team(team_struct(0));
+    reset_team(team_struct(1));
+}
+
+/* setup94.asm:clearTeamStats. Clear both team structs, keeping the first $1A0 bytes of each
+ * hot / cold table (+$1A2, through homehotcoldsave / awayhotcoldsave) and the goalie words; the
+ * last roster slot's place is -1. Falls into setteams. */
+void clearTeamStats(void)
+{
+    struct Team *home = team_struct(0), *away = team_struct(1);
+    uint16_t hg = home->goalie, ag = away->goalie;
+    memcpy(g.homehotcoldsave, home->hotcold, 0x1A0);
+    memcpy(g.awayhotcoldsave, away->hotcold, 0x1A0);
+    memset(home, 0, sizeof *home);
+    memset(away, 0, sizeof *away);
+    rules_clear_stats();                                  /* (the rules' own, beside the RAM) */
+    memcpy(home->hotcold, g.homehotcoldsave, 0x1A0);
+    memcpy(away->hotcold, g.awayhotcoldsave, 0x1A0);
+    away->goalie = ag;
+    home->goalie = hg;
+    home->penbox[0] = 0xFF;                               /* (st tmpdst+$34: the penalty box empty) */
+    away->penbox[0] = 0xFF;
+    setteams();
+}
+
+/* setup94.asm:setteams. Both team structs from HomeTeam / VisTeam, with their sort objects. */
+void setteams(void)
+{
+    team_struct(0)->sort = RAM_OFF_SortCords;
+    InitTeamStructure(g.HomeTeam, team_struct(0));
+    team_struct(1)->sort = RAM_OFF_SortCords + 6 * 0x80;
+    InitTeamStructure(g.VisTeam, team_struct(1));
+}
+
+/* setup94.asm:InitTeamStructure. Team struct a2 for team d0: the team number ($28), its data
+ * (tmdata, from TeamList) and its line sets at $16A (the layout by OptLine). */
+void InitTeamStructure(uint16_t team, struct Team *tm)
+{
+    tm->team = team;
+    tm->data = rosters_team(team)->data;
+    InitTeamLines(tm);
+}
+
+/* setup94.asm:InitTeamStructure+$10. Team struct a2's line sets at $16A from its data's (the
+ * layout by OptLine); the line editor's "Set Original lines". */
+void InitTeamLines(struct Team *tm)
+{
+    const uint8_t *src = rosters_team(tm->team)->lines[0];
+    uint8_t *dst = tm->lines[0];                          /* (the 7 line sets, row after row) */
+    if (g.OptLine != 0) {
+        memcpy(dst, src, 8);
+        memcpy(dst + 8, src + 16, 12 * 4);
+    } else {
+        memcpy(dst, src + 8, 14 * 4);
+    }
+}
+
+/* setup94.asm:setplayercolors. Each team's colours (team data + its palette offset) to
+ * palfadenew palettes 2 (home) and 3 (visitors). */
+void setplayercolors(void)
+{
+    for (int away = 0; away < 2; away++) {
+        pal_load_w(0x20 + 0x10 * away, rosters_team(team_struct(away)->team)->colours[away], 0x10);
+    }
+}
+
+/* setup94.asm:PeriodOver. The period is over: count it (gsp) and flip the ends; after the third
+ * period a tied game goes to overtime, after overtime only a tied playoff game goes on; else
+ * the game is over (gsp 4). Fade out and fall into PeriodOver_sp, which does not return. */
+void PeriodOver(void)
+{
+    g.gsp++;
+    g.gmode ^= 1 << gmdir;
+    if (g.gsp >= 3) {
+        if (g.gsp > 3) {
+            g.gsp = 3;
+            if (g.OptPlayMode == 0) g.gsp = 4;
+        }
+        if (team_struct(0)->score != team_struct(1)->score) g.gsp = 4;
+    }
+    forceblack();
+    PeriodOver_sp();
+}
+
+/* setup94.asm:PeriodOver_sp. Between periods: reset the clock, two vblanks with the sound
+ * off between, the end of period song, the ticker scores (and the playoff team stats at the end
+ * of the game), the intermission, then the next period or the game over. Does not return. */
+void PeriodOver_sp(void)
+{
+    ResetClock();
+    uint16_t v = g.vcount;
+    while (g.vcount == v) hal_wait_vblank();
+    p_turnoff();
+    v = g.vcount;
+    while (g.vcount == v) hal_wait_vblank();
+    song(SYM_SngEOG);
+    UpdateScores();
+    if (g.gsp == 4) AddPlayoffTeamStats();
+    Intermission();
+    if (g.gsp == 4) GameOver();
+    else StartPer();
 }
 
 /* setup94.asm:GameOver. After the game: the playoff password (EncodePW), in the playoffs their
@@ -766,69 +829,6 @@ void ScrollDisplayUp(void)
         uint16_t d2 = (uint16_t)(d1 + 0x80);
         DoDMA_nd2(0x3A, d1, d2);
         d1 = d2;
-    }
-}
-
-#include "attract_strings_gen.h"
-#include "data_strings_gen.h"
-
-#define PRINTZ(s) printz(s, sizeof s)
-
-/* the goal entry of the last goal: ChkCnt + ScoreSumbytes (byte 2 bit 7 away, 3 scorer, 4 / 5
- * assists, negative when none) */
-static const uint8_t *last_goal(void) { return ram_bytes(rp_add(RAM(ScoreSum), (int16_t)(g.ScoreSumbytes - 6)), 6); }
-
-/* the star scores: a long per roster slot of both teams from ThreeStars (52, past it into
- * teamrecbuf), big-endian as the 68000 keeps them in that scratch buffer */
-static uint8_t *star_scores(void) { return ram_bytes(RAM(ThreeStars), 0x34 * 4); }
-
-/* the number of the player whose name that is (the byte after it, on the cartridge) */
-static uint8_t name_number(const struct RosterText *name) { return ((const struct RosterPlayer *)(const void *)name)->number; }
-
-/* FormatPlayerName / FormatPlayerNumInitial: "NN " then the name from after the first space
- * (the first name), optionally after the first initial and ". " */
-static uint32_t format_name(uint16_t player, struct Team *tm, int initial)
-{
-    const struct RosterText *name = GetPlayerNamePointer(player, tm);
-    const uint8_t *p = name->s;
-    uint8_t *out = text_buffer();
-    out = ConvertByteToDigits(name_number(name), out);    /* his jersey number */
-    *out++ = ' ';
-    const uint8_t *end = p + rd16(p);
-    p += 2;
-    if (initial) { *out++ = *p++; *out++ = '.'; *out++ = ' '; }
-    while (*p++ != ' ') {}
-    do *out++ = *p++; while (p != end);
-    return FinalizeTextBuffer(out);
-}
-
-/* the player of TempPlOffset (bit 15 set: the away team) */
-static struct Team *temp_player(uint16_t *player)
-{
-    uint16_t p = g.TempPlOffset;
-    if ((int16_t)p >= 0) { *player = p; return team_struct(0); }
-    *player = p & 0xFF;
-    return team_struct(1);
-}
-
-/* the playoff stat bit stream runs down in words from outputbuffer + $DE: the long holding bit
- * pos of it */
-static uint8_t *stat_long(uint16_t pos) { return g.outputbuffer + 0xDE - (uint16_t)((pos >> 4) << 1); }
-
-/* ---- the playoff password (after a playoff game) --------------------------------------------- */
-
-/* the long at p (two words of a 5-word number) plus v, the carry run up through at most n words
- * above it (dbcc: n counts down to -1) */
-static void add_long_carry(uint8_t *p, uint32_t v, int16_t n)
-{
-    uint32_t old = rd32(p), sum = old + v;
-    wr32(p, sum);
-    int carry = sum < old;
-    while (carry && --n != -1) {
-        p -= 2;
-        uint16_t w = (uint16_t)(rd16(p) + 1);
-        wr16(p, w);
-        carry = w == 0;
     }
 }
 

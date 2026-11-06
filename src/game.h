@@ -690,69 +690,32 @@ void swpchk(struct SortObj *o);                         /* a3 */
 void j_setc1player(uint16_t player);                    /* d0 */
 void j_setc2player(uint16_t player);                    /* d0 */
 
-/* setup94: the boxes over the rink, player names, the playoff tree and password */
-void box(void);
-void ShowGoalBox(void);
-void PenaltyShotBox(void);
-void ShowThreeStars(void);
-void CalcStarScores(uint16_t d2);                       /* d2 = extra ice time a goalie needs */
-int16_t CalcTeamStarScores(struct Team *tm, struct Team *other, uint8_t **out, uint16_t mintime);   /* a2, a3, a4, d5 -> d3 */
-uint16_t TakeTopStarScore(struct Team **tm);            /* -> d0, a2 */
-const struct RosterText *GetPlayerNamePointer(uint16_t player, struct Team *tm);   /* d0, a2 -> a0 */
-uint8_t *ConvertByteToDigits(uint16_t bcd, uint8_t *dst);          /* d0, a1 -> a1 */
-uint32_t FinalizeTextBuffer(uint8_t *end);              /* a1 -> a1 = mesarea */
-uint32_t FormatPlayerName(uint16_t player, struct Team *tm);    /* d0, a2 -> a1 */
-uint32_t FormatPlayerNumInitial(uint16_t player, struct Team *tm);   /* d0, a2 -> a1 */
-uint32_t getname(uint16_t player, struct Team *tm);             /* d0, a2 -> a1 */
-uint32_t GetPlayerName(void);                           /* -> a1 */
-uint32_t GetPlayerNumInitial(void);                     /* -> a1 */
-void ShowInjuryBox(void);
-uint16_t GetShifter(uint16_t *first_bit);               /* -> d1, d2 */
-void AddPlayoffTeamStats(void);
-void ReadTeamStats(void);
-void DefaultMenus(void);
-uint16_t SuperDiv(uint8_t *bits, uint16_t div);               /* a3, d0 -> d0 */
-void ReadPassBits(uint8_t *bits);                             /* a3 */
-uint16_t GetRandomUnusedTeam(uint32_t *used);           /* d3 -> d0 */
-void InitializeGameStructures(void);
-void FigureJoy(void);
-void MakeTree(void);
-void NewPO(void);
-void ContinuePlayoffs(void);
-void ClrPassBits(uint8_t *bits);                              /* a3 */
-void SuperAdd(uint8_t *bits, uint32_t v);                     /* a3, d0 */
-void SuperMult(uint8_t *bits, uint16_t m);                    /* a3, d0 */
-void PushBits(uint8_t *bits, uint16_t v, uint16_t range);         /* a3, d0, d1 */
-void WritePassBits(uint8_t *bits);                            /* a3 */
-void ResolveGames(void);
-void EncodePW(void);
-uint32_t FormatLastName(const struct RosterText *name, uint8_t *out);   /* a0, a1 -> a1 = mesarea */
-uint32_t FormatPlayerNameShort(uint16_t player, struct Team *tm);    /* d0, a2 -> a1 */
-uint32_t FormatPlayerNameLast(uint16_t player, struct Team *tm);     /* d0, a2 -> a1 */
-
 /* ---- setup94.asm: the rink, teams and period setup, the front end's flow, the playoff screen ---- */
-void PeriodOver(void);                                  /* does not return on the 68k */
-void resetplstuff(void);
-void SprSort(void);
-uint16_t setupEASportsMap(void);                            /* -> d4 */
+void setupice(void);
+void setupice_highlight(void);
 void setupIceRinkPal(void);
+uint16_t setupEASportsMap(void);                            /* -> d4 */
 uint16_t ReloadEnergyBarTiles(void);                    /* -> d4 */
 uint16_t ReloadCrowdTiles(void);                        /* -> d4 */
-void setplayercolors(void);
-void setupice(void);
-uint16_t defaultsprites(uint16_t chars);                /* d4 -> d4 */
-uint16_t defaultsprites_0(uint16_t chars);               /* d4 -> d4 */
+uint16_t ReloadRefHorTiles(void);                       /* -> d4 */
+uint16_t ReloadRefTiles(void);                          /* -> d4 */
+uint16_t ReloadFaceOffTiles(void);                      /* -> d4 */
+uint16_t ReloadFaceOffMap(void);                        /* -> d4 */
 uint16_t setupTeamBlocksMap(uint16_t chars);            /* d4 -> d4 */
 uint8_t *CopyTeamBlockMapData(uint32_t map, uint16_t team, uint16_t vram, uint8_t *dst);  /* a0, d0, d1, a1 -> a1 */
-uint16_t ReloadRefHorTiles(void);                       /* -> d4 */
-void setupice_highlight(void);
+uint16_t defaultsprites(uint16_t chars);                /* d4 -> d4 */
+uint16_t defaultsprites_0(uint16_t chars);               /* d4 -> d4 */
+void SprSort(void);
+void resetplstuff(void);
 void clearTeamStats(void);                              /* falls into setteams */
 void setteams(void);
 void InitTeamStructure(uint16_t team, struct Team *tm);   /* d0, a2 */
 void InitTeamLines(struct Team *tm);                    /* InitTeamStructure+$10, a2 */
-uint16_t ReloadRefTiles(void);                          /* -> d4 */
-uint16_t ReloadFaceOffTiles(void);                      /* -> d4 */
-uint16_t ReloadFaceOffMap(void);                        /* -> d4 */
+void setplayercolors(void);
+void PeriodOver(void);                                  /* does not return on the 68k */
+void PeriodOver_sp(void);                           /* the intermission, then StartPer or GameOver */
+void GameOver(void);                                    /* the password, the playoff screens, back to the title */
+void ExitToOpening(void);                               /* restarts the front end */
 void Opening(void);                                     /* none of the three returns */
 void Opening2(void);
 void Opening3(void);
@@ -768,9 +731,49 @@ void VBlank_Playoff(void);
 uint32_t InitScoutingDisplay(void);                     /* -> a0 */
 void UpdateScoutingDisplay(void);
 void ScrollDisplayUp(void);
-void GameOver(void);                                    /* the password, the playoff screens, back to the title */
-void PeriodOver_sp(void);                           /* the intermission, then StartPer or GameOver */
-void ExitToOpening(void);                               /* restarts the front end */
+void EASportsScreen(void);
+void UpdatePlayoffLevel(void);
+void TeamIcons(void);
+uint16_t DrawTeamBitmap(uint16_t team, uint16_t chars); /* d1, d4 -> d4 */
+void VBlank_SetOptions(void);
+void DefaultMenus(void);
+void ContinuePlayoffs(void);
+void NewPO(void);
+void MakeTree(void);
+void FigureJoy(void);
+void InitializeGameStructures(void);
+uint16_t GetRandomUnusedTeam(uint32_t *used);           /* d3 -> d0 */
+void ReadPassBits(uint8_t *bits);                             /* a3 */
+void EncodePW(void);
+void WritePassBits(uint8_t *bits);                            /* a3 */
+void PushBits(uint8_t *bits, uint16_t v, uint16_t range);         /* a3, d0, d1 */
+void ClrPassBits(uint8_t *bits);                              /* a3 */
+void SuperAdd(uint8_t *bits, uint32_t v);                     /* a3, d0 */
+void SuperMult(uint8_t *bits, uint16_t m);                    /* a3, d0 */
+uint16_t SuperDiv(uint8_t *bits, uint16_t div);               /* a3, d0 -> d0 */
+uint16_t GetShifter(uint16_t *first_bit);               /* -> d1, d2 */
+void AddPlayoffTeamStats(void);
+void ReadTeamStats(void);
+void ResolveGames(void);
+void ShowThreeStars(void);
+uint16_t TakeTopStarScore(struct Team **tm);            /* -> d0, a2 */
+void CalcStarScores(uint16_t d2);                       /* d2 = extra ice time a goalie needs */
+int16_t CalcTeamStarScores(struct Team *tm, struct Team *other, uint8_t **out, uint16_t mintime);   /* a2, a3, a4, d5 -> d3 */
+void ShowInjuryBox(void);
+void PenaltyShotBox(void);
+void ShowGoalBox(void);
+void box(void);
+uint32_t GetPlayerName(void);                           /* -> a1 */
+uint32_t getname(uint16_t player, struct Team *tm);             /* d0, a2 -> a1 */
+uint32_t GetPlayerNumInitial(void);                     /* -> a1 */
+uint32_t FormatPlayerNumInitial(uint16_t player, struct Team *tm);   /* d0, a2 -> a1 */
+uint32_t FormatPlayerName(uint16_t player, struct Team *tm);    /* d0, a2 -> a1 */
+uint32_t FormatPlayerNameLast(uint16_t player, struct Team *tm);     /* d0, a2 -> a1 */
+uint32_t FormatPlayerNameShort(uint16_t player, struct Team *tm);    /* d0, a2 -> a1 */
+uint32_t FormatLastName(const struct RosterText *name, uint8_t *out);   /* a0, a1 -> a1 = mesarea */
+uint32_t FinalizeTextBuffer(uint8_t *end);              /* a1 -> a1 = mesarea */
+const struct RosterText *GetPlayerNamePointer(uint16_t player, struct Team *tm);   /* d0, a2 -> a0 */
+uint8_t *ConvertByteToDigits(uint16_t bcd, uint8_t *dst);          /* d0, a1 -> a1 */
 
 /* ---- optsetup94.asm: the game setup screen ---- */
 void GameSetUp(void);                                   /* the setup screen */
@@ -804,13 +807,6 @@ void LogoBoxHome(void);
 void LogoBoxLeft(void);
 void LogoBoxVis(void);
 void DrawLogoBox(uint16_t chars);                       /* d4 */
-
-/* setup94: the EA screen, matchup pictures, option screen helpers */
-void EASportsScreen(void);
-void UpdatePlayoffLevel(void);
-void TeamIcons(void);
-uint16_t DrawTeamBitmap(uint16_t team, uint16_t chars); /* d1, d4 -> d4 */
-void VBlank_SetOptions(void);
 
 /* ---- scout94.asm: the scouting report ---- */
 void ScoutingReport(void);                              /* the matchups */
