@@ -27,7 +27,7 @@ void EndShootout(void)
         int16_t d0 = (int16_t)g.Vpos < 0 ? 0xF0 : -0xF0;
         a3->Ypos = (int16_t)(d0 + (int16_t)g.Vpos);
         a3->Xpos = 0;
-        assinsert(7, a3);                                 /* assscore */
+        assinsert(ascore, a3);
         a3->pflags &= (uint8_t)~(1 << pfalock);
         a3->pflags2 &= (uint8_t)~2;
         a3->pflags &= (uint8_t)~(1 << pfnc);

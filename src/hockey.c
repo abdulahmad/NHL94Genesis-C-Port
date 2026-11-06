@@ -129,9 +129,9 @@ static void start_period(void)
     struct SortObj *puck = sortobj(puckscnum);
     g.fox = 0;                                            /* face off at center ice */
     g.foy = 0;
-    uint16_t ass = 0x1B;                                  /* pfaceoff */
+    uint16_t ass = pfaceoff;
     if (g.gmode2 & HI(0)) {                               /* shootout */
-        ass = 0x1E;
+        ass = pshootout;
         g.BA_Skater_Offset = 8;
         g.BA_Goalie_SCnum = 0xB;
     }
@@ -316,14 +316,14 @@ void clockcont(void)
 void clockcont_0(void)
 {
     struct SortObj *a3 = sortobj(puckscnum);
-    assinsert(0x18, a3);                                  /* pucknothing */
+    assinsert(pnorm, a3);
     uint16_t pen;
     if ((int16_t)g.gsp < 2) {
         pen = 2;                                          /* PenEOP */
         AddPenalty2(pen, a3);
         return;
     }
-    uint16_t d0 = 7;                                      /* score assignment */
+    uint16_t d0 = ascore;
     a3 = sortobj(0);
     int cup = 0;
     if (g.gamelevel == 3) {
@@ -336,7 +336,7 @@ void clockcont_0(void)
         }
     }
     if (cup) {
-        d0 = 8;                                           /* stanley cup assignment */
+        d0 = astanley;
         for (int i = 0; i < 12; i++) sortobj(i)->pflags &= (uint8_t)~(1 << pfjoycon);
     }
     int16_t d1 = (int16_t)(g.teams[0].tmscore - g.teams[1].tmscore);
@@ -345,7 +345,7 @@ void clockcont_0(void)
         for (int i = 0; i < 6; i++, a3++) {
             if (a3->position <= 0) continue;              /* skip the goalie */
             assinsert(d0, a3);
-            d0 = 7;
+            d0 = ascore;
         }
         goto eog;
     }

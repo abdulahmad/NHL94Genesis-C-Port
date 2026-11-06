@@ -7,7 +7,7 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 
 ## Now
 
-G0–G6 merged to `main` (leftover ROM order [#4](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/4) through ram.h [#10](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/10)). Names 840/0/0/0. Frame gates were not run in the merge environment (no captures/vectors/golden) — run `make test && make lockstep && make golden-check` on a machine that has them. E6 Original lockstep stays parked.
+Asstab slot indexes named from cleaned 94G (`anull`, `adefo`, `abreakaway`, …) on `cursor/asstab-index-names-7e4c`. Values stay this ROM's numbers. G0–G6 remain on `main`. Names 840/0/0/0. Frame gates need a machine with captures. E6 Original lockstep stays parked. Do not merge to `main` without Abdul.
 
 ## Done
 
@@ -99,6 +99,7 @@ G0–G6 merged to `main` (leftover ROM order [#4](https://github.com/abdulahmad/
 13. ~~**G4** unused leftover code~~ (2026-11-06): `PuckComingToward` in `helpers.c`, `TerminateLogName` in `ui.c`. `rtsStatScroll` parked (no empty stub). Names 840/0/0/0. No `test/ports.c` runners.
 14. ~~**G5** rest-of-tree ROM order~~ (2026-11-06, [#9](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/9)): 13 modules (fourway, sram, menu, replay, shootout, crowd, hockey, records, collide, penalty, cards, stats, setup) follow 94G ROM order. Names 840/0/0/0. G0 checker green on the original-routine tree.
 15. ~~**G6** ram.h names vs `ram94.asm`~~ (2026-11-06, [#10](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/10)): equate names in `ram.h` + call sites. Offsets stay. Typed regions keep C collection names. Names 840/0/0/0.
+16. **Asstab index names** (2026-11-06): C immediates use `tables94.asm` slot names (`anull` … `aonetimer`). No new names. Review PR; do not merge.
 
 ## Needs
 
