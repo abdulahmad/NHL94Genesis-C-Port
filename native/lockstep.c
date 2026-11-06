@@ -220,11 +220,11 @@ static const char *masked_diff(const record *r)
     static uint8_t ram[RAM_SIZE];
     ram_pack(ram);                                        /* (RAM as the 68000 has it) */
     #define MASKED(mask, i) ((mask)[(i) >> 3] & (1 << ((i) & 7)))
-    /* the game's copy of vcount (its waits keep it: oldvcount = vcount) differs with it */
-    int vc = MASKED(m, RAM_OFF_vcount) || MASKED(m, RAM_OFF_vcount + 1);
+    /* the game's copy of Vcount (its waits keep it: OldVcount = Vcount) differs with it */
+    int vc = MASKED(m, RAM_OFF_Vcount) || MASKED(m, RAM_OFF_Vcount + 1);
     int n = 0, first = -1;
     for (uint32_t i = 0; i < RAM_VARS_END; i++) {
-        if (vc && (i == RAM_OFF_oldvcount || i == RAM_OFF_oldvcount + 1)) continue;
+        if (vc && (i == RAM_OFF_OldVcount || i == RAM_OFF_OldVcount + 1)) continue;
         if (ram[i] != p[i] && !MASKED(m, i)) { if (first < 0) first = i; n++; }
     }
     if (n) { snprintf(what, sizeof what, "work RAM (%d bytes, the first at %04x: %02x, the oracle's %02x)", n, first, ram[first], p[first]); return what; }
@@ -524,8 +524,8 @@ void lockstep_check(long frame)
     }
     if (restarted) { restarted = 0; return; }             /* the same wait, from the restart */
     if (getenv("LOCKSTEP_DEBUG"))
-        printf("  check: the oracle's frame %u (68k at %06x), the game in %06x, vcount %04x oldvcount %04x disflags %04x vbint %06x\n",
-               r->frame, r->at, depth > 0 && depth <= 512 ? where[depth - 1] : 0, g.vcount, g.oldvcount, g.disflags, g.vbint);
+        printf("  check: the oracle's frame %u (68k at %06x), the game in %06x, Vcount %04x OldVcount %04x disflags %04x VBint %06x\n",
+               r->frame, r->at, depth > 0 && depth <= 512 ? where[depth - 1] : 0, g.Vcount, g.OldVcount, g.disflags, g.VBint);
     if (logic_lags && r->state && !at_game_loop(r) && depth > 0 && depth <= 512 && where[depth - 1] == r->routine
         && r->routine && !in_game_logic()) {
         /* the span's lag frames fell in the game's logic, where their places are not exact, and it

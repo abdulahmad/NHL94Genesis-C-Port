@@ -62,12 +62,12 @@ static void summary_team(uint8_t flags)
 {
     struct Team *tm = team_struct(flags & 0x80);
     g.printx = 0xC;
-    print_p(roster_text(&rosters_team(tm->team)->abbr));
+    print_p(roster_text(&rosters_team(tm->tmteam)->abbr));
 }
 
 /* ---- the menu screens: Other Scores ------------------------------------------------------------ */
 
-/* stats94.asm:ShowScores. The night's other games (gsstruct) over the Scores bitmap; up / down
+/* stats94.asm:ShowScores. The night's other games (gstruct) over the Scores bitmap; up / down
  * scroll, Start leaves (ExitStatsScreen). A menu item. */
 void ShowScores(void)
 {
@@ -126,18 +126,18 @@ void UpdateVertScrollReg(void)
     g.disflags = saved;
 }
 
-/* stats94.asm:DisplayGameInfo. Game d3 of gsstruct (not the user's, gamenum, nor one with flag
+/* stats94.asm:DisplayGameInfo. Game d3 of gstruct (not the user's, gamenum, nor one with flag
  * bit 1 or 2): its two teams and scores (PrintGameInfo) and its period (PerLabels). */
 void DisplayGameInfo(uint16_t n)
 {
     if (n == g.gamenum) return;
     const struct Matchup *gs = &g.matchups[n];
-    if (gs->flags & (MU_HIGHLIGHT | MU_SERIES_OVER)) return;
-    PrintGameInfo(gs->team2, gs->score2);
+    if (gs->gsflags & (MU_HIGHLIGHT | MU_SERIES_OVER)) return;
+    PrintGameInfo(gs->gst2, gs->gss2);
     g.printy++;
-    PrintGameInfo(gs->team1, gs->score1);
+    PrintGameInfo(gs->gst1, gs->gss1);
     g.printx = 0x1C;
-    Fprintsmall(SYM_PerLabels, (uint16_t)(gs->per - 1));
+    Fprintsmall(SYM_PerLabels, (uint16_t)(gs->gsper - 1));
     g.printy += 2;
 }
 
@@ -165,7 +165,7 @@ void DrawScrollArrows(void)
  * between its four routines; here each returns the next. */
 void LineEditor(struct Team *tm)
 {
-    tm->flags |= 1;
+    tm->tmflags |= 1;
     SetupScreen(0, 0x1C);
     g.DispAttribCtr = 0;
     g.PlayerScrollCtr = 0;
@@ -336,7 +336,7 @@ void DrawLineIcon(uint16_t line, struct Team *tm)
     g.printx = rd16(pos);
     uint16_t slot = (uint16_t)((line << 3) + 1);
     g.printy = rd16(pos + 2);
-    const uint8_t *slots = tm->lines[0];                  /* (the line sets, row after row) */
+    const uint8_t *slots = tm->tmlines[0];                  /* (the line sets, row after row) */
     for (int16_t n = (int16_t)rd16(pos + 4); n >= 0; n--, slot++) {
         g.printx = rd16(pos);
         printsmallz(str_DrawLineIcon_2, sizeof str_DrawLineIcon_2);
@@ -401,7 +401,7 @@ int LineEditorExit(struct Team *tm)
     struct MenuPos item = g.menu;
     uint32_t list = g.menulist, draw = g.menudraw;
     uint32_t items = SYM_LineEditorMenuText;
-    if ((uint8_t)(tm->team + 1) != g.databuffer[0]) items = SYM_LineEditorMenuNoLoad;
+    if ((uint8_t)(tm->tmteam + 1) != g.databuffer[0]) items = SYM_LineEditorMenuNoLoad;
     printsmallz(str_LineEditorExit_1, sizeof str_LineEditorExit_1);
     Pausemode_top(items, SYM_rtss2);
     for (;;) {
@@ -425,7 +425,7 @@ int LineEditorExit(struct Team *tm)
  * another slot of that line, the slot's old player goes there (a swap). */
 void SetLineSlot(uint8_t player, uint16_t slot, struct Team *tm)
 {
-    uint8_t *lines = tm->lines[0], *line = lines + (int16_t)(slot & 0xFFF8);
+    uint8_t *lines = tm->tmlines[0], *line = lines + (int16_t)(slot & 0xFFF8);
     for (int16_t i = 5; i >= 0; i--)
         if (line[1 + i] == player) { line[1 + i] = lines[(int16_t)slot]; break; }
     lines[(int16_t)slot] = player;
@@ -456,8 +456,8 @@ void DecodeTeamLines(struct Team *tm)
 void EncodeTeamLines(struct Team *tm)
 {
     uint8_t *a0 = g.databuffer;
-    *a0++ = (uint8_t)(tm->team + 1);
-    const uint8_t *lines = tm->lines[0];
+    *a0++ = (uint8_t)(tm->tmteam + 1);
+    const uint8_t *lines = tm->tmlines[0];
     const uint8_t *slots = rom_ptr(SYM_AttributeOffsetTbl);
     uint16_t goalies = GetGoalieCount(tm), forwards = GetForwardCount(tm);
     int odd = 0;
@@ -479,7 +479,7 @@ void EncodeTeamLines(struct Team *tm)
 void TeamRosterScreen(struct Team *tm)
 {
     SetupScreen(0xD, 0x17);
-    g.SelectedPlayerIdx = (uint16_t)(1 + tm->line);
+    g.SelectedPlayerIdx = (uint16_t)(1 + tm->tmline);
     g.DispAttribCtr = 0;
     for (;;) {                                            /* .redraw */
         printz(str_TeamRosterScreen_1, sizeof str_TeamRosterScreen_1);
@@ -592,7 +592,7 @@ void DisplayPlayerList(struct Team *tm)
     uint8_t *who = g.Satt;
     wr32(who, 0x01020304);                                /* the goalies */
     if ((int16_t)(g.SelectedPlayerIdx - 1) >= 0) {
-        who = &tm->lines[(uint16_t)(g.SelectedPlayerIdx - 1)][1];
+        who = &tm->tmlines[(uint16_t)(g.SelectedPlayerIdx - 1)][1];
         text = SYM_PlayerPositionText;
         rows = (int16_t)g.SelectedPlayerIdx > 5 ? 3 : 4;
     }
@@ -627,7 +627,7 @@ void GetNameandAttrib(uint16_t player, uint32_t sel, struct Team *tm)
  * or his penalty time. */
 void AttribStatus(uint16_t player, struct Team *tm)
 {
-    uint16_t st = tm->pdst[((int16_t)(uint16_t)(player * 2)) / 2], n;
+    uint16_t st = tm->tmpdst[((int16_t)(uint16_t)(player * 2)) / 2], n;
     if ((int16_t)st < 0) {
         n = (uint16_t)~st;
         if (n > 3) n = 1;
@@ -644,7 +644,7 @@ void AttribStatus(uint16_t player, struct Team *tm)
 /* stats94.asm:AttribEnergy. Energy: his word at $32 of the team struct / 40, at most 100. */
 void AttribEnergy(uint16_t player, struct Team *tm)
 {
-    uint16_t e = (uint16_t)m68k_divu((uint32_t)(int32_t)(int16_t)tm->pde[((int16_t)(uint16_t)(player * 2)) / 2], 0x28);
+    uint16_t e = (uint16_t)m68k_divu((uint32_t)(int32_t)(int16_t)tm->tmpde[((int16_t)(uint16_t)(player * 2)) / 2], 0x28);
     if ((int16_t)e > 0x64) e = 0x64;
     AttribPrintPct(e);
 }
@@ -911,7 +911,7 @@ void PlayoffStatsScreen(void)
     ReadTeamStats();
     uint16_t team = (uint16_t)((g.potreeteam & 0xFF00) | g.potree[g.potreeteam]);
     struct Team *tm = team_struct(0);
-    if (team != tm->team) tm = team_struct(1);
+    if (team != tm->tmteam) tm = team_struct(1);
     PlayerStatsList(tm, 1);
 }
 
@@ -1050,7 +1050,7 @@ void DrawStatsList(struct Team *tm, int playoff)
     do {
         int32_t top = -1;
         best = 0xFF;
-        const struct RosterTeam *T = rosters_team(tm->team);
+        const struct RosterTeam *T = rosters_team(tm->tmteam);
         for (int16_t p = (int16_t)GetPlayerCount(tm) - 1; p >= 0; p--) {
             if (done & (1u << (p & 31))) continue;
             uint16_t v = 0;
@@ -1305,11 +1305,11 @@ void TimeoutMenu(struct Team *tm)
     g.menu.item--;                                        /* (the timeout item goes) */
     g.menu.top--;
     g.menulist = SYM_PauseText2;
-    tm->flags |= 4;
+    tm->tmflags |= 4;
     printz(str_TimeoutMenu_1, sizeof str_TimeoutMenu_1);
     Framer(0x16, 6);
     printz(str_TimeoutMenu_2, sizeof str_TimeoutMenu_2);
-    struct Text city = roster_text(&rosters_team(tm->team)->city);
+    struct Text city = roster_text(&rosters_team(tm->tmteam)->city);
     g.printx -= (uint16_t)(text_len(city) >> 1);
     print_p(city);
     RestoreTeamEnergy(team_struct(0));
@@ -1327,7 +1327,7 @@ void Pausemode_go(struct Team *tm)
     mi->top = GetGoalieCount(tm);                         /* (the last row: the goalies after "no goalie") */
     printz(str_Pausemode_go_1, sizeof str_Pausemode_go_1);
     Framer(0x18, (uint16_t)(3 + mi->top));
-    int16_t cur = (int16_t)tm->goalie;
+    int16_t cur = (int16_t)tm->tmgoalie;
     if (cur < 0) cur = -1;
     mi->item = (uint16_t)(cur + 1);
     for (;;) {
@@ -1346,8 +1346,8 @@ void Pausemode_go(struct Team *tm)
         }
     }
     int16_t g0 = (int16_t)(mi->item - 1);
-    if (g0 >= 0 || (int16_t)tm->goalie >= -1) {
-        tm->goalie = (uint16_t)g0;
+    if (g0 >= 0 || (int16_t)tm->tmgoalie >= -1) {
+        tm->tmgoalie = (uint16_t)g0;
         setpersonel(tm);
     }
     *mi = kept;
@@ -1368,7 +1368,7 @@ void Pausemode_gnum(struct Team *tm)
             g.printx = 0xB;
             printz(str_Pausemode_gnum_2, sizeof str_Pausemode_gnum_2);
         } else {
-            const struct RosterPlayer *P = &rosters_team(tm->team)->player[n - 1];
+            const struct RosterPlayer *P = &rosters_team(tm->tmteam)->player[n - 1];
             g.printx = 8;
             print_p(roster_text(&P->name));
             uint8_t num = P->number;
@@ -1384,7 +1384,7 @@ void Pausemode_gnum(struct Team *tm)
 }
 
 /* stats94.asm:GetGoalieCount. a2 = team -> d0 = its goalies (the nibbles of its start odds). */
-uint16_t GetGoalieCount(struct Team *tm) { return rosters_team(tm->team)->goalies; }
+uint16_t GetGoalieCount(struct Team *tm) { return rosters_team(tm->tmteam)->goalies; }
 
 /* stats94.asm:GetDefenseStart. d0 = the roster index of team a2's first defenseman: its goalies
  * (GetGoalieCount) and forwards (GetForwardCount). */
@@ -1394,10 +1394,10 @@ uint16_t GetDefenseStart(struct Team *tm)
 }
 
 /* stats94.asm:GetForwardCount. d0 = team a2's forwards. */
-uint16_t GetForwardCount(struct Team *tm) { return rosters_team(tm->team)->forwards; }
+uint16_t GetForwardCount(struct Team *tm) { return rosters_team(tm->tmteam)->forwards; }
 
 /* stats94.asm:GetPlayerCount. a2 = team -> d0 = its players. */
-uint16_t GetPlayerCount(struct Team *tm) { return rosters_team(tm->team)->players; }
+uint16_t GetPlayerCount(struct Team *tm) { return rosters_team(tm->tmteam)->players; }
 
 /* stats94.asm:Pausemode_rjoy. Wait for the next vblank and a new button press -> d1 (and
  * the other pad words). */
@@ -1405,8 +1405,8 @@ uint16_t Pausemode_rjoy(uint16_t *d0, uint16_t *d2, uint16_t *d3)
 {
     uint16_t d1;
     do {
-        uint16_t v = g.vcount;
-        while (g.vcount == v) hal_wait_vblank();
+        uint16_t v = g.Vcount;
+        while (g.Vcount == v) hal_wait_vblank();
         getpzjoy(d0, &d1, d2, d3);
         nodiag(&d1, *d3);
     } while ((d1 & 0xFF) == 0);

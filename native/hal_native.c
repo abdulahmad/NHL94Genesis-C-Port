@@ -144,7 +144,7 @@ static void vblank(int wait)
     z80_relay_frame();                                    /* (the YM2612's busy grid) */
     if (mdrt_vdp_reg(vdp(), 1) & 0x20) {                    /* the vblank interrupt */
         in_vblank = 1;
-        call68k(g.vbint);
+        call68k(g.VBint);
         in_vblank = 0;
     }
     mdrt_vblank_end(native_m);

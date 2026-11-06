@@ -4,8 +4,8 @@
  * minutes without a press, the demo.
  *
  * Options (d7 = line * 2, the offset from OptPlayMode): 0 OptPlayMode (Regular Season, Continue
- * Playoffs, New Playoffs, New Playoffs/7 game, Shootout), 2 OptNOP, 4 Opt1Team, 6 Opt2Team,
- * 8 OptPerlen, $A OptGoalie, $C OptUserRec (0 On), $E OptPen (0 Off), $10 OptLine (0 On, 2 Auto).
+ * Playoffs, New Playoffs, New Playoffs/7 game, Shootout), 2 OptNOP, 4 Opt1team, 6 Opt2team,
+ * 8 Optperlen, $A OptGoalie, $C OptUserRec (0 On), $E OptPen (0 Off), $10 OptLine (0 On, 2 Auto).
  * setupcardflags (high byte) bits: 0 a player card up, 1 the card's side (visitors), 2 / 3 the
  * home / visitors block drawn, 5 C pressed, 6 / 7 the home / visitors logo shown. */
 #include <string.h>
@@ -33,7 +33,7 @@ static const uint8_t more_lengths[7][23] = {      /* (22 bytes each, and the lit
 void GameSetUp(void)
 {
     ReadLineData();
-    ReadPassBits(pass_bits(RAM(pwddatabuffer)));
+    ReadPassBits(pass_bits(RAM(passbits)));
     g.OptLine = g.TmpOptLine2;
     g.OptPlayMode = g.TempOptPlayMode;
     g.sflags7 &= (uint8_t)~2;
@@ -44,8 +44,8 @@ void GameSetUp(void)
     g.setupprevline = 0;
     PrintOptionNames();
     if (g.demoflag == 0) {                                /* after a demo: random teams */
-        g.Opt1Team = randomd0(rosters.teams);
-        g.Opt2Team = randomd0(rosters.teams);
+        g.Opt1team = randomd0(rosters.teams);
+        g.Opt2team = randomd0(rosters.teams);
     }
     ST_W(g.demoflag);
     if (g.OptPlayMode != 4) {
@@ -108,8 +108,8 @@ void GameSetUp(void)
         if (g.OptPlayMode != 4) FigureJoy();
         ChangeOption(d7, d2);
         if (g.OptPlayMode == 4 || g.OptPlayMode == 0) {   /* Regular Season and Shootout: the menu's teams */
-            g.HomeTeam = g.Opt1Team;
-            g.VisTeam = g.Opt2Team;
+            g.HomeTeam = g.Opt1team;
+            g.VisTeam = g.Opt2team;
         }
         g.logoteam = g.HomeTeam;
         if (!(g.setupcardflags & CARD(6)) || g.setuphome != g.HomeTeam) {
@@ -390,7 +390,7 @@ void setoptions(void)
     static const uint8_t font[8] = { 0x0F, 0xC0, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
     static const uint8_t font2[8] = { 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
     static const uint8_t logobox[8] = { 0x03, 0x41, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
-    g.vbint = SYM_VBlank_SetOptions;
+    g.VBint = SYM_VBlank_SetOptions;
     cpu_set_sr(0x2500);
     g.disflags &= (uint16_t)~HI(dfok);
     g.disflags |= HI(dfng);
@@ -432,8 +432,8 @@ void setoptions(void)
     defaultsprites_0(c);
     sortobj(0)->OldXpos = 0x28;
     sortobj(6)->OldXpos = 0x28;
-    ST_W(g.teams[0].shots);
-    ST_W(g.teams[1].shots);
+    ST_W(g.teams[0].tmshots);
+    ST_W(g.teams[1].tmshots);
 }
 
 /* optsetup94.asm:ReadSetupPads. Each frame for up to $5460 frames (six minutes): the pads (four
@@ -445,8 +445,8 @@ uint16_t ReadSetupPads(void)
 {
     uint16_t d6 = 0x5460, d1 = 0;
     do {
-        while ((uint16_t)(g.vcount - g.oldvcount) == 0) hal_wait_vblank();
-        g.oldvcount = g.vcount;
+        while ((uint16_t)(g.Vcount - g.OldVcount) == 0) hal_wait_vblank();
+        g.OldVcount = g.Vcount;
         g.setupcardflags &= (uint16_t)~CARD(5);
         UpdateRosterPlayers();
         uint16_t d0, d2, d3;

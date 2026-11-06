@@ -118,7 +118,7 @@ int replay_irq(void)
 }
 
 /* A wait loop: a short backward conditional Bcc.s within 12 bytes after pc that jumps
- * to pc or before, over code that reads vcount, palcount or disflags (their absolute short
+ * to pc or before, over code that reads Vcount, palcount or disflags (their absolute short
  * addresses appear in it). An interrupt there is the vblank the loop waits for. */
 static int in_wait_loop(uint32_t pc)
 {
@@ -130,7 +130,7 @@ static int in_wait_loop(uint32_t pc)
         if (target > pc || pc - target > 16) continue;
         for (uint32_t a = target; a < b; a += 2) {
             uint16_t w = (uint16_t)(rom_cart[a] << 8 | rom_cart[a + 1]);
-            if (w == (uint16_t)RAM_OFF_vcount || w == (uint16_t)RAM_OFF_palcount || w == (uint16_t)RAM_OFF_disflags) return 1;
+            if (w == (uint16_t)RAM_OFF_Vcount || w == (uint16_t)RAM_OFF_palcount || w == (uint16_t)RAM_OFF_disflags) return 1;
         }
     }
     return 0;

@@ -20,8 +20,8 @@ static uint32_t inline_table(uint32_t from, uint32_t to, const uint8_t table[8])
 /* resetplstuff's .top: team a2's skaters lose their flags and glide again */
 static void reset_team(struct Team *tm)
 {
-    tm->flags &= (uint8_t)~0x10;                                    /* team offside bit */
-    struct SortObj *o = sortobj_at(tm->sort);
+    tm->tmflags &= (uint8_t)~0x10;                                    /* team offside bit */
+    struct SortObj *o = sortobj_at(tm->tmsort);
     for (int i = 0; i < 6; i++, o++) {
         o->pflags2 = 0;
         if (o->position < 0) continue;
@@ -128,7 +128,7 @@ void setupice(void)
     g.Hpos = 0;
     g.Vpos = 0;
     g.Oldrow = 0x7D0;
-    ST_W(g.zamx);
+    ST_W(g.Zamx);
     DoFill(0x800, g.maps[0].vram, 0x7FF);
     g.rinkvrcset = 0;
     uint16_t c = DecompressGraphicsPlain(g.sflags4 & HI(4) ? ART(RevRinkTiles) : ART(Rinktiles), 0);
@@ -137,7 +137,7 @@ void setupice(void)
     c = setupEASportsMap();
     g.energybarchars = c;
     c = DecompressGraphicsPlain(ART(EnergyBarMap) + 8, c);
-    g.animchars = c;
+    g.crowdvrcset = c;
     c = DecompressGraphicsPlain(ART(CrowdFrameList) + 8, c);
     g.arenaanimchars = c;
     c += 0x32;
@@ -147,7 +147,7 @@ void setupice(void)
     c = AddFramer(c);
     g.smallfontchars = c;
     c = DecompressGraphicsWithRemap(ART(SmallFontMap) + 8, c, inline_table(SYM_setupice, SYM_setupice + 0x200, small));
-    g.BigFontChars = c;
+    g.BigFontchars = c;
     c = DecompressGraphicsWithRemap(ART(BigFontMap) + 8, c, inline_table(SYM_setupice + 1, SYM_setupice + 0x200, big));
     c = setupTeamBlocksMap(c);
     if (view_wide()) DoFill(0x80, g.maps[0].vram, 0x7FF);       /* (its unpacking ran over plane A's first two rows: the wide view shows their other half) */
@@ -165,7 +165,7 @@ void setupice(void)
     g.DMAlistend = ram_addr(v.dma);
     dodmalist();
     g.disflags = saved;
-    g.vbint = SYM_VBlank;
+    g.VBint = SYM_VBlank;
     g.disflags &= (uint16_t)~(HI(dfok) | HI(dfng));
     cpu_set_sr(0x2300);
 }
@@ -182,7 +182,7 @@ void setupice_highlight(void)
     g.Hpos = 0;
     g.Vpos = 0;
     g.Oldrow = 0x7D0;
-    ST_W(g.zamx);
+    ST_W(g.Zamx);
     defaultsprites(g.spritechars);
     setupIceRinkPal();
     if (g.gmode & (1 << gmdir))
@@ -200,7 +200,7 @@ void setupice_highlight(void)
     dodmalist();
     g.palcount = 0x1C;
     g.disflags = saved;
-    g.vbint = SYM_VBlank;
+    g.VBint = SYM_VBlank;
     g.disflags &= (uint16_t)~(HI(dfok) | HI(dfng));
     cpu_set_sr(0x2300);
 }
@@ -223,7 +223,7 @@ uint16_t setupEASportsMap(void)
 uint16_t ReloadEnergyBarTiles(void) { return DecompressGraphicsPlain(ART(EnergyBarMap) + 8, g.energybarchars); }
 
 /* setup94.asm:ReloadCrowdTiles. -> d4 = the char after them */
-uint16_t ReloadCrowdTiles(void) { return DecompressGraphicsPlain(ART(CrowdFrameList) + 8, g.animchars); }
+uint16_t ReloadCrowdTiles(void) { return DecompressGraphicsPlain(ART(CrowdFrameList) + 8, g.crowdvrcset); }
 
 /* setup94.asm:ReloadRefHorTiles. The horizontal referee tiles at ExtraChars -> d4. */
 uint16_t ReloadRefHorTiles(void) { return DecompressGraphicsPlain(ART(RefMap2) + 8, g.ExtraChars); }
@@ -389,27 +389,27 @@ void resetplstuff(void)
 void clearTeamStats(void)
 {
     struct Team *home = team_struct(0), *away = team_struct(1);
-    uint16_t hg = home->goalie, ag = away->goalie;
-    memcpy(g.homehotcoldsave, home->hotcold, 0x1A0);
-    memcpy(g.awayhotcoldsave, away->hotcold, 0x1A0);
+    uint16_t hg = home->tmgoalie, ag = away->tmgoalie;
+    memcpy(g.homehotcoldsave, home->tmHotCold, 0x1A0);
+    memcpy(g.awayhotcoldsave, away->tmHotCold, 0x1A0);
     memset(home, 0, sizeof *home);
     memset(away, 0, sizeof *away);
     rules_clear_stats();                                  /* (the rules' own, beside the RAM) */
-    memcpy(home->hotcold, g.homehotcoldsave, 0x1A0);
-    memcpy(away->hotcold, g.awayhotcoldsave, 0x1A0);
-    away->goalie = ag;
-    home->goalie = hg;
-    home->penbox[0] = 0xFF;                               /* (st tmpdst+$34: the penalty box empty) */
-    away->penbox[0] = 0xFF;
+    memcpy(home->tmHotCold, g.homehotcoldsave, 0x1A0);
+    memcpy(away->tmHotCold, g.awayhotcoldsave, 0x1A0);
+    away->tmgoalie = ag;
+    home->tmgoalie = hg;
+    home->tmboxlist[0] = 0xFF;                               /* (st tmpdst+$34: the penalty box empty) */
+    away->tmboxlist[0] = 0xFF;
     setteams();
 }
 
 /* setup94.asm:setteams. Both team structs from HomeTeam / VisTeam, with their sort objects. */
 void setteams(void)
 {
-    team_struct(0)->sort = RAM_OFF_SortCords;
+    team_struct(0)->tmsort = RAM_OFF_SortCords;
     InitTeamStructure(g.HomeTeam, team_struct(0));
-    team_struct(1)->sort = RAM_OFF_SortCords + 6 * 0x80;
+    team_struct(1)->tmsort = RAM_OFF_SortCords + 6 * 0x80;
     InitTeamStructure(g.VisTeam, team_struct(1));
 }
 
@@ -417,8 +417,8 @@ void setteams(void)
  * (tmdata, from TeamList) and its line sets at $16A (the layout by OptLine). */
 void InitTeamStructure(uint16_t team, struct Team *tm)
 {
-    tm->team = team;
-    tm->data = rosters_team(team)->data;
+    tm->tmteam = team;
+    tm->tmdata = rosters_team(team)->data;
     InitTeamLines(tm);
 }
 
@@ -426,8 +426,8 @@ void InitTeamStructure(uint16_t team, struct Team *tm)
  * layout by OptLine); the line editor's "Set Original lines". */
 void InitTeamLines(struct Team *tm)
 {
-    const uint8_t *src = rosters_team(tm->team)->lines[0];
-    uint8_t *dst = tm->lines[0];                          /* (the 7 line sets, row after row) */
+    const uint8_t *src = rosters_team(tm->tmteam)->lines[0];
+    uint8_t *dst = tm->tmlines[0];                          /* (the 7 line sets, row after row) */
     if (g.OptLine != 0) {
         memcpy(dst, src, 8);
         memcpy(dst + 8, src + 16, 12 * 4);
@@ -441,7 +441,7 @@ void InitTeamLines(struct Team *tm)
 void setplayercolors(void)
 {
     for (int away = 0; away < 2; away++) {
-        pal_load_w(0x20 + 0x10 * away, rosters_team(team_struct(away)->team)->colours[away], 0x10);
+        pal_load_w(0x20 + 0x10 * away, rosters_team(team_struct(away)->tmteam)->colours[away], 0x10);
     }
 }
 
@@ -457,7 +457,7 @@ void PeriodOver(void)
             g.gsp = 3;
             if (g.OptPlayMode == 0) g.gsp = 4;
         }
-        if (team_struct(0)->score != team_struct(1)->score) g.gsp = 4;
+        if (team_struct(0)->tmscore != team_struct(1)->tmscore) g.gsp = 4;
     }
     forceblack();
     PeriodOver_sp();
@@ -469,11 +469,11 @@ void PeriodOver(void)
 void PeriodOver_sp(void)
 {
     ResetClock();
-    uint16_t v = g.vcount;
-    while (g.vcount == v) hal_wait_vblank();
+    uint16_t v = g.Vcount;
+    while (g.Vcount == v) hal_wait_vblank();
     p_turnoff();
-    v = g.vcount;
-    while (g.vcount == v) hal_wait_vblank();
+    v = g.Vcount;
+    while (g.Vcount == v) hal_wait_vblank();
     song(SYM_SngEOG);
     UpdateScores();
     if (g.gsp == 4) AddPlayoffTeamStats();
@@ -540,7 +540,7 @@ void Opening3(void)
 void PlayoffScreen(void)
 {
     if (g.OptPlayMode == 0) return;
-    g.vbint = SYM_VBlank_Playoff;
+    g.VBint = SYM_VBlank_Playoff;
     g.disflags &= (uint16_t)~HI(df32c);
     g.VSCRLPM = 0;
     g.VSPRITES = 0xBC00;
@@ -655,8 +655,8 @@ void waitxc1(void)
         g.palfadenew[0x21] ^= 0xEE;
         g.palcount = 0x18;
     }
-    while (g.vcount == g.oldvcount) hal_wait_vblank();
-    g.oldvcount = g.vcount;
+    while (g.Vcount == g.OldVcount) hal_wait_vblank();
+    g.OldVcount = g.Vcount;
 }
 
 /* setup94.asm:PlayoffScreen_doscores. The best-of-7 wins "t-b" of game struct a2 at printx / printy. */
@@ -664,9 +664,9 @@ void PlayoffScreen_doscores(const struct Matchup *gs)
 {
     uint8_t *m = g.mesarea;
     wr16(m, 6);
-    m[2] = (uint8_t)(gs->topwins + '0');
+    m[2] = (uint8_t)(gs->gspotwins + '0');
     m[3] = '-';
-    m[4] = (uint8_t)(gs->botwins + '0');
+    m[4] = (uint8_t)(gs->gspobwins + '0');
     m[5] = 0;
     print(ram_addr(g.mesarea));
 }
@@ -690,7 +690,7 @@ void PlayoffScreen_doteam(uint16_t row)
 }
 
 /* setup94.asm:VBlank_Playoff. The playoff screen's vblank: unless dfng, the sprites (and the tree's
- * scroll, $FEA0 + DispAttribCtr) and the fade; then vcount and the music. */
+ * scroll, $FEA0 + DispAttribCtr) and the fade; then Vcount and the music. */
 void VBlank_Playoff(void)
 {
     if (!(g.disflags & HI(dfng))) {
@@ -703,7 +703,7 @@ void VBlank_Playoff(void)
         }
         cramfade();
     }
-    g.vcount++;
+    g.Vcount++;
     p_music_vblank();
 }
 
@@ -716,11 +716,11 @@ uint32_t InitScoutingDisplay(void)
     g.VertLineScrolling = 0xFFFF;
     ST_W(g.PlayerScrollCtr);
     g.SelectedPlayerIdx = 0;
-    g.typedelay = 0;
+    g.ScoutingReportTimer = 0;
     return ram_addr(g.TestList);
 }
 
-/* setup94.asm:UpdateScoutingDisplay. The text player: each time its delay (typedelay; longer
+/* setup94.asm:UpdateScoutingDisplay. The text player: each time its delay (ScoutingReportTimer; longer
  * after a comma or a full stop; none with asv set) runs out, the next word of the paragraph
  * (PlayerScrollCtr: its offset in ScoutTextScript; negative: the next paragraph of TestList) to
  * the text box, a line at a time (ScrollDisplayUp); the special characters put in the team data:
@@ -729,8 +729,8 @@ uint32_t InitScoutingDisplay(void)
  * (_ + { }). */
 void UpdateScoutingDisplay(void)
 {
-    if ((int16_t)g.typedelay > 0x1000) return;
-    if ((int16_t)g.asv >= 0 && (int16_t)--g.typedelay >= 0) return;
+    if ((int16_t)g.ScoutingReportTimer > 0x1000) return;
+    if ((int16_t)g.asv >= 0 && (int16_t)--g.ScoutingReportTimer >= 0) return;
     const uint32_t a1 = SYM_ScoutTextScript;
     int16_t d0 = (int16_t)g.PlayerScrollCtr;
     if (d0 < 0) {                                         /* the next paragraph */
@@ -739,7 +739,7 @@ void UpdateScoutingDisplay(void)
         g.SelectedPlayerIdx += 2;
         d0 = (int16_t)g.TestList[i / 2];                  /* (SelectedPlayerIdx: its byte offset) */
         if (d0 < 0) {                                     /* the list's end */
-            g.typedelay = 0x7FFF;
+            g.ScoutingReportTimer = 0x7FFF;
             g.screentimer = 0x1E0;
             return;
         }
@@ -749,7 +749,7 @@ void UpdateScoutingDisplay(void)
         d0 = (int16_t)(uint16_t)(p - rom_ptr(a1));
     }
     const uint8_t *a2 = rom_ptr(a1) + d0;
-    g.typedelay = 0xA;
+    g.ScoutingReportTimer = 0xA;
     d0 = (int16_t)g.DispAttribCtr;
     struct Text str;                                      /* a String the special character puts in */
     struct Team *tm;
@@ -758,8 +758,8 @@ void UpdateScoutingDisplay(void)
     case '_': case '{': tm = team_struct(0); goto city;
     case '+': case '}': tm = team_struct(1); goto city;
     case '$': tm = team_struct(g.awayhotter != 0); goto city;
-    case '[': tm = team_struct(0); d1 = tm->goalie; goto roster;
-    case ']': tm = team_struct(1); d1 = tm->goalie; goto roster;
+    case '[': tm = team_struct(0); d1 = tm->tmgoalie; goto roster;
+    case ']': tm = team_struct(1); d1 = tm->tmgoalie; goto roster;
     case '<': d1 = NextHomeHotPlayer(&tm); goto roster;
     case '>': d1 = NextAwayHotPlayer(&tm); goto roster;
     case '|': d1 = NextHomeColdPlayer(&tm); goto roster;
@@ -783,7 +783,7 @@ void UpdateScoutingDisplay(void)
             do {
                 *a0++ = *a2;
                 d1++;
-                if (*a2 == ',' || *a2 == '.') g.typedelay += 0x28;
+                if (*a2 == ',' || *a2 == '.') g.ScoutingReportTimer += 0x28;
                 more = *a2++ == ' ' && *a2 == ' ';
             } while (more);
             if (a2[-1] == ' ') {
@@ -798,10 +798,10 @@ void UpdateScoutingDisplay(void)
         goto put;
     }
 city:                                                     /* the team's city (the String at word 4 of its data) */
-    str = roster_text(&rosters_team(tm->team)->city);
+    str = roster_text(&rosters_team(tm->tmteam)->city);
     goto append;
 roster:                                                   /* player d1's name in team a1's roster */
-    str = roster_text(&rosters_team(tm->team)->player[d1].name);
+    str = roster_text(&rosters_team(tm->tmteam)->player[d1].name);
 append:
     g.PlayerScrollCtr++;
     d0 = (int16_t)(d0 + text_len(str) - 1);
@@ -836,7 +836,7 @@ void ScrollDisplayUp(void)
  * until a button or $50 x 4 frames (about 5 s). */
 void EASportsScreen(void)
 {
-    g.vbint = SYM_vb2;
+    g.VBint = SYM_vb2;
     g.disflags &= (uint16_t)~HI(df32c);
     g.maps[2].colshift = 5;
     g.maps[1].vram = 0xA000;
@@ -880,8 +880,8 @@ void UpdatePlayoffLevel(void)
 void TeamIcons(void)
 {
     if (g.OptPlayMode == 4 || g.OptPlayMode == 0) {
-        g.HomeTeam = g.Opt1Team;
-        g.VisTeam = g.Opt2Team;
+        g.HomeTeam = g.Opt1team;
+        g.VisTeam = g.Opt2team;
     }
     printz(str_TeamIcons_1, sizeof str_TeamIcons_1);
     uint16_t t = g.VisTeam;
@@ -912,7 +912,7 @@ uint16_t DrawTeamBitmap(uint16_t team, uint16_t chars)
 }
 
 /* setup94.asm:VBlank_SetOptions. The setup screen's vblank: unless dfng, the sprites (when
- * dfok) and the fade; then vcount and the music. */
+ * dfok) and the fade; then Vcount and the music. */
 void VBlank_SetOptions(void)
 {
     if (!(g.disflags & HI(dfng))) {
@@ -922,7 +922,7 @@ void VBlank_SetOptions(void)
         }
         cramfade();
     }
-    g.vcount++;
+    g.Vcount++;
     p_music_vblank();
 }
 
@@ -934,21 +934,21 @@ void DefaultMenus(void)
     const uint8_t *t = rom_ptr(SYM_defmenuoptions);
     g.OptPlayMode = rd16(t);
     g.OptNOP = rd16(t + 2);
-    g.Opt1Team = rd16(t + 4);
-    g.Opt2Team = rd16(t + 6);
-    g.OptPerlen = rd16(t + 8);
+    g.Opt1team = rd16(t + 4);
+    g.Opt2team = rd16(t + 6);
+    g.Optperlen = rd16(t + 8);
     g.OptGoalie = rd16(t + 0xA);
     g.OptUserRec = rd16(t + 0xC);
     g.OptPen = rd16(t + 0xE);
     g.OptLine = rd16(t + 0x10);
 }
 
-/* setup94.asm:ContinuePlayoffs. The playoff state saved at pwddatabuffer (ReadPassBits); when a
+/* setup94.asm:ContinuePlayoffs. The playoff state saved at passbits (ReadPassBits); when a
  * game has been played, the tree (MakeTree) and OptNOP from pojoy (7 or $B - pojoy, pojoy
  * moved to the pad set-ups). */
 void ContinuePlayoffs(void)
 {
-    ReadPassBits(pass_bits(RAM(pwddatabuffer)));
+    ReadPassBits(pass_bits(RAM(passbits)));
     if ((g.gamelevel | g.bosgames) == 0) return;          /* nothing played yet */
     MakeTree();
     uint16_t d0 = g.FourWayPlay ? 0xB : 7;
@@ -968,7 +968,7 @@ void ContinuePlayoffs(void)
 void NewPO(void)
 {
     uint16_t row = randomd0(rosters.playoff_rows), d1;
-    uint16_t team = g.Opt1Team > rosters.playoff_teams - 1 ? rosters.playoff_teams - 1 : g.Opt1Team;
+    uint16_t team = g.Opt1team > rosters.playoff_teams - 1 ? rosters.playoff_teams - 1 : g.Opt1team;
     for (;;) {
         row = (row + 1) & (rosters.playoff_rows - 1);
         const uint8_t *a0 = roster_seats[row & 31];
@@ -983,8 +983,8 @@ void NewPO(void)
     if (g.OptPlayMode != 2) {
         g.bosgames = 0;
         for (int n = 0; n < 8; n++) {
-            g.matchups[n].topwins = 0;
-            g.matchups[n].botwins = 0;
+            g.matchups[n].gspotwins = 0;
+            g.matchups[n].gspobwins = 0;
         }
     }
     MakeTree();
@@ -1005,18 +1005,18 @@ void MakeTree(void)
     if (n < 0) return;                                    /* the playoffs are over */
     a0 = tree + (int16_t)(first * 2);
     for (struct Matchup *gs = g.matchups; n >= 0; n--, gs++) {
-        gs->score1 = 0;
-        gs->score2 = 0;
-        gs->per = 0;
-        gs->flags &= (uint8_t)~MU_HIGHLIGHT;
+        gs->gss1 = 0;
+        gs->gss2 = 0;
+        gs->gsper = 0;
+        gs->gsflags &= (uint8_t)~MU_HIGHLIGHT;
         if (g.bosgames == 2 || g.bosgames == 3 || g.bosgames == 5) {
-            gs->flags &= (uint8_t)~MU_FLIPPED;
-            gs->team1 = (uint16_t)((gs->team1 & 0xFF00) | *a0++);
-            gs->team2 = (uint16_t)((gs->team2 & 0xFF00) | *a0++);
+            gs->gsflags &= (uint8_t)~MU_FLIPPED;
+            gs->gst1 = (uint16_t)((gs->gst1 & 0xFF00) | *a0++);
+            gs->gst2 = (uint16_t)((gs->gst2 & 0xFF00) | *a0++);
         } else {
-            gs->flags |= MU_FLIPPED;
-            gs->team2 = (uint16_t)((gs->team2 & 0xFF00) | *a0++);
-            gs->team1 = (uint16_t)((gs->team1 & 0xFF00) | *a0++);
+            gs->gsflags |= MU_FLIPPED;
+            gs->gst2 = (uint16_t)((gs->gst2 & 0xFF00) | *a0++);
+            gs->gst1 = (uint16_t)((gs->gst1 & 0xFF00) | *a0++);
         }
     }
     FigureJoy();
@@ -1038,16 +1038,16 @@ void FigureJoy(void)
             uint16_t d0;
             ST_W(g.gamenum);
             for (;;) {
-                if (gs->team1 == team) {
+                if (gs->gst1 == team) {
                     d0 = 0;
-                    g.Opt2Team = gs->team2;
-                    g.Opt1Team = gs->team1;
+                    g.Opt2team = gs->gst2;
+                    g.Opt1team = gs->gst1;
                     break;
                 }
-                if (gs->team2 == team) {
+                if (gs->gst2 == team) {
                     d0 = g.FourWayPlay ? 5 : 4;
-                    g.Opt2Team = gs->team1;
-                    g.Opt1Team = gs->team2;
+                    g.Opt2team = gs->gst1;
+                    g.Opt1team = gs->gst2;
                     break;
                 }
                 if (n-- == 0) return;                     /* the playoff team is out */
@@ -1055,8 +1055,8 @@ void FigureJoy(void)
             }
             d0 = (uint16_t)((d0 + g.pojoy) << 2);
             g.gamenum = n;
-            g.HomeTeam = gs->team1;
-            g.VisTeam = gs->team2;
+            g.HomeTeam = gs->gst1;
+            g.VisTeam = gs->gst2;
             uint32_t list = rom_find(SYM_FigureJoy, SYM_InitializeGameStructures, pojoylist, 8);
             if (g.FourWayPlay) list += 0x20;              /* .pojoylist2 follows */
             g.cont1team = rd16(rom_ptr(list + d0));
@@ -1087,7 +1087,7 @@ void FigureJoy(void)
     InitializeGameStructures();
 }
 
-/* setup94.asm:InitializeGameStructures. Random team pairs for the 8 gsstruct games, none of
+/* setup94.asm:InitializeGameStructures. Random team pairs for the 8 gstruct games, none of
  * them HomeTeam or VisTeam. */
 void InitializeGameStructures(void)
 {
@@ -1095,8 +1095,8 @@ void InitializeGameStructures(void)
     uint32_t used = 1u << (g.HomeTeam & 31);
     used |= 1u << (g.VisTeam & 31);
     for (int n = 0; n < 8; n++) {
-        g.matchups[n].team1 = GetRandomUnusedTeam(&used);
-        g.matchups[n].team2 = GetRandomUnusedTeam(&used);
+        g.matchups[n].gst1 = GetRandomUnusedTeam(&used);
+        g.matchups[n].gst2 = GetRandomUnusedTeam(&used);
     }
 }
 
@@ -1121,13 +1121,13 @@ void ReadPassBits(uint8_t *bits)
     for (int i = 0; i < 5; i++) saved[i] = rd16(bits + 2 * i);
     for (int n = 7; n >= 0; n--) {
         struct Matchup *gs = &g.matchups[n];
-        gs->flags &= (uint8_t)~MU_SERIES_OVER;
+        gs->gsflags &= (uint8_t)~MU_SERIES_OVER;
         uint16_t w = SuperDiv(bits, 5);
-        gs->botwins = w;
-        if (w == 4) gs->flags |= MU_SERIES_OVER;
+        gs->gspobwins = w;
+        if (w == 4) gs->gsflags |= MU_SERIES_OVER;
         w = SuperDiv(bits, 5);
-        gs->topwins = w;
-        if (w == 4) gs->flags |= MU_SERIES_OVER;
+        gs->gspotwins = w;
+        if (w == 4) gs->gsflags |= MU_SERIES_OVER;
     }
     g.WinBits = SuperDiv(bits, 0x4000);
     g.pojoy = SuperDiv(bits, 8);
@@ -1140,7 +1140,7 @@ void ReadPassBits(uint8_t *bits)
 }
 
 /* setup94.asm:EncodePW. After a playoff game (not Demo, Regular Season or a shootout): the results
- * (ResolveGames), the tree, and the state saved (WritePassBits to pwddatabuffer, WriteLineData);
+ * (ResolveGames), the tree, and the state saved (WritePassBits to passbits, WriteLineData);
  * the playoffs over (or the user's team out): cleared, and the mode back to new playoffs. */
 void EncodePW(void)
 {
@@ -1150,14 +1150,14 @@ void EncodePW(void)
     ResolveGames();
     MakeTree();
     if (g.gamelevel != 4 && (int16_t)g.gamenum >= 0) {
-        WritePassBits(pass_bits(RAM(pwddatabuffer)));
+        WritePassBits(pass_bits(RAM(passbits)));
         WriteLineData();
         if (!(g.sflags3 & (1 << sf3alttree))) return;
         ReadPassBits(pass_bits(RAM(tpassbits)));                          /* the bits before the round was settled */
         MakeTree();
         return;
     }
-    ClrPassBits(pass_bits(RAM(pwddatabuffer)));
+    ClrPassBits(pass_bits(RAM(passbits)));
     WriteLineData();
     g.OptPlayMode = 2;                                    /* new playoffs */
     g.TempOptPlayMode = 2;
@@ -1178,8 +1178,8 @@ void WritePassBits(uint8_t *bits)
     PushBits(bits, g.pojoy, 8);
     PushBits(bits, g.WinBits, 0x4000);
     for (int n = 0; n < 8; n++) {
-        PushBits(bits, g.matchups[n].topwins, 5);
-        PushBits(bits, g.matchups[n].botwins, 5);
+        PushBits(bits, g.matchups[n].gspotwins, 5);
+        PushBits(bits, g.matchups[n].gspobwins, 5);
     }
 }
 
@@ -1246,8 +1246,8 @@ void AddPlayoffTeamStats(void)
     ReadTeamStats();
     uint16_t team = g.potree[g.potreeteam];
     struct Team *tm = team_struct(0);
-    if (tm->team != team) tm = team_struct(1);
-    const uint8_t *st = (const uint8_t *)tm + offsetof(struct Team, pgoals);   /* (goals, assists, shots, penalty minutes: four tables of 26) */
+    if (tm->tmteam != team) tm = team_struct(1);
+    const uint8_t *st = (const uint8_t *)tm + offsetof(struct Team, tmgoals);   /* (goals, assists, shots, penalty minutes: four tables of 26) */
     uint8_t *tot = g.statsbuffer;
     for (int i = 0; i < 0x68; i++) wr16(tot + 2 * i, (uint16_t)(rd16(tot + 2 * i) + st[i]));
     const uint8_t *widths = rom_ptr(SYM_BitWidthTable);
@@ -1290,39 +1290,39 @@ void ReadTeamStats(void)
 void ResolveGames(void)
 {
     struct Matchup *gs = &g.matchups[g.gamenum];
-    gs->score1 = g.teams[0].score;
-    gs->score2 = g.teams[1].score;
+    gs->gss1 = g.teams[0].tmscore;
+    gs->gss2 = g.teams[1].tmscore;
     uint16_t first;
     int16_t n = (int16_t)GetShifter(&first);
     uint16_t won = 0;
     if (g.bosgames == 7) {                                /* best of one */
         for (; n >= 0; n--) {
             const struct Matchup *a0 = &g.matchups[n];
-            if (!(a0->score1 > a0->score2)) won |= (uint16_t)(1u << n);
-            if (a0->flags & MU_FLIPPED) won ^= (uint16_t)(1u << n);
+            if (!(a0->gss1 > a0->gss2)) won |= (uint16_t)(1u << n);
+            if (a0->gsflags & MU_FLIPPED) won ^= (uint16_t)(1u << n);
         }
         goto winbits;
     }
     for (; n >= 0; n--) {                                 /* the series' wins */
         struct Matchup *a0 = &g.matchups[n];
-        if (a0->topwins == 4 || a0->botwins == 4) continue;
-        int bottom = (a0->flags & MU_FLIPPED) != 0;          /* (team1 the tree's bottom team) */
-        if ((int16_t)(a0->score1 - a0->score2) < 0) bottom = !bottom;
-        if (bottom) a0->botwins++; else a0->topwins++;
+        if (a0->gspotwins == 4 || a0->gspobwins == 4) continue;
+        int bottom = (a0->gsflags & MU_FLIPPED) != 0;          /* (team1 the tree's bottom team) */
+        if ((int16_t)(a0->gss1 - a0->gss2) < 0) bottom = !bottom;
+        if (bottom) a0->gspobwins++; else a0->gspotwins++;
     }
     if (++g.bosgames != 7) {
         gs = &g.matchups[g.gamenum];
-        if (gs->topwins != 4 && gs->botwins != 4) return;
+        if (gs->gspotwins != 4 && gs->gspobwins != 4) return;
         if ((int16_t)g.gamelevel < 3) {                   /* the user's series is over: the round's others */
             n = (int16_t)GetShifter(&first);
             for (; n >= 0; n--) {
                 struct Matchup *a0 = &g.matchups[n];
                 if ((uint16_t)n == g.gamenum) continue;
-                while (a0->topwins != 4 && a0->botwins != 4) {
-                    a0->topwins++;
+                while (a0->gspotwins != 4 && a0->gspobwins != 4) {
+                    a0->gspotwins++;
                     if (randomd0(0xC8) & 1) {
-                        a0->topwins--;
-                        a0->botwins++;
+                        a0->gspotwins--;
+                        a0->gspobwins++;
                     }
                 }
             }
@@ -1334,9 +1334,9 @@ void ResolveGames(void)
     n = (int16_t)GetShifter(&first);
     for (; n >= 0; n--) {
         struct Matchup *a0 = &g.matchups[n];
-        if (a0->topwins != 4) won |= (uint16_t)(1u << n);
-        a0->topwins = 0;
-        a0->botwins = 0;
+        if (a0->gspotwins != 4) won |= (uint16_t)(1u << n);
+        a0->gspotwins = 0;
+        a0->gspobwins = 0;
     }
 winbits:
     g.WinBits &= (uint16_t)((uint16_t)(1u << first) - 1);
@@ -1353,8 +1353,8 @@ void ShowThreeStars(void)
     if (g.gmode & 0x80) return;
     g.gmode |= 0x80;
     g.disflags |= HI(dfclock);
-    uint16_t v = g.vcount;
-    while (g.vcount == v) hal_wait_vblank();
+    uint16_t v = g.Vcount;
+    while (g.Vcount == v) hal_wait_vblank();
     PRINTZ(str_ShowThreeStars_1);
     Framer(0x1C, 9);
     PRINTZ(str_ShowThreeStars_2);
@@ -1367,12 +1367,12 @@ void ShowThreeStars(void)
         uint16_t player = TakeTopStarScore(&tm);
         g.printx = 0x1A;
         g.printy++;
-        print_p(roster_text(&rosters_team(tm->team)->abbr));
+        print_p(roster_text(&rosters_team(tm->tmteam)->abbr));
         uint32_t name = getname(player, tm);
         g.printx = 3;
         print(name);
     }
-    if ((int16_t)(team_struct(0)->score - team_struct(1)->score) > 0) song(SYM_SFXhomewin);
+    if ((int16_t)(team_struct(0)->tmscore - team_struct(1)->tmscore) > 0) song(SYM_SFXhomewin);
 }
 
 /* setup94.asm:TakeTopStarScore. Take the highest of the 52 star scores (and clear it) -> d0 = the
@@ -1412,15 +1412,15 @@ void CalcStarScores(uint16_t d2)
  * 4 goals per 100 shots, +75000 more for a shutout. -> d3 = the goal difference. */
 int16_t CalcTeamStarScores(struct Team *tm, struct Team *other, uint8_t **out, uint16_t mintime)
 {
-    int16_t diff = (int16_t)(tm->score - other->score);
+    int16_t diff = (int16_t)(tm->tmscore - other->tmscore);
     uint16_t goalies = (uint16_t)(0x19 - GetGoalieCount(tm));
     for (int16_t slot = 0x19, k = 0; slot >= 0; slot--, k++, *out += 4) {                /* (k: the roster slot) */
         uint32_t score = (uint32_t)(int32_t)diff;
         if ((uint16_t)slot > goalies) {                  /* goalie slot */
-            if (mintime > tm->ptoi[k]) { wr32(*out, score); continue; }
-            uint16_t shots = tm->pshots[k];
+            if (mintime > tm->tmpice[k]) { wr32(*out, score); continue; }
+            uint16_t shots = tm->tmpshots[k];
             if (shots == 0) { wr32(*out, score); continue; }
-            uint16_t pct = (uint16_t)m68k_divu((uint32_t)tm->pgoals[k] * 100, shots);
+            uint16_t pct = (uint16_t)m68k_divu((uint32_t)tm->tmgoals[k] * 100, shots);
             if (pct <= 4) {
                 score += 32000;
                 if (pct == 0) score += 75000;
@@ -1428,9 +1428,9 @@ int16_t CalcTeamStarScores(struct Team *tm, struct Team *other, uint8_t **out, u
             wr32(*out, score);
             continue;
         }
-        score += tm->pgoals[k] * 11000u + tm->passists[k] * 10100u;
-        uint32_t shots = tm->pshots[k] * 10u;
-        if (diff == 0) score += (uint16_t)shots * 100u + tm->ptoi[k];
+        score += tm->tmgoals[k] * 11000u + tm->tmassists[k] * 10100u;
+        uint32_t shots = tm->tmpshots[k] * 10u;
+        if (diff == 0) score += (uint16_t)shots * 100u + tm->tmpice[k];
         else score += shots;
         wr32(*out, score);
     }
@@ -1491,9 +1491,9 @@ void ShowGoalBox(void)
     if (e[2] & 0x80) { tm = team_struct(1); g.scorergoalies = g.awaygoalies; }
     uint32_t text = SYM_GoalBigTxt;
     if (g.DelayedPen & 1) { g.DelayedPen &= (uint8_t)~1; text = SYM_PPGoalBigTxt; }
-    if (tm->pgoals[e[3]] == 3 && e[3] >= g.scorergoalies) {          /* third goal of a skater */
+    if (tm->tmgoals[e[3]] == 3 && e[3] >= g.scorergoalies) {          /* third goal of a skater */
         text += rd16(rom_ptr(text));                               /* HAT TRICK! */
-        if (tm->team == g.HomeTeam) StartArenaAnim(0);
+        if (tm->tmteam == g.HomeTeam) StartArenaAnim(0);
     }
     printbig(text);
     uint16_t scorer = e[3];
@@ -1600,7 +1600,7 @@ uint32_t FinalizeTextBuffer(uint8_t *end)
 }
 
 /* setup94.asm:GetPlayerNamePointer. d0 = roster slot, a2 = team -> a0 = the player's name. */
-const struct RosterText *GetPlayerNamePointer(uint16_t player, struct Team *tm) { return &rosters_team(tm->team)->player[player].name; }
+const struct RosterText *GetPlayerNamePointer(uint16_t player, struct Team *tm) { return &rosters_team(tm->tmteam)->player[player].name; }
 
 /* setup94.asm:ConvertByteToDigits. d0 = BCD byte: two ASCII digits to (a1)+, a leading 0 as a
  * space. -> a1 */

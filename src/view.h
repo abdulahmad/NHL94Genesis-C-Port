@@ -21,7 +21,7 @@ static inline int16_t view_hpos(void) { return view_wide() ? VIEW_HPOS : 0x3C; }
 /* the shift of what is placed for 256: while the rink is up and not paused */
 static inline int16_t view_shift(void)
 {
-    return view_wide() && (g.disflags & HI(df32c)) && g.vbint == SYM_VBlank && !(g.sflags & HI(sfpz)) ? VIEW_SHIFT : 0;
+    return view_wide() && (g.disflags & HI(df32c)) && g.VBint == SYM_VBlank && !(g.sflags & HI(sfpz)) ? VIEW_SHIFT : 0;
 }
 /* the rink's screen mode and plane A's scroll, after a setVram or a screen over the rink */
 void view_rink_mode(void);

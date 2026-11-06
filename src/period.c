@@ -145,14 +145,14 @@ static uint16_t team_logo(uint16_t team, uint16_t chars)
  * to matchuptimer, in 2 or 3 columns */
 static void period_num(const struct Team *tm, int k)
 {
-    uint16_t v = g.matchup ? tm->pershots[k] : tm->pergoals[k];
+    uint16_t v = g.matchup ? tm->tmPerShots[k] : tm->tmPerGoals[k];
     g.matchuptimer += v;
     printz(str_PeriodStatsScreen_15, sizeof str_PeriodStatsScreen_15);
     g.printx -= 3;
     print(PushNumberWidth(v, (int16_t)v < 0x64 ? 2 : 3));
 }
 
-/* PeriodStatsScreen's .team: team a2's goals (or shots, matchup) by period, then the total */
+/* PeriodStatsScreen's .tmteam: team a2's goals (or shots, matchup) by period, then the total */
 static void period_team(struct Team *tm)
 {
     g.matchuptimer = 0;
@@ -176,7 +176,7 @@ static void period_team(struct Team *tm)
     print(PushNumberWidth(g.matchuptimer, (int16_t)g.matchuptimer < 0x64 ? 2 : 3));
 }
 
-/* PeriodStatsScreen's .title and .lines */
+/* PeriodStatsScreen's .title and .tmlines */
 static void period_title(void)
 {
     if (g.matchup) printz(str_PeriodStatsScreen_11, sizeof str_PeriodStatsScreen_11);
@@ -352,8 +352,8 @@ void PrintStatValue(const uint8_t *a0, struct Team *tm)
     wr16(g.mesarea, 2);
     uint16_t off = rd16(a0);
     if (off == 0xFFFF) {
-        uint32_t d0 = (uint32_t)tm->score * 0x64;
-        uint16_t d1 = tm->shots;
+        uint32_t d0 = (uint32_t)tm->tmscore * 0x64;
+        uint16_t d1 = tm->tmshots;
         if (d1 != 0) d0 = m68k_divu(d0, d1);
         appstring(PushNumber((uint16_t)d0), mes);
         appendz(str_PrintStatValue_1, sizeof str_PrintStatValue_1, mes);
@@ -393,13 +393,13 @@ void updatePPTeamTime(void)
 {
     if (!(g.sflags2 & HI(sf2pwrplay))) return;
     struct Team *tm = team_struct((g.sflags2 & HI(sf2pwrtm)) != 0);
-    tm->pptime++;
+    tm->tmPwrPlayTime++;
 }
 
 /* period94.asm:GetTeamRating. The TeamRatings byte of team $28(a2). */
 uint16_t GetTeamRating(struct Team *tm)
 {
-    return rosters_team(tm->team)->rating;
+    return rosters_team(tm->tmteam)->rating;
 }
 
 /* period94.asm:ShortenMsgTimer. Cap msgtimer at 2, unless a second pad is on and a3 is not the

@@ -13,7 +13,7 @@ void LeadSong(void)
     uint16_t saved = g.sflags2;
     if (g.gmode2 & HI(1)) { LeadSongExit(saved); return; }
     struct Team *leader = team_struct(1);
-    int16_t diff = (int16_t)(team_struct(0)->ap - team_struct(1)->ap);
+    int16_t diff = (int16_t)(team_struct(0)->tmap - team_struct(1)->tmap);
     if (diff == 0) { LeadSongExit(saved); return; }
     if (diff < 0) {
         if (!(g.sflags2 & HI(6))) { ClearLeadSong(); g.sflags2 |= HI(6); }
@@ -42,7 +42,7 @@ void ClearPenalties(void)
 {
     g.PBnum = 0;
     g.Penaltytimer = 0;
-    g.Pencntdwn = 0;
+    g.PenCntDwn = 0;
     ram_fill(RAM(PenBuf), 0, 0x44);                       /* 17 longs: PenBuf and the word after */
     clrTmPdst(team_struct(0));
     clrTmPdst(team_struct(1));
@@ -51,8 +51,8 @@ void ClearPenalties(void)
 /* logos94.asm:clrTmPdst. Team a0: all 26 roster slots on the bench (-2), then the end word -1. */
 void clrTmPdst(struct Team *tm)
 {
-    for (int i = 0; i < 26; i++) tm->pdst[i] = 0xFFFE;
-    tm->penbox[0] = tm->penbox[1] = 0xFF;                 /* (the end word -1 after them: the penalty box empty) */
+    for (int i = 0; i < 26; i++) tm->tmpdst[i] = 0xFFFE;
+    tm->tmboxlist[0] = tm->tmboxlist[1] = 0xFF;                 /* (the end word -1 after them: the penalty box empty) */
 }
 
 /* logos94.asm:HotColdIcon. Team a2: the icon by the name of iconplayer (x 2 away, $20 home,

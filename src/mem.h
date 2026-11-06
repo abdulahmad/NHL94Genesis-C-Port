@@ -3,7 +3,7 @@
  * written where ram_host_ says the host keeps it, so the 68000's big-endian view holds over fields
  * of any width (the playbook's NATIVE-STATE.md).
  *
- * The game reads its state by name (g.x, tm->score, the replay frames, the sound driver's slots);
+ * The game reads its state by name (g.x, tm->tmscore, the replay frames, the sound driver's slots);
  * what still goes by machine address, on purpose: addresses the game keeps or passes as data (m8
  * and its kin follow them, cartridge or RAM), a region's second use in another layout than its own
  * (the replay area as the save RAM's copy and the highlight's keep, the sort objects as the

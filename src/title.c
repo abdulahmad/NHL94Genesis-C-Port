@@ -37,7 +37,7 @@ void TitleScreen(void)
     cpu_set_sr(0x2700);
     uint16_t hi = vdp_hv16();                             /* the seed from the HV counter: its high word first */
     g.seed = (uint32_t)hi << 16 | vdp_hv16();
-    g.vbint = SYM_VBlank_TitleScreen;
+    g.VBint = SYM_VBlank_TitleScreen;
     g.disflags |= HI(df32c);
     screen_layout();
     setVram(0);
@@ -120,15 +120,15 @@ uint32_t CreditsPrintRow(uint32_t a1)
  * the pads -> Start pressed (the 68k then returns from its caller too). */
 int CreditsWait(void)
 {
-    uint16_t v = g.vcount;
-    while (g.vcount == v) hal_wait_vblank();
+    uint16_t v = g.Vcount;
+    while (g.Vcount == v) hal_wait_vblank();
     g.clampcounter -= 2;
     if ((int16_t)g.clampcounter < 0) g.clampcounter = 0;
     return (orjoy() & 0x80) != 0;
 }
 
 /* title94.asm:VBlank_TitleScreen. The title's vblank: unless dfng, the line scroll table (at
- * SortCords) and Vscroll, the sprites, the fade; then vcount, CreditsScrollStep and the music. */
+ * SortCords) and Vscroll, the sprites, the fade; then Vcount, CreditsScrollStep and the music. */
 void VBlank_TitleScreen(void)
 {
     if (!(g.disflags & HI(dfng))) {
@@ -142,7 +142,7 @@ void VBlank_TitleScreen(void)
         }
         cramfade();
     }
-    g.vcount++;
+    g.Vcount++;
     CreditsScrollStep();
     p_music_vblank();
 }

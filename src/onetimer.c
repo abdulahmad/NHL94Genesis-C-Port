@@ -120,7 +120,7 @@ void assonetimer(struct Team *tm, struct SortObj *o)
             g.sflags8 &= (uint8_t)~0x20;
             g.onetimerflags = 0;
             g.onetimerclock[0] = 0;
-            ST_W(g.passplayer);
+            ST_W(g.passReceiverPlayerNum);
             uint16_t d0 = (uint16_t)o->SCnum;
             g.onetimerplayer = d0;
             if (!PFLAG(o, pfjoycon) && (int16_t)g.inputjoy >= 0) {
@@ -242,14 +242,14 @@ void onetimershot(struct SortObj *a2, struct SortObj *o)
     doshot(o);
     struct Team *tm = team_struct(PFLAG(o, pfteam));
     uint16_t d0 = o->pnum;
-    if (!rules[RULE_ASSIST_FIX] || d0 != tm->assist1)            /* (rules: a give-and-go keeps the second assist) */
-        tm->assist2 = tm->assist1;
-    tm->assist1 = tm->lasttouch;
-    tm->lasttouch = d0;
+    if (!rules[RULE_ASSIST_FIX] || d0 != tm->tmtouch2)            /* (rules: a give-and-go keeps the second assist) */
+        tm->tmtouch3 = tm->tmtouch2;
+    tm->tmtouch2 = tm->tmtouch1;
+    tm->tmtouch1 = d0;
     g.sflags8 |= 0x80;
-    g.crowdlevel += 0x96;
+    g.Crowdlevel += 0x96;
     g.CwdExciteLvl += 0xA;
-    tm->onetimers++;                                                  /* one-timer attempts */
+    tm->tmOneTimers++;                                                  /* one-timer attempts */
     g.onetimerflags |= HI(0);
     o->pflags2 |= 2;
     g.sflags6 |= HI(1);

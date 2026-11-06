@@ -22,7 +22,7 @@ void hal_wait_vblank(void)
 {
     if (replay_irq()) return;
     replay_fail("vblank wait with no recorded interrupt");
-    g.disflags &= (uint16_t)~HI(dfok); g.vcount++; g.palcount = 0xFFFF;
+    g.disflags &= (uint16_t)~HI(dfok); g.Vcount++; g.palcount = 0xFFFF;
 }
 /* Writes are checked against the capture's write log, in order (captures made before the shim
  * logged writes have none, and then nothing is checked). */

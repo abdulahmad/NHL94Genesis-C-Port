@@ -65,14 +65,14 @@ uint16_t LoadHomeTeamGfx(uint16_t start)
 void PrintPlayerAssists(uint16_t player, struct Team *tm)
 {
     printz(str_PrintPlayerAssists_1, sizeof str_PrintPlayerAssists_1);
-    PrintParenNumber(tm->passists, player);
+    PrintParenNumber(tm->tmassists, player);
 }
 
 /* ui94.asm:PrintPlayerGoals. d0 = player, a2 = team: " (goals)", next row. */
 void PrintPlayerGoals(uint16_t player, struct Team *tm)
 {
     printz(str_PrintPlayerGoals_1, sizeof str_PrintPlayerGoals_1);
-    PrintParenNumber(tm->pgoals, player);
+    PrintParenNumber(tm->tmgoals, player);
 }
 
 /* ui94.asm:PrintParenNumber. " (n)" with byte d0 of the team table, then the next
@@ -167,7 +167,7 @@ void DrawPlayoffSprite(void)
  * the fades-only vblank, for $50 x 4 frames or until a button. */
 void HiScoreScreen(void)
 {
-    g.vbint = SYM_vb2;
+    g.VBint = SYM_vb2;
     g.disflags &= (uint16_t)~HI(df32c);
     screen_layout();
     forceblack();
@@ -202,7 +202,7 @@ void HiScoreScreen(void)
 struct Team *GetTeamStruct(uint16_t team)
 {
     struct Team *tm = team_struct(0);
-    return tm->team == team ? tm : team_struct(1);
+    return tm->tmteam == team ? tm : team_struct(1);
 }
 
 /* ui94.asm:CountButtonPress. Count a button press of pad d4 (homepresses / awaypresses), and

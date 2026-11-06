@@ -147,10 +147,10 @@ void PutTeamBlock(uint16_t off)
     g.disflags = saved;
 }
 
-/* menu94.asm:MenuWaitVblank. Wait until vcount moves off oldvcount, then put it back. */
+/* menu94.asm:MenuWaitVblank. Wait until Vcount moves off OldVcount, then put it back. */
 void MenuWaitVblank(void)
 {
-    uint16_t v = g.oldvcount;
-    while (g.vcount == v) hal_wait_vblank();
-    g.vcount = g.oldvcount;
+    uint16_t v = g.OldVcount;
+    while (g.Vcount == v) hal_wait_vblank();
+    g.Vcount = g.OldVcount;
 }

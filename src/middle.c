@@ -32,11 +32,11 @@ static void fade_black(uint16_t count)
     for (int i = 0; i < 0x40; i++) g.palfadenew[i] = keep[i];
 }
 
-/* the vblank interrupt advances vcount; the 68k spins on it (.0 cmp.w (vcount).w,d0 / beq.s .0) */
+/* the vblank interrupt advances Vcount; the 68k spins on it (.0 cmp.w (Vcount).w,d0 / beq.s .0) */
 static void wait_vcount(void)
 {
-    uint16_t v = g.vcount;
-    while (g.vcount == v) hal_wait_vblank();
+    uint16_t v = g.Vcount;
+    while (g.Vcount == v) hal_wait_vblank();
 }
 
 /* ReadJoy1-4: read pad n -> d0 = direction and buttons, d1 = new presses, d2 = changed
@@ -141,14 +141,14 @@ void forceblack2(void) { fade_black(0x64); }
 void forcefade(void)
 {
     uint16_t sr = cpu_get_sr();
-    uint32_t vbint = g.vbint;
+    uint32_t VBint = g.VBint;
     uint16_t saved = g.disflags;
     g.disflags &= (uint16_t)~HI(dfng);
-    g.vbint = SYM_vb2;
+    g.VBint = SYM_vb2;
     cpu_set_sr(0x2500);
     while ((int16_t)g.palcount >= 0) hal_wait_vblank();
     g.disflags = saved;
-    g.vbint = vbint;
+    g.VBint = VBint;
     cpu_set_sr(sr);
 }
 
@@ -254,11 +254,11 @@ void song(int16_t n)
 
 /* middle94.asm:waitx. d0 = frames: wait that many vblanks or until a button is pressed on any
  * pad (pads 3 and 4 in four way play). waitxpad = the buttons held. Returns the last ReadJoy
- * results (d0 = vcount when the time ran out). */
+ * results (d0 = Vcount when the time ran out). */
 void waitx(uint16_t frames, uint16_t *d0, uint16_t *d1, uint16_t *d2, uint16_t *d3)
 {
     g.waitxpad = 0;
-    g.vcount = (uint16_t)-frames;
+    g.Vcount = (uint16_t)-frames;
     for (;;) {
         ReadJoy1(d0, d1, d2, d3);
         g.waitxpad = *d3;
@@ -274,7 +274,7 @@ void waitx(uint16_t frames, uint16_t *d0, uint16_t *d1, uint16_t *d2, uint16_t *
             g.waitxpad |= *d3;
             if (*d1) return;
         }
-        *d0 = g.vcount;
+        *d0 = g.Vcount;
         wait_vcount();
         if ((int16_t)*d0 >= 0) return;
     }
@@ -288,9 +288,9 @@ uint16_t waitxsr(uint16_t frames)
 {
     int16_t keep_elapsed = elapsed;
     uint16_t d0, d1, d2, d3;
-    g.vcount = (uint16_t)-frames;
+    g.Vcount = (uint16_t)-frames;
     for (;;) {
-        if (g.zamx <= 0x708) g.zamx++;
+        if (g.Zamx <= 0x708) g.Zamx++;
         elapsed = 1;
         updatecrowdf();
         RunArenaAnim();
@@ -321,13 +321,13 @@ uint16_t waitxsr(uint16_t frames)
             }
         }
         if (key) {
-            int16_t left = (int16_t)g.vcount;
+            int16_t left = (int16_t)g.Vcount;
             if (left >= -0x78) left = -0x78;
             if (HandleMenuInput(&d1)) { d1 |= 0x80; break; }
-            g.vcount = (uint16_t)left;
+            g.Vcount = (uint16_t)left;
         }
         setvideo();
-        d0 = g.vcount;
+        d0 = g.Vcount;
         wait_vcount();
         if ((int16_t)d0 >= 0) break;
     }
@@ -386,25 +386,25 @@ void ProcessInputWithRepeat(uint16_t *d1, uint16_t d2, uint16_t d3)
     *d1 = d3;
 }
 
-/* middle94.asm:ReadJoy1. Pad 1 (pad4way1). */
+/* middle94.asm:ReadJoy1. Pad 1 (PadRaw1). */
 void ReadJoy1(uint16_t *d0, uint16_t *d1, uint16_t *d2, uint16_t *d3)
 {
-    uint16_t last = g.lj1; read_pad(g.pad4way1, &last, d0, d1, d2, d3); g.lj1 = last;
+    uint16_t last = g.lj1; read_pad(g.PadRaw1, &last, d0, d1, d2, d3); g.lj1 = last;
 }
-/* middle94.asm:ReadJoy2. Pad 2 (pad4way2). */
+/* middle94.asm:ReadJoy2. Pad 2 (PadRaw2). */
 void ReadJoy2(uint16_t *d0, uint16_t *d1, uint16_t *d2, uint16_t *d3)
 {
-    uint16_t last = g.lj2; read_pad(g.pad4way2, &last, d0, d1, d2, d3); g.lj2 = last;
+    uint16_t last = g.lj2; read_pad(g.PadRaw2, &last, d0, d1, d2, d3); g.lj2 = last;
 }
-/* middle94.asm:ReadJoy3. Four way play pad 3 (pad4way3). */
+/* middle94.asm:ReadJoy3. Four way play pad 3 (PadRaw3). */
 void ReadJoy3(uint16_t *d0, uint16_t *d1, uint16_t *d2, uint16_t *d3)
 {
-    uint16_t last = g.lj3; read_pad(g.pad4way3, &last, d0, d1, d2, d3); g.lj3 = last;
+    uint16_t last = g.lj3; read_pad(g.PadRaw3, &last, d0, d1, d2, d3); g.lj3 = last;
 }
-/* middle94.asm:ReadJoy4. Four way play pad 4 (pad4way4). */
+/* middle94.asm:ReadJoy4. Four way play pad 4 (PadRaw4). */
 void ReadJoy4(uint16_t *d0, uint16_t *d1, uint16_t *d2, uint16_t *d3)
 {
-    uint16_t last = g.lj4; read_pad(g.pad4way4, &last, d0, d1, d2, d3); g.lj4 = last;
+    uint16_t last = g.lj4; read_pad(g.PadRaw4, &last, d0, d1, d2, d3); g.lj4 = last;
 }
 
 /* middle94.asm:ReadJoy. d0 = pad byte (active low) -> d0 = direction 0-8 (jdtab) in bits 0-3 and
@@ -497,7 +497,7 @@ void setVram(uint16_t colour)
 }
 
 /* middle94.asm:setVram_0. Clear VRAM and set the VDP registers from disflags (32 / 40 columns),
- * Map1col1 (64 or 128 wide), VmMap1-3, VSPRITES and VSCRLPM; no window, whole-screen scroll. */
+ * Map1col (64 or 128 wide), VmMAP1-3, VSPRITES and VSCRLPM; no window, whole-screen scroll. */
 void setVram_0(void)
 {
     uint16_t saved = g.disflags;

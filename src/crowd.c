@@ -124,7 +124,7 @@ void Create_HotCold_Table(struct Team *tm)
 /* crowd94.asm:HotColdLoop. The loop of Create_HotCold_Table from entry d1 down. */
 void HotColdLoop(struct Team *tm, int16_t d1)
 {
-    uint8_t *hc = tm->hotcold[0];                         /* (the table, row after row) */
+    uint8_t *hc = tm->tmHotCold[0];                         /* (the table, row after row) */
     for (; d1 >= 0; d1--)
         hc[d1] = (uint8_t)randomd0s(9);
 }
@@ -142,7 +142,7 @@ uint16_t Clamp0to100(int16_t v)
 uint8_t AttributeCalc(uint8_t v, struct SortObj *o)
 {
     struct Team *tm = team_struct(PFLAG(o, pfteam));
-    int32_t hc = (int8_t)tm->hotcold[o->pnum][0];
+    int32_t hc = (int8_t)tm->tmHotCold[o->pnum][0];
     hc = (int16_t)m68k_divs(hc, 3);
     hc = rule_scale(RULE_STREAKS, hc);                    /* (rules: the streaks' effect) */
     int16_t d3 = (int16_t)(v * 5 + hc);
@@ -186,8 +186,8 @@ void BuildHotColdLists(void)
  * TempBuffer (byte pairs: player, sum), then sort them by sum. */
 void SortHotColdStarters(struct Team *tm)
 {
-    const uint8_t *hc = tm->hotcold[0];                   /* (the table, row after row) */
-    const uint8_t *a0 = rosters_team(tm->team)->lines[0];           /* the starters */
+    const uint8_t *hc = tm->tmHotCold[0];                   /* (the table, row after row) */
+    const uint8_t *a0 = rosters_team(tm->tmteam)->lines[0];           /* the starters */
     uint8_t *a1 = g.TempBuffer;
     for (int i = 0; i < 6; i++) {
         uint8_t d1 = (uint8_t)(*a0++ - 1);

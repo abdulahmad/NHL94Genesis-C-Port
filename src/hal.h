@@ -19,7 +19,7 @@ uint8_t vdp_hv8(void);       /* move.b (VDP_CNTR).l: V counter */
 uint16_t vdp_hv16(void);     /* move.w (VDP_CNTR).l: HV counter word */
 uint16_t vdp_status(void);   /* move.w (VDP_CTRL).l: status word (bit 1 = DMA busy) */
 uint16_t vdp_read(void);     /* move.w (VDP_DATA).l: read at the current address */
-void hal_wait_vblank(void);  /* spin until vcount changes */
+void hal_wait_vblank(void);  /* spin until Vcount changes */
 void vdp_ctrl(uint32_t v);   /* move.l to the VDP control port (a command: two words) */
 void vdp_ctrl16(uint16_t v); /* move.w to the VDP control port (a register write or half a command) */
 void vdp_data(uint16_t v);   /* move.w to the VDP data port */

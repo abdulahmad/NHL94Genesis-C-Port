@@ -37,7 +37,7 @@ void ReplayMode(void)
     g.sflags &= (uint16_t)~HI(sfscrl);
     g.sflags3 &= (uint8_t)~0x20;
     g.pads[3].Yfrac |= 0xFF00;                            /* st replayactive: the camera's Yfrac, its high byte */
-    struct RinkObj *cam = &g.pads[3];                     /* a5, the camera (ReplayStarStruct): Xpos, Ypos its place, Yfrac the
+    struct RinkObj *cam = &g.pads[3];                     /* a5, the camera (CameraPosStruct): Xpos, Ypos its place, Yfrac the
                                                            * object it follows, Zpos < 0 none (not read while sfscrl is clear) */
     uint32_t a4 = g.recbpr;
     do elapsed = (int16_t)suba4(&a4, cam); while (elapsed != 0);
@@ -48,8 +48,8 @@ void ReplayMode(void)
     g.palcount = 0x18;
     elapsed = 1;
     for (;;) {                                            /* .top */
-        while ((uint16_t)elapsed > (uint16_t)(g.vcount - g.oldvcount)) hal_wait_vblank();
-        g.oldvcount = g.vcount;
+        while ((uint16_t)elapsed > (uint16_t)(g.Vcount - g.OldVcount)) hal_wait_vblank();
+        g.OldVcount = g.Vcount;
         if ((int16_t)g.replayicontimer >= 0) {
             g.replayicontimer = (uint16_t)(g.replayicontimer - elapsed);
             if ((int16_t)g.replayicontimer < 0) { g.replayicontimer = 0; EraseReplayIcon(); }
@@ -379,7 +379,7 @@ uint16_t RestoreReplayFrame(uint32_t frame, struct RinkObj *cam)
     g.lastsfx = (uint16_t)(int16_t)(int8_t)f->lastsfx;
     uint16_t d7 = f->elapsed;
     g.PadControlBits = (uint16_t)((g.PadControlBits & 0xF000) | (f->padbits & 0xFFF));
-    g.crowdframe = f->crowdframe;
+    g.Crowdframe = f->Crowdframe;
     g.glovecords = f->glovecords;
     g.PBnum = (uint16_t)((f->pbnum << 8) | (g.PBnum & 0xFF));
     g.PadControlBits34 = (uint16_t)((f->padbits34 << 4) | 0xF00F);
@@ -391,8 +391,8 @@ uint16_t RestoreReplayFrame(uint32_t frame, struct RinkObj *cam)
         }
         UpdateCameraPos(o, cam);
     } else {
-        g.Hpos = f->hpos;
-        g.Vpos = f->vpos;
+        g.Hpos = f->Hpos;
+        g.Vpos = f->Vpos;
         if (rev) {
             g.Hpos = (uint16_t)-g.Hpos;
             g.Vpos = (uint16_t)-g.Vpos;
@@ -462,10 +462,10 @@ void updatereplay(void)
     g.lastsfx |= 0x80;
     f->elapsed = (uint8_t)elapsed;
     f->padbits = g.PadControlBits;
-    f->crowdframe = g.crowdframe;
+    f->Crowdframe = g.Crowdframe;
     f->glovecords = g.glovecords;
     f->pbnum = (uint8_t)(g.PBnum >> 8);
     f->padbits34 = (uint8_t)(g.PadControlBits34 >> 4);
-    f->hpos = g.Hpos;
-    f->vpos = g.Vpos;
+    f->Hpos = g.Hpos;
+    f->Vpos = g.Vpos;
 }

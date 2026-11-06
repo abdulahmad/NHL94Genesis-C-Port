@@ -26,19 +26,19 @@ static uint16_t long_count(const struct Unpack *u)
  * that follows the call (cb, its 68k address) as the remap table. */
 uint16_t DecompressGraphicsWithRemap(uint32_t tiles, uint16_t start, uint32_t cb)
 {
-    g.callbackPtr = cb;
+    g.remapTablePtr = cb;
     return DecompressGraphics(tiles, start);
 }
 
 /* decompress94.asm:DecompressGraphicsPlain. DecompressGraphics without a remap table. */
 uint16_t DecompressGraphicsPlain(uint32_t tiles, uint16_t start)
 {
-    g.callbackPtr = 0;
+    g.remapTablePtr = 0;
     return DecompressGraphics(tiles, start);
 }
 
 /* decompress94.asm:DecompressGraphics. a2 = graphics (a word count of tiles, bit 15 = packed, then
- * the data), d4 = first char: load them at char d4 (DMA, remap through callbackPtr, or
+ * the data), d4 = first char: load them at char d4 (DMA, remap through remapTablePtr, or
  * DecompressBytecode) -> d4 = next char. */
 uint16_t DecompressGraphics(uint32_t tiles, uint16_t start)
 {
@@ -54,8 +54,8 @@ uint16_t DecompressGraphics(uint32_t tiles, uint16_t start)
     }
     start += n;
     uint16_t words = (uint16_t)(n << 4);
-    if (g.callbackPtr == 0) DoDMApro(data, words, vram);
-    else remap(data, g.callbackPtr, words, vram);
+    if (g.remapTablePtr == 0) DoDMApro(data, words, vram);
+    else remap(data, g.remapTablePtr, words, vram);
     return start;
 }
 
@@ -179,12 +179,12 @@ int Opcode_CopyBackwardReverseLong(struct Unpack *u)
 }
 
 /* decompress94.asm:FlushOutputBuffer. Send the ring buffer (all 256 bytes when it wrapped, else the
- * idx bytes in it) to the VRAM address d3, through remap when callbackPtr is set, and advance d3. */
+ * idx bytes in it) to the VRAM address d3, through remap when remapTablePtr is set, and advance d3. */
 void FlushOutputBuffer(struct Unpack *u)
 {
     uint16_t words = (uint16_t)((u->idx ? u->idx : 0x100) >> 1);
     uint16_t vram = u->vram;
     u->vram = (uint16_t)(u->vram + 2 * words);
-    if (g.callbackPtr) remap(ram_addr(u->ring), g.callbackPtr, words, vram);
+    if (g.remapTablePtr) remap(ram_addr(u->ring), g.remapTablePtr, words, vram);
     else DoDMApro(ram_addr(u->ring), words, vram);
 }
