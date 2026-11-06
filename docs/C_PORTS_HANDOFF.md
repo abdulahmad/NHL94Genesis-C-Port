@@ -7,7 +7,7 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 
 ## Now
 
-G6 ram.h names stacked on G5 [#9](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/9) as [#10](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/10). `ram.h` field names and `RAM_OFF_*` match `ram94.asm` equates; offsets unchanged. Typed regions keep C collection names (`maps`, `teams`, `matchups`, `replay`, `menu`). Names 840/0/0/0. Do not merge to main. Frame gates not run here (no captures/vectors/golden) — the next machine that has them must run before merge.
+G0–G6 merged to `main` (leftover ROM order [#4](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/4) through ram.h [#10](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/10)). Names 840/0/0/0. Frame gates were not run in the merge environment (no captures/vectors/golden) — run `make test && make lockstep && make golden-check` on a machine that has them. E6 Original lockstep stays parked.
 
 ## Done
 
