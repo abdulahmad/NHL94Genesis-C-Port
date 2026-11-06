@@ -92,7 +92,7 @@ SDLLIBS := $(filter-out -mwindows,$(shell pkg-config --libs sdl2))
 BIN    ?= build/nhl94$(EXE)
 OBJ    ?= build/obj
 NOBJ   := $(SRC:%.c=$(OBJ)/%.o) $(NATIVE:%.c=$(OBJ)/%.o)
-OVERBARO := $(OBJ)/native/overbar/scaler.o
+OVERBARO := $(OBJ)/native/overbar/scaler.o $(OBJ)/native/overbar/host.o $(OBJ)/native/overbar/present.o
 NFLAGS  = $(CFLAGS) $(SANITIZE) -O2 -Isrc -Inative -I$(MDRT)/include -Inative/overbar/include $(shell pkg-config --cflags sdl2)
 MDRTHDR := $(wildcard $(MDRT)/include/mdrt/*.h)
 nhl94: $(BIN)
@@ -116,7 +116,7 @@ FORCE:
 $(OBJ)/icon.o: res/icon.rc res/icon.ico
 	@mkdir -p $(dir $@)
 	$(WINDRES) -I res $< -O coff -o $@
-$(OBJ)/native/overbar/scaler.o: native/overbar/src/scaler.c native/overbar/include/overbar/overbar.h
+$(OBJ)/native/overbar/%.o: native/overbar/src/%.c native/overbar/include/overbar/overbar.h
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -c $< -o $@
 $(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt

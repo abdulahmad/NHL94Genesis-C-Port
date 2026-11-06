@@ -22,21 +22,28 @@ static int watch(void *user, SDL_Event *e)
     return 1;
 }
 
-static void seed_keys(void)
+static void seed_keys(ob_profile profile)
 {
     FILE *f = fopen("settings.ini", "r");
     if (f) { fclose(f); return; }
     f = fopen("settings.ini", "w");
     if (!f) return;
     /* PulseMan fills the rest of the file on first run. Grave opens overlay; F11
-     * is remapped to Grave. Record is not F11 (Capture page). */
+     * is remapped to Grave. Record is not F11 (Capture page). Handheld: fullscreen
+     * 4:3 integer, vsync on, 60 Hz panel (PulseMan has no VRR). */
     fprintf(f, "key.menu = Grave\nkey.record =\n");
+    if (profile == OB_PROFILE_HANDHELD) {
+        fprintf(f, "video.scale = integer\nvideo.aspect = 4:3\nvideo.vsync = on\n");
+        fprintf(f, "window.fullscreen = 1\n");
+    }
     fclose(f);
 }
 
 void overbar_install(void)
 {
-    seed_keys();
+    ob_profile profile = ob_profile_from_env();
+    ob_present_apply_hints(profile);
+    seed_keys(profile);
     SDL_AddEventWatch(watch, NULL);
 }
 

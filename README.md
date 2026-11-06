@@ -59,6 +59,8 @@ make nhl94
 ./build/nhl94          # the first time, it asks for your ROM (or give it with --rom FILE)
 ```
 
+**PortMaster / RG35XX:** zip layout and launch script are in [`portmaster/`](portmaster/). Handheld first launch is 60 Hz, overlay only, SDL_Renderer / KMSDRM (no desktop OpenGL). Copy your dump to `roms/nhl94.gen`. `./portmaster/pack.sh` builds `nhl94g.zip`. Private zip; the ROM is never included.
+
 | | Player 1 | Player 2 |
 |---|---|---|
 | D-pad | arrows | I J K L |
