@@ -4,38 +4,6 @@
 #include "hal.h"
 #include "symbols_gen.h"
 
-/* sram94.asm:ReadSRAM. d0 = first save RAM byte, d1 = count, a0 = destination. */
-void ReadSRAM(uint32_t at, uint32_t count, uint32_t dst)
-{
-    uint16_t off = (uint16_t)(at << 1);
-    rp p = ram_at(dst);
-    uint16_t n = (uint16_t)(count - 1);
-    do { w8_next(&p, sram_read8((uint32_t)(int16_t)off + 1)); off += 2; } while (n-- != 0);
-}
-
-/* sram94.asm:WriteSRAM. d0 = first save RAM byte, d1 = count, a0 = source (each byte written as
- * the low byte of a word). */
-void WriteSRAM(uint32_t at, uint32_t count, uint32_t src)
-{
-    uint16_t off = (uint16_t)(at << 1);
-    uint32_t p = src;
-    uint16_t n = (uint16_t)(count - 1);
-    do { sram_write16((uint32_t)(int16_t)off, m8(p++)); off += 2; } while (n-- != 0);
-}
-
-/* sram94.asm:MakeSRAMChecksum. Read all of save RAM to M68K_RAM, put the byte sum of bytes
- * 0-$1FFD in byte $1FFF and its complement in $1FFE, and write those two back. */
-void MakeSRAMChecksum(void)
-{
-    ReadSRAM(0, 0x2000, RAM_BASE);
-    rp ram = ram_at(RAM_BASE);
-    uint8_t sum = 0;
-    for (int i = 0; i < 0x1FFE; i++) sum = (uint8_t)(sum + r8(ram, i));
-    w8(ram, 0x1FFF, sum);
-    w8(ram, 0x1FFE, (uint8_t)~sum);
-    WriteSRAM(0x1FFE, 2, RAM_BASE + 0x1FFE);
-}
-
 /* sram94.asm:InitSaveRAM. Copy save RAM to work RAM $0000-$1FFF and check it (ValidateSRAM); a
  * bad one is cleared and read again. With the vblank counting vcount only (VBcount). Two
  * power-on tests that never return: Start+A+C held writes and reads back every bit of every
@@ -117,4 +85,36 @@ void ClearSRAM(void)
     w8(ram, 0, 1);
     WriteSRAM(1, 1, RAM_BASE);
     MakeSRAMChecksum();
+}
+
+/* sram94.asm:WriteSRAM. d0 = first save RAM byte, d1 = count, a0 = source (each byte written as
+ * the low byte of a word). */
+void WriteSRAM(uint32_t at, uint32_t count, uint32_t src)
+{
+    uint16_t off = (uint16_t)(at << 1);
+    uint32_t p = src;
+    uint16_t n = (uint16_t)(count - 1);
+    do { sram_write16((uint32_t)(int16_t)off, m8(p++)); off += 2; } while (n-- != 0);
+}
+
+/* sram94.asm:MakeSRAMChecksum. Read all of save RAM to M68K_RAM, put the byte sum of bytes
+ * 0-$1FFD in byte $1FFF and its complement in $1FFE, and write those two back. */
+void MakeSRAMChecksum(void)
+{
+    ReadSRAM(0, 0x2000, RAM_BASE);
+    rp ram = ram_at(RAM_BASE);
+    uint8_t sum = 0;
+    for (int i = 0; i < 0x1FFE; i++) sum = (uint8_t)(sum + r8(ram, i));
+    w8(ram, 0x1FFF, sum);
+    w8(ram, 0x1FFE, (uint8_t)~sum);
+    WriteSRAM(0x1FFE, 2, RAM_BASE + 0x1FFE);
+}
+
+/* sram94.asm:ReadSRAM. d0 = first save RAM byte, d1 = count, a0 = destination. */
+void ReadSRAM(uint32_t at, uint32_t count, uint32_t dst)
+{
+    uint16_t off = (uint16_t)(at << 1);
+    rp p = ram_at(dst);
+    uint16_t n = (uint16_t)(count - 1);
+    do { w8_next(&p, sram_read8((uint32_t)(int16_t)off + 1)); off += 2; } while (n-- != 0);
 }

@@ -1034,14 +1034,14 @@ void MenuWaitVblank(void);
 uint16_t Pausemode_top(uint32_t items, uint32_t draw);  /* a0, a1 (falls into DrawMenuScreen) -> d1 */
 
 /* ---- sram94.asm: save RAM ---- */
-void ReadSRAM(uint32_t at, uint32_t count, uint32_t dst);   /* d0, d1, a0 */
-void WriteSRAM(uint32_t at, uint32_t count, uint32_t src);  /* d0, d1, a0 */
-void MakeSRAMChecksum(void);
 void InitSaveRAM(void);
 void SRAMWaitVblank(void);
 void VBcount(void);
 void ValidateSRAM(void);
 void ClearSRAM(void);
+void WriteSRAM(uint32_t at, uint32_t count, uint32_t src);  /* d0, d1, a0 */
+void MakeSRAMChecksum(void);
+void ReadSRAM(uint32_t at, uint32_t count, uint32_t dst);   /* d0, d1, a0 */
 
 /* ---- fourway94.asm: four way play ---- */
 void Detect4WayPlay(void);
