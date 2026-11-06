@@ -864,26 +864,11 @@ void CalcWinPercents(void);
 void ReadTeamRecords(void);
 
 /* ---- cards94.asm: player cards and the save RAM records ---- */
-void wallcollduringcheck(struct SortObj *a2, struct SortObj *a3);
-void CountGoalies(void);
-void CrowdRecordIO(uint32_t team, uint32_t buf);        /* d1, a0 */
-void ReadCrowdRecord(uint32_t team, uint32_t buf);     /* d1, a0 */
-void setSlotBit(void);
-void CountPlayers(void);                                /* and sram94: the save records */
-void PlayerRecordIO(uint32_t slot, uint16_t team, uint32_t buf);   /* d0, d1, a0 */
-void ReadPlayerRecord(uint32_t slot, uint16_t team, uint32_t buf);
-void WritePlayerRecord(uint32_t slot, uint16_t team, uint32_t buf);
-void TeamRecordIO(uint32_t team, uint32_t buf);        /* d1, a0 */
-void ReadTeamRecord(uint32_t team, uint32_t buf);
-void WriteTeamRecord(uint32_t team, uint32_t buf);
-void WriteCrowdRecord(uint32_t team, uint32_t buf);
-void UpdatePlayerRecords(uint32_t team, uint32_t buf, struct Team *tm, uint16_t goalies, uint16_t opponent);     /* d1, a0, a2, d5, d6 */
-void UpdateTeamRecord(uint32_t buf, uint32_t rec_no, uint16_t other, uint16_t team, uint16_t vs, struct Team *a1, struct Team *a2);       /* a0, d1, d2, d3, d4, a1, a2 */
-void UpdateCrowdRecord(uint32_t buf, uint32_t team, uint16_t opp, uint16_t user, uint16_t opp_user, uint16_t goalies, struct Team *tm);     /* a0, d1, d2, d4, d5, d6, a1 */
-void UpdateRecords(void);
 void ResetCardTimer(void);
 void PlayerCardTimer(void);
 void PlayerCardScreen(void);
+void wallcollduringcheck(struct SortObj *a2, struct SortObj *a3);
+void setSlotBit(void);
 void PrintRecordValue(uint32_t buf, uint16_t team, uint16_t player);   /* a1, d0, d1 */
 void CopyString(uint32_t src, uint32_t dst);            /* a1, a3 */
 void AppendNumber(uint16_t n, uint32_t buf);            /* d0, a1 */
@@ -892,25 +877,38 @@ void PrintRecordHolder(uint32_t buf, uint16_t team, uint16_t player, uint32_t re
 void PrintRecordVs(uint32_t buf, uint16_t team, uint16_t player, uint32_t rec);
 void AppendRecordHolder(uint32_t buf, uint16_t team, uint16_t player, uint32_t rec);
 void AppendRecordVs(uint32_t buf, uint16_t team, uint16_t player, uint32_t rec);
+void ReadPlayerRecord(uint32_t slot, uint16_t team, uint32_t buf);
+void PlayerRecordIO(uint32_t slot, uint16_t team, uint32_t buf);   /* d0, d1, a0 */
+void WritePlayerRecord(uint32_t slot, uint16_t team, uint32_t buf);
+void ReadCrowdRecord(uint32_t team, uint32_t buf);     /* d1, a0 */
+void CrowdRecordIO(uint32_t team, uint32_t buf);        /* d1, a0 */
+void WriteCrowdRecord(uint32_t team, uint32_t buf);
+void ReadTeamRecord(uint32_t team, uint32_t buf);
+void TeamRecordIO(uint32_t team, uint32_t buf);        /* d1, a0 */
+void WriteTeamRecord(uint32_t team, uint32_t buf);
+void WriteNameLog(void);
 void ReadNameLog(void);
 void NameLogIO(void);
+void UpdateRecords(void);
+void UpdateTeamRecord(uint32_t buf, uint32_t rec_no, uint16_t other, uint16_t team, uint16_t vs, struct Team *a1, struct Team *a2);       /* a0, d1, d2, d3, d4, a1, a2 */
+void UpdateCrowdRecord(uint32_t buf, uint32_t team, uint16_t opp, uint16_t user, uint16_t opp_user, uint16_t goalies, struct Team *tm);     /* a0, d1, d2, d4, d5, d6, a1 */
+void UpdatePlayerRecords(uint32_t team, uint32_t buf, struct Team *tm, uint16_t goalies, uint16_t opponent);     /* d1, a0, a2, d5, d6 */
+void CountGoalies(void);
+void CountPlayers(void);                                /* and sram94: the save records */
 void AppendUserName(uint32_t buf, uint16_t user);       /* a1, d2 */
-void AppendTeamName(uint16_t team, uint32_t buf);       /* d0, a1 */
-void TrimSpaces(uint32_t str);                          /* a2 */
-void WriteNameLog(void);
-uint32_t DrawPlayerPicture(uint16_t player, uint16_t team);   /* d0, d1 -> a0 */
-uint16_t CalcAttrib(uint16_t player, struct Team *tm, uint32_t mask, uint16_t *div);   /* d0, a2, d4 -> d0, d1 */
 void PlayerCards(void);                                 /* the player cards */
 void WrapCardIndex(uint16_t idx);                       /* a0 (a RAM word) */
 void DrawPlayerCard(uint16_t idx);                      /* a0 (a RAM word) */
 void PrintCardRecords(void);
 void ClearCardText(uint16_t x, uint16_t y);             /* d0, d1 */
-void PrintCardRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam);   /* d0-d5 */
 void PrintCrowdRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam);
 void PrintSaveRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam);
 void PrintGoalRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam);
+void PrintCardRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam);   /* d0-d5 */
+void AppendTeamName(uint16_t team, uint32_t buf);       /* d0, a1 */
 void PrintOverallRating(uint16_t player, uint16_t x, uint16_t y);   /* d0, d1, d2 */
 void PrintStartingLine(uint16_t x, uint16_t y);         /* d0, d1 */
+uint16_t CalcAttrib(uint16_t player, struct Team *tm, uint32_t mask, uint16_t *div);   /* d0, a2, d4 -> d0, d1 */
 void PrintCardPosition(uint16_t player, uint16_t x, uint16_t y);    /* d0, d1, d2 */
 void PrintTeamRating(uint16_t x, uint16_t y);           /* d0, d1 */
 void PrintCardTeam(uint16_t y);                         /* d1 */
@@ -918,8 +916,10 @@ void PrintCentered(uint32_t s);                         /* a0 */
 void GetJerseyString(uint16_t player, uint32_t buf);    /* d0, a1 */
 void PrintGoalsAssists(uint16_t player, uint16_t x, uint16_t y);    /* d0, d1, d2 */
 void PrintSaves(uint16_t player, uint16_t x, uint16_t y);           /* d0, d1, d2 */
+uint32_t DrawPlayerPicture(uint16_t player, uint16_t team);   /* d0, d1 -> a0 */
 void DrawPictureBox(void);
 struct Team *GetCardTeam(void);                         /* -> a0 */
+void TrimSpaces(uint32_t str);                          /* a2 */
 uint16_t GetCardPlayer(void);                           /* -> d0 */
 void BuildCardPlayerLists(void);
 void BuildCardPlayerList(struct Team *tm, uint8_t *list);     /* a0, a1 */
