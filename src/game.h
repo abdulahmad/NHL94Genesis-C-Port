@@ -1044,8 +1044,8 @@ void ValidateSRAM(void);
 void ClearSRAM(void);
 
 /* ---- fourway94.asm: four way play ---- */
-void Set4WayPlayerStub(struct SortObj *o);              /* a3 (an rts) */
 void Detect4WayPlay(void);
+void Set4WayPlayerStub(struct SortObj *o);              /* a3 (an rts) */
 
 /* ---- dispatch: the C side of jsr (a0) and of the stack resets (dispatch.c) ---- */
 void run68k(void (*entry)(void));                       /* call entry, and whatever restart_at names after it */
