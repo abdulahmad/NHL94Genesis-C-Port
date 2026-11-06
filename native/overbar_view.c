@@ -10,6 +10,7 @@
 #include <string.h>
 #include <SDL.h>
 #include "mdrt/view.h"
+#include "native.h"
 #include "overbar/overbar.h"
 
 static int watch(void *user, SDL_Event *e)

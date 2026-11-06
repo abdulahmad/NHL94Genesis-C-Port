@@ -78,7 +78,6 @@ ifeq ($(OS),Windows_NT)
 EXE    ?= .exe
 NETLIB ?= -lws2_32                                       # (pulseman's online play: Winsock)
 WINDRES ?= $(patsubst %gcc,%windres,$(CC))
-ICONO  := $(OBJ)/icon.o                                  # (the exe's icon, res/icon.ico)
 # (Windows: the C++ runtime linked in, so the game needs only SDL2.dll beside it)
 CXXLIB ?= -static-libgcc -Wl,-Bstatic -lstdc++ -Wl,--whole-archive -lwinpthread -Wl,--no-whole-archive -Wl,-Bdynamic
 endif
@@ -91,6 +90,9 @@ SDLLIBS := $(filter-out -mwindows,$(shell pkg-config --libs sdl2))
 # game is in, so states know where it waits), the native side not
 BIN    ?= build/nhl94$(EXE)
 OBJ    ?= build/obj
+ifeq ($(OS),Windows_NT)
+ICONO  := $(OBJ)/icon.o                                  # (the exe's icon, res/icon.ico)
+endif
 NOBJ   := $(SRC:%.c=$(OBJ)/%.o) $(NATIVE:%.c=$(OBJ)/%.o)
 OVERBARO := $(OBJ)/native/overbar/scaler.o $(OBJ)/native/overbar/host.o $(OBJ)/native/overbar/present.o
 NFLAGS  = $(CFLAGS) $(SANITIZE) -O2 -Isrc -Inative -I$(MDRT)/include -Inative/overbar/include $(shell pkg-config --cflags sdl2)
