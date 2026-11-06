@@ -22,14 +22,6 @@ static inline int16_t puckc(void) { return (int16_t)puck_carrier(); }
 static inline const uint8_t *penalty_entry(uint16_t pen) { const uint8_t *t = rom_ptr(SYM_Penaltylist); return t + rd16(t + pen); }
 static inline uint8_t *penbuf(void) { return g.PenBuf; }
 
-/* penalty94.asm:loadTeamStruct. a2 = team struct of player a3, a1 = the other team's. */
-struct Team *loadTeamStruct(const struct SortObj *o, struct Team **other)
-{
-    int away = (o->pflags & (1 << pfteam)) != 0;
-    if (other) *other = team_struct(!away);
-    return team_struct(away);
-}
-
 /* penalty94.asm:AddPenalty. Add penalty d0 for player a3. Ignored while the clock is stopped,
  * when penalties are off, for a player with pflags2 bit 2 set, or offsides when offsides are
  * off. */
@@ -944,6 +936,14 @@ void ChkShotStat(void)
     a1->pshots[gk]++;
 }
 
+/* penalty94.asm:loadTeamStruct. a2 = team struct of player a3, a1 = the other team's. */
+struct Team *loadTeamStruct(const struct SortObj *o, struct Team **other)
+{
+    int away = (o->pflags & (1 << pfteam)) != 0;
+    if (other) *other = team_struct(!away);
+    return team_struct(away);
+}
+
 /* refill one team (a2) and pick the other's (a3) starting line from the players on the ice */
 static void intermission_team(struct Team *a2, struct Team *a3)
 {
@@ -984,6 +984,82 @@ void reenergizeteam(struct Team *tm)
     }
 }
 
+/* penalty94.asm:Intermission. Between periods (and after the game, which first updates the
+ * records): the zamboni crosses under the period's menu (the playoff and shootout lists in
+ * their modes), the ticker shows the other games' scores, then the highlights; start cuts it
+ * short. Waits while a pad is on a team. */
+void Intermission(void)
+{
+    static const uint32_t sslist[10] = {
+        SYM_StartGameText, SYM_IntermissionText, SYM_IntermissionText, SYM_IntermissionText, SYM_ExitGameText,
+        SYM_StartGameTextPO, SYM_IntermissionText, SYM_IntermissionText, SYM_IntermissionText, SYM_ExitGameTextPO,
+    };
+    if (g.gsp == 4) {
+        g.gameclock = 0;
+        UpdateRecords();
+    }
+    SetupTeamForIntermission();
+    for (int i = 0; i < 0x10; i++) sortobj(i)->Xpos = 0;
+    DecompressGraphicsPlain(ART(ZamFrameList) + 8, g.ExtraChars);
+    g.zamx = 0x140;
+    uint16_t list = g.gsp;
+    if (g.OptPlayMode != 0) list += 5;
+    uint32_t items = sslist[list];
+    if (g.gmode2 & HI(0)) items = SYM_ShootoutIntermissionMenu;
+    g.sflags |= HI(sfpz);
+    Pausemode_top(items, SYM_Pausemode_pall);
+    uint16_t d1;
+    g.TickerNum = GetShifter(NULL);
+    int skip = 0;
+    while ((int16_t)g.TickerNum >= 0) {
+        struct Matchup *gs = NULL;
+        int16_t d3 = NewTicker2(&gs);
+        NewTicker3(d3, gs);
+        if (waitxsr(0x96) & 0x80) { skip = 1; break; }
+        ClearTickerArea();
+        if (waitxsr(0x3C) & 0x80) { skip = 1; break; }
+    }
+    if (skip) g.sflags3 |= 1 << sf3sbut;
+    DoHiLights();
+    int cut = (g.sflags3 & (1 << sf3sbut)) != 0;
+    g.sflags3 &= (uint8_t)~(1 << sf3sbut);
+    if (!cut) {
+        do {
+            d1 = waitxsr(0x1E0);
+            if (d1 & 0x80) break;
+        } while (g.cont1team != 0 || g.cont2team != 0);
+    }
+    ST_W(g.zamx);
+}
+
+/* penalty94.asm:InitScores. Initialize the other games' scores / period in the playoffs. */
+void InitScores(void)
+{
+    if ((int16_t)g.gamelevel > 1) return;
+    int16_t d1 = (int16_t)GetShifter(NULL);
+    for (; d1 >= 0; d1--) {
+        struct Matchup *a0 = &g.matchups[d1];
+        if ((uint16_t)d1 == g.gamenum) continue;
+        if (a0->flags & MU_SERIES_OVER) continue;
+        a0->per = 0;
+        for (int16_t d0 = (int16_t)randomd0(3); d0 > 0; d0--) SetScore(a0);
+    }
+}
+
+/* penalty94.asm:UpdateScores. Update the ticker score values (PeriodOver). */
+void UpdateScores(void)
+{
+    int16_t d1 = (int16_t)GetShifter(NULL);
+    g.TickerNum = (uint16_t)d1;
+    for (; d1 >= 0; d1--) {
+        struct Matchup *a0 = &g.matchups[d1];
+        if ((uint16_t)d1 == g.gamenum) continue;
+        a0->flags &= (uint8_t)~MU_HIGHLIGHT;
+        if (a0->flags & MU_SERIES_OVER) continue;
+        SetScore(a0);
+    }
+}
+
 /* the weights at nibblebuffer two to a long, as getscore adds them (add.l) */
 static uint32_t nib_long(int k) { return (uint32_t)g.nibblebuffer[2 * k] << 16 | g.nibblebuffer[2 * k + 1]; }
 static void set_nib_long(int k, uint32_t v) { g.nibblebuffer[2 * k] = (uint16_t)(v >> 16); g.nibblebuffer[2 * k + 1] = (uint16_t)v; }
@@ -1020,34 +1096,6 @@ void SetScore(struct Matchup *a0)
     a0->score1 += s;
     s = getscore(a0->team2, a0->team1);
     a0->score2 += s;
-}
-
-/* penalty94.asm:InitScores. Initialize the other games' scores / period in the playoffs. */
-void InitScores(void)
-{
-    if ((int16_t)g.gamelevel > 1) return;
-    int16_t d1 = (int16_t)GetShifter(NULL);
-    for (; d1 >= 0; d1--) {
-        struct Matchup *a0 = &g.matchups[d1];
-        if ((uint16_t)d1 == g.gamenum) continue;
-        if (a0->flags & MU_SERIES_OVER) continue;
-        a0->per = 0;
-        for (int16_t d0 = (int16_t)randomd0(3); d0 > 0; d0--) SetScore(a0);
-    }
-}
-
-/* penalty94.asm:UpdateScores. Update the ticker score values (PeriodOver). */
-void UpdateScores(void)
-{
-    int16_t d1 = (int16_t)GetShifter(NULL);
-    g.TickerNum = (uint16_t)d1;
-    for (; d1 >= 0; d1--) {
-        struct Matchup *a0 = &g.matchups[d1];
-        if ((uint16_t)d1 == g.gamenum) continue;
-        a0->flags &= (uint8_t)~MU_HIGHLIGHT;
-        if (a0->flags & MU_SERIES_OVER) continue;
-        SetScore(a0);
-    }
 }
 
 /* penalty94.asm:NewTicker. Show the next ticker score once the clock is at 8:00 or less.
@@ -1146,6 +1194,24 @@ uint32_t AdvanceStringPtr(uint32_t list, uint16_t n)
     for (; n != 0; n--) list += rd16(rom_ptr(list));
     return list;
 }
+
+/* penalty94.asm:DoHiLights. The highlights: each game of the round (GetShifter, last first)
+ * whose highlight flag is set (gsfhl, cleared here), unless the series is over (gsfso). */
+void DoHiLights(void)
+{
+    int16_t n = (int16_t)GetShifter(NULL);
+    do {
+        struct Matchup *gs = &g.matchups[n];
+        if (!(gs->flags & MU_SERIES_OVER)) {
+            int hl = gs->flags & MU_HIGHLIGHT;
+            gs->flags &= (uint8_t)~MU_HIGHLIGHT;
+            if (hl) StartHL(gs, n);
+        }
+    } while (n-- != 0);
+}
+
+/* penalty94.asm:StartHL. Play the highlight of game a0 (d1 = its number): StartHL2. */
+void StartHL(struct Matchup *gs, int16_t game) { StartHL2(gs, game); }
 
 /* ---- the intermission and the highlights of the other games ---- */
 
@@ -1304,70 +1370,4 @@ void StartHL2(struct Matchup *gs, int16_t game)
         if (waitxsr(0x3C) & 0x80) g.sflags3 |= 1 << sf3sbut;
         return;
     }
-}
-
-/* penalty94.asm:StartHL. Play the highlight of game a0 (d1 = its number): StartHL2. */
-void StartHL(struct Matchup *gs, int16_t game) { StartHL2(gs, game); }
-
-/* penalty94.asm:DoHiLights. The highlights: each game of the round (GetShifter, last first)
- * whose highlight flag is set (gsfhl, cleared here), unless the series is over (gsfso). */
-void DoHiLights(void)
-{
-    int16_t n = (int16_t)GetShifter(NULL);
-    do {
-        struct Matchup *gs = &g.matchups[n];
-        if (!(gs->flags & MU_SERIES_OVER)) {
-            int hl = gs->flags & MU_HIGHLIGHT;
-            gs->flags &= (uint8_t)~MU_HIGHLIGHT;
-            if (hl) StartHL(gs, n);
-        }
-    } while (n-- != 0);
-}
-
-/* penalty94.asm:Intermission. Between periods (and after the game, which first updates the
- * records): the zamboni crosses under the period's menu (the playoff and shootout lists in
- * their modes), the ticker shows the other games' scores, then the highlights; start cuts it
- * short. Waits while a pad is on a team. */
-void Intermission(void)
-{
-    static const uint32_t sslist[10] = {
-        SYM_StartGameText, SYM_IntermissionText, SYM_IntermissionText, SYM_IntermissionText, SYM_ExitGameText,
-        SYM_StartGameTextPO, SYM_IntermissionText, SYM_IntermissionText, SYM_IntermissionText, SYM_ExitGameTextPO,
-    };
-    if (g.gsp == 4) {
-        g.gameclock = 0;
-        UpdateRecords();
-    }
-    SetupTeamForIntermission();
-    for (int i = 0; i < 0x10; i++) sortobj(i)->Xpos = 0;
-    DecompressGraphicsPlain(ART(ZamFrameList) + 8, g.ExtraChars);
-    g.zamx = 0x140;
-    uint16_t list = g.gsp;
-    if (g.OptPlayMode != 0) list += 5;
-    uint32_t items = sslist[list];
-    if (g.gmode2 & HI(0)) items = SYM_ShootoutIntermissionMenu;
-    g.sflags |= HI(sfpz);
-    Pausemode_top(items, SYM_Pausemode_pall);
-    uint16_t d1;
-    g.TickerNum = GetShifter(NULL);
-    int skip = 0;
-    while ((int16_t)g.TickerNum >= 0) {
-        struct Matchup *gs = NULL;
-        int16_t d3 = NewTicker2(&gs);
-        NewTicker3(d3, gs);
-        if (waitxsr(0x96) & 0x80) { skip = 1; break; }
-        ClearTickerArea();
-        if (waitxsr(0x3C) & 0x80) { skip = 1; break; }
-    }
-    if (skip) g.sflags3 |= 1 << sf3sbut;
-    DoHiLights();
-    int cut = (g.sflags3 & (1 << sf3sbut)) != 0;
-    g.sflags3 &= (uint8_t)~(1 << sf3sbut);
-    if (!cut) {
-        do {
-            d1 = waitxsr(0x1E0);
-            if (d1 & 0x80) break;
-        } while (g.cont1team != 0 || g.cont2team != 0);
-    }
-    ST_W(g.zamx);
 }

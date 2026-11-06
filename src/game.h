@@ -509,7 +509,6 @@ void setplayer(uint16_t roster, struct SortObj *o);              /* d3, a3 */
 uint8_t ClampNibble(uint8_t v);                                  /* d3 -> d3 */
 
 /* ---- penalty94.asm: penalties, stoppages, the intermission and highlights ---- */
-struct Team *loadTeamStruct(const struct SortObj *o, struct Team **other);   /* a3 -> a2 (a1 = the other team) */
 void AddPenalty(uint16_t pen, struct SortObj *o);       /* d0, a3 */
 void AddPenalty2(uint16_t pen, struct SortObj *o);      /* d0, a3 */
 void PenaltyManager(void);
@@ -548,12 +547,14 @@ void linebar(uint16_t line, struct Team *tm);           /* d0, a2 */
 uint16_t getlinee(uint16_t line, struct Team *tm);      /* d0, a2 -> d0 */
 uint16_t AvgCline(struct Team *tm);                     /* a2 -> d0 */
 void ChkShotStat(void);
+struct Team *loadTeamStruct(const struct SortObj *o, struct Team **other);   /* a3 -> a2 (a1 = the other team) */
 void SetupTeamForIntermission(void);
 void RestoreTeamEnergy(struct Team *tm);                /* a2 */
 void reenergizeteam(struct Team *tm);                   /* a2 */
-void SetScore(struct Matchup *a0);                      /* a0 = gsstruct entry */
+void Intermission(void);
 void InitScores(void);
 void UpdateScores(void);
+void SetScore(struct Matchup *a0);                      /* a0 = gsstruct entry */
 int16_t NewTicker(struct Matchup **gs);                 /* -> d3, a0 */
 int16_t NewTicker2(struct Matchup **gs);
 int16_t CheckGameTickerStatus(int16_t d3, struct Matchup **gs);
@@ -562,7 +563,6 @@ void ClearTickerArea(void);
 void SetTickerAreaPosition(uint16_t *d0, uint16_t *d1);
 void Fprintsmall(uint32_t list, uint16_t n);    /* a1, d0 */
 uint32_t AdvanceStringPtr(uint32_t list, uint16_t n);   /* a1, d0 -> a1 */
-void Intermission(void);
 void DoHiLights(void);
 void StartHL(struct Matchup *gs, int16_t game);         /* a0 = the game's gsstruct, d1 = its number */
 void StartHL2(struct Matchup *gs, int16_t game);
