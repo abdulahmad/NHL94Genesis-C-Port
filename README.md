@@ -77,16 +77,17 @@ Game controllers work too (the first two are players 1 and 2).
 | F7 | slow motion on / off |
 | F8 | a frame at a time, while paused |
 | F10 | save the replay: the last 20 seconds, as a GIF (in `videos/`) |
-| F11 | start / stop recording a GIF |
+| `` ` `` / F11 | overlay menu (Overbar; first launch binds PulseMan `key.menu` to Grave). Record a GIF from Capture, not F11 |
 | F12 | screenshot (a PNG in `screenshots/`) |
-| Esc | the menu: save and load states there |
+| Esc | not overlay (backs out of a PulseMan page when the overlay is already open) |
 | Alt+Enter | full screen |
 
 ## Playing
 
 ### The menu
 
-Esc (or a controller's Back button) opens it; arrows and Enter, or the d-pad, A and B, work it.
+`` ` `` or F11 (or a controller's Back button) opens it; arrows and Enter, or the d-pad, A and B, work it.
+The picture is Overbar's 4:3 dest of a 240-line canvas with the 224-line source unpadded (H40 PAR 1.0, H32 PAR 5:4).
 
 - **Game ROM**: your cartridge dump, in a file browser.
 - **Reset**, and **Save state** / **Load state**: eight slots, each with a picture of the

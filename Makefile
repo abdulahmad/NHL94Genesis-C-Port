@@ -92,7 +92,8 @@ SDLLIBS := $(filter-out -mwindows,$(shell pkg-config --libs sdl2))
 BIN    ?= build/nhl94$(EXE)
 OBJ    ?= build/obj
 NOBJ   := $(SRC:%.c=$(OBJ)/%.o) $(NATIVE:%.c=$(OBJ)/%.o)
-NFLAGS  = $(CFLAGS) $(SANITIZE) -O2 -Isrc -Inative -I$(MDRT)/include $(shell pkg-config --cflags sdl2)
+OVERBARO := $(OBJ)/native/overbar/scaler.o
+NFLAGS  = $(CFLAGS) $(SANITIZE) -O2 -Isrc -Inative -I$(MDRT)/include -Inative/overbar/include $(shell pkg-config --cflags sdl2)
 MDRTHDR := $(wildcard $(MDRT)/include/mdrt/*.h)
 nhl94: $(BIN)
 $(OBJ)/src/%.o: src/%.c $(HDR) $(MDRTHDR)
@@ -115,9 +116,12 @@ FORCE:
 $(OBJ)/icon.o: res/icon.rc res/icon.ico
 	@mkdir -p $(dir $@)
 	$(WINDRES) -I res $< -O coff -o $@
-$(BIN): $(NOBJ) $(ICONO) mdrt
+$(OBJ)/native/overbar/scaler.o: native/overbar/src/scaler.c native/overbar/include/overbar/overbar.h
+	@mkdir -p $(dir $@)
+	$(CC) $(NFLAGS) -c $< -o $@
+$(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt
 	@mkdir -p $(dir $@) out
-	$(CC) $(CFLAGS) $(SANITIZE) -O2 $(LDFLAGS) -o $@ $(NOBJ) $(ICONO) $(MDRTLIBS) $(SDLLIBS) -lm $(CXXLIB) $(NETLIB)
+	$(CC) $(CFLAGS) $(SANITIZE) -O2 $(LDFLAGS) -o $@ $(NOBJ) $(OVERBARO) $(ICONO) $(MDRTLIBS) $(SDLLIBS) -lm $(CXXLIB) $(NETLIB)
 mdrt:
 	@test -f $(MDRT)/Makefile || { echo "no pulseman at $(MDRT): git submodule update --init (or make MDRT=path/to/pulseman)"; exit 1; }
 	$(MAKE) -C $(MDRT) MODE=release B=$(MDRTB) sdl

@@ -830,6 +830,7 @@ int main(int argc, char **argv)
             o.net = native_net();
             o.net_udp = native_net_udp();
         }
+        overbar_install();
         int r = mdrt_sdl_run(&c, &o, native_game, NULL);
         native_net_close();
         return r;
