@@ -214,7 +214,7 @@ static inline uint8_t timer_get(uint16_t w, int16_t pad) { return pad ? (uint8_t
 static inline uint8_t timer_dec(uint8_t v) { int8_t r = (int8_t)(v - 1); return r < 0 ? 0 : (uint8_t)r; }
 static inline uint16_t goaliemode(int16_t pad) { return pad ? g.goaliemode2 : g.goaliemode1; }
 
-/* the assignment dispatch table (data94.asm:asstab), indexed by asslist[assnum] */
+/* the assignment dispatch table (tables94.asm:asstab), indexed by asslist[assnum] */
 typedef void (*assfn)(struct Team *tm, struct SortObj *o);
 static void ass_none(struct Team *tm, struct SortObj *o) { (void)tm; (void)o; }       /* rtss2 */
 static void ass_puckunflip(struct Team *tm, struct SortObj *o) { (void)tm; puckunflip(o); }

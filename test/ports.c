@@ -82,7 +82,7 @@ static void run_setplayer(const Record *r) { setplayer((uint16_t)r->regs_in[R_D3
 static void run_ClampNibble(const Record *r) { expect_reg16(r, R_D3, (uint16_t)((r->regs_in[R_D3] & 0xFF00) | ClampNibble((uint8_t)r->regs_in[R_D3])) & 0xFF, "d3 (low byte)"); }
 
 
-/* ---- checks94 ---- */
+/* ---- logic94 ---- */
 #define D16(reg) ((int16_t)r->regs_in[reg])
 static skate_aux aux_from(uint32_t a0)
 {
@@ -147,13 +147,13 @@ static void run_noturn0(const Record *r) { noturn0((uint16_t)r->regs_in[R_D0], D
 static void run_noturn(const Record *r) { noturn(D16(R_D2), OBJ(R_A3)); }
 static void run_playeracc(const Record *r) { playeracc(D16(R_D2), OBJ(R_A3)); }
 
-/* ---- assign94 ---- */
+/* ---- logic94 (assign) ---- */
 TO(assbench) TO(asseben) TO(asspenalty) TO(assdopen) TO(assepen) TO(assgoaliebreakwait) TO(assfaceoff) TO(assfaceoffpl)
 TO(assfight) TO(assfwatch) TO(assstanley) TO(assscore) TO(assdefo) TO(assdefd) TO(asswingd)
 static void run_check4bench(const Record *r) { check4bench(OBJ(R_A3)); }
 O(donothing)
 
-/* ---- input94 ---- */
+/* ---- logic94 (input) ---- */
 static void run_doinput(const Record *r) { doinput((uint16_t)r->regs_in[R_D0], (uint16_t)r->regs_in[R_D1], (uint16_t)r->regs_in[R_D2], (uint16_t)r->regs_in[R_D3], D16(R_D4), OBJ(R_A3)); }
 static void run_ClampTargetY(const Record *r)
 {
@@ -251,7 +251,7 @@ static void run_CopyColdestPlayer(const Record *r) { w16(PLACE(R_A0), 0, CopyCol
 static void run_CompareHotColdTotals(const Record *r) { expect_reg16(r, R_D0, CompareHotColdTotals(), "d0"); }
 static void run_GetHotColdTotal(const Record *r) { expect_reg16(r, R_D1, GetHotColdTotal(TEAM(R_A0)), "d1"); }
 
-/* ---- period94, hockey94, display94 ---- */
+/* ---- period94, hockey94, video94 ---- */
 V(EndShootout) V(ClearGameStats) V(SetStatScroll) V(PrintStatScrollArrows) V(DisplayStats) V(updatePPTeamTime)
 V(ClearShotData) V(restoreteams) V(ResetClock) V(periodicevents) V(CheckInjury) V(RestoreBenchEnergy) V(CheckLateGameSong)
 V(UpdateCwdExcite) V(updatecrowdf) V(clockcont) V(clockcont_0) V(demoread) V(startpause) V(startpause1) V(startpause2) V(startpause3)
@@ -268,7 +268,7 @@ static void run_GetPeriodTime(const Record *r) { expect_reg16(r, R_D0, GetPeriod
 static void run_EndDemoOnPress(const Record *r) { EndDemoOnPress((uint16_t)r->regs_in[R_D1]); }
 static void run_seta2(const Record *r) { expect_reg16(r, R_A2, (uint16_t)rp_addr(team_place(seta2())), "a2"); }
 
-/* display94: the sprite builders take a5 / a6 / d6 in a struct Vid and leave them advanced */
+/* video94: the sprite builders take a5 / a6 / d6 in a struct Vid and leave them advanced */
 #define VID_IN(v) struct Vid v = { ram_bytes(ram_at(r->regs_in[R_A5]), 0), ram_bytes(ram_at(r->regs_in[R_A6]), 0), (uint16_t)r->regs_in[R_D6] }
 #define VID_OUT(v) expect_reg16(r, R_A5, (uint16_t)ram_addr(v.dma), "a5"); expect_reg16(r, R_A6, (uint16_t)ram_addr(v.sat), "a6"); expect_reg16(r, R_D6, v.link, "d6")
 #define VID_RUN(name) static void run_##name(const Record *r) { VID_IN(v); name(&v); VID_OUT(v); }
@@ -387,7 +387,7 @@ static void run_AddTeamBlock(const Record *r) { expect_reg16(r, R_D4, AddTeamBlo
 V(forceblack) V(forceblack2) V(forcefade) V(cramfade) V(CopyPaletteToCRAM) V(WaitDMA) V(setVram_0) V(xyVmMap)
 
 
-/* ---- title94, data94, cards94, sram94, stats94, setup94, shootout94, fourway94, menu94 helpers ---- */
+/* ---- title94, ui94, setup94, cards94, sram94, stats94, shootout94, fourway94, menu94 helpers ---- */
 static void expect_z(const Record *r, int z) { expect_reg16(r, R_SR, z ? 4 : 0, "Z flag"); }
 #define ZOUT(r) (((r)->regs_out[R_SR] >> 2) & 1)
 static void expect_z_only(const Record *r, int z) { if (z != (int)ZOUT(r)) expect_z(r, z); }
@@ -545,7 +545,7 @@ static void run_VBlank_TitleScreen(const Record *r) { VBlank_TitleScreen(); }
 static void run_CreditsLineScroll(const Record *r) { CreditsLineScroll(); }
 static void run_CreditsScrollStep(const Record *r) { CreditsScrollStep(); }
 
-/* ---- the game setup screen (optsetup94 and its helpers in data94 / cards94 / attract94 ...) ---- */
+/* ---- the game setup screen (optsetup94 and its helpers in setup94 / cards94 ...) ---- */
 #define A(reg) (r->regs_in[reg])
 static void run_SuperDiv(const Record *r) { expect_reg16(r, R_D0, SuperDiv(pass_bits(ram_at(A(R_A3))), R16(R_D0)), "d0"); }
 static void run_ReadPassBits(const Record *r) { ReadPassBits(pass_bits(ram_at(A(R_A3)))); }
@@ -718,7 +718,7 @@ static void run_ReadStatColumn(const Record *r) { expect_reg16(r, R_D2, ReadStat
 static void run_GetStatsValue(const Record *r) { expect_reg16(r, R_D2, GetStatsValue(R16(R_D1), R16(R_D0), R16(R_D2)), "d2"); }
 static void run_DrawStatsListArrows(const Record *r) { DrawStatsListArrows(); }
 
-/* ---- the menu screens (stats94, cards94, records94, shootout94; data94 / title94 helpers) ---- */
+/* ---- the menu screens (stats94, cards94, records94, shootout94; setup94 / title94 helpers) ---- */
 static void run_ShowScores(const Record *r) { ShowScores(); }
 static void run_UpdateScoresScroll(const Record *r) { UpdateScoresScroll(); }
 static void run_UpdateVertScrollReg(const Record *r) { UpdateVertScrollReg(); }
