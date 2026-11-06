@@ -4,18 +4,6 @@
 
 static inline int16_t puckx(void) { return (int16_t)g.puckx[0]; }
 
-/* chgplayer94.asm:rtsChgplayer. chgplayer's early exit. */
-void rtsChgplayer(void) {}
-
-/* chgplayer94.asm:swpchk. jmp Sweepcheck. */
-void swpchk(struct SortObj *o) { Sweepcheck(o); }
-
-/* chgplayer94.asm:j_setc1player. jmp setc1player. */
-void j_setc1player(uint16_t player) { setc1player(player); }
-
-/* chgplayer94.asm:j_setc2player. jmp setc2player. */
-void j_setc2player(uint16_t player) { setc2player(player); }
-
 /* chgplayer94.asm:chgplayer. Pad d4 takes the free skater of its team nearest to where the puck
  * is going (not a goalie, not unavailable, locked or on the other pad, and in a penalty shot
  * or shootout only the shooter or the goalie). When that is its own player, a3 sweep checks.
@@ -49,4 +37,16 @@ void chgplayer(uint16_t pad, struct SortObj *o)
     else if (pad == 0) j_setc1player(pick);
     else j_setc2player(pick);
 }
+
+/* chgplayer94.asm:rtsChgplayer. chgplayer's early exit. */
+void rtsChgplayer(void) {}
+
+/* chgplayer94.asm:swpchk. jmp Sweepcheck. */
+void swpchk(struct SortObj *o) { Sweepcheck(o); }
+
+/* chgplayer94.asm:j_setc1player. jmp setc1player. */
+void j_setc1player(uint16_t player) { setc1player(player); }
+
+/* chgplayer94.asm:j_setc2player. jmp setc2player. */
+void j_setc2player(uint16_t player) { setc2player(player); }
 

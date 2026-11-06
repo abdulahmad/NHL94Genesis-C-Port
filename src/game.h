@@ -613,18 +613,18 @@ void ClearGameStats(void);
 void AddArenaAnimSprite(uint8_t **sat, uint16_t *link);         /* a6, d6 */
 void PrintPlayerNameRight(uint16_t player, struct Team *tm);   /* d0, a2 */
 uint32_t SkipNameNumber(uint16_t player, struct Team *tm);   /* d0, a2 -> a1 */
+void PeriodStatsScreen(void);
+void StatsReport(void);
 void SetStatScroll(void);
 uint16_t StatScrollRow(void);                           /* -> d3 */
 uint16_t StatScrollRowEnd(void);
 void PrintStatScrollArrows(void);
 void DisplayStats(void);
 void PrintStatValue(const uint8_t *a0, struct Team *tm);
+void rtsStatTables(void);
 void updatePPTeamTime(void);
 uint16_t GetTeamRating(struct Team *tm);                /* a2 -> d0 */
 void ShortenMsgTimer(struct SortObj *o);
-void PeriodStatsScreen(void);
-void StatsReport(void);
-void rtsStatTables(void);
 void ManualGoalieMenu(void);
 
 /* ---- shootoutpath94.asm: saved lines and shootout skate paths ---- */
@@ -640,9 +640,9 @@ int ShootoutShootCheck(struct SortObj *o);              /* a3 -> Z */
 /* ---- ui94.asm: unpack, rink gfx, HiScore, played-by ---- */
 void UnpackPicture(uint32_t pic);                       /* a2 */
 uint16_t LoadHomeTeamGfx(uint16_t start);               /* d4 -> d4 */
-void PrintParenNumber(const uint8_t *table, uint16_t player);   /* a2 = team + table offset, d0 */
-void PrintPlayerGoals(uint16_t player, struct Team *tm);   /* d0, a2 */
 void PrintPlayerAssists(uint16_t player, struct Team *tm);   /* d0, a2 */
+void PrintPlayerGoals(uint16_t player, struct Team *tm);   /* d0, a2 */
+void PrintParenNumber(const uint8_t *table, uint16_t player);   /* a2 = team + table offset, d0 */
 void PlaceBoardFall(struct SortObj *o);                 /* a3 */
 uint16_t GetLeagueCrowdRecord(void);                    /* -> d0 */
 uint16_t getFgtbyte(struct SortObj *a2, struct SortObj *a3);   /* -> d0 */
@@ -654,10 +654,10 @@ void HiScoreScreen(void);
 struct Team *GetTeamStruct(uint16_t team);              /* d2 -> a2 */
 void CountButtonPress(int16_t pad, struct SortObj *o);  /* d4, a3 */
 uint32_t PlayedByHome(void);                            /* -> a1 */
-uint32_t PlayedByAway(void);
 uint32_t PlayedByText(uint16_t user);                   /* d0 -> a1 */
-uint32_t PlayedByNone(void);
 uint32_t PlayedByExit(uint32_t a1);
+uint32_t PlayedByNone(void);
+uint32_t PlayedByAway(void);
 
 /* ---- helpers94.asm: leftover helpers before the title ---- */
 void SetSflags8Bit1(void);
@@ -677,8 +677,8 @@ void CreditsScrollStep(void);
 void LeadSong(void);
 void ClearLeadSong(void);
 void LeadSongExit(uint16_t sflags2);                    /* the sflags2 LeadSong saved */
-void clrTmPdst(struct Team *tm);                        /* a0 */
 void ClearPenalties(void);
+void clrTmPdst(struct Team *tm);                        /* a0 */
 void HotColdIcon(struct Team *tm);                      /* a2 */
 
 /* ---- chgplayer94.asm: chgplayer and far thunks ---- */

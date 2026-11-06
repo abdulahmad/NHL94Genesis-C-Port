@@ -131,123 +131,6 @@ uint32_t SkipNameNumber(uint16_t player, struct Team *tm)
     return a1 + 2;
 }
 
-/* period94.asm:SetStatScroll. Plane A vertical scroll = VertLineScrolling - $50, with disflags
- * bit 2 set while it writes. */
-void SetStatScroll(void)
-{
-    uint16_t saved = g.disflags;
-    g.disflags |= HI(dfng);
-    vdp_ctrl(VSRAM_W + (2u << 16));
-    vdp_data((uint16_t)(0xFFB0 + g.VertLineScrolling));
-    g.disflags = saved;
-}
-
-/* period94.asm:StatScrollRow / StatScrollRowEnd. The row of the scroll position. */
-uint16_t StatScrollRow(void) { return g.VertLineScrolling >> 4; }
-uint16_t StatScrollRowEnd(void) { return (uint16_t)((g.VertLineScrolling >> 4) + 6); }
-
-/* period94.asm:PrintStatScrollArrows. The scroll arrows of the Game Statistics screen. */
-void PrintStatScrollArrows(void)
-{
-    printsmallz(str_PrintStatScrollArrows_1, sizeof str_PrintStatScrollArrows_1);
-    if (g.VertLineScrolling != 0) printsmallz(str_PrintStatScrollArrows_2, sizeof str_PrintStatScrollArrows_2);
-    else printsmallz(str_PrintStatScrollArrows_3, sizeof str_PrintStatScrollArrows_3);
-    if (g.matchupvis != g.VertLineScrolling) printsmallz(str_PrintStatScrollArrows_4, sizeof str_PrintStatScrollArrows_4);
-    else printsmallz(str_PrintStatScrollArrows_5, sizeof str_PrintStatScrollArrows_5);
-    printsmallz(str_PrintStatScrollArrows_6, sizeof str_PrintStatScrollArrows_6);
-}
-
-/* period94.asm:DisplayStats. The team logos, then each stat row (without the power
- * play rows when penalties are off) centred, with the home value at x $22 and the visitors'
- * at x 9. */
-void DisplayStats(void)
-{
-    printz(str_DisplayStats_1, sizeof str_DisplayStats_1);
-    PutTeamBlock(0x2C);
-    printz(str_DisplayStats_2, sizeof str_DisplayStats_2);
-    PutTeamBlock(0);
-    SetStatScroll();
-    printz(str_DisplayStats_3, sizeof str_DisplayStats_3);
-    int rows = 0xE;
-    uint32_t a1 = SYM_TeamStatTextTbl;
-    if (g.OptPen == 0) { rows = 0xA; a1 = SYM_TeamStatTextTblNoPen; }
-    for (; rows >= 0; rows--) {
-        g.printx = (uint16_t)(0x15 - (rd16(rom_ptr(a1)) >> 1));
-        uint32_t a0 = print(a1);                          /* print leaves a1 after the string */
-        g.printx = 0x22;
-        PrintStatValue(rom_ptr(a0), team_struct(0));
-        g.printx = 9;
-        PrintStatValue(rom_ptr(a0), team_struct(1));
-        a1 = a0 + 4;
-        g.printy += 2;
-    }
-}
-
-/* period94.asm:PrintStatValue. Print the stat row a0 (two team struct offsets) for team a2
- * centred at printx: the value (offsets $A and $352 are times), "/second" if any, " (pct%)"
- * for passing; offset $FFFF is the shooting percentage. */
-void PrintStatValue(const uint8_t *a0, struct Team *tm)
-{
-    rp t = team_place(tm);                                /* (the stats table holds offsets in a team struct) */
-    uint32_t mes = ram_addr(g.mesarea);
-    wr16(g.mesarea, 2);
-    uint16_t off = rd16(a0);
-    if (off == 0xFFFF) {
-        uint32_t d0 = (uint32_t)tm->score * 0x64;
-        uint16_t d1 = tm->shots;
-        if (d1 != 0) d0 = m68k_divu(d0, d1);
-        appstring(PushNumber((uint16_t)d0), mes);
-        appendz(str_PrintStatValue_1, sizeof str_PrintStatValue_1, mes);
-    } else {
-        uint16_t d0 = r16(t, off);
-        uint32_t a1;
-        if (off == 0x352) a1 = PushTime(d0);
-        else {
-            if (off != 0xA) a1 = PushNumber(d0);
-            else a1 = PushTime(d0);
-        }
-        appstring(a1, mes);
-        int16_t off2 = (int16_t)rd16(a0 + 2);
-        if (off2 >= 0) {
-            appendz(str_PrintStatValue_2, sizeof str_PrintStatValue_2, mes);
-            appstring(PushNumber(r16(t, off2)), mes);
-            if (off == 0x14) {                            /* passing: the percentage */
-                appendz(str_PrintStatValue_3, sizeof str_PrintStatValue_3, mes);
-                uint32_t p = (uint32_t)r16(t, off) * 0x64;
-                uint16_t d1 = r16(t, off2);
-                if (d1 != 0) p = m68k_divu(p, d1);
-                appstring(PushNumber((uint16_t)p), mes);
-                appendz(str_PrintStatValue_4, sizeof str_PrintStatValue_4, mes);
-            }
-        }
-    }
-    g.printx -= rd16(g.mesarea) >> 1;
-    print(mes);
-}
-
-/* period94.asm:updatePPTeamTime. One more second of power play time for the team on the power
- * play. */
-void updatePPTeamTime(void)
-{
-    if (!(g.sflags2 & HI(sf2pwrplay))) return;
-    struct Team *tm = team_struct((g.sflags2 & HI(sf2pwrtm)) != 0);
-    tm->pptime++;
-}
-
-/* period94.asm:GetTeamRating. The TeamRatings byte of team $28(a2). */
-uint16_t GetTeamRating(struct Team *tm)
-{
-    return rosters_team(tm->team)->rating;
-}
-
-/* period94.asm:ShortenMsgTimer. Cap msgtimer at 2, unless a second pad is on and a3 is not the
- * puck carrier. */
-void ShortenMsgTimer(struct SortObj *o)
-{
-    if (g.cont2team != 0 && (uint16_t)o->SCnum != puck_carrier()) return;
-    if ((int16_t)g.msgtimer > 2) g.msgtimer = 2;
-}
-
 /* PeriodStatsScreen: team's logo bitmap at printx / printy, its colours as palette 2 -> the next
  * char */
 static uint16_t team_logo(uint16_t team, uint16_t chars)
@@ -356,9 +239,6 @@ void PeriodStatsScreen(void)
     ExitStatsScreen();
 }
 
-/* period94.asm:rtsStatTables. The scroll step's rts. */
-void rtsStatTables(void) {}
-
 /* StatsReport's .scroll: move the rows by PlayerScrollCtr within 0..matchupvis,
  * stopping at a row boundary; at the boundaries print the row that scrolls in */
 static void stats_scroll(void)
@@ -410,6 +290,126 @@ void StatsReport(void)
     }
 }
 
+/* period94.asm:SetStatScroll. Plane A vertical scroll = VertLineScrolling - $50, with disflags
+ * bit 2 set while it writes. */
+void SetStatScroll(void)
+{
+    uint16_t saved = g.disflags;
+    g.disflags |= HI(dfng);
+    vdp_ctrl(VSRAM_W + (2u << 16));
+    vdp_data((uint16_t)(0xFFB0 + g.VertLineScrolling));
+    g.disflags = saved;
+}
+
+/* period94.asm:StatScrollRow / StatScrollRowEnd. The row of the scroll position. */
+uint16_t StatScrollRow(void) { return g.VertLineScrolling >> 4; }
+uint16_t StatScrollRowEnd(void) { return (uint16_t)((g.VertLineScrolling >> 4) + 6); }
+
+/* period94.asm:PrintStatScrollArrows. The scroll arrows of the Game Statistics screen. */
+void PrintStatScrollArrows(void)
+{
+    printsmallz(str_PrintStatScrollArrows_1, sizeof str_PrintStatScrollArrows_1);
+    if (g.VertLineScrolling != 0) printsmallz(str_PrintStatScrollArrows_2, sizeof str_PrintStatScrollArrows_2);
+    else printsmallz(str_PrintStatScrollArrows_3, sizeof str_PrintStatScrollArrows_3);
+    if (g.matchupvis != g.VertLineScrolling) printsmallz(str_PrintStatScrollArrows_4, sizeof str_PrintStatScrollArrows_4);
+    else printsmallz(str_PrintStatScrollArrows_5, sizeof str_PrintStatScrollArrows_5);
+    printsmallz(str_PrintStatScrollArrows_6, sizeof str_PrintStatScrollArrows_6);
+}
+
+/* period94.asm:DisplayStats. The team logos, then each stat row (without the power
+ * play rows when penalties are off) centred, with the home value at x $22 and the visitors'
+ * at x 9. */
+void DisplayStats(void)
+{
+    printz(str_DisplayStats_1, sizeof str_DisplayStats_1);
+    PutTeamBlock(0x2C);
+    printz(str_DisplayStats_2, sizeof str_DisplayStats_2);
+    PutTeamBlock(0);
+    SetStatScroll();
+    printz(str_DisplayStats_3, sizeof str_DisplayStats_3);
+    int rows = 0xE;
+    uint32_t a1 = SYM_TeamStatTextTbl;
+    if (g.OptPen == 0) { rows = 0xA; a1 = SYM_TeamStatTextTblNoPen; }
+    for (; rows >= 0; rows--) {
+        g.printx = (uint16_t)(0x15 - (rd16(rom_ptr(a1)) >> 1));
+        uint32_t a0 = print(a1);                          /* print leaves a1 after the string */
+        g.printx = 0x22;
+        PrintStatValue(rom_ptr(a0), team_struct(0));
+        g.printx = 9;
+        PrintStatValue(rom_ptr(a0), team_struct(1));
+        a1 = a0 + 4;
+        g.printy += 2;
+    }
+}
+
+/* period94.asm:PrintStatValue. Print the stat row a0 (two team struct offsets) for team a2
+ * centred at printx: the value (offsets $A and $352 are times), "/second" if any, " (pct%)"
+ * for passing; offset $FFFF is the shooting percentage. */
+void PrintStatValue(const uint8_t *a0, struct Team *tm)
+{
+    rp t = team_place(tm);                                /* (the stats table holds offsets in a team struct) */
+    uint32_t mes = ram_addr(g.mesarea);
+    wr16(g.mesarea, 2);
+    uint16_t off = rd16(a0);
+    if (off == 0xFFFF) {
+        uint32_t d0 = (uint32_t)tm->score * 0x64;
+        uint16_t d1 = tm->shots;
+        if (d1 != 0) d0 = m68k_divu(d0, d1);
+        appstring(PushNumber((uint16_t)d0), mes);
+        appendz(str_PrintStatValue_1, sizeof str_PrintStatValue_1, mes);
+    } else {
+        uint16_t d0 = r16(t, off);
+        uint32_t a1;
+        if (off == 0x352) a1 = PushTime(d0);
+        else {
+            if (off != 0xA) a1 = PushNumber(d0);
+            else a1 = PushTime(d0);
+        }
+        appstring(a1, mes);
+        int16_t off2 = (int16_t)rd16(a0 + 2);
+        if (off2 >= 0) {
+            appendz(str_PrintStatValue_2, sizeof str_PrintStatValue_2, mes);
+            appstring(PushNumber(r16(t, off2)), mes);
+            if (off == 0x14) {                            /* passing: the percentage */
+                appendz(str_PrintStatValue_3, sizeof str_PrintStatValue_3, mes);
+                uint32_t p = (uint32_t)r16(t, off) * 0x64;
+                uint16_t d1 = r16(t, off2);
+                if (d1 != 0) p = m68k_divu(p, d1);
+                appstring(PushNumber((uint16_t)p), mes);
+                appendz(str_PrintStatValue_4, sizeof str_PrintStatValue_4, mes);
+            }
+        }
+    }
+    g.printx -= rd16(g.mesarea) >> 1;
+    print(mes);
+}
+
+/* period94.asm:rtsStatTables. The scroll step's rts. */
+void rtsStatTables(void) {}
+
+/* period94.asm:updatePPTeamTime. One more second of power play time for the team on the power
+ * play. */
+void updatePPTeamTime(void)
+{
+    if (!(g.sflags2 & HI(sf2pwrplay))) return;
+    struct Team *tm = team_struct((g.sflags2 & HI(sf2pwrtm)) != 0);
+    tm->pptime++;
+}
+
+/* period94.asm:GetTeamRating. The TeamRatings byte of team $28(a2). */
+uint16_t GetTeamRating(struct Team *tm)
+{
+    return rosters_team(tm->team)->rating;
+}
+
+/* period94.asm:ShortenMsgTimer. Cap msgtimer at 2, unless a second pad is on and a3 is not the
+ * puck carrier. */
+void ShortenMsgTimer(struct SortObj *o)
+{
+    if (g.cont2team != 0 && (uint16_t)o->SCnum != puck_carrier()) return;
+    if ((int16_t)g.msgtimer > 2) g.msgtimer = 2;
+}
+
 /* period94.asm:ManualGoalieMenu. The "Manual Goalie" menu item: toggle the goalie mode of the
  * pause pad; in a penalty shot or shootout the pad then takes the skater or the goalie on its
  * side by that mode. */
@@ -437,3 +437,4 @@ void ManualGoalieMenu(void)
     else if ((int16_t)g.BA_Sktr_SCnum > 5) return;
     setc2player(g.goaliemode2 != 0 ? 6 : 0xB);
 }
+
