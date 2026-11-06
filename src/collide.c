@@ -761,7 +761,7 @@ goal:
     printscores1();
     g.crowdnoisedelay = 0x2710;
     if (!(g.gmode2 & HI(0)))
-        setass(7, a2);
+        setass(ascore, a2);
     g.collflag = 0;
     o->Xvel = 0;
     o->Yvel = 0;
@@ -772,7 +772,7 @@ goal:
     g.puckcross[0].frames |= 0xFF00;                  /* (st puckcross2: the high byte) */
     g.puckcross[1].frames |= 0xFF00;
     o->pflags |= 1 << pfnc;
-    assreplace(0x1A, o);                                 /* puckunflip */
+    assreplace(pnothing, o);
     SetSPA(o + 1, SPAsiren);                             /* the goal light object follows the puck */
     AddPenalty2(0xE, sortobj_at(a1->tmsort));              /* the other team's first object: faceoff */
 }
@@ -1430,7 +1430,7 @@ void SetupPenaltyShot(struct Team *team)
             o->position = 0;
         } else {
             o->pflags2 |= 1 << 2;
-            assreplace(0x20, o);                           /* assgoaliebreakwait */
+            assreplace(agoaliebreakwait, o);
             goto next;
         }
         {
@@ -1461,7 +1461,7 @@ void forcepldata(struct Team *team)
         if (d0 >= 0) {
             Setplass(o);
             if (o->position == 4)
-                assinsert(0x11, o);                        /* anearest */
+                assinsert(anearest, o);
             uint16_t d3 = (uint16_t)(o->newpnum * 2);
             team->tmpdst[d3 / 2] = 0xFFFF;                   /* on the ice */
             setplayer(d3 >> 1, o);
@@ -1519,11 +1519,11 @@ void setplayer(uint16_t roster, struct SortObj *o)
     struct Team *tm = team_struct(o->pflags & (1 << pfteam));
     o->pnum = (uint8_t)roster;
     int16_t idx = (int16_t)((int8_t)(uint8_t)roster * 2);
-    uint16_t ass = 0xA;                                    /* aepen */
+    uint16_t ass = aepen;
     int16_t st = (int16_t)tm->tmpdst[idx / 2];
     int give = 1;
     if (st < 0) {
-        ass = 9;                                           /* assben */
+        ass = aeben;
         if (st != -2)
             give = 0;
     }

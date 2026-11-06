@@ -116,7 +116,7 @@ cont:
     NewTicker3(d3, gs);
     puck_loose();
     struct SortObj *puck = sortobj(puckscnum);
-    assinsert(0x1A, puck);                                /* puckunflip */
+    assinsert(pnothing, puck);
     puck->temp1 = 0x1C20;
     ST_W(g.RefStep);
     g.RefCnt = 0;
@@ -234,7 +234,7 @@ void InProgress(void)
             if ((int8_t)*box++ < 0) break;
         box[-1] = (uint8_t)p;
         *box = 0xFF;
-        assreplace(0xC, pl);                              /* asspenalty */
+        assreplace(apenalty, pl);
         SetPA(pen);
         USBoard();
         return;
@@ -243,7 +243,7 @@ void InProgress(void)
     InProgress_ap(team_struct(1));
     g.gmode &= (uint8_t)~(1 << gmpen);
     g.BA_PS_flags &= (uint16_t)~HI(6);
-    assreplace((g.BA_PS_flags & HI(3)) ? 0x1E : 0x1B, sortobj(puckscnum));   /* puckshootout / puckfaceoff */
+    assreplace((g.BA_PS_flags & HI(3)) ? pshootout : pfaceoff, sortobj(puckscnum));
 }
 
 /* penalty94.asm:InProgress_ap. a2 = team. Clears tmpdst bit 5, counts the players kept off the
