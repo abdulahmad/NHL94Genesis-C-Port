@@ -662,6 +662,7 @@ uint32_t PlayedByAway(void);
 /* ---- helpers94.asm: leftover helpers before the title ---- */
 void SetSflags8Bit1(void);
 uint16_t AttribAdjust(uint16_t v);                      /* d0 -> d0 */
+int PuckComingToward(struct SortObj *o);                /* a3 -> Z clear */
 uint8_t ReadGoaliePulled(struct SortObj *o);            /* a3 -> ccr of tst.w tmgoalie */
 void EndOneTimer(struct SortObj *o);                    /* a3 */
 

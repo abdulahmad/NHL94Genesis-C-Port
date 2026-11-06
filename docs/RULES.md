@@ -39,3 +39,4 @@ What decides each kind of name and place in the C ports. Workers and the splitte
 * 2026-11-06: `make gen` tables/strings read current 94G files (`logic94`/`video94`/`setup94`/`title94`+`ui94`); generated `*_tables_gen.h` / `*_strings_gen.h` names stay. Oracle pin (`ref/`, `build/asm/symbols.json`) is not rewritten. (gen inputs)
 * 2026-11-06: capture `--fn` lists use current 94G file names (`logic94`/`video94`); boot `TitleScreen`; drop `goalie94`. helpers leftover names stay. Session output names unchanged. (capture fns)
 * 2026-11-06: leftover comments name current 94G files (`tables94.asm:asstab`; ports.c `logic94`/`video94`/`setup94`). (comments)
+* 2026-11-06: park `rtsStatScroll` (shared `rts`; `StatScrollRow` / `StatScrollRowEnd` already return the value). Do not add `void rtsStatScroll(void) {}`. (unused ports)
