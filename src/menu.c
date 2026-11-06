@@ -17,6 +17,30 @@ static void set_menu_item(uint16_t v) { g.menu.item = v; }
  * each; an item whose text word is negative ends the list) */
 static uint32_t skip_string(uint32_t a) { return a + (int16_t)m16(a); }
 
+/* menu94.asm:Pausemode_top. Start a menu: a0 = item list, a1 = screen draw routine, item 0
+ * selected and shown first; falls into DrawMenuScreen -> d1. */
+uint16_t Pausemode_top(uint32_t items, uint32_t draw)
+{
+    g.menulist = items;
+    g.menudraw = draw;
+    set_menu_item(0);
+    set_menu_top(0);
+    return DrawMenuScreen();
+}
+
+/* menu94.asm:DrawMenuScreen. Draw the screen behind the menu (menudraw), frame the menu box,
+ * print it and fade in. -> d1 as Pausemode_Pmenu leaves it. */
+uint16_t DrawMenuScreen(void)
+{
+    call68k(g.menudraw);
+    PRINTSMALLZ(str_DrawMenuScreen_1);
+    SetMenuPrintX();
+    Framer(0x16, 6);
+    uint16_t d1 = Pausemode_Pmenu();
+    g.palcount = 0x18;
+    return d1;
+}
+
 /* menu94.asm:SetMenuPrintX. printx = the left edge of the menu box: 5 in 32 column mode, else 9. */
 void SetMenuPrintX(void)
 {
@@ -25,16 +49,25 @@ void SetMenuPrintX(void)
     g.printx += 4;
 }
 
-/* menu94.asm:PrintMenuItem. Print item a1 -> a1 past its text. An item whose text starts with
- * 'x' is the goalie option: "Manual Goalie" or "Auto Goalie" by the pause pad's goalie mode. */
-uint32_t PrintMenuItem(uint32_t item)
+/* menu94.asm:HandleMenuInput. Act on the pad bits d1: down / up move the selection, C runs the
+ * selected item's handler (with a2 = the pause pad's team) and redraws the menu unless the
+ * handler drew its own screen (sflags5 bit 1). -> Z (1): leave the menu (start, or C on item 0).
+ * d1 comes back as the redraw leaves it (a handler's own registers are not followed). */
+int HandleMenuInput(uint16_t *d1)
 {
-    if (m8(item + 2) != 'x') return printsmall(item);
-    static const uint8_t manual[] = "  Manual Goalie   ", automatic[] = "   Auto Goalie    ";
-    uint16_t mode = g.sflags & HI(sfpj) ? g.goaliemode2 : g.goaliemode1;
-    const uint8_t *text = mode ? automatic : manual;
-    printsmall(rom_find(SYM_PrintMenuItem, SYM_PrintMenuItem + 0x80, text, sizeof manual - 1) - 2);
-    return skip_string(item);
+    if (*d1 & 0x80) return 1;
+    if (*d1 & 2) { set_menu_item((uint16_t)(menu_item() + 1)); *d1 = Pausemode_Pmenu(); return 0; }
+    if (*d1 & 1) { set_menu_item((uint16_t)(menu_item() - 1)); *d1 = Pausemode_Pmenu(); return 0; }
+    if (!(*d1 & 0x20)) return 0;
+    seta2();
+    uint32_t a = skip_string(skip_string(g.menulist));
+    a = skip_string(a);
+    for (uint16_t n = menu_item(); n; n--) a = skip_string(a + 4);
+    call68k(m32(a));
+    int keep = (g.sflags5 & 2) != 0;
+    g.sflags5 &= (uint8_t)~2;
+    if (!keep) *d1 = DrawMenuScreen();
+    return menu_item() == 0;
 }
 
 /* menu94.asm:Pausemode_Pmenu. Clamp the selection to the items, scroll the four rows shown,
@@ -85,49 +118,16 @@ uint16_t Pausemode_Pmenu(void)
     return rows;
 }
 
-/* menu94.asm:DrawMenuScreen. Draw the screen behind the menu (menudraw), frame the menu box,
- * print it and fade in. -> d1 as Pausemode_Pmenu leaves it. */
-uint16_t DrawMenuScreen(void)
+/* menu94.asm:PrintMenuItem. Print item a1 -> a1 past its text. An item whose text starts with
+ * 'x' is the goalie option: "Manual Goalie" or "Auto Goalie" by the pause pad's goalie mode. */
+uint32_t PrintMenuItem(uint32_t item)
 {
-    call68k(g.menudraw);
-    PRINTSMALLZ(str_DrawMenuScreen_1);
-    SetMenuPrintX();
-    Framer(0x16, 6);
-    uint16_t d1 = Pausemode_Pmenu();
-    g.palcount = 0x18;
-    return d1;
-}
-
-/* menu94.asm:Pausemode_top. Start a menu: a0 = item list, a1 = screen draw routine, item 0
- * selected and shown first; falls into DrawMenuScreen -> d1. */
-uint16_t Pausemode_top(uint32_t items, uint32_t draw)
-{
-    g.menulist = items;
-    g.menudraw = draw;
-    set_menu_item(0);
-    set_menu_top(0);
-    return DrawMenuScreen();
-}
-
-/* menu94.asm:HandleMenuInput. Act on the pad bits d1: down / up move the selection, C runs the
- * selected item's handler (with a2 = the pause pad's team) and redraws the menu unless the
- * handler drew its own screen (sflags5 bit 1). -> Z (1): leave the menu (start, or C on item 0).
- * d1 comes back as the redraw leaves it (a handler's own registers are not followed). */
-int HandleMenuInput(uint16_t *d1)
-{
-    if (*d1 & 0x80) return 1;
-    if (*d1 & 2) { set_menu_item((uint16_t)(menu_item() + 1)); *d1 = Pausemode_Pmenu(); return 0; }
-    if (*d1 & 1) { set_menu_item((uint16_t)(menu_item() - 1)); *d1 = Pausemode_Pmenu(); return 0; }
-    if (!(*d1 & 0x20)) return 0;
-    seta2();
-    uint32_t a = skip_string(skip_string(g.menulist));
-    a = skip_string(a);
-    for (uint16_t n = menu_item(); n; n--) a = skip_string(a + 4);
-    call68k(m32(a));
-    int keep = (g.sflags5 & 2) != 0;
-    g.sflags5 &= (uint8_t)~2;
-    if (!keep) *d1 = DrawMenuScreen();
-    return menu_item() == 0;
+    if (m8(item + 2) != 'x') return printsmall(item);
+    static const uint8_t manual[] = "  Manual Goalie   ", automatic[] = "   Auto Goalie    ";
+    uint16_t mode = g.sflags & HI(sfpj) ? g.goaliemode2 : g.goaliemode1;
+    const uint8_t *text = mode ? automatic : manual;
+    printsmall(rom_find(SYM_PrintMenuItem, SYM_PrintMenuItem + 0x80, text, sizeof manual - 1) - 2);
+    return skip_string(item);
 }
 
 /* menu94.asm:PutTeamBlock. Two rows of 11 map words from TeamBlockMap + d0 at printx / printy;
