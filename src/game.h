@@ -246,10 +246,16 @@ void p_initialZ80(void);
 void ClearAllTrackAndSFXSlots(void);
 
 /* ---- hockey94.asm: the game loop, the clock, pause mode ---- */
+void VBjsr(void);                                       /* the vblank interrupt: the vbint handler */
+void Begin(void);                                       /* does not return */
+void StartGame(void);                                   /* does not return */
 void ClearShotData(void);
 void restoreteams(void);
 void ResetClock(void);
 uint16_t GetPeriodTime(void);                           /* -> d0 */
+void StartPer(void);                                    /* does not return: resets the stack */
+void Gameloop(void);                                    /* does not return */
+void DoGameFrame(void);
 void periodicevents(void);
 void CheckInjury(void);
 void RestoreBenchEnergy(void);
@@ -258,22 +264,16 @@ void UpdateCwdExcite(void);
 void updatecrowdf(void);
 void clockcont(void);
 void clockcont_0(void);
-int EndDemoOnPress(uint16_t d1);                        /* 1 = the demo ended */
 void demoread(void);
-void startpause(void);
+int EndDemoOnPress(uint16_t d1);                        /* 1 = the demo ended */
 void startpause1(void);
 void startpause2(void);
+void startpause(void);
 void startpause3(void);
 void startpause4(void);
+void Pausemode(void);
 void Pausemode_pall(void);
 struct Team *seta2(void);                               /* -> a2 */
-void DoGameFrame(void);
-void Gameloop(void);                                    /* does not return */
-void StartPer(void);                                    /* does not return: resets the stack */
-void Pausemode(void);
-void VBjsr(void);                                       /* the vblank interrupt: the vbint handler */
-void Begin(void);                                       /* does not return */
-void StartGame(void);                                   /* does not return */
 
 /* ---- video94.asm: the game play display: sprites, scroll, the vblank ---- */
 /* The sprite builders share three registers: a5 = the DMA list being filled (long

@@ -13,6 +13,70 @@
 
 #define PFLAG(o, b) ((o)->pflags & (1 << (b)))
 
+/* hockey94.asm:VBjsr. The vblank interrupt: jump to the handler in vbint. */
+void VBjsr(void) { call68k(g.vbint); }
+
+/* hockey94.asm:Begin. The cold start from Start: clear the game's RAM ($B000-$DEF3), note PAL,
+ * start the sound, look for the 4 Way Play adaptor, the EA Sports screen, save RAM, the line
+ * data, the attract screen, the default options, then the title (Opening). */
+void Begin(void)
+{
+    cpu_set_sr(0x2700);
+    ram_fill(RAM(VSCRLPM), 0, 0xDEF4 - RAM_OFF_VSCRLPM);
+    uint8_t *palflag = g.PALflag;
+    wr16(palflag, 0);
+    g.PalMode = vdp_status() & 1;                         /* status bit 0: PAL (50 Hz) */
+    if (g.PalMode) palflag[0] = (uint8_t)(palflag[0] | 1);
+    p_initialZ80();
+    p_turnoff();
+    p_music_vblank();
+    KillCrowd();
+    Detect4WayPlay();
+    g.PadControlBits34 = 0xFFFF;
+    EASportsScreen();
+    InitSaveRAM();
+    ReadLineData();
+    HiScoreScreen();
+    DefaultMenus();
+    g.TmpOptLine2 = g.OptLine;
+    g.TempOptPlayMode = g.OptPlayMode;
+    orjoy();                                              /* forget the presses so far */
+    Opening();
+}
+
+/* hockey94.asm:StartGame. A new game: the presses counted, 30 second periods when pad 1 holds
+ * Start+A+C, offsides, the shot buffer, the team stats (hot / cold tables in a shootout), the
+ * scores, the rink, the crowd record, then the intermission into the first period. Does not
+ * return. */
+void StartGame(void)
+{
+    ST_W(g.arenaanim);
+    g.homepresses = 0;
+    g.awaypresses = 0;
+    g.homedirpresses = 0;
+    g.awaydirpresses = 0;
+    uint16_t d0, d1, d2, d3;
+    ReadJoy1(&d0, &d1, &d2, &d3);
+    if ((uint8_t)d3 == 0xE0) g.OptPerlen = rules[RULE_PERIOD_LENGTHS] ? 7 : 3;   /* (the secret 30 seconds) */
+    g.gmode = 0;
+    if (g.OptPen == 1) g.gmode |= 1 << gmoffs;
+    if ((int16_t)g.OptPlayMode > 1) ClearShotData();
+    clearTeamStats();
+    if (g.gmode2 & HI(0)) {
+        Create_HotCold_Table(team_struct(0));
+        Create_HotCold_Table(team_struct(1));
+    }
+    g.ScoreSumbytes = 0;
+    g.PenSumLength = 0;
+    g.gsp = 0;
+    g.ChkCnt = 0;
+    restoreteams();
+    InitScores();
+    setupice();
+    LoadCrowdRec();
+    PeriodOver_sp();
+}
+
 /* hockey94.asm:ClearShotData. Clear $E4 words at outputbuffer. */
 void ClearShotData(void)
 {
@@ -51,6 +115,84 @@ uint16_t GetPeriodTime(void)
 {
     if (rules[RULE_PERIOD_LENGTHS]) return more_periodtimes[g.OptPerlen & 7];
     return periodtimes[g.OptPerlen];
+}
+
+/* StartPer after the stack reset */
+static void start_period(void)
+{
+    p_turnoff();
+    setupice();
+    ResetClock();
+    g.PadControlBits |= 0xF000;
+    ST_W(g.c1playernum);                                  /* no controlled player yet */
+    ST_W(g.c2playernum);
+    struct SortObj *puck = sortobj(puckscnum);
+    g.fox = 0;                                            /* face off at center ice */
+    g.foy = 0;
+    uint16_t ass = 0x1B;                                  /* pfaceoff */
+    if (g.gmode2 & HI(0)) {                               /* shootout */
+        ass = 0x1E;
+        g.BA_Skater_Offset = 8;
+        g.BA_Goalie_SCnum = 0xB;
+    }
+    assreplace(ass, puck);
+    g.sflags2 |= HI(sf2drec);                             /* don't record */
+    g.sflags &= (uint16_t)~HI(sfwrap);                    /* reset the replay */
+    g.lastsfx = 0xFFFF;
+    g.recbpr = RAM_BASE;                                  /* the replay starts at M68K_RAM */
+    g.oldvcount = g.vcount;
+    DoGameFrame();                                        /* two frames before the loop */
+    g.palcount = 0xFFFF;
+    DoGameFrame();
+    g.CwdExciteLvl = (uint16_t)(g.gamelevel << 4);
+    g.CurCrowdMeter = 0;
+    g.HmTeam = g.HomeTeam;
+    g.SongIndex = 0;
+    ChooseSong();
+    song((int16_t)g.SongNum);                             /* the period start tune */
+    if ((int16_t)g.gsp < 2) g.sflags3 |= 0x80;            /* periods 1 and 2 */
+    Gameloop();
+}
+
+/* hockey94.asm:StartPer. Start a period: overtime flag, the faceoff animation, then with a fresh
+ * stack: sound off, the rink, the clock, the opening faceoff, two frames, the crowd and the
+ * period tune, and the game loop. */
+void StartPer(void)
+{
+    if (g.gsp == 3) g.sflags7 |= 2;                       /* overtime */
+    ST_W(g.faceoffanim[0]);
+    restart_at(start_period);                             /* movea.w #Stack,sp */
+}
+
+/* hockey94.asm:Gameloop. The game: a frame, the demo check, the pause when it is asked for. */
+void Gameloop(void)
+{
+    for (;;) {
+        DoGameFrame();
+        demoread();
+        if (g.sflags & HI(sfpz)) Pausemode();
+    }
+}
+
+/* hockey94.asm:DoGameFrame. Wait for a vblank, then one frame of game logic: d7 (elapsed) =
+ * the frames since the last pass. The clock and periodic events, the players, a delayed song,
+ * the slot bit, the view, the replay recording, and the lists for the next vblank. */
+void DoGameFrame(void)
+{
+    int16_t d7;
+    while ((d7 = (int16_t)(g.vcount - g.oldvcount)) == 0) hal_wait_vblank();
+    g.oldvcount = g.vcount;
+    elapsed = d7;
+    periodicevents();
+    updateplayers();
+    if ((int16_t)g.songdelay > 0 && --g.songdelay == 0) {
+        stop_current_song(0);                             /* updateplayers' d0 is not followed (a register leak) */
+        song((int16_t)g.delayedsong);
+    }
+    setSlotBit();
+    checkwindow();
+    updatereplay();
+    setvideo();
 }
 
 /* hockey94.asm:periodicevents. Called every game loop pass: penalties, the crowd, the arena
@@ -220,15 +362,6 @@ eog:
     AddPenalty2(4, a3);                                   /* PenEOG */
 }
 
-/* hockey94.asm:EndDemoOnPress. Any button on the pad just read ends the demo. Returns 1 when
- * it did. */
-int EndDemoOnPress(uint16_t d1)
-{
-    if (d1 == 0) return 0;
-    ExitToOpening();
-    return 1;
-}
-
 /* hockey94.asm:demoread. Monitor the pads in demo mode: start pauses, anything else ends the
  * demo. */
 void demoread(void)
@@ -250,115 +383,22 @@ void demoread(void)
     EndDemoOnPress(d1);
 }
 
+/* hockey94.asm:EndDemoOnPress. Any button on the pad just read ends the demo. Returns 1 when
+ * it did. */
+int EndDemoOnPress(uint16_t d1)
+{
+    if (d1 == 0) return 0;
+    ExitToOpening();
+    return 1;
+}
+void startpause1(void) { g.pausepad = 0; g.sflags &= (uint16_t)~HI(sfpj); startpause(); }
+void startpause2(void) { g.pausepad = 0; g.sflags |= HI(sfpj); startpause(); }
+
 /* hockey94.asm:startpause / startpause1-4. Pause at the end of this frame, remembering the
  * pad that asked. */
 void startpause(void) { g.sflags |= HI(sfpz); }
-void startpause1(void) { g.pausepad = 0; g.sflags &= (uint16_t)~HI(sfpj); startpause(); }
-void startpause2(void) { g.pausepad = 0; g.sflags |= HI(sfpj); startpause(); }
 void startpause3(void) { g.pausepad = 3; g.sflags &= (uint16_t)~HI(sfpj); startpause(); }
 void startpause4(void) { g.pausepad = 4; g.sflags |= HI(sfpj); startpause(); }
-
-/* hockey94.asm:Pausemode_pall. The draw routine of the pause menu: the window plane over
- * the horizontal rink, the crowd silenced, plane 3 erased. */
-void Pausemode_pall(void)
-{
-    if (view_wide()) vdp_ctrl16(SYM_VDPR_MODE4);         /* (the wide view: the window plane is 32 columns) */
-    vdp_ctrl16(SYM_VDPR_WINX);
-    vdp_ctrl16(SYM_VDPR_WINY + 0x1C);
-    SetHor();
-    setvideo();
-    KillCrowd();
-    printsmallz(str_Pausemode_pall_1, sizeof str_Pausemode_pall_1);
-    eraser(0x20, 0x1C, 0x7FF);
-}
-
-/* hockey94.asm:seta2. The team struct of the pause joystick. */
-struct Team *seta2(void)
-{
-    uint16_t t = (g.sflags & HI(sfpj)) ? g.cont2team : g.cont1team;
-    return team_struct(t != 1);
-}
-
-/* hockey94.asm:VBjsr. The vblank interrupt: jump to the handler in vbint. */
-void VBjsr(void) { call68k(g.vbint); }
-
-/* hockey94.asm:DoGameFrame. Wait for a vblank, then one frame of game logic: d7 (elapsed) =
- * the frames since the last pass. The clock and periodic events, the players, a delayed song,
- * the slot bit, the view, the replay recording, and the lists for the next vblank. */
-void DoGameFrame(void)
-{
-    int16_t d7;
-    while ((d7 = (int16_t)(g.vcount - g.oldvcount)) == 0) hal_wait_vblank();
-    g.oldvcount = g.vcount;
-    elapsed = d7;
-    periodicevents();
-    updateplayers();
-    if ((int16_t)g.songdelay > 0 && --g.songdelay == 0) {
-        stop_current_song(0);                             /* updateplayers' d0 is not followed (a register leak) */
-        song((int16_t)g.delayedsong);
-    }
-    setSlotBit();
-    checkwindow();
-    updatereplay();
-    setvideo();
-}
-
-/* hockey94.asm:Gameloop. The game: a frame, the demo check, the pause when it is asked for. */
-void Gameloop(void)
-{
-    for (;;) {
-        DoGameFrame();
-        demoread();
-        if (g.sflags & HI(sfpz)) Pausemode();
-    }
-}
-
-/* StartPer after the stack reset */
-static void start_period(void)
-{
-    p_turnoff();
-    setupice();
-    ResetClock();
-    g.PadControlBits |= 0xF000;
-    ST_W(g.c1playernum);                                  /* no controlled player yet */
-    ST_W(g.c2playernum);
-    struct SortObj *puck = sortobj(puckscnum);
-    g.fox = 0;                                            /* face off at center ice */
-    g.foy = 0;
-    uint16_t ass = 0x1B;                                  /* pfaceoff */
-    if (g.gmode2 & HI(0)) {                               /* shootout */
-        ass = 0x1E;
-        g.BA_Skater_Offset = 8;
-        g.BA_Goalie_SCnum = 0xB;
-    }
-    assreplace(ass, puck);
-    g.sflags2 |= HI(sf2drec);                             /* don't record */
-    g.sflags &= (uint16_t)~HI(sfwrap);                    /* reset the replay */
-    g.lastsfx = 0xFFFF;
-    g.recbpr = RAM_BASE;                                  /* the replay starts at M68K_RAM */
-    g.oldvcount = g.vcount;
-    DoGameFrame();                                        /* two frames before the loop */
-    g.palcount = 0xFFFF;
-    DoGameFrame();
-    g.CwdExciteLvl = (uint16_t)(g.gamelevel << 4);
-    g.CurCrowdMeter = 0;
-    g.HmTeam = g.HomeTeam;
-    g.SongIndex = 0;
-    ChooseSong();
-    song((int16_t)g.SongNum);                             /* the period start tune */
-    if ((int16_t)g.gsp < 2) g.sflags3 |= 0x80;            /* periods 1 and 2 */
-    Gameloop();
-}
-
-/* hockey94.asm:StartPer. Start a period: overtime flag, the faceoff animation, then with a fresh
- * stack: sound off, the rink, the clock, the opening faceoff, two frames, the crowd and the
- * period tune, and the game loop. */
-void StartPer(void)
-{
-    if (g.gsp == 3) g.sflags7 |= 2;                       /* overtime */
-    ST_W(g.faceoffanim[0]);
-    restart_at(start_period);                             /* movea.w #Stack,sp */
-}
 
 /* hockey94.asm:Pausemode. The pause menu: fade out, silence, the menu for the pausing pad's team
  * (shootout or alternate item lists), run it until it is left, then put the rink back (vertical
@@ -404,63 +444,23 @@ void Pausemode(void)
     g.oldvcount = g.vcount;
 }
 
-/* hockey94.asm:Begin. The cold start from Start: clear the game's RAM ($B000-$DEF3), note PAL,
- * start the sound, look for the 4 Way Play adaptor, the EA Sports screen, save RAM, the line
- * data, the attract screen, the default options, then the title (Opening). */
-void Begin(void)
+/* hockey94.asm:Pausemode_pall. The draw routine of the pause menu: the window plane over
+ * the horizontal rink, the crowd silenced, plane 3 erased. */
+void Pausemode_pall(void)
 {
-    cpu_set_sr(0x2700);
-    ram_fill(RAM(VSCRLPM), 0, 0xDEF4 - RAM_OFF_VSCRLPM);
-    uint8_t *palflag = g.PALflag;
-    wr16(palflag, 0);
-    g.PalMode = vdp_status() & 1;                         /* status bit 0: PAL (50 Hz) */
-    if (g.PalMode) palflag[0] = (uint8_t)(palflag[0] | 1);
-    p_initialZ80();
-    p_turnoff();
-    p_music_vblank();
+    if (view_wide()) vdp_ctrl16(SYM_VDPR_MODE4);         /* (the wide view: the window plane is 32 columns) */
+    vdp_ctrl16(SYM_VDPR_WINX);
+    vdp_ctrl16(SYM_VDPR_WINY + 0x1C);
+    SetHor();
+    setvideo();
     KillCrowd();
-    Detect4WayPlay();
-    g.PadControlBits34 = 0xFFFF;
-    EASportsScreen();
-    InitSaveRAM();
-    ReadLineData();
-    HiScoreScreen();
-    DefaultMenus();
-    g.TmpOptLine2 = g.OptLine;
-    g.TempOptPlayMode = g.OptPlayMode;
-    orjoy();                                              /* forget the presses so far */
-    Opening();
+    printsmallz(str_Pausemode_pall_1, sizeof str_Pausemode_pall_1);
+    eraser(0x20, 0x1C, 0x7FF);
 }
 
-/* hockey94.asm:StartGame. A new game: the presses counted, 30 second periods when pad 1 holds
- * Start+A+C, offsides, the shot buffer, the team stats (hot / cold tables in a shootout), the
- * scores, the rink, the crowd record, then the intermission into the first period. Does not
- * return. */
-void StartGame(void)
+/* hockey94.asm:seta2. The team struct of the pause joystick. */
+struct Team *seta2(void)
 {
-    ST_W(g.arenaanim);
-    g.homepresses = 0;
-    g.awaypresses = 0;
-    g.homedirpresses = 0;
-    g.awaydirpresses = 0;
-    uint16_t d0, d1, d2, d3;
-    ReadJoy1(&d0, &d1, &d2, &d3);
-    if ((uint8_t)d3 == 0xE0) g.OptPerlen = rules[RULE_PERIOD_LENGTHS] ? 7 : 3;   /* (the secret 30 seconds) */
-    g.gmode = 0;
-    if (g.OptPen == 1) g.gmode |= 1 << gmoffs;
-    if ((int16_t)g.OptPlayMode > 1) ClearShotData();
-    clearTeamStats();
-    if (g.gmode2 & HI(0)) {
-        Create_HotCold_Table(team_struct(0));
-        Create_HotCold_Table(team_struct(1));
-    }
-    g.ScoreSumbytes = 0;
-    g.PenSumLength = 0;
-    g.gsp = 0;
-    g.ChkCnt = 0;
-    restoreteams();
-    InitScores();
-    setupice();
-    LoadCrowdRec();
-    PeriodOver_sp();
+    uint16_t t = (g.sflags & HI(sfpj)) ? g.cont2team : g.cont1team;
+    return team_struct(t != 1);
 }
