@@ -2,4 +2,4 @@
 #pragma once
 #include <stdint.h>
 
-static const uint8_t str_Pausemode_pall_1[8] = { 0, 8, 255, 3, 253, 0, 252, 0 };   /* hockey94.asm:478 printsmallz */
+static const uint8_t str_Pausemode_pall_1[8] = { 0, 8, 255, 3, 253, 0, 252, 0 };   /* hockey94.asm:480 printsmallz */

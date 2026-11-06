@@ -2,7 +2,7 @@
 #pragma once
 #include <stdint.h>
 
-static const uint8_t str_ShowReplayIcon_1[6] = { 0, 6, 189, 2, 2, 0 };   /* replay94.asm:297 printz */
+static const uint8_t str_ShowReplayIcon_1[6] = { 0, 6, 189, 2, 2, 0 };   /* replay94.asm:299 printz */
 static const uint8_t str_EraseReplayIcon_1[6] = { 0, 6, 189, 2, 2, 0 };   /* replay94.asm:316 printz */
-static const uint8_t str_ShowReplayBanner_1[6] = { 0, 6, 189, 2, 0, 0 };   /* replay94.asm:326 printz */
-static const uint8_t str_EraseReplayBanner_1[6] = { 0, 6, 189, 2, 2, 0 };   /* replay94.asm:341 printz */
+static const uint8_t str_ShowReplayBanner_1[6] = { 0, 6, 189, 2, 0, 0 };   /* replay94.asm:324 printz */
+static const uint8_t str_EraseReplayBanner_1[6] = { 0, 6, 189, 2, 2, 0 };   /* replay94.asm:337 printz */

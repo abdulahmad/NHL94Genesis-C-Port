@@ -2,21 +2,21 @@
 #pragma once
 #include <stdint.h>
 
-static const uint8_t str_ScoutingReport_1[6] = { 0, 6, 254, 0, 0, 0 };   /* scout94.asm:109 printz */
-static const uint8_t str_ScoutingReport_2[14] = { 0, 14, 223, 12, 13, 77, 65, 84, 67, 72, 85, 80, 83, 0 };   /* scout94.asm:124 printbigz */
-static const uint8_t str_ScoutingReport_3[16] = { 0, 16, 255, 16, 17, 65, 68, 86, 65, 78, 84, 65, 71, 69, 58, 0 };   /* scout94.asm:129 printz */
-static const uint8_t str_ScoutingReport_4[6] = { 0, 6, 222, 6, 3, 0 };   /* scout94.asm:133 printz */
+static const uint8_t str_ScoutingReport_1[6] = { 0, 6, 254, 0, 0, 0 };   /* scout94.asm:117 printz */
+static const uint8_t str_ScoutingReport_2[14] = { 0, 14, 223, 12, 13, 77, 65, 84, 67, 72, 85, 80, 83, 0 };   /* scout94.asm:130 printbigz */
+static const uint8_t str_ScoutingReport_3[16] = { 0, 16, 255, 16, 17, 65, 68, 86, 65, 78, 84, 65, 71, 69, 58, 0 };   /* scout94.asm:133 printz */
+static const uint8_t str_ScoutingReport_4[6] = { 0, 6, 222, 6, 3, 0 };   /* scout94.asm:135 printz */
 static const uint8_t str_ScoutingReport_5[6] = { 0, 6, 222, 1, 14, 0 };   /* scout94.asm:140 printz */
-static const uint8_t str_ScoutingReport_6[6] = { 0, 6, 222, 31, 14, 0 };   /* scout94.asm:147 printz */
-static const uint8_t str_ScoutingReport_7[6] = { 0, 6, 255, 1, 1, 0 };   /* scout94.asm:154 printz */
-static const uint8_t str_PrintMatchupRatings_1[10] = { 0, 10, 248, 0, 1, 22, 22, 249, 1, 0 };   /* scout94.asm:439 printsmallz */
-static const uint8_t str_PrintMatchupRatings_2[46] = { 0, 46, 255, 0, 23, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0 };   /* scout94.asm:466 printz */
-static const uint8_t str_PrintMatchupRatings_3[6] = { 0, 6, 255, 34, 22, 0 };   /* scout94.asm:470 printz */
-static const uint8_t str_PrintMatchupRatings_4[6] = { 0, 6, 255, 4, 22, 0 };   /* scout94.asm:479 printz */
-static const uint8_t str_PrintMatchupRatings_5[10] = { 0, 10, 248, 0, 1, 13, 19, 249, 1, 0 };   /* scout94.asm:496 printsmallz */
-static const uint8_t str_PrintMatchupRatings_6[46] = { 0, 46, 255, 0, 23, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0 };   /* scout94.asm:510 printz */
-static const uint8_t str_PrintMatchupRatings_7[6] = { 0, 6, 255, 35, 23, 0 };   /* scout94.asm:514 printz */
-static const uint8_t str_PrintMatchupRatings_8[6] = { 0, 6, 255, 34, 22, 0 };   /* scout94.asm:526 printz */
-static const uint8_t str_PrintMatchupRatings_9[6] = { 0, 6, 255, 0, 23, 0 };   /* scout94.asm:539 printz */
-static const uint8_t str_PrintMatchupRatings_10[6] = { 0, 6, 255, 4, 22, 0 };   /* scout94.asm:551 printz */
-static const uint8_t str_PrintAdvantageMarks_1[6] = { 0, 6, 255, 19, 22, 0 };   /* scout94.asm:629 printz */
+static const uint8_t str_ScoutingReport_6[6] = { 0, 6, 222, 31, 14, 0 };   /* scout94.asm:145 printz */
+static const uint8_t str_ScoutingReport_7[6] = { 0, 6, 255, 1, 1, 0 };   /* scout94.asm:150 printz */
+static const uint8_t str_PrintMatchupRatings_1[10] = { 0, 10, 248, 0, 1, 22, 22, 249, 1, 0 };   /* scout94.asm:430 printsmallz */
+static const uint8_t str_PrintMatchupRatings_2[46] = { 0, 46, 255, 0, 23, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0 };   /* scout94.asm:455 printz */
+static const uint8_t str_PrintMatchupRatings_3[6] = { 0, 6, 255, 34, 22, 0 };   /* scout94.asm:457 printz */
+static const uint8_t str_PrintMatchupRatings_4[6] = { 0, 6, 255, 4, 22, 0 };   /* scout94.asm:464 printz */
+static const uint8_t str_PrintMatchupRatings_5[10] = { 0, 10, 248, 0, 1, 13, 19, 249, 1, 0 };   /* scout94.asm:479 printsmallz */
+static const uint8_t str_PrintMatchupRatings_6[46] = { 0, 46, 255, 0, 23, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 0 };   /* scout94.asm:491 printz */
+static const uint8_t str_PrintMatchupRatings_7[6] = { 0, 6, 255, 35, 23, 0 };   /* scout94.asm:493 printz */
+static const uint8_t str_PrintMatchupRatings_8[6] = { 0, 6, 255, 34, 22, 0 };   /* scout94.asm:503 printz */
+static const uint8_t str_PrintMatchupRatings_9[6] = { 0, 6, 255, 0, 23, 0 };   /* scout94.asm:514 printz */
+static const uint8_t str_PrintMatchupRatings_10[6] = { 0, 6, 255, 4, 22, 0 };   /* scout94.asm:524 printz */
+static const uint8_t str_PrintAdvantageMarks_1[6] = { 0, 6, 255, 19, 22, 0 };   /* scout94.asm:601 printz */

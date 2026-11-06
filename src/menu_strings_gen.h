@@ -2,8 +2,8 @@
 #pragma once
 #include <stdint.h>
 
-static const uint8_t str_DrawMenuScreen_1[6] = { 0, 6, 254, 4, 252, 12 };   /* menu94.asm:13 printsmallz */
-static const uint8_t str_Pausemode_Pmenu_1[38] = { 0, 38, 251, 1, 32, 251, 255, 250, 1, 32, 251, 255, 250, 1, 32, 251, 255, 250, 1, 32, 251, 18, 32, 251, 255, 250, 255, 32, 251, 255, 250, 255, 32, 251, 255, 250, 255, 32 };   /* menu94.asm:101 printsmallz */
-static const uint8_t str_Pausemode_Pmenu_2[12] = { 0, 12, 254, 5, 251, 1, 250, 1, 123, 250, 255, 0 };   /* menu94.asm:119 printsmallz */
-static const uint8_t str_Pausemode_Pmenu_3[6] = { 0, 6, 251, 2, 250, 1 };   /* menu94.asm:125 printsmallz */
-static const uint8_t str_Pausemode_Pmenu_4[8] = { 0, 8, 254, 5, 251, 1, 125, 0 };   /* menu94.asm:143 printsmallz */
+static const uint8_t str_DrawMenuScreen_1[6] = { 0, 6, 254, 4, 252, 12 };   /* menu94.asm:15 printsmallz */
+static const uint8_t str_Pausemode_Pmenu_1[38] = { 0, 38, 251, 1, 32, 251, 255, 250, 1, 32, 251, 255, 250, 1, 32, 251, 255, 250, 1, 32, 251, 18, 32, 251, 255, 250, 255, 32, 251, 255, 250, 255, 32, 251, 255, 250, 255, 32 };   /* menu94.asm:107 printsmallz */
+static const uint8_t str_Pausemode_Pmenu_2[12] = { 0, 12, 254, 5, 251, 1, 250, 1, 123, 250, 255, 0 };   /* menu94.asm:126 printsmallz */
+static const uint8_t str_Pausemode_Pmenu_3[6] = { 0, 6, 251, 2, 250, 1 };   /* menu94.asm:130 printsmallz */
+static const uint8_t str_Pausemode_Pmenu_4[8] = { 0, 8, 254, 5, 251, 1, 125, 0 };   /* menu94.asm:147 printsmallz */
