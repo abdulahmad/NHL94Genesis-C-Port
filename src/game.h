@@ -832,7 +832,6 @@ struct Text GetTeamNickname(struct Team *tm);           /* a2 -> a1 */
 struct Text GetTeamArena(struct Team *tm);              /* a2 -> a1 */
 
 /* ---- records94.asm: the user records: the name entry, Record Holders ---- */
-void UserNameEntry(void);                               /* the name entry */
 void NameEntryScreen(void);
 void NameLetterGrid(void);
 void NameEntryHelp(void);
@@ -852,6 +851,7 @@ void NameEntryFramer(uint16_t w, uint16_t h);           /* d0, d1 */
 void GetLogName(uint32_t dst);                          /* a1 */
 void StoreUserName(void);
 void WriteNameRecord(void);
+void UserNameEntry(void);                               /* the name entry */
 int SkipOtherUserName(int16_t dir);                     /* d0 (on the stack) -> Z: stepped */
 void RecordHoldersScreen(void);                         /* the record holders */
 void PrintRecordPage(void);
