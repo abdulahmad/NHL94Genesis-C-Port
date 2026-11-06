@@ -1008,11 +1008,11 @@ uint16_t GetForwardCount(struct Team *tm);              /* a2 -> d0 */
 
 /* ---- shootout94.asm: the shootout ---- */
 void ShootoutModeBox(void);
+void ClearShootout(void);
 void NextShooter(struct SortObj *o);                    /* a3 passes through to StartShootoutPath */
 void CountShootoutGoals(void);
-void ShootoutWonBy(void);
 void InitShooters(void);
-void ClearShootout(void);
+void ShootoutWonBy(void);
 void ShootoutShooters(struct Team *tm);                 /* a2, the shootout shooters */
 void ShooterSelectList(struct Team *tm);
 void PrintShooterList(struct Team *tm);
