@@ -7,7 +7,7 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 
 ## Now
 
-G4 unused leftover ports stacked on G2/G3 [#7](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/7). `PuckComingToward` and `TerminateLogName` ported; `rtsStatScroll` parked. Names 840/0/0/0. Next: G5 rest-of-tree ROM order (G0 checker already proven). Do not merge to main. Frame gates not run here (no captures/vectors/golden).
+G5 rest-of-tree ROM order stacked on G4 [#8](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/8). Original routines in fourway, sram, menu, replay, shootout, crowd, hockey, records, collide, penalty, cards, stats, setup follow 94G ROM order. Names 840/0/0/0. Next: G6 ram.h (wide). Do not merge to main. Frame gates not run here (no captures/vectors/golden).
 
 ## Done
 
@@ -97,7 +97,8 @@ G4 unused leftover ports stacked on G2/G3 [#7](https://github.com/abdulahmad/NHL
 11. ~~**G2** capture `--fn` lists~~ (2026-11-06): `tools/hybrid/capture_all.sh` uses current 94G file names (`logic94` / `video94`; boot `TitleScreen`; drop `goalie94`). Session output names stay. helpers leftover names stay.
 12. ~~**G3** leftover comments~~ (2026-11-06): `src/logic.c` `tables94.asm:asstab`; `test/ports.c` section comments name current modules.
 13. ~~**G4** unused leftover code~~ (2026-11-06): `PuckComingToward` in `helpers.c`, `TerminateLogName` in `ui.c`. `rtsStatScroll` parked (no empty stub). Names 840/0/0/0. No `test/ports.c` runners.
-14. **G5** rest-of-tree ROM order (13 modules) still waits. G0 checker is proven (arena/title green, fourway/menu red).
+14. ~~**G5** rest-of-tree ROM order~~ (2026-11-06): 13 modules (fourway, sram, menu, replay, shootout, crowd, hockey, records, collide, penalty, cards, stats, setup) follow 94G ROM order. Names 840/0/0/0. G0 checker green on the original-routine tree.
+15. **G6** ram.h names vs `ram94.asm` (wide; Abdul reads the diff). Offsets stay.
 
 ## Needs
 
