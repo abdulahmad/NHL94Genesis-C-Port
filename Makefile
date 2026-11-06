@@ -184,32 +184,55 @@ oracle: build/nhl_oracle.so
 build/nhl_oracle.so: tools/hybrid/oracle_shim.c
 	$(MAKE) -s -f tools/hybrid/Makefile
 
-# The generated headers are committed; a build never remakes them. `make gen` does, from ref/
-# (tools/fetch_refs.sh) and the asm rebuild (tools/asm/build_vasm.sh: build/asm/), and shows
-# what changed.
-STRINGS := checks input penalty period hockey display replay title data shootout menu stats attract cards optsetup records setup scout
-ASMSRC  := ref/NHL94Genesis/src
+# The generated headers are committed; a build never remakes them. `make gen` regenerates
+# tables/strings from current 94G (`$NHL_ASM` or ../nhl94genesis). Output *_gen.h names stay.
+# Oracle pin (ref/NHL94Genesis, build/asm/symbols.json) is not rewritten; ram/symbols/anim/routines
+# still use it when present (`make gen-pin`).
+ifndef NHL_ASM
+NHL_ASM := $(firstword $(wildcard ../nhl94genesis ../NHL94Genesis))
+endif
+ASMSRC  := $(NHL_ASM)/src
 gen:
-	@test -d $(ASMSRC) || { echo "make gen needs ref/NHL94Genesis: tools/fetch_refs.sh"; exit 1; }
-	@test -f build/asm/symbols.json || { echo "make gen needs build/asm/symbols.json: tools/asm/build_vasm.sh"; exit 1; }
+	@test -d "$(ASMSRC)" || { echo "make gen needs NHL94Genesis at \$$NHL_ASM or ../nhl94genesis"; exit 1; }
 	@mkdir -p out
+	$(PY) tools/gen_tables.py $(ASMSRC)/collide94.asm "checkpuckcoll/.cbg:cbg" "checkpuckcoll/.cbgsq:cbgsq" "puckgoalie/.list:savelist" "puckgoalie/.list2:saveodds" "puckgoalie/.list3:saveodds3" "Setplass/.alist:alist" "FallDown/.FallList:FallList" checkinglist -o src/collide_tables_gen.h
+	$(PY) tools/gen_tables.py $(ASMSRC)/logic94.asm "asswingo/.dedata:wingo_zones" "asscentero/.dedata:centero_zones" "asspuckc/.postab2:puckc_postab" "goaliesave/.saveanim:saveanim" "CompLine/.hl1:homelines" "CompLine/.al1:awaylines" "puckfaceoff2/.apl:fo_apl" "puckfaceoff2/.ptab:fo_ptab" "Endfaceoff/.ftab:fo_ftab" "doplayeracc/.ftab:turn_ftab" MaxSpeed dirtab -o src/checks_tables_gen.h
+	$(PY) tools/gen_tables.py $(ASMSRC)/logic94.asm "getlchoice/.tab:lchoice_tab" shotsets -o src/input_tables_gen.h
+	$(PY) tools/gen_tables.py $(ASMSRC)/hockey94.asm "GetPeriodTime/.timetab:periodtimes" -o src/hockey_tables_gen.h
+	$(PY) tools/gen_tables.py $(ASMSRC)/video94.asm "showzam/.ftab:zam_ftab" "checksso/.tab:sso_tab" -o src/display_tables_gen.h
+	$(PY) tools/gen_tables.py $(ASMSRC)/setup94.asm "defaultsprites/.listsso:listsso" "defaultsprites/.listffo:listffo" "defaultsprites_0/.list:dslist" -o src/setup_tables_gen.h
+	$(PY) tools/gen_tables.py $(ASMSRC)/penalty94.asm sctab "StartHL2/.postab:hl_postab" -o src/penalty_tables_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/logic94.asm -o src/checks_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/logic94.asm -o src/input_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/penalty94.asm -o src/penalty_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/period94.asm -o src/period_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/hockey94.asm -o src/hockey_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/video94.asm -o src/display_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/replay94.asm -o src/replay_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/title94.asm $(ASMSRC)/ui94.asm -o src/title_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/setup94.asm -o src/data_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/shootout94.asm -o src/shootout_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/menu94.asm -o src/menu_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/stats94.asm -o src/stats_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/setup94.asm -o src/attract_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/cards94.asm -o src/cards_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/optsetup94.asm -o src/optsetup_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/records94.asm -o src/records_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/setup94.asm -o src/setup_strings_gen.h
+	$(PY) tools/gen_strings.py $(ASMSRC)/scout94.asm -o src/scout_strings_gen.h
+	@if [ -d ref/NHL94Genesis ] && [ -f build/asm/symbols.json ]; then $(MAKE) gen-pin; else echo "skip gen-pin (no ref/NHL94Genesis or build/asm/symbols.json)"; fi
+	@git status --short -- src/ram.h 'src/*_gen.h' native/routines_gen.h
+gen-pin:
+	@test -d ref/NHL94Genesis || { echo "make gen-pin needs ref/NHL94Genesis: tools/fetch_refs.sh"; exit 1; }
+	@test -f build/asm/symbols.json || { echo "make gen-pin needs build/asm/symbols.json: tools/asm/build_vasm.sh"; exit 1; }
 	$(PY) tools/ramwidths.py ref/NHL94Genesis out/ramwidths.json
 	$(PY) tools/callgraph.py > /dev/null
 	$(PY) tools/gen_ram.py
 	$(PY) tools/gen_symbols.py
 	$(PY) tools/gen_anim.py
-	$(PY) tools/gen_tables.py $(ASMSRC)/collide94.asm "checkpuckcoll/.cbg:cbg" "checkpuckcoll/.cbgsq:cbgsq" "puckgoalie/.list:savelist" "puckgoalie/.list2:saveodds" "puckgoalie/.list3:saveodds3" "Setplass/.alist:alist" "FallDown/.FallList:FallList" checkinglist -o src/collide_tables_gen.h
-	$(PY) tools/gen_tables.py $(ASMSRC)/checks94.asm "asswingo/.dedata:wingo_zones" "asscentero/.dedata:centero_zones" "asspuckc/.postab2:puckc_postab" "goaliesave/.saveanim:saveanim" "CompLine/.hl1:homelines" "CompLine/.al1:awaylines" "puckfaceoff2/.apl:fo_apl" "puckfaceoff2/.ptab:fo_ptab" "Endfaceoff/.ftab:fo_ftab" "doplayeracc/.ftab:turn_ftab" MaxSpeed dirtab -o src/checks_tables_gen.h
-	$(PY) tools/gen_tables.py $(ASMSRC)/input94.asm "getlchoice/.tab:lchoice_tab" shotsets -o src/input_tables_gen.h
-	$(PY) tools/gen_tables.py $(ASMSRC)/hockey94.asm "GetPeriodTime/.timetab:periodtimes" -o src/hockey_tables_gen.h
-	$(PY) tools/gen_tables.py $(ASMSRC)/display94.asm "showzam/.ftab:zam_ftab" "checksso/.tab:sso_tab" -o src/display_tables_gen.h
-	$(PY) tools/gen_tables.py $(ASMSRC)/setup94.asm "defaultsprites/.listsso:listsso" "defaultsprites/.listffo:listffo" "defaultsprites2/.list:dslist" -o src/setup_tables_gen.h
-	$(PY) tools/gen_tables.py $(ASMSRC)/penalty94.asm sctab "StartHL2/.postab:hl_postab" -o src/penalty_tables_gen.h
-	for f in $(STRINGS); do $(PY) tools/gen_strings.py build/asm/src/$${f}94.asm -o src/$${f}_strings_gen.h || exit 1; done
 	$(PY) tools/gen_routines.py $(CC)
-	@git status --short -- src/ram.h 'src/*_gen.h' native/routines_gen.h
 
 clean:
 	rm -rf build/captest build/oracle_shim.o build/nhl94 build/obj build/cross build/relaytest
 .PHONY: rulestest rosterstest test oracle clean nhl94 relaytest mdrt vectors lockstep runtime-check runtime-selfcheck golden golden-check \
-	golden-cross golden-ubsan netplay-check gen release FORCE
+	golden-cross golden-ubsan netplay-check gen gen-pin release FORCE

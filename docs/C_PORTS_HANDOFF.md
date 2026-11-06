@@ -7,7 +7,7 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 
 ## Now
 
-G0 ROM-order checker stacked on leftover [#4](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/4). `python3 tools/check_rom_order.py --module M`: arena/title OK, fourway/menu mismatch. Next: G1 gen inputs (current 94G files; keep `*_gen.h` names). Do not merge to main. Frame gates not run here (no captures/vectors/golden).
+G1 gen inputs stacked on G0 [#5](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/5) / leftover [#4](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/4). `make gen` reads current 94G (`$NHL_ASM` or `../nhl94genesis`); `*_gen.h` names stay; array values unchanged. Next: G2 capture `--fn` lists. Do not merge to main. Frame gates not run here (no captures/vectors/golden).
 
 ## Done
 
@@ -93,7 +93,8 @@ G0 ROM-order checker stacked on leftover [#4](https://github.com/abdulahmad/NHL9
 7. ~~**Leftover recut**~~ (2026-11-05): C files follow Abdul's leftover 94G includes (`arena.c`, `shootoutpath.c`, `ui.c`, `helpers.c`, `logos.c`, `chgplayer.c`; `ManualGoalieMenu` in `period.c`; `title.c` is TitleScreen/credits). Names gate 838/0/0/0.
 8. ~~**Leftover ROM order**~~ (2026-11-06, [#4](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/4)): original routines in `period.c`, `ui.c`, `logos.c`, `chgplayer.c` follow 94G ROM order. `arena.c`, `shootoutpath.c`, `helpers.c`, `title.c` already did. Names gate 838/0/0/0.
 9. ~~**G0 ROM-order checker**~~ (2026-11-06): `tools/check_rom_order.py --module M` compares original C defs with 94G globals that have a C function (skips statics and data labels). Self-test: arena/title OK, fourway/menu mismatch. Does not fail the tree until G5.
-10. **G1** `make gen` inputs → current 94G files; keep `*_gen.h` names. Unused leftover code (`TerminateLogName`, `PuckComingToward`; park `rtsStatScroll`) and rest-of-tree ROM order (G5) still wait.
+10. ~~**G1 gen inputs**~~ (2026-11-06): `make gen` tables/strings from current 94G (`logic94` / `video94` / `setup94` / `title94`+`ui94`; `defaultsprites_0` for dslist). Output `*_gen.h` names stay; committed array values unchanged. Oracle pin not rewritten (`make gen-pin` when present).
+11. **G2** capture `--fn` lists in `tools/hybrid/capture_all.sh` (current 94G file names; boot `TitleScreen`). Unused leftover code (`TerminateLogName`, `PuckComingToward`; park `rtsStatScroll`) and rest-of-tree ROM order (G5) still wait.
 
 ## Needs
 

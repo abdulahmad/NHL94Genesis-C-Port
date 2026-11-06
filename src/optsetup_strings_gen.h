@@ -2,17 +2,17 @@
 #pragma once
 #include <stdint.h>
 
-static const uint8_t str_SetMenuArea_1[6] = { 0, 6, 255, 16, 14, 0 };   /* optsetup94.asm:334 printz */
-static const uint8_t str_SetFrameRect_1[6] = { 0, 6, 255, 16, 14, 0 };   /* optsetup94.asm:362 printz */
-static const uint8_t str_PrintOptionValue_1[6] = { 0, 6, 191, 17, 16, 0 };   /* optsetup94.asm:595 printz */
-static const uint8_t str_setoptions_1[6] = { 0, 6, 255, 0, 0, 0 };   /* optsetup94.asm:860 printz */
-static const uint8_t str_setoptions_2[6] = { 0, 6, 254, 0, 0, 0 };   /* optsetup94.asm:868 printz */
-static const uint8_t str_setoptions_3[6] = { 0, 6, 255, 0, 0, 0 };   /* optsetup94.asm:885 printz */
-static const uint8_t str_setoptions_4[6] = { 0, 6, 255, 1, 14, 0 };   /* optsetup94.asm:900 printz */
-static const uint8_t str_EraseCard_1[6] = { 0, 6, 239, 0, 0, 0 };   /* optsetup94.asm:1071 printz */
-static const uint8_t str_EraseCard_2[6] = { 0, 6, 255, 0, 0, 0 };   /* optsetup94.asm:1083 printz */
-static const uint8_t str_EraseCard_3[6] = { 0, 6, 255, 0, 0, 0 };   /* optsetup94.asm:1098 printz */
-static const uint8_t str_DrawHomeBlock_1[6] = { 0, 6, 239, 0, 0, 0 };   /* optsetup94.asm:1120 printz */
-static const uint8_t str_DrawHomeBlock_2[6] = { 0, 6, 255, 0, 0, 0 };   /* optsetup94.asm:1130 printz */
-static const uint8_t str_DrawVisBlock_1[6] = { 0, 6, 239, 0, 0, 0 };   /* optsetup94.asm:1144 printz */
-static const uint8_t str_DrawVisBlock_2[6] = { 0, 6, 207, 0, 0, 0 };   /* optsetup94.asm:1154 printz */
+static const uint8_t str_SetMenuArea_1[6] = { 0, 6, 255, 16, 14, 0 };   /* optsetup94.asm:343 printz */
+static const uint8_t str_SetFrameRect_1[6] = { 0, 6, 255, 16, 14, 0 };   /* optsetup94.asm:371 printz */
+static const uint8_t str_PrintOptionValue_1[6] = { 0, 6, 191, 17, 16, 0 };   /* optsetup94.asm:612 printz */
+static const uint8_t str_setoptions_1[6] = { 0, 6, 255, 0, 0, 0 };   /* optsetup94.asm:829 printz */
+static const uint8_t str_setoptions_2[6] = { 0, 6, 254, 0, 0, 0 };   /* optsetup94.asm:835 printz */
+static const uint8_t str_setoptions_3[6] = { 0, 6, 255, 0, 0, 0 };   /* optsetup94.asm:850 printz */
+static const uint8_t str_setoptions_4[6] = { 0, 6, 255, 1, 14, 0 };   /* optsetup94.asm:863 printz */
+static const uint8_t str_EraseCard_1[6] = { 0, 6, 239, 0, 0, 0 };   /* optsetup94.asm:1039 printz */
+static const uint8_t str_EraseCard_2[6] = { 0, 6, 255, 0, 0, 0 };   /* optsetup94.asm:1049 printz */
+static const uint8_t str_EraseCard_3[6] = { 0, 6, 255, 0, 0, 0 };   /* optsetup94.asm:1062 printz */
+static const uint8_t str_DrawHomeBlock_1[6] = { 0, 6, 239, 0, 0, 0 };   /* optsetup94.asm:1084 printz */
+static const uint8_t str_DrawHomeBlock_2[6] = { 0, 6, 255, 0, 0, 0 };   /* optsetup94.asm:1092 printz */
+static const uint8_t str_DrawVisBlock_1[6] = { 0, 6, 239, 0, 0, 0 };   /* optsetup94.asm:1105 printz */
+static const uint8_t str_DrawVisBlock_2[6] = { 0, 6, 207, 0, 0, 0 };   /* optsetup94.asm:1113 printz */
