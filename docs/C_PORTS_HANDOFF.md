@@ -5,6 +5,10 @@ Project-wide handoff (always current, read it first): `alignment-plan/c_ports_HA
 
 Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md).
 
+## Now
+
+G0 ROM-order checker stacked on leftover [#4](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/4). `python3 tools/check_rom_order.py --module M`: arena/title OK, fourway/menu mismatch. Next: G1 gen inputs (current 94G files; keep `*_gen.h` names). Do not merge to main. Frame gates not run here (no captures/vectors/golden).
+
 ## Done
 
 * Phase 0: credit in the README and the release READMEs, AGENTS.md, CLAUDE.md, docs/RULES.md, docs/VANILLA.md, this file.
@@ -87,7 +91,9 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 5. ~~**File recut**~~ (done 2026-11-04): 0 other_module. One `src/<module>.c` per 94G asm file.
 6. ~~**E6**~~ parked 2026-11-04 (3 Original lockstep failures; see Results). Overclock slider still to come. SNES Smooth was not flipped.
 7. ~~**Leftover recut**~~ (2026-11-05): C files follow Abdul's leftover 94G includes (`arena.c`, `shootoutpath.c`, `ui.c`, `helpers.c`, `logos.c`, `chgplayer.c`; `ManualGoalieMenu` in `period.c`; `title.c` is TitleScreen/credits). Names gate 838/0/0/0.
-8. **Leftover ROM order** (2026-11-06): original routines in `period.c`, `ui.c`, `logos.c`, `chgplayer.c` follow 94G ROM order. `arena.c`, `shootoutpath.c`, `helpers.c`, `title.c` already did. Names gate 838/0/0/0. Unused asm labels still without C: `rtsStatScroll`, `TerminateLogName`, `PuckComingToward`. `make gen` still reads the pinned leftover names (`checks94`/`input94`/`display94`, `title_strings_gen.h`).
+8. ~~**Leftover ROM order**~~ (2026-11-06, [#4](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/4)): original routines in `period.c`, `ui.c`, `logos.c`, `chgplayer.c` follow 94G ROM order. `arena.c`, `shootoutpath.c`, `helpers.c`, `title.c` already did. Names gate 838/0/0/0.
+9. ~~**G0 ROM-order checker**~~ (2026-11-06): `tools/check_rom_order.py --module M` compares original C defs with 94G globals that have a C function (skips statics and data labels). Self-test: arena/title OK, fourway/menu mismatch. Does not fail the tree until G5.
+10. **G1** `make gen` inputs → current 94G files; keep `*_gen.h` names. Unused leftover code (`TerminateLogName`, `PuckComingToward`; park `rtsStatScroll`) and rest-of-tree ROM order (G5) still wait.
 
 ## Needs
 
