@@ -34,7 +34,7 @@ void NameEntryScreen(void)
     static const uint8_t bigfont[8] = { 0x71, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
     cpu_set_sr(0x2700);
     uint16_t d4 = 2;
-    g.vbint = SYM_VBlank_SetOptions;
+    g.VBint = SYM_VBlank_SetOptions;
     g.disflags &= (uint16_t)~HI(dfok);
     g.disflags |= HI(dfng);
     g.disflags &= (uint16_t)~HI(df32c);
@@ -65,7 +65,7 @@ void NameEntryScreen(void)
     d4 += 0x24;
     g.logobox1chars = d4;
     d4 = DecompressGraphicsPlain(ART(LogoBoxMap) + 8, d4);
-    g.BigFontChars = d4;
+    g.BigFontchars = d4;
     DecompressGraphicsWithRemap(ART(BigFontMap) + 8, d4, rom_find(SYM_NameEntryScreen, SYM_NameLetterGrid, bigfont, 8));
     PRINTZ(str_NameEntryScreen_3);                        /* the team's city, centred on x $1F */
     uint16_t team = g.nameentryvis ? g.VisTeam : g.HomeTeam;
@@ -117,8 +117,8 @@ loop:
     }
     MoveLogArrows();
     for (;;) {                                            /* the next press of this team's pad */
-        uint16_t v = g.vcount;
-        while (g.vcount == v) hal_wait_vblank();
+        uint16_t v = g.Vcount;
+        while (g.Vcount == v) hal_wait_vblank();
         uint16_t j0, j2, j3;
         if ((uint16_t)(g.cont1team - 1) == g.nameentryvis) ReadJoy1(&j0, &d1, &j2, &j3);
         else ReadJoy2(&j0, &d1, &j2, &j3);

@@ -125,7 +125,7 @@ void play_sfx_or_music_track(uint16_t n)
  * stream), key off and mute its channels and send the buffer. d0 = the caller's d0: the 68k
  * loads only the low byte of each channel number into d0 and indexes the attenuation table
  * with d0.w, so a high byte of $FF left by the caller puts the mute 256 bytes lower (in
- * pwddatabuffer) and leaves the channel's volume alone. */
+ * passbits) and leaves the channel's volume alone. */
 void stop_current_song(uint16_t d0)
 {
     uint16_t sr = cpu_get_sr();
@@ -211,18 +211,18 @@ uint8_t ReadPad4Way3(void) { return read_4way(0x2C); }
 /* sound94.asm:ReadPad4Way4. */
 uint8_t ReadPad4Way4(void) { return read_4way(0x3C); }
 
-/* sound94.asm:ReadJoyData. Read the pads every vblank to pad4way1-4: four through the 4 way
+/* sound94.asm:ReadJoyData. Read the pads every vblank to PadRaw1-4: four through the 4 way
  * adaptor with FourWayPlay, else pads 1 and 2. */
 void ReadJoyData(void)
 {
     if (g.FourWayPlay) {
-        g.pad4way1 = ReadPad4Way1();
-        g.pad4way2 = ReadPad4Way2();
-        g.pad4way3 = ReadPad4Way3();
-        g.pad4way4 = ReadPad4Way4();
+        g.PadRaw1 = ReadPad4Way1();
+        g.PadRaw2 = ReadPad4Way2();
+        g.PadRaw3 = ReadPad4Way3();
+        g.PadRaw4 = ReadPad4Way4();
     } else {
-        g.pad4way1 = ReadPad1();
-        g.pad4way2 = ReadPad2();
+        g.PadRaw1 = ReadPad1();
+        g.PadRaw2 = ReadPad2();
     }
 }
 
@@ -348,7 +348,7 @@ void handle_command_10(uint32_t ev, uint16_t track)
 {
     uint32_t e = ev;
     if (m8(e + 3) == 0) { handle_command_00(ev, track); return; }
-    struct Channel *ch = &g.fm_channels[5];                /* the PCM channel (fm_channel_struct6) */
+    struct Channel *ch = &g.fm_channels[5];                /* the PCM channel (pcm_channel_struct) */
     struct Voice *voices = VOICES;
     uint16_t key = voice_key(m8(e + 1), track);
     uint8_t patch = voice(voices, key)->patch;

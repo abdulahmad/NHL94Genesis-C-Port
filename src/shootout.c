@@ -23,7 +23,7 @@ void ShootoutModeBox(void)
     print(FormatPlayerNumInitial(sortobj((int16_t)g.BA_Goalie_SCnum)->pnum, team_struct(g.BA_Team == 0)));
     for (int away = 0; away < 2; away++) {
         printz(away ? str_ShootoutModeBox_4 : str_ShootoutModeBox_3, away ? sizeof str_ShootoutModeBox_4 : sizeof str_ShootoutModeBox_3);
-        print_p(roster_text(&rosters_team(team_struct(away)->team)->city));
+        print_p(roster_text(&rosters_team(team_struct(away)->tmteam)->city));
         g.printx = 0x15;
         print(PushNumberWidth(away ? g.awayshootgoals : g.homeshootgoals, 3));
     }

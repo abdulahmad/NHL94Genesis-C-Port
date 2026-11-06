@@ -201,122 +201,122 @@ _Static_assert(offsetof(struct SortObj, handed) == 0x76, "SortObj handed");
 #define tmsize 0x364
 /* a team's struct (team_struct(away)) */
 struct RAM_PACKED Team {
-    uint16_t shots;  /* shots (tmshots) */
-    uint16_t PwrGoals;  /* power play goals */
-    uint16_t PwrPlays;  /* power plays */
-    uint16_t Penalties;  /* penalties */
-    uint16_t Penmin;  /* penalty minutes */
-    uint16_t ATOP;  /* attack zone time (seconds) */
-    uint16_t score;
-    uint16_t faceoffs;  /* faceoffs won */
-    uint16_t checks;  /* body checks */
-    uint16_t passes;  /* pass attempts */
-    uint16_t passcomp;  /* passes completed */
-    uint16_t line;  /* the line on the ice */
-    uint16_t lasttouch;  /* the last player to touch the puck (roster number, in the low byte) */
-    uint16_t assist1;  /* the two before him ($FFxx: none) */
-    uint16_t assist2;
-    uint32_t data;  /* the team's data (the cartridge's address) */
-    uint16_t sort;  /* its first sort object (an address) */
-    uint16_t ap;  /* active players on the ice, 4-6 */
-    uint16_t goalie;  /* the goalie (roster slot; $FFxx: pulled) */
-    uint16_t team;  /* the team (TeamList index; the asm reads it as Xvel(a2)) */
-    uint32_t neardist;  /* distance squared from the puck to the team's nearest skater */
-    uint16_t lchoice;  /* the line the pad chose */
-    uint8_t flags;
+    uint16_t tmshots;  /* shots (tmshots) */
+    uint16_t tmPwrGoals;  /* power play goals */
+    uint16_t tmPwrPlays;  /* power plays */
+    uint16_t tmPenalties;  /* penalties */
+    uint16_t tmPenmin;  /* penalty minutes */
+    uint16_t tmATOP;  /* attack zone time (seconds) */
+    uint16_t tmscore;
+    uint16_t tmfowon;  /* faceoffs won */
+    uint16_t tmchecks;  /* body checks */
+    uint16_t tmpasses;  /* pass attempts */
+    uint16_t tmpasscomp;  /* passes completed */
+    uint16_t tmline;  /* the line on the ice */
+    uint16_t tmtouch1;  /* the last player to touch the puck (roster number, in the low byte) */
+    uint16_t tmtouch2;  /* the two before him ($FFxx: none) */
+    uint16_t tmtouch3;
+    uint32_t tmdata;  /* the team's data (the cartridge's address) */
+    uint16_t tmsort;  /* its first sort object (an address) */
+    uint16_t tmap;  /* active players on the ice, 4-6 */
+    uint16_t tmgoalie;  /* the goalie (roster slot; $FFxx: pulled) */
+    uint16_t tmteam;  /* the team (TeamList index; the asm reads it as Xvel(a2)) */
+    uint32_t tmnear;  /* distance squared from the puck to the team's nearest skater */
+    uint16_t tmlcchoice;  /* the line the pad chose */
+    uint8_t tmflags;
     uint8_t _pad31;
-    uint16_t pde[26];  /* energy of each roster player */
-    uint16_t pdst[26];  /* where each is: -2 bench, -1 ice, 0 and up the penalty box */
-    uint8_t penbox[26];  /* the penalty box: roster offsets (player * 2), ended by a negative byte */
-    uint8_t pgoals[26];  /* goals (a goalie's: goals against) */
-    uint8_t passists[26];  /* assists */
-    uint8_t pshots[26];  /* shots (a goalie's: shots faced) */
+    uint16_t tmpde[26];  /* energy of each roster player */
+    uint16_t tmpdst[26];  /* where each is: -2 bench, -1 ice, 0 and up the penalty box */
+    uint8_t tmboxlist[26];  /* the penalty box: roster offsets (player * 2), ended by a negative byte */
+    uint8_t tmgoals[26];  /* goals (a goalie's: goals against) */
+    uint8_t tmassists[26];  /* assists */
+    uint8_t tmpshots[26];  /* shots (a goalie's: shots faced) */
     uint8_t ppim[26];  /* penalty minutes */
     uint8_t pchecks[26];  /* body checks */
-    uint16_t ptoi[26];  /* time on ice */
-    uint8_t lines[7][8];  /* the line sets: 7 lines of 8 slots (roster number + 1) */
-    uint8_t hotcold[26][16];  /* 94: each player's hot / cold bytes (signed) */
-    uint16_t pergoals[4];  /* goals by period */
-    uint16_t pershots[4];  /* shots by period */
-    uint16_t pptime;  /* power play time */
-    uint16_t ppshots;  /* power play shots */
-    uint16_t shgoals;  /* shorthanded goals */
-    uint16_t breakaways;
-    uint16_t bagoals;  /* breakaway goals */
-    uint16_t onetimers;  /* one-timer attempts */
-    uint16_t otgoals;  /* one-timer goals */
-    uint16_t psattempts;  /* penalty shot (and shootout) attempts */
-    uint16_t psgoals;  /* penalty shot goals */
+    uint16_t tmpice[26];  /* time on ice */
+    uint8_t tmlines[7][8];  /* the line sets: 7 lines of 8 slots (roster number + 1) */
+    uint8_t tmHotCold[26][16];  /* 94: each player's hot / cold bytes (signed) */
+    uint16_t tmPerGoals[4];  /* goals by period */
+    uint16_t tmPerShots[4];  /* shots by period */
+    uint16_t tmPwrPlayTime;  /* power play time */
+    uint16_t tmPPShots;  /* power play shots */
+    uint16_t tmSHGoals;  /* shorthanded goals */
+    uint16_t tmBreakaways;
+    uint16_t tmBreakawayGoals;  /* breakaway goals */
+    uint16_t tmOneTimers;  /* one-timer attempts */
+    uint16_t tmOneTimerGoals;  /* one-timer goals */
+    uint16_t tmPenShots;  /* penalty shot (and shootout) attempts */
+    uint16_t tmPenShotGoals;  /* penalty shot goals */
 };
 _Static_assert(sizeof(struct Team) == 0x364, "Team size");
-_Static_assert(offsetof(struct Team, shots) == 0x000, "Team shots");
-_Static_assert(offsetof(struct Team, PwrGoals) == 0x002, "Team PwrGoals");
-_Static_assert(offsetof(struct Team, PwrPlays) == 0x004, "Team PwrPlays");
-_Static_assert(offsetof(struct Team, Penalties) == 0x006, "Team Penalties");
-_Static_assert(offsetof(struct Team, Penmin) == 0x008, "Team Penmin");
-_Static_assert(offsetof(struct Team, ATOP) == 0x00A, "Team ATOP");
-_Static_assert(offsetof(struct Team, score) == 0x00C, "Team score");
-_Static_assert(offsetof(struct Team, faceoffs) == 0x00E, "Team faceoffs");
-_Static_assert(offsetof(struct Team, checks) == 0x010, "Team checks");
-_Static_assert(offsetof(struct Team, passes) == 0x012, "Team passes");
-_Static_assert(offsetof(struct Team, passcomp) == 0x014, "Team passcomp");
-_Static_assert(offsetof(struct Team, line) == 0x016, "Team line");
-_Static_assert(offsetof(struct Team, lasttouch) == 0x018, "Team lasttouch");
-_Static_assert(offsetof(struct Team, assist1) == 0x01A, "Team assist1");
-_Static_assert(offsetof(struct Team, assist2) == 0x01C, "Team assist2");
-_Static_assert(offsetof(struct Team, data) == 0x01E, "Team data");
-_Static_assert(offsetof(struct Team, sort) == 0x022, "Team sort");
-_Static_assert(offsetof(struct Team, ap) == 0x024, "Team ap");
-_Static_assert(offsetof(struct Team, goalie) == 0x026, "Team goalie");
-_Static_assert(offsetof(struct Team, team) == 0x028, "Team team");
-_Static_assert(offsetof(struct Team, neardist) == 0x02A, "Team neardist");
-_Static_assert(offsetof(struct Team, lchoice) == 0x02E, "Team lchoice");
-_Static_assert(offsetof(struct Team, flags) == 0x030, "Team flags");
-_Static_assert(offsetof(struct Team, pde) == 0x032, "Team pde");
-_Static_assert(offsetof(struct Team, pdst) == 0x066, "Team pdst");
-_Static_assert(offsetof(struct Team, penbox) == 0x09A, "Team penbox");
-_Static_assert(offsetof(struct Team, pgoals) == 0x0B4, "Team pgoals");
-_Static_assert(offsetof(struct Team, passists) == 0x0CE, "Team passists");
-_Static_assert(offsetof(struct Team, pshots) == 0x0E8, "Team pshots");
+_Static_assert(offsetof(struct Team, tmshots) == 0x000, "Team tmshots");
+_Static_assert(offsetof(struct Team, tmPwrGoals) == 0x002, "Team tmPwrGoals");
+_Static_assert(offsetof(struct Team, tmPwrPlays) == 0x004, "Team tmPwrPlays");
+_Static_assert(offsetof(struct Team, tmPenalties) == 0x006, "Team tmPenalties");
+_Static_assert(offsetof(struct Team, tmPenmin) == 0x008, "Team tmPenmin");
+_Static_assert(offsetof(struct Team, tmATOP) == 0x00A, "Team tmATOP");
+_Static_assert(offsetof(struct Team, tmscore) == 0x00C, "Team tmscore");
+_Static_assert(offsetof(struct Team, tmfowon) == 0x00E, "Team tmfowon");
+_Static_assert(offsetof(struct Team, tmchecks) == 0x010, "Team tmchecks");
+_Static_assert(offsetof(struct Team, tmpasses) == 0x012, "Team tmpasses");
+_Static_assert(offsetof(struct Team, tmpasscomp) == 0x014, "Team tmpasscomp");
+_Static_assert(offsetof(struct Team, tmline) == 0x016, "Team tmline");
+_Static_assert(offsetof(struct Team, tmtouch1) == 0x018, "Team tmtouch1");
+_Static_assert(offsetof(struct Team, tmtouch2) == 0x01A, "Team tmtouch2");
+_Static_assert(offsetof(struct Team, tmtouch3) == 0x01C, "Team tmtouch3");
+_Static_assert(offsetof(struct Team, tmdata) == 0x01E, "Team tmdata");
+_Static_assert(offsetof(struct Team, tmsort) == 0x022, "Team tmsort");
+_Static_assert(offsetof(struct Team, tmap) == 0x024, "Team tmap");
+_Static_assert(offsetof(struct Team, tmgoalie) == 0x026, "Team tmgoalie");
+_Static_assert(offsetof(struct Team, tmteam) == 0x028, "Team tmteam");
+_Static_assert(offsetof(struct Team, tmnear) == 0x02A, "Team tmnear");
+_Static_assert(offsetof(struct Team, tmlcchoice) == 0x02E, "Team tmlcchoice");
+_Static_assert(offsetof(struct Team, tmflags) == 0x030, "Team tmflags");
+_Static_assert(offsetof(struct Team, tmpde) == 0x032, "Team tmpde");
+_Static_assert(offsetof(struct Team, tmpdst) == 0x066, "Team tmpdst");
+_Static_assert(offsetof(struct Team, tmboxlist) == 0x09A, "Team tmboxlist");
+_Static_assert(offsetof(struct Team, tmgoals) == 0x0B4, "Team tmgoals");
+_Static_assert(offsetof(struct Team, tmassists) == 0x0CE, "Team tmassists");
+_Static_assert(offsetof(struct Team, tmpshots) == 0x0E8, "Team tmpshots");
 _Static_assert(offsetof(struct Team, ppim) == 0x102, "Team ppim");
 _Static_assert(offsetof(struct Team, pchecks) == 0x11C, "Team pchecks");
-_Static_assert(offsetof(struct Team, ptoi) == 0x136, "Team ptoi");
-_Static_assert(offsetof(struct Team, lines) == 0x16A, "Team lines");
-_Static_assert(offsetof(struct Team, hotcold) == 0x1A2, "Team hotcold");
-_Static_assert(offsetof(struct Team, pergoals) == 0x342, "Team pergoals");
-_Static_assert(offsetof(struct Team, pershots) == 0x34A, "Team pershots");
-_Static_assert(offsetof(struct Team, pptime) == 0x352, "Team pptime");
-_Static_assert(offsetof(struct Team, ppshots) == 0x354, "Team ppshots");
-_Static_assert(offsetof(struct Team, shgoals) == 0x356, "Team shgoals");
-_Static_assert(offsetof(struct Team, breakaways) == 0x358, "Team breakaways");
-_Static_assert(offsetof(struct Team, bagoals) == 0x35A, "Team bagoals");
-_Static_assert(offsetof(struct Team, onetimers) == 0x35C, "Team onetimers");
-_Static_assert(offsetof(struct Team, otgoals) == 0x35E, "Team otgoals");
-_Static_assert(offsetof(struct Team, psattempts) == 0x360, "Team psattempts");
-_Static_assert(offsetof(struct Team, psgoals) == 0x362, "Team psgoals");
+_Static_assert(offsetof(struct Team, tmpice) == 0x136, "Team tmpice");
+_Static_assert(offsetof(struct Team, tmlines) == 0x16A, "Team tmlines");
+_Static_assert(offsetof(struct Team, tmHotCold) == 0x1A2, "Team tmHotCold");
+_Static_assert(offsetof(struct Team, tmPerGoals) == 0x342, "Team tmPerGoals");
+_Static_assert(offsetof(struct Team, tmPerShots) == 0x34A, "Team tmPerShots");
+_Static_assert(offsetof(struct Team, tmPwrPlayTime) == 0x352, "Team tmPwrPlayTime");
+_Static_assert(offsetof(struct Team, tmPPShots) == 0x354, "Team tmPPShots");
+_Static_assert(offsetof(struct Team, tmSHGoals) == 0x356, "Team tmSHGoals");
+_Static_assert(offsetof(struct Team, tmBreakaways) == 0x358, "Team tmBreakaways");
+_Static_assert(offsetof(struct Team, tmBreakawayGoals) == 0x35A, "Team tmBreakawayGoals");
+_Static_assert(offsetof(struct Team, tmOneTimers) == 0x35C, "Team tmOneTimers");
+_Static_assert(offsetof(struct Team, tmOneTimerGoals) == 0x35E, "Team tmOneTimerGoals");
+_Static_assert(offsetof(struct Team, tmPenShots) == 0x360, "Team tmPenShots");
+_Static_assert(offsetof(struct Team, tmPenShotGoals) == 0x362, "Team tmPenShotGoals");
 
 #define gssize 0x10
-/* one of the night's games, a playoff matchup in the playoffs (gsstruct) */
+/* one of the night's games, a playoff matchup in the playoffs (gstruct) */
 struct RAM_PACKED Matchup {
-    uint16_t team1;  /* the teams (gst1, gst2: TeamList indexes; flags bit 0, the two flipped) */
-    uint16_t team2;
-    uint16_t topwins;  /* the playoff tree's top team's wins (gspotwins: best of 7, 4 wins it) */
-    uint16_t botwins;  /* the bottom team's (gspobwins) */
-    uint16_t per;  /* the period (gsper: 0 not started, 1-3, 4 overtime, 5 final) */
-    uint16_t score1;  /* team1's score (gss1) */
-    uint16_t score2;  /* team2's (gss2) */
-    uint8_t flags;  /* gsflags: MU_FLIPPED, MU_HIGHLIGHT, MU_SERIES_OVER */
+    uint16_t gst1;  /* the teams (gst1, gst2: TeamList indexes; flags bit 0, the two flipped) */
+    uint16_t gst2;
+    uint16_t gspotwins;  /* the playoff tree's top team's wins (gspotwins: best of 7, 4 wins it) */
+    uint16_t gspobwins;  /* the bottom team's (gspobwins) */
+    uint16_t gsper;  /* the period (gsper: 0 not started, 1-3, 4 overtime, 5 final) */
+    uint16_t gss1;  /* team1's score (gss1) */
+    uint16_t gss2;  /* team2's (gss2) */
+    uint8_t gsflags;  /* gsflags: MU_FLIPPED, MU_HIGHLIGHT, MU_SERIES_OVER */
     uint8_t _padF;
 };
 _Static_assert(sizeof(struct Matchup) == 0x10, "Matchup size");
-_Static_assert(offsetof(struct Matchup, team1) == 0x000, "Matchup team1");
-_Static_assert(offsetof(struct Matchup, team2) == 0x002, "Matchup team2");
-_Static_assert(offsetof(struct Matchup, topwins) == 0x004, "Matchup topwins");
-_Static_assert(offsetof(struct Matchup, botwins) == 0x006, "Matchup botwins");
-_Static_assert(offsetof(struct Matchup, per) == 0x008, "Matchup per");
-_Static_assert(offsetof(struct Matchup, score1) == 0x00A, "Matchup score1");
-_Static_assert(offsetof(struct Matchup, score2) == 0x00C, "Matchup score2");
-_Static_assert(offsetof(struct Matchup, flags) == 0x00E, "Matchup flags");
+_Static_assert(offsetof(struct Matchup, gst1) == 0x000, "Matchup gst1");
+_Static_assert(offsetof(struct Matchup, gst2) == 0x002, "Matchup gst2");
+_Static_assert(offsetof(struct Matchup, gspotwins) == 0x004, "Matchup gspotwins");
+_Static_assert(offsetof(struct Matchup, gspobwins) == 0x006, "Matchup gspobwins");
+_Static_assert(offsetof(struct Matchup, gsper) == 0x008, "Matchup gsper");
+_Static_assert(offsetof(struct Matchup, gss1) == 0x00A, "Matchup gss1");
+_Static_assert(offsetof(struct Matchup, gss2) == 0x00C, "Matchup gss2");
+_Static_assert(offsetof(struct Matchup, gsflags) == 0x00E, "Matchup gsflags");
 
 /* one frame of the instant replay (updatereplay) */
 struct RAM_PACKED ReplayFrame {
@@ -327,12 +327,12 @@ struct RAM_PACKED ReplayFrame {
     uint8_t lastsfx;  /* the sound effect started */
     uint8_t elapsed;  /* the frames it lasted */
     uint16_t padbits;  /* PadControlBits (the low 12 bits) */
-    uint16_t crowdframe;
+    uint16_t Crowdframe;
     uint16_t glovecords;
     uint8_t pbnum;  /* PBnum's high byte */
     uint8_t padbits34;  /* PadControlBits34 >> 4 */
-    uint16_t hpos;  /* the view (Hpos, Vpos) */
-    uint16_t vpos;
+    uint16_t Hpos;  /* the view (Hpos, Vpos) */
+    uint16_t Vpos;
 };
 _Static_assert(sizeof(struct ReplayFrame) == 0x62, "ReplayFrame size");
 _Static_assert(offsetof(struct ReplayFrame, obj) == 0x000, "ReplayFrame obj");
@@ -342,12 +342,12 @@ _Static_assert(offsetof(struct ReplayFrame, shadowz) == 0x053, "ReplayFrame shad
 _Static_assert(offsetof(struct ReplayFrame, lastsfx) == 0x054, "ReplayFrame lastsfx");
 _Static_assert(offsetof(struct ReplayFrame, elapsed) == 0x055, "ReplayFrame elapsed");
 _Static_assert(offsetof(struct ReplayFrame, padbits) == 0x056, "ReplayFrame padbits");
-_Static_assert(offsetof(struct ReplayFrame, crowdframe) == 0x058, "ReplayFrame crowdframe");
+_Static_assert(offsetof(struct ReplayFrame, Crowdframe) == 0x058, "ReplayFrame Crowdframe");
 _Static_assert(offsetof(struct ReplayFrame, glovecords) == 0x05A, "ReplayFrame glovecords");
 _Static_assert(offsetof(struct ReplayFrame, pbnum) == 0x05C, "ReplayFrame pbnum");
 _Static_assert(offsetof(struct ReplayFrame, padbits34) == 0x05D, "ReplayFrame padbits34");
-_Static_assert(offsetof(struct ReplayFrame, hpos) == 0x05E, "ReplayFrame hpos");
-_Static_assert(offsetof(struct ReplayFrame, vpos) == 0x060, "ReplayFrame vpos");
+_Static_assert(offsetof(struct ReplayFrame, Hpos) == 0x05E, "ReplayFrame Hpos");
+_Static_assert(offsetof(struct ReplayFrame, Vpos) == 0x060, "ReplayFrame Vpos");
 
 /* one of the sound driver's 8 track slots: a sound or song's event stream */
 struct RAM_PACKED TrackSlot {
@@ -421,8 +421,8 @@ _Static_assert(offsetof(struct PuckCross, frames) == 0x002, "PuckCross frames");
 
 /* a plane map's place in VRAM and its width */
 struct RAM_PACKED Plane {
-    uint16_t vram;  /* the map's VRAM address (VmMap1) */
-    uint16_t colshift;  /* a row is 1 << colshift tiles (Map1col1) */
+    uint16_t vram;  /* the map's VRAM address (VmMAP1) */
+    uint16_t colshift;  /* a row is 1 << colshift tiles (Map1col) */
 };
 _Static_assert(sizeof(struct Plane) == 0x4, "Plane size");
 _Static_assert(offsetof(struct Plane, vram) == 0x000, "Plane vram");
@@ -433,13 +433,13 @@ struct RAM_PACKED Ram {
     uint8_t replayend[0xAC];  /* $FFFFAF54: end of the replay frames ($62 bytes each from M68K_RAM); suba4, adda43 and the record step wrap here */
     uint16_t VSCRLPM;  /* $FFFFB000 */
     uint16_t VSPRITES;  /* $FFFFB002 */
-    struct Plane maps[3];  /* $FFFFB004: the plane maps: 1 and 2 the planes, 3 the window (VmMap1) */
-    uint16_t BigFontChars;  /* $FFFFB010 */
+    struct Plane maps[3];  /* $FFFFB004: the plane maps: 1 and 2 the planes, 3 the window (VmMAP1) */
+    uint16_t BigFontchars;  /* $FFFFB010 */
     uint16_t smallfontchars;  /* $FFFFB012 */
     uint16_t smallfont2chars;  /* $FFFFB014 */
     uint16_t energybarchars;  /* $FFFFB016 */
     uint16_t rinkvrcset;  /* $FFFFB018 */
-    uint16_t animchars;  /* $FFFFB01A: 94 keeps the crowd tiles 1st vram char here */
+    uint16_t crowdvrcset;  /* $FFFFB01A: 94 keeps the crowd tiles 1st vram char here */
     uint16_t faceoffvrcset;  /* $FFFFB01C */
     uint16_t framercset;  /* $FFFFB01E */
     uint16_t EASNcset;  /* $FFFFB020 */
@@ -454,9 +454,9 @@ struct RAM_PACKED Ram {
     uint16_t fodropx;  /* $FFFFB032 */
     uint16_t fodropy;  /* $FFFFB034 */
     uint32_t recbpr;  /* $FFFFB036 */
-    uint32_t vbint;  /* $FFFFB03A */
-    uint16_t vcount;  /* $FFFFB03E */
-    uint16_t oldvcount;  /* $FFFFB040 */
+    uint32_t VBint;  /* $FFFFB03A */
+    uint16_t Vcount;  /* $FFFFB03E */
+    uint16_t OldVcount;  /* $FFFFB040 */
     uint16_t repeatdelayframes;  /* $FFFFB042 */
     uint16_t asv;  /* $FFFFB044 */
     uint16_t lldisp;  /* $FFFFB046 */
@@ -476,15 +476,15 @@ struct RAM_PACKED Ram {
     uint16_t Ylist[0x10];  /* $FFFFB84A */
     uint16_t OOlistpos[0x10];  /* $FFFFB86A */
     uint8_t OOlist[0x10];  /* $FFFFB88A */
-    uint16_t crowdframe;  /* $FFFFB89A */
-    uint16_t crowdlevel;  /* $FFFFB89C */
-    uint16_t crowdstep;  /* $FFFFB89E */
-    uint16_t crowdcnt;  /* $FFFFB8A0 */
+    uint16_t Crowdframe;  /* $FFFFB89A */
+    uint16_t Crowdlevel;  /* $FFFFB89C */
+    uint16_t Crowdstep;  /* $FFFFB89E */
+    uint16_t Crowdcnt;  /* $FFFFB8A0 */
     uint16_t CwdExciteLvl;  /* $FFFFB8A2 */
     uint16_t MaxCwdExciteLvl;  /* $FFFFB8A4 */
     uint16_t NumCwdExciteLvl;  /* $FFFFB8A6 */
     uint32_t SumCwdExciteLvl;  /* $FFFFB8A8 */
-    uint16_t zamx;  /* $FFFFB8AC */
+    uint16_t Zamx;  /* $FFFFB8AC */
     uint16_t playoffspritex;  /* $FFFFB8AE */
     uint16_t playoffspritey;  /* $FFFFB8B0 */
     uint16_t clampcounter;  /* $FFFFB8B2 */
@@ -500,7 +500,7 @@ struct RAM_PACKED Ram {
     uint16_t palcount;  /* $FFFFBD26 */
     uint16_t palfadenew[0x40];  /* $FFFFBD28 */
     struct FoMan fomen[3];  /* $FFFFBDA8: the faceoff men: the two players, then the ref (fofdata) (fofdata2) */
-    struct RinkObj pads[7];  /* $FFFFBDB4: the pads' markers (Joy1Struct the second; the fourth the replay camera, ReplayStarStruct), then the gloves (glovestruct) (pads) */
+    struct RinkObj pads[7];  /* $FFFFBDB4: the pads' markers (Joy1Struct the second; the fourth the replay camera, CameraPosStruct), then the gloves (glovestruct) (pads) */
     uint16_t PadControlBits;  /* $FFFFBE78 */
     uint16_t padcont[0x6];  /* $FFFFBE7A */
     uint16_t PadControlBits34;  /* $FFFFBE86: as PadControlBits, for pads 3 and 4 (4 way play) */
@@ -509,7 +509,7 @@ struct RAM_PACKED Ram {
     uint16_t lastplayer;  /* $FFFFBEDA */
     uint16_t passdir;  /* $FFFFBEDC */
     uint16_t passspeed;  /* $FFFFBEDE */
-    uint16_t passplayer;  /* $FFFFBEE0 */
+    uint16_t passReceiverPlayerNum;  /* $FFFFBEE0 */
     uint16_t glovecords;  /* $FFFFBEE2 */
     uint16_t threat;  /* $FFFFBEE4 */
     struct PuckCross puckcross[2];  /* $FFFFBEE6: the puck's crossings of the top goal line, then the bottom's (puckcross) */
@@ -517,10 +517,10 @@ struct RAM_PACKED Ram {
     uint16_t lj2;  /* $FFFFBEF0 */
     uint16_t lj3;  /* $FFFFBEF2 */
     uint16_t lj4;  /* $FFFFBEF4 */
-    uint8_t pad4way1;  /* $FFFFBEF6 */
-    uint8_t pad4way2;  /* $FFFFBEF7 */
-    uint8_t pad4way3;  /* $FFFFBEF8 */
-    uint8_t pad4way4;  /* $FFFFBEF9 */
+    uint8_t PadRaw1;  /* $FFFFBEF6 */
+    uint8_t PadRaw2;  /* $FFFFBEF7 */
+    uint8_t PadRaw3;  /* $FFFFBEF8 */
+    uint8_t PadRaw4;  /* $FFFFBEF9 */
     uint16_t pad4wayword;  /* $FFFFBEFA: the pad word the unused ReadJoySwapPad1-4 swap a pad's saved word into around ReadJoy1 */
     uint8_t _padBEFC[0x2];
     uint16_t pad4waysave1;  /* $FFFFBEFE: ReadJoySwapPad1 saved pad word */
@@ -633,7 +633,7 @@ struct RAM_PACKED Ram {
     uint16_t VisTeam;  /* $FFFFC332 */
     uint8_t TeamBlockMap[0x70];  /* $FFFFC334: Map word buffer for CopyTeamBlockMapData and PutTeamBlock */
     uint8_t PenBuf[0x42];  /* $FFFFC3A4 */
-    uint16_t Pencntdwn;  /* $FFFFC3E6 */
+    uint16_t PenCntDwn;  /* $FFFFC3E6 */
     uint16_t Penaltytimer;  /* $FFFFC3E8 */
     uint16_t PBnum;  /* $FFFFC3EA */
     uint16_t InjCntDown;  /* $FFFFC3EC */
@@ -652,9 +652,9 @@ struct RAM_PACKED Ram {
     uint8_t ScoreSum[0x168];  /* $FFFFC474 */
     uint16_t PenSumLength;  /* $FFFFC5DC */
     uint8_t PenSum[0xF0];  /* $FFFFC5DE */
-    struct Team teams[2];  /* $FFFFC6CE: the home and away team structs, AwShots the second (tmstruct) */
+    struct Team teams[2];  /* $FFFFC6CE: the home and away team structs, awtmstruct the second (tmstruct) */
     uint8_t statsbuffer[0xD0];  /* $FFFFCD96 */
-    struct Matchup matchups[8];  /* $FFFFCE66: the night's games: the playoff tree's first round, then each round's (gsstruct) */
+    struct Matchup matchups[8];  /* $FFFFCE66: the night's games: the playoff tree's first round, then each round's (gstruct) */
     uint16_t gamenum;  /* $FFFFCEE6 */
     uint16_t postarts;  /* $FFFFCEE8 */
     uint16_t bosgames;  /* $FFFFCEEA */
@@ -672,7 +672,7 @@ struct RAM_PACKED Ram {
     uint8_t PKBonus;  /* $FFFFCF2F */
     uint8_t ThirdPBonus;  /* $FFFFCF30 */
     uint8_t HmAwBonus;  /* $FFFFCF31 */
-    uint32_t callbackPtr;  /* $FFFFCF32 */
+    uint32_t remapTablePtr;  /* $FFFFCF32 */
     uint8_t ThreeStars[0xC8];  /* $FFFFCF36 */
     uint8_t teamrecbuf[0x38];  /* $FFFFCFFE: SRAM team record buffer: the 16 byte record of a team (ReadCrowdRecord), byte 8 crowd record, byte 9 its name number */
     uint16_t nibblebuffer[0x6];  /* $FFFFD036 */
@@ -681,7 +681,7 @@ struct RAM_PACKED Ram {
     uint16_t FourWayPlay;  /* $FFFFD046 */
     union {
         uint16_t options[9];  /* $FFFFD048: the setup menu's options by number (OptPlayMode ... OptLine) */
-        struct RAM_PACKED { uint16_t OptPlayMode, OptNOP, Opt1Team, Opt2Team, OptPerlen, OptGoalie, OptUserRec, OptPen, OptLine; };
+        struct RAM_PACKED { uint16_t OptPlayMode, OptNOP, Opt1team, Opt2team, Optperlen, OptGoalie, OptUserRec, OptPen, OptLine; };
     };
     uint16_t goaliemode1;  /* $FFFFD05A */
     uint16_t goaliemode2;  /* $FFFFD05C */
@@ -696,7 +696,7 @@ struct RAM_PACKED Ram {
     uint16_t TmpOptLine2;  /* $FFFFD072 */
     uint16_t TempOptPlayMode;  /* $FFFFD074 */
     uint8_t databuffer[0x12];  /* $FFFFD076 */
-    uint8_t pwddatabuffer[0xA];  /* $FFFFD088 */
+    uint8_t passbits[0xA];  /* $FFFFD088 */
     uint8_t outputbuffer[0xE4];  /* $FFFFD092 */
     uint8_t tpassbits[0xA];  /* $FFFFD176 */
     uint8_t music_needs_z80_update;  /* $FFFFD180 */
@@ -706,7 +706,7 @@ struct RAM_PACKED Ram {
     uint16_t per_channel_frequency_table[0x7];  /* $FFFFD18E */
     uint8_t per_channel_patch_table[0x8];  /* $FFFFD19C */
     struct Voice fm_voices[64];  /* $FFFFD1A4: the voice of each key (fm_voice_usage_table) */
-    struct Channel fm_channels[6];  /* $FFFFD3A4: the channels (fm_channel_struct6 the sixth, PCM) (fm_channel_structs) */
+    struct Channel fm_channels[6];  /* $FFFFD3A4: the channels (pcm_channel_struct the sixth, PCM) (fm_channel_structs) */
     struct TrackSlot fm_slots[8];  /* $FFFFD3D4: the track slots (track 7 the first) (fm_track_slots) */
     uint16_t BA_Team;  /* $FFFFD404 */
     uint16_t BA_Sktr_SCnum;  /* $FFFFD406 */
@@ -795,7 +795,7 @@ struct RAM_PACKED Ram {
     uint16_t VertLineScrolling;  /* $FFFFD5AE */
     uint16_t PlayerScrollCtr;  /* $FFFFD5B0 */
     uint16_t SelectedPlayerIdx;  /* $FFFFD5B2 */
-    uint16_t typedelay;  /* $FFFFD5B4 */
+    uint16_t ScoutingReportTimer;  /* $FFFFD5B4 */
     uint16_t screentimer;  /* $FFFFD5B6 */
     uint16_t TestList[0x7A];  /* $FFFFD5B8 */
     uint16_t arenaanimchars;  /* $FFFFD6AC */
@@ -814,7 +814,7 @@ struct RAM_PACKED Ram {
     uint16_t OvrDivisor;  /* $FFFFD6CE */
     uint16_t OvrDividend;  /* $FFFFD6D0 */
     uint8_t homehotcoldsave[0x1A0];  /* $FFFFD6D2: clearTeamStats keeps the first $1A0 bytes of the home hot / cold table (HmShots+$1A2) here */
-    uint8_t awayhotcoldsave[0x1A0];  /* $FFFFD872: the same for AwShots+$1A2 */
+    uint8_t awayhotcoldsave[0x1A0];  /* $FFFFD872: the same for awtmstruct+$1A2 */
     uint16_t sopath;  /* $FFFFDA12 */
     uint16_t sopathpoint;  /* $FFFFDA14 */
     uint16_t sopathx;  /* $FFFFDA16 */
@@ -857,17 +857,17 @@ _Static_assert(offsetof(struct Ram, replayend) == 0xAF54, "replayend");
 _Static_assert(offsetof(struct Ram, VSCRLPM) == 0xB000, "VSCRLPM");
 _Static_assert(offsetof(struct Ram, VSPRITES) == 0xB002, "VSPRITES");
 _Static_assert(offsetof(struct Ram, maps) == 0xB004, "maps");
-/* Map1col1 at 0xB006 overlaps the previous field; use RAM_OFF_Map1col1 */
-/* VmMap2 at 0xB008 overlaps the previous field; use RAM_OFF_VmMap2 */
-/* Map2col1 at 0xB00A overlaps the previous field; use RAM_OFF_Map2col1 */
-/* VmMap3 at 0xB00C overlaps the previous field; use RAM_OFF_VmMap3 */
-/* Map3col1 at 0xB00E overlaps the previous field; use RAM_OFF_Map3col1 */
-_Static_assert(offsetof(struct Ram, BigFontChars) == 0xB010, "BigFontChars");
+/* Map1col at 0xB006 overlaps the previous field; use RAM_OFF_Map1col */
+/* VmMAP2 at 0xB008 overlaps the previous field; use RAM_OFF_VmMAP2 */
+/* Map2col at 0xB00A overlaps the previous field; use RAM_OFF_Map2col */
+/* VmMAP3 at 0xB00C overlaps the previous field; use RAM_OFF_VmMAP3 */
+/* Map3col at 0xB00E overlaps the previous field; use RAM_OFF_Map3col */
+_Static_assert(offsetof(struct Ram, BigFontchars) == 0xB010, "BigFontchars");
 _Static_assert(offsetof(struct Ram, smallfontchars) == 0xB012, "smallfontchars");
 _Static_assert(offsetof(struct Ram, smallfont2chars) == 0xB014, "smallfont2chars");
 _Static_assert(offsetof(struct Ram, energybarchars) == 0xB016, "energybarchars");
 _Static_assert(offsetof(struct Ram, rinkvrcset) == 0xB018, "rinkvrcset");
-_Static_assert(offsetof(struct Ram, animchars) == 0xB01A, "animchars");
+_Static_assert(offsetof(struct Ram, crowdvrcset) == 0xB01A, "crowdvrcset");
 _Static_assert(offsetof(struct Ram, faceoffvrcset) == 0xB01C, "faceoffvrcset");
 _Static_assert(offsetof(struct Ram, framercset) == 0xB01E, "framercset");
 _Static_assert(offsetof(struct Ram, EASNcset) == 0xB020, "EASNcset");
@@ -882,9 +882,9 @@ _Static_assert(offsetof(struct Ram, printfontset) == 0xB030, "printfontset");
 _Static_assert(offsetof(struct Ram, fodropx) == 0xB032, "fodropx");
 _Static_assert(offsetof(struct Ram, fodropy) == 0xB034, "fodropy");
 _Static_assert(offsetof(struct Ram, recbpr) == 0xB036, "recbpr");
-_Static_assert(offsetof(struct Ram, vbint) == 0xB03A, "vbint");
-_Static_assert(offsetof(struct Ram, vcount) == 0xB03E, "vcount");
-_Static_assert(offsetof(struct Ram, oldvcount) == 0xB040, "oldvcount");
+_Static_assert(offsetof(struct Ram, VBint) == 0xB03A, "VBint");
+_Static_assert(offsetof(struct Ram, Vcount) == 0xB03E, "Vcount");
+_Static_assert(offsetof(struct Ram, OldVcount) == 0xB040, "OldVcount");
 _Static_assert(offsetof(struct Ram, repeatdelayframes) == 0xB042, "repeatdelayframes");
 _Static_assert(offsetof(struct Ram, asv) == 0xB044, "asv");
 _Static_assert(offsetof(struct Ram, lldisp) == 0xB046, "lldisp");
@@ -902,15 +902,15 @@ _Static_assert(offsetof(struct Ram, puck_pflags2) == 0xB7AD, "puck_pflags2");
 _Static_assert(offsetof(struct Ram, Ylist) == 0xB84A, "Ylist");
 _Static_assert(offsetof(struct Ram, OOlistpos) == 0xB86A, "OOlistpos");
 _Static_assert(offsetof(struct Ram, OOlist) == 0xB88A, "OOlist");
-_Static_assert(offsetof(struct Ram, crowdframe) == 0xB89A, "crowdframe");
-_Static_assert(offsetof(struct Ram, crowdlevel) == 0xB89C, "crowdlevel");
-_Static_assert(offsetof(struct Ram, crowdstep) == 0xB89E, "crowdstep");
-_Static_assert(offsetof(struct Ram, crowdcnt) == 0xB8A0, "crowdcnt");
+_Static_assert(offsetof(struct Ram, Crowdframe) == 0xB89A, "Crowdframe");
+_Static_assert(offsetof(struct Ram, Crowdlevel) == 0xB89C, "Crowdlevel");
+_Static_assert(offsetof(struct Ram, Crowdstep) == 0xB89E, "Crowdstep");
+_Static_assert(offsetof(struct Ram, Crowdcnt) == 0xB8A0, "Crowdcnt");
 _Static_assert(offsetof(struct Ram, CwdExciteLvl) == 0xB8A2, "CwdExciteLvl");
 _Static_assert(offsetof(struct Ram, MaxCwdExciteLvl) == 0xB8A4, "MaxCwdExciteLvl");
 _Static_assert(offsetof(struct Ram, NumCwdExciteLvl) == 0xB8A6, "NumCwdExciteLvl");
 _Static_assert(offsetof(struct Ram, SumCwdExciteLvl) == 0xB8A8, "SumCwdExciteLvl");
-_Static_assert(offsetof(struct Ram, zamx) == 0xB8AC, "zamx");
+_Static_assert(offsetof(struct Ram, Zamx) == 0xB8AC, "Zamx");
 _Static_assert(offsetof(struct Ram, playoffspritex) == 0xB8AE, "playoffspritex");
 _Static_assert(offsetof(struct Ram, playoffspritey) == 0xB8B0, "playoffspritey");
 _Static_assert(offsetof(struct Ram, clampcounter) == 0xB8B2, "clampcounter");
@@ -929,7 +929,7 @@ _Static_assert(offsetof(struct Ram, fomen) == 0xBDA8, "fomen");
 /* fofdata at 0xBDB0 overlaps the previous field; use RAM_OFF_fofdata */
 _Static_assert(offsetof(struct Ram, pads) == 0xBDB4, "pads");
 /* Joy1Struct at 0xBDD0 overlaps the previous field; use RAM_OFF_Joy1Struct */
-/* ReplayStarStruct at 0xBE08 overlaps the previous field; use RAM_OFF_ReplayStarStruct */
+/* CameraPosStruct at 0xBE08 overlaps the previous field; use RAM_OFF_CameraPosStruct */
 /* replayactive at 0xBE1E overlaps the previous field; use RAM_OFF_replayactive */
 /* Joy3Struct at 0xBE24 overlaps the previous field; use RAM_OFF_Joy3Struct */
 /* Joy4Struct at 0xBE40 overlaps the previous field; use RAM_OFF_Joy4Struct */
@@ -942,7 +942,7 @@ _Static_assert(offsetof(struct Ram, shotplayer) == 0xBED8, "shotplayer");
 _Static_assert(offsetof(struct Ram, lastplayer) == 0xBEDA, "lastplayer");
 _Static_assert(offsetof(struct Ram, passdir) == 0xBEDC, "passdir");
 _Static_assert(offsetof(struct Ram, passspeed) == 0xBEDE, "passspeed");
-_Static_assert(offsetof(struct Ram, passplayer) == 0xBEE0, "passplayer");
+_Static_assert(offsetof(struct Ram, passReceiverPlayerNum) == 0xBEE0, "passReceiverPlayerNum");
 _Static_assert(offsetof(struct Ram, glovecords) == 0xBEE2, "glovecords");
 _Static_assert(offsetof(struct Ram, threat) == 0xBEE4, "threat");
 _Static_assert(offsetof(struct Ram, puckcross) == 0xBEE6, "puckcross");
@@ -953,10 +953,10 @@ _Static_assert(offsetof(struct Ram, lj1) == 0xBEEE, "lj1");
 _Static_assert(offsetof(struct Ram, lj2) == 0xBEF0, "lj2");
 _Static_assert(offsetof(struct Ram, lj3) == 0xBEF2, "lj3");
 _Static_assert(offsetof(struct Ram, lj4) == 0xBEF4, "lj4");
-_Static_assert(offsetof(struct Ram, pad4way1) == 0xBEF6, "pad4way1");
-_Static_assert(offsetof(struct Ram, pad4way2) == 0xBEF7, "pad4way2");
-_Static_assert(offsetof(struct Ram, pad4way3) == 0xBEF8, "pad4way3");
-_Static_assert(offsetof(struct Ram, pad4way4) == 0xBEF9, "pad4way4");
+_Static_assert(offsetof(struct Ram, PadRaw1) == 0xBEF6, "PadRaw1");
+_Static_assert(offsetof(struct Ram, PadRaw2) == 0xBEF7, "PadRaw2");
+_Static_assert(offsetof(struct Ram, PadRaw3) == 0xBEF8, "PadRaw3");
+_Static_assert(offsetof(struct Ram, PadRaw4) == 0xBEF9, "PadRaw4");
 _Static_assert(offsetof(struct Ram, pad4wayword) == 0xBEFA, "pad4wayword");
 _Static_assert(offsetof(struct Ram, pad4waysave1) == 0xBEFE, "pad4waysave1");
 _Static_assert(offsetof(struct Ram, pad4waysave2) == 0xBF00, "pad4waysave2");
@@ -1059,7 +1059,7 @@ _Static_assert(offsetof(struct Ram, HomeTeam) == 0xC330, "HomeTeam");
 _Static_assert(offsetof(struct Ram, VisTeam) == 0xC332, "VisTeam");
 _Static_assert(offsetof(struct Ram, TeamBlockMap) == 0xC334, "TeamBlockMap");
 _Static_assert(offsetof(struct Ram, PenBuf) == 0xC3A4, "PenBuf");
-_Static_assert(offsetof(struct Ram, Pencntdwn) == 0xC3E6, "Pencntdwn");
+_Static_assert(offsetof(struct Ram, PenCntDwn) == 0xC3E6, "PenCntDwn");
 _Static_assert(offsetof(struct Ram, Penaltytimer) == 0xC3E8, "Penaltytimer");
 _Static_assert(offsetof(struct Ram, PBnum) == 0xC3EA, "PBnum");
 _Static_assert(offsetof(struct Ram, InjCntDown) == 0xC3EC, "InjCntDown");
@@ -1081,7 +1081,7 @@ _Static_assert(offsetof(struct Ram, PenSum) == 0xC5DE, "PenSum");
 _Static_assert(offsetof(struct Ram, teams) == 0xC6CE, "teams");
 /* HmGoals at 0xC6DA overlaps the previous field; use RAM_OFF_HmGoals */
 /* HomeTeamRosterPtr at 0xC6EC overlaps the previous field; use RAM_OFF_HomeTeamRosterPtr */
-/* AwShots at 0xCA32 overlaps the previous field; use RAM_OFF_AwShots */
+/* awtmstruct at 0xCA32 overlaps the previous field; use RAM_OFF_awtmstruct */
 /* AwGoals at 0xCA3E overlaps the previous field; use RAM_OFF_AwGoals */
 /* AwayTeamRosterPtr at 0xCA50 overlaps the previous field; use RAM_OFF_AwayTeamRosterPtr */
 _Static_assert(offsetof(struct Ram, statsbuffer) == 0xCD96, "statsbuffer");
@@ -1103,7 +1103,7 @@ _Static_assert(offsetof(struct Ram, PPBonus) == 0xCF2E, "PPBonus");
 _Static_assert(offsetof(struct Ram, PKBonus) == 0xCF2F, "PKBonus");
 _Static_assert(offsetof(struct Ram, ThirdPBonus) == 0xCF30, "ThirdPBonus");
 _Static_assert(offsetof(struct Ram, HmAwBonus) == 0xCF31, "HmAwBonus");
-_Static_assert(offsetof(struct Ram, callbackPtr) == 0xCF32, "callbackPtr");
+_Static_assert(offsetof(struct Ram, remapTablePtr) == 0xCF32, "remapTablePtr");
 _Static_assert(offsetof(struct Ram, ThreeStars) == 0xCF36, "ThreeStars");
 _Static_assert(offsetof(struct Ram, teamrecbuf) == 0xCFFE, "teamrecbuf");
 _Static_assert(offsetof(struct Ram, nibblebuffer) == 0xD036, "nibblebuffer");
@@ -1111,9 +1111,9 @@ _Static_assert(offsetof(struct Ram, homeuser) == 0xD042, "homeuser");
 _Static_assert(offsetof(struct Ram, awayuser) == 0xD044, "awayuser");
 _Static_assert(offsetof(struct Ram, FourWayPlay) == 0xD046, "FourWayPlay");
 _Static_assert(offsetof(struct Ram, OptNOP) == 0xD04A, "OptNOP");
-_Static_assert(offsetof(struct Ram, Opt1Team) == 0xD04C, "Opt1Team");
-_Static_assert(offsetof(struct Ram, Opt2Team) == 0xD04E, "Opt2Team");
-_Static_assert(offsetof(struct Ram, OptPerlen) == 0xD050, "OptPerlen");
+_Static_assert(offsetof(struct Ram, Opt1team) == 0xD04C, "Opt1team");
+_Static_assert(offsetof(struct Ram, Opt2team) == 0xD04E, "Opt2team");
+_Static_assert(offsetof(struct Ram, Optperlen) == 0xD050, "Optperlen");
 _Static_assert(offsetof(struct Ram, OptGoalie) == 0xD052, "OptGoalie");
 _Static_assert(offsetof(struct Ram, OptUserRec) == 0xD054, "OptUserRec");
 _Static_assert(offsetof(struct Ram, OptPen) == 0xD056, "OptPen");
@@ -1132,7 +1132,7 @@ _Static_assert(offsetof(struct Ram, music_tick_divider) == 0xD070, "music_tick_d
 _Static_assert(offsetof(struct Ram, TmpOptLine2) == 0xD072, "TmpOptLine2");
 _Static_assert(offsetof(struct Ram, TempOptPlayMode) == 0xD074, "TempOptPlayMode");
 _Static_assert(offsetof(struct Ram, databuffer) == 0xD076, "databuffer");
-_Static_assert(offsetof(struct Ram, pwddatabuffer) == 0xD088, "pwddatabuffer");
+_Static_assert(offsetof(struct Ram, passbits) == 0xD088, "passbits");
 _Static_assert(offsetof(struct Ram, outputbuffer) == 0xD092, "outputbuffer");
 _Static_assert(offsetof(struct Ram, tpassbits) == 0xD176, "tpassbits");
 _Static_assert(offsetof(struct Ram, music_needs_z80_update) == 0xD180, "music_needs_z80_update");
@@ -1142,7 +1142,7 @@ _Static_assert(offsetof(struct Ram, per_channel_frequency_table) == 0xD18E, "per
 _Static_assert(offsetof(struct Ram, per_channel_patch_table) == 0xD19C, "per_channel_patch_table");
 _Static_assert(offsetof(struct Ram, fm_voices) == 0xD1A4, "fm_voices");
 _Static_assert(offsetof(struct Ram, fm_channels) == 0xD3A4, "fm_channels");
-/* fm_channel_struct6 at 0xD3CC overlaps the previous field; use RAM_OFF_fm_channel_struct6 */
+/* pcm_channel_struct at 0xD3CC overlaps the previous field; use RAM_OFF_pcm_channel_struct */
 _Static_assert(offsetof(struct Ram, fm_slots) == 0xD3D4, "fm_slots");
 _Static_assert(offsetof(struct Ram, BA_Team) == 0xD404, "BA_Team");
 _Static_assert(offsetof(struct Ram, BA_Sktr_SCnum) == 0xD406, "BA_Sktr_SCnum");
@@ -1230,7 +1230,7 @@ _Static_assert(offsetof(struct Ram, DispAttribCtr) == 0xD5AC, "DispAttribCtr");
 _Static_assert(offsetof(struct Ram, VertLineScrolling) == 0xD5AE, "VertLineScrolling");
 _Static_assert(offsetof(struct Ram, PlayerScrollCtr) == 0xD5B0, "PlayerScrollCtr");
 _Static_assert(offsetof(struct Ram, SelectedPlayerIdx) == 0xD5B2, "SelectedPlayerIdx");
-_Static_assert(offsetof(struct Ram, typedelay) == 0xD5B4, "typedelay");
+_Static_assert(offsetof(struct Ram, ScoutingReportTimer) == 0xD5B4, "ScoutingReportTimer");
 _Static_assert(offsetof(struct Ram, screentimer) == 0xD5B6, "screentimer");
 _Static_assert(offsetof(struct Ram, TestList) == 0xD5B8, "TestList");
 _Static_assert(offsetof(struct Ram, arenaanimchars) == 0xD6AC, "arenaanimchars");
@@ -1300,18 +1300,18 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_replayend 0xAF54
 #define RAM_OFF_VSCRLPM 0xB000
 #define RAM_OFF_VSPRITES 0xB002
-#define RAM_OFF_VmMap1 0xB004
-#define RAM_OFF_Map1col1 0xB006
-#define RAM_OFF_VmMap2 0xB008
-#define RAM_OFF_Map2col1 0xB00A
-#define RAM_OFF_VmMap3 0xB00C
-#define RAM_OFF_Map3col1 0xB00E
-#define RAM_OFF_BigFontChars 0xB010
+#define RAM_OFF_VmMAP1 0xB004
+#define RAM_OFF_Map1col 0xB006
+#define RAM_OFF_VmMAP2 0xB008
+#define RAM_OFF_Map2col 0xB00A
+#define RAM_OFF_VmMAP3 0xB00C
+#define RAM_OFF_Map3col 0xB00E
+#define RAM_OFF_BigFontchars 0xB010
 #define RAM_OFF_smallfontchars 0xB012
 #define RAM_OFF_smallfont2chars 0xB014
 #define RAM_OFF_energybarchars 0xB016
 #define RAM_OFF_rinkvrcset 0xB018
-#define RAM_OFF_animchars 0xB01A
+#define RAM_OFF_crowdvrcset 0xB01A
 #define RAM_OFF_faceoffvrcset 0xB01C
 #define RAM_OFF_framercset 0xB01E
 #define RAM_OFF_EASNcset 0xB020
@@ -1326,13 +1326,14 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_fodropx 0xB032
 #define RAM_OFF_fodropy 0xB034
 #define RAM_OFF_recbpr 0xB036
-#define RAM_OFF_vbint 0xB03A
-#define RAM_OFF_vcount 0xB03E
-#define RAM_OFF_oldvcount 0xB040
+#define RAM_OFF_VBint 0xB03A
+#define RAM_OFF_Vcount 0xB03E
+#define RAM_OFF_OldVcount 0xB040
 #define RAM_OFF_repeatdelayframes 0xB042
 #define RAM_OFF_asv 0xB044
 #define RAM_OFF_lldisp 0xB046
 #define RAM_OFF_periodendtime 0xB048
+#define RAM_OFF_GoalieStruct 0xAFCA
 #define RAM_OFF_SortCords 0xB04A
 #define RAM_OFF_puckx 0xB74A
 #define RAM_OFF_pucky 0xB75E
@@ -1346,15 +1347,15 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_Ylist 0xB84A
 #define RAM_OFF_OOlistpos 0xB86A
 #define RAM_OFF_OOlist 0xB88A
-#define RAM_OFF_crowdframe 0xB89A
-#define RAM_OFF_crowdlevel 0xB89C
-#define RAM_OFF_crowdstep 0xB89E
-#define RAM_OFF_crowdcnt 0xB8A0
+#define RAM_OFF_Crowdframe 0xB89A
+#define RAM_OFF_Crowdlevel 0xB89C
+#define RAM_OFF_Crowdstep 0xB89E
+#define RAM_OFF_Crowdcnt 0xB8A0
 #define RAM_OFF_CwdExciteLvl 0xB8A2
 #define RAM_OFF_MaxCwdExciteLvl 0xB8A4
 #define RAM_OFF_NumCwdExciteLvl 0xB8A6
 #define RAM_OFF_SumCwdExciteLvl 0xB8A8
-#define RAM_OFF_zamx 0xB8AC
+#define RAM_OFF_Zamx 0xB8AC
 #define RAM_OFF_playoffspritex 0xB8AE
 #define RAM_OFF_playoffspritey 0xB8B0
 #define RAM_OFF_clampcounter 0xB8B2
@@ -1373,7 +1374,8 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_fofdata 0xBDB0
 #define RAM_OFF_pads 0xBDB4
 #define RAM_OFF_Joy1Struct 0xBDD0
-#define RAM_OFF_ReplayStarStruct 0xBE08
+#define RAM_OFF_Joy2Struct 0xBDEC
+#define RAM_OFF_CameraPosStruct 0xBE08
 #define RAM_OFF_replayactive 0xBE1E
 #define RAM_OFF_Joy3Struct 0xBE24
 #define RAM_OFF_Joy4Struct 0xBE40
@@ -1386,7 +1388,7 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_lastplayer 0xBEDA
 #define RAM_OFF_passdir 0xBEDC
 #define RAM_OFF_passspeed 0xBEDE
-#define RAM_OFF_passplayer 0xBEE0
+#define RAM_OFF_passReceiverPlayerNum 0xBEE0
 #define RAM_OFF_glovecords 0xBEE2
 #define RAM_OFF_threat 0xBEE4
 #define RAM_OFF_puckcross 0xBEE6
@@ -1397,10 +1399,10 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_lj2 0xBEF0
 #define RAM_OFF_lj3 0xBEF2
 #define RAM_OFF_lj4 0xBEF4
-#define RAM_OFF_pad4way1 0xBEF6
-#define RAM_OFF_pad4way2 0xBEF7
-#define RAM_OFF_pad4way3 0xBEF8
-#define RAM_OFF_pad4way4 0xBEF9
+#define RAM_OFF_PadRaw1 0xBEF6
+#define RAM_OFF_PadRaw2 0xBEF7
+#define RAM_OFF_PadRaw3 0xBEF8
+#define RAM_OFF_PadRaw4 0xBEF9
 #define RAM_OFF_pad4wayword 0xBEFA
 #define RAM_OFF_pad4waysave1 0xBEFE
 #define RAM_OFF_pad4waysave2 0xBF00
@@ -1503,7 +1505,7 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_VisTeam 0xC332
 #define RAM_OFF_TeamBlockMap 0xC334
 #define RAM_OFF_PenBuf 0xC3A4
-#define RAM_OFF_Pencntdwn 0xC3E6
+#define RAM_OFF_PenCntDwn 0xC3E6
 #define RAM_OFF_Penaltytimer 0xC3E8
 #define RAM_OFF_PBnum 0xC3EA
 #define RAM_OFF_InjCntDown 0xC3EC
@@ -1525,11 +1527,11 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_tmstruct 0xC6CE
 #define RAM_OFF_HmGoals 0xC6DA
 #define RAM_OFF_HomeTeamRosterPtr 0xC6EC
-#define RAM_OFF_AwShots 0xCA32
+#define RAM_OFF_awtmstruct 0xCA32
 #define RAM_OFF_AwGoals 0xCA3E
 #define RAM_OFF_AwayTeamRosterPtr 0xCA50
 #define RAM_OFF_statsbuffer 0xCD96
-#define RAM_OFF_gsstruct 0xCE66
+#define RAM_OFF_gstruct 0xCE66
 #define RAM_OFF_gamenum 0xCEE6
 #define RAM_OFF_postarts 0xCEE8
 #define RAM_OFF_bosgames 0xCEEA
@@ -1547,18 +1549,19 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_PKBonus 0xCF2F
 #define RAM_OFF_ThirdPBonus 0xCF30
 #define RAM_OFF_HmAwBonus 0xCF31
-#define RAM_OFF_callbackPtr 0xCF32
+#define RAM_OFF_remapTablePtr 0xCF32
 #define RAM_OFF_ThreeStars 0xCF36
 #define RAM_OFF_teamrecbuf 0xCFFE
 #define RAM_OFF_nibblebuffer 0xD036
+#define RAM_OFF_varend 0xD03E
 #define RAM_OFF_homeuser 0xD042
 #define RAM_OFF_awayuser 0xD044
 #define RAM_OFF_FourWayPlay 0xD046
 #define RAM_OFF_OptPlayMode 0xD048
 #define RAM_OFF_OptNOP 0xD04A
-#define RAM_OFF_Opt1Team 0xD04C
-#define RAM_OFF_Opt2Team 0xD04E
-#define RAM_OFF_OptPerlen 0xD050
+#define RAM_OFF_Opt1team 0xD04C
+#define RAM_OFF_Opt2team 0xD04E
+#define RAM_OFF_Optperlen 0xD050
 #define RAM_OFF_OptGoalie 0xD052
 #define RAM_OFF_OptUserRec 0xD054
 #define RAM_OFF_OptPen 0xD056
@@ -1576,8 +1579,9 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_TmpOptLine2 0xD072
 #define RAM_OFF_TempOptPlayMode 0xD074
 #define RAM_OFF_databuffer 0xD076
-#define RAM_OFF_pwddatabuffer 0xD088
+#define RAM_OFF_passbits 0xD088
 #define RAM_OFF_outputbuffer 0xD092
+#define RAM_OFF_marker 0xD174
 #define RAM_OFF_tpassbits 0xD176
 #define RAM_OFF_music_needs_z80_update 0xD180
 #define RAM_OFF_Z80_command_buffer 0xD182
@@ -1586,7 +1590,7 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_per_channel_patch_table 0xD19C
 #define RAM_OFF_fm_voice_usage_table 0xD1A4
 #define RAM_OFF_fm_channel_structs 0xD3A4
-#define RAM_OFF_fm_channel_struct6 0xD3CC
+#define RAM_OFF_pcm_channel_struct 0xD3CC
 #define RAM_OFF_fm_track_slots 0xD3D4
 #define RAM_OFF_BA_Team 0xD404
 #define RAM_OFF_BA_Sktr_SCnum 0xD406
@@ -1674,7 +1678,7 @@ static inline struct SortObj *sortobj(int n) { return (struct SortObj *)((uint8_
 #define RAM_OFF_VertLineScrolling 0xD5AE
 #define RAM_OFF_PlayerScrollCtr 0xD5B0
 #define RAM_OFF_SelectedPlayerIdx 0xD5B2
-#define RAM_OFF_typedelay 0xD5B4
+#define RAM_OFF_ScoutingReportTimer 0xD5B4
 #define RAM_OFF_screentimer 0xD5B6
 #define RAM_OFF_TestList 0xD5B8
 #define RAM_OFF_arenaanimchars 0xD6AC

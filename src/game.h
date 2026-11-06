@@ -31,7 +31,7 @@ enum { MU_FLIPPED = 1, MU_HIGHLIGHT = 2, MU_SERIES_OVER = 4 };                  
  * above (the native game's stack is C's). The oracle shim's lockstep hash uses the same bound. */
 #define RAM_VARS_END 0xDF00u
 
-/* the home (0) or away team's struct (src/ram.h: struct Team, tmstruct and AwShots) */
+/* the home (0) or away team's struct (src/ram.h: struct Team, tmstruct and awtmstruct) */
 static inline struct Team *team_struct(int away) { return &g.teams[away ? 1 : 0]; }
 /* puckc, who has the puck ($FFxx: nobody): the 68000 keeps it as a word in the puck's own sort
  * object, its newpos and newpnum bytes; st puckc (its high byte $FF): nobody */
@@ -39,7 +39,7 @@ static inline uint16_t puck_carrier(void) { const struct SortObj *p = sortobj(pu
 static inline void set_puck_carrier(uint16_t v) { struct SortObj *p = sortobj(puckscnum); p->newpos = (uint8_t)(v >> 8); p->newpnum = (uint8_t)v; }
 static inline void puck_loose(void) { sortobj(puckscnum)->newpos = 0xFF; }
 
-/* a 5-word number of the playoff password at a place (pwddatabuffer, tpassbits): its bytes, with
+/* a 5-word number of the playoff password at a place (passbits, tpassbits): its bytes, with
  * the word below it SuperMult spills into */
 static inline uint8_t *pass_bits(rp p) { return ram_bytes(rp_add(p, -2), 12) + 2; }
 
@@ -179,7 +179,7 @@ void ControlCode_AddY(struct PrintState *st);
 void ControlCode_SetFont(struct PrintState *st);
 void FormatAndPrintTime(uint16_t v);       /* d0 */
 void printbigz(const uint8_t *s, unsigned n);
-/* printbig's pen: d4 = x, d5 = y, d6 = attribute + BigFontChars */
+/* printbig's pen: d4 = x, d5 = y, d6 = attribute + BigFontchars */
 struct BigPen { uint16_t x, y, attr; };
 void PrintBigChar(uint8_t c, struct BigPen *pen);                /* d0 */
 void PutBigTile(uint16_t tile, const struct BigPen *pen);        /* d3 */
@@ -246,7 +246,7 @@ void p_initialZ80(void);
 void ClearAllTrackAndSFXSlots(void);
 
 /* ---- hockey94.asm: the game loop, the clock, pause mode ---- */
-void VBjsr(void);                                       /* the vblank interrupt: the vbint handler */
+void VBjsr(void);                                       /* the vblank interrupt: the VBint handler */
 void Begin(void);                                       /* does not return */
 void StartGame(void);                                   /* does not return */
 void ClearShotData(void);
@@ -554,7 +554,7 @@ void reenergizeteam(struct Team *tm);                   /* a2 */
 void Intermission(void);
 void InitScores(void);
 void UpdateScores(void);
-void SetScore(struct Matchup *a0);                      /* a0 = gsstruct entry */
+void SetScore(struct Matchup *a0);                      /* a0 = gstruct entry */
 int16_t NewTicker(struct Matchup **gs);                 /* -> d3, a0 */
 int16_t NewTicker2(struct Matchup **gs);
 int16_t CheckGameTickerStatus(int16_t d3, struct Matchup **gs);
@@ -564,7 +564,7 @@ void SetTickerAreaPosition(uint16_t *d0, uint16_t *d1);
 void Fprintsmall(uint32_t list, uint16_t n);    /* a1, d0 */
 uint32_t AdvanceStringPtr(uint32_t list, uint16_t n);   /* a1, d0 -> a1 */
 void DoHiLights(void);
-void StartHL(struct Matchup *gs, int16_t game);         /* a0 = the game's gsstruct, d1 = its number */
+void StartHL(struct Matchup *gs, int16_t game);         /* a0 = the game's gstruct, d1 = its number */
 void StartHL2(struct Matchup *gs, int16_t game);
 
 /* ---- arena94.asm: arena / faceoff animations and ChooseSong ---- */

@@ -44,7 +44,7 @@ void AddPenalty2(uint16_t pen, struct SortObj *o)
 {
     if (g.sflags & HI(sfhor)) return;
     if ((int16_t)pen >= 0xE) {
-        g.crowdlevel += 0xC8;
+        g.Crowdlevel += 0xC8;
         int16_t snd = 0xC;
         if (PFLAG(o, pfteam)) { g.CwdExciteLvl += 0x14; snd = 0xB; }
         song(snd);
@@ -96,9 +96,9 @@ void chkprogress(void)
     }
 cont:
     if (!(g.gmode & (1 << gmpen))) return;
-    if ((int16_t)g.Pencntdwn < 0) { InProgress(); return; }
-    g.Pencntdwn = (uint16_t)(g.Pencntdwn - elapsed);
-    if ((int16_t)g.Pencntdwn >= 0) return;
+    if ((int16_t)g.PenCntDwn < 0) { InProgress(); return; }
+    g.PenCntDwn = (uint16_t)(g.PenCntDwn - elapsed);
+    if ((int16_t)g.PenCntDwn >= 0) return;
     g.gmode &= (uint8_t)~(1 << gmpendel);
     uint8_t *a0 = penbuf();
     for (;; a0 += 2) {                                    /* any penalty with minutes? */
@@ -106,9 +106,9 @@ cont:
         if ((int8_t)penalty_entry(a0[0])[1] > 0) break;
     }
     g.sflags2 |= HI(sf2drec);
-    uint16_t vc = g.vcount;
+    uint16_t vc = g.Vcount;
     forceblack();
-    g.vcount = vc;
+    g.Vcount = vc;
     SetHor();
     DecompressGraphicsPlain(ART(RefMap2) + 8, g.ExtraChars);   /* the horizontal ref tiles */
     struct Matchup *gs = NULL;
@@ -208,8 +208,8 @@ void InProgress(void)
             d0 = 0x8000;
             struct Team *tt = a1; a1 = a2; a2 = tt;
         }
-        a2->Penalties++;
-        a2->Penmin += d2;
+        a2->tmPenalties++;
+        a2->tmPenmin += d2;
         d0 = (uint16_t)((d0 & 0xFF00) | pl->pnum);
         a4[3] = pl->pnum;
         g.TempPlOffset = d0;
@@ -218,18 +218,18 @@ void InProgress(void)
         p = (int16_t)(p * 2);
         d2 = (uint16_t)((uint16_t)(int8_t)d2 * 0x3C);
         d2 |= 0x2000;
-        uint16_t old = a2->pdst[p / 2];
+        uint16_t old = a2->tmpdst[p / 2];
         if ((int16_t)old >= 0 && (old & 0x1000)) d2 |= 0x1000;   /* keep bit 12 of an old time */
-        a2->pdst[p / 2] = d2;
+        a2->tmpdst[p / 2] = d2;
         d2 &= 0xEFFF;
         for (int16_t d1 = 0x32; d1 >= 0; d1 -= 2) {       /* the same time on the other team: coincidental */
-            if ((a1->pdst[d1 / 2] & 0xEFFF) != d2) continue;
+            if ((a1->tmpdst[d1 / 2] & 0xEFFF) != d2) continue;
             if (!(g.sflags5 & 0x20)) continue;
-            a1->pdst[d1 / 2] |= 0x4000;
-            a2->pdst[p / 2] |= 0x4000;
+            a1->tmpdst[d1 / 2] |= 0x4000;
+            a2->tmpdst[p / 2] |= 0x4000;
             break;
         }
-        uint8_t *box = a2->penbox;                        /* add him to the penalty box list */
+        uint8_t *box = a2->tmboxlist;                        /* add him to the penalty box list */
         for (int i = 0; i <= 0x18; i++)
             if ((int8_t)*box++ < 0) break;
         box[-1] = (uint8_t)p;
@@ -252,16 +252,16 @@ void InProgress_ap(struct Team *tm)
 {
     uint16_t d1 = 6;
     for (int16_t d0 = 0x32; d0 >= 0; d0 -= 2) {
-        uint16_t st = tm->pdst[d0 / 2];
+        uint16_t st = tm->tmpdst[d0 / 2];
         if ((int16_t)st <= 0) continue;
         st &= (uint16_t)~0x2000;
-        tm->pdst[d0 / 2] = st;
+        tm->tmpdst[d0 / 2] = st;
         if (st & 0x4000) continue;
         if (st & 0x1000) continue;
         if (d1 == 4) continue;                            /* never below 4 players */
         d1--;
     }
-    tm->ap = d1;
+    tm->tmap = d1;
 }
 
 /* penalty94.asm:checkfornewpen. Look for a new penalty (entered through AddPenalty). Stops
@@ -299,8 +299,8 @@ void checkfornewpen(void)
         if (was) continue;
         const uint8_t *e = penalty_entry(a0[-2]);         /* the longest stop delay wins */
         uint16_t d1 = (uint16_t)(e[0] << 5);
-        if ((int16_t)d1 <= (int16_t)g.Pencntdwn) continue;
-        g.Pencntdwn = d1;
+        if ((int16_t)d1 <= (int16_t)g.PenCntDwn) continue;
+        g.PenCntDwn = d1;
     }
 }
 
@@ -337,7 +337,7 @@ void Stop4Pen(uint32_t a0, struct SortObj *o)
         limitfo();                                        /* keeps d0 */
         leak = (uint16_t)d0;
     }
-    g.Pencntdwn = 0;
+    g.PenCntDwn = 0;
     g.gmode |= 1 << gmpen;
     stop_current_song(leak);
     sfx(SYM_SFXwhistle);
@@ -488,20 +488,20 @@ void ClearPenaltyMessage(void)
  * scored on player in the box without a coincidental penalty. */
 void PenGoalStuff(struct Team *a1, struct Team *a2)
 {
-    if (a1->ap == 6) ClearPenaltyBuffer();
-    if ((int16_t)a2->ap <= (int16_t)a1->ap) return;
-    uint8_t *a0 = a1->penbox;
+    if (a1->tmap == 6) ClearPenaltyBuffer();
+    if ((int16_t)a2->tmap <= (int16_t)a1->tmap) return;
+    uint8_t *a0 = a1->tmboxlist;
     for (;;) {
         uint8_t d2 = *a0++;
         if ((int8_t)d2 < 0) return;
-        if (a1->pdst[d2 / 2] & 0x4000) continue;          /* coincidental */
-        a1->pdst[d2 / 2] = 0;
+        if (a1->tmpdst[d2 / 2] & 0x4000) continue;          /* coincidental */
+        a1->tmpdst[d2 / 2] = 0;
         RemovePlayerFromList(a0);
         g.DelayedPen |= 1;
-        a1->ap++;
-        a2->PwrGoals++;
-        team_struct(0)->flags |= 1;                                                /* tmflcc: line changes */
-        team_struct(1)->flags |= 1;
+        a1->tmap++;
+        a2->tmPwrGoals++;
+        team_struct(0)->tmflags |= 1;                                                /* tmflcc: line changes */
+        team_struct(1)->tmflags |= 1;
         return;
     }
 }
@@ -532,9 +532,9 @@ void updatepentime(void)
 /* a player's box time is 5 seconds or less: beep, and release him at 0 */
 static void penbox_check(struct Team *tm, uint16_t d0)
 {
-    if ((int16_t)tm->pdst[d0 / 2] > 5) return;
+    if ((int16_t)tm->tmpdst[d0 / 2] > 5) return;
     int16_t snd = SYM_SFXbeep1;
-    if (tm->pdst[d0 / 2] == 0) {
+    if (tm->tmpdst[d0 / 2] == 0) {
         releasepl(tm, d0);
         snd = SYM_SFXbeep2;
     }
@@ -547,18 +547,18 @@ static void penbox_check(struct Team *tm, uint16_t d0)
  * count down on their own. */
 void updatepentime_ut(struct Team *tm)
 {
-    uint8_t *a0 = tm->penbox;
+    uint8_t *a0 = tm->tmboxlist;
     uint8_t *a1 = g.mesarea;                              /* the serving players (the message area as scratch) */
     int16_t d1 = 2;
     for (;;) {
         uint8_t d0 = *a0++;
         if ((int8_t)d0 < 0) break;
-        uint16_t st = tm->pdst[d0 / 2];
+        uint16_t st = tm->tmpdst[d0 / 2];
         if (st & 0x4000) {                                /* coincidental: on its own clock */
             st--;
-            tm->pdst[d0 / 2] = st;
+            tm->tmpdst[d0 / 2] = st;
             if (!(st & 0x0800)) continue;
-            tm->pdst[d0 / 2] = (st & 0x1000) ? 0 : 0x1000;
+            tm->tmpdst[d0 / 2] = (st & 0x1000) ? 0 : 0x1000;
             RemovePlayerFromList(a0);
             return;
         }
@@ -566,7 +566,7 @@ void updatepentime_ut(struct Team *tm)
         wr16(a1, d0);
         a1 += 2;
         st--;
-        tm->pdst[d0 / 2] = st;
+        tm->tmpdst[d0 / 2] = st;
         if (st == 0) RemovePlayerFromList(a0);            /* time is up */
     }
     uint16_t first = rd16(g.mesarea), second = rd16(g.mesarea + 2);   /* (the message area as scratch) */
@@ -600,7 +600,7 @@ void chkatop(void)
     }
     if (g.gmode & (1 << gmdir)) d1 ^= tmsize;
     struct Team *tm = team_struct(d1 != 0);
-    tm->ATOP++;
+    tm->tmATOP++;
 }
 
 /* penalty94.asm:releasepl. A player's penalty time is up so let him out: a2 = team, d0 =
@@ -608,15 +608,15 @@ void chkatop(void)
  * importance (priolist, after the goalie when there is one). */
 void releasepl(struct Team *tm, uint16_t d0)
 {
-    struct SortObj *a3 = sortobj_at(tm->sort);
+    struct SortObj *a3 = sortobj_at(tm->tmsort);
     while (a3->position >= 0) a3++;
     uint16_t d3 = d0 >> 1;
-    uint16_t d1 = tm->ap;
-    tm->ap = (uint16_t)(d1 + 1);
-    team_struct(0)->flags |= 1;
-    team_struct(1)->flags |= 1;
+    uint16_t d1 = tm->tmap;
+    tm->tmap = (uint16_t)(d1 + 1);
+    team_struct(0)->tmflags |= 1;
+    team_struct(1)->tmflags |= 1;
     const uint8_t *a0 = rom_ptr(SYM_priolist);
-    if ((int16_t)tm->goalie < 0) a0++;
+    if ((int16_t)tm->tmgoalie < 0) a0++;
     a3->position = a0[d1];
     Setplass(a3);
     setplayer(d3, a3);
@@ -628,24 +628,24 @@ void releasepl(struct Team *tm, uint16_t d0)
 uint16_t GetLowestPen(struct Team *a2, struct Team *a3)
 {
     uint16_t d0 = 0, d3 = 0;
-    const uint8_t *a0 = a2->penbox;
+    const uint8_t *a0 = a2->tmboxlist;
     for (;;) {
         uint8_t i = *a0++;
         if ((int8_t)i < 0) break;
-        uint16_t d2 = a2->pdst[i / 2];
+        uint16_t d2 = a2->tmpdst[i / 2];
         if (d2 & 0x4000) continue;                        /* coincidental */
         d2 = (uint16_t)(d2 - d3);
         d0 = (uint16_t)(d0 + d2);
         d3 = d2;
     }
-    if (a3->ap == 6) return d0;                           /* 6 on the ice: done */
+    if (a3->tmap == 6) return d0;                           /* 6 on the ice: done */
     d0 = (uint16_t)(d0 - d3);
-    a0 = a3->penbox;
+    a0 = a3->tmboxlist;
     for (;;) {
         uint8_t i = *a0++;
         if ((int8_t)i < 0) return d0;
-        if ((uint8_t)(a3->pdst[i / 2] >> 8) & 0x40) continue;
-        if ((int16_t)d0 < (int16_t)a3->pdst[i / 2]) return d0;
+        if ((uint8_t)(a3->tmpdst[i / 2] >> 8) & 0x40) continue;
+        if ((int16_t)d0 < (int16_t)a3->tmpdst[i / 2]) return d0;
         return (uint16_t)(d0 + d3);
     }
 }
@@ -665,7 +665,7 @@ void updatepwrplay(void)
 {
     if (g.gmode2 & HI(1)) return;
     struct Team *a2 = team_struct(0), *a3 = team_struct(1);
-    int16_t d0 = (int16_t)(a2->ap - a3->ap);
+    int16_t d0 = (int16_t)(a2->tmap - a3->tmap);
     if (d0 == 0) { clrpwrplay(); return; }                /* the same number on the ice */
     if (d0 < 0) {
         if (!(g.sflags2 & HI(sf2pwrtm))) {
@@ -681,13 +681,13 @@ void updatepwrplay(void)
     }
     int was = g.sflags2 & HI(sf2pwrplay);
     g.sflags2 |= HI(sf2pwrplay);
-    if (!was) a3->PwrPlays++;
+    if (!was) a3->tmPwrPlays++;
     printz(str_updatepwrplay_1, sizeof str_updatepwrplay_1);
     print(PushTime(GetLowestPen(a2, a3)));
     uint32_t mes = ram_addr(g.mesarea);
     wr16(g.mesarea, 2);
     appendz(str_updatepwrplay_2, sizeof str_updatepwrplay_2, mes);
-    appstring_p(roster_text(&rosters_team(a3->team)->abbr), mes);      /* the team's abbreviation */
+    appstring_p(roster_text(&rosters_team(a3->tmteam)->abbr), mes);      /* the team's abbreviation */
     print(mes);
 }
 
@@ -766,9 +766,9 @@ void printscores1(void)
  * score as 2 digits at x $1C. */
 void printscores1_ps(struct Team *tm)
 {
-    print_p(roster_text(&rosters_team(tm->team)->abbr));
+    print_p(roster_text(&rosters_team(tm->tmteam)->abbr));
     g.printx = 0x1C;
-    print(PushNumberWidth(tm->score, 2));
+    print(PushNumberWidth(tm->tmscore, 2));
 }
 
 /* penalty94.asm:PrintTeamLogoAndScore. The team logo map (d0 = offset) 5 columns left of
@@ -780,7 +780,7 @@ void PrintTeamLogoAndScore(struct Team *tm, uint16_t logo)
     PutTeamBlock(logo);
     g.printx = saved;
     g.printy += 2;
-    uint16_t d0 = tm->score;
+    uint16_t d0 = tm->tmscore;
     if ((int16_t)d0 >= 0xA) g.printx -= 1;
     uint32_t a1 = PushNumber(d0);
     d0 = (uint16_t)((uint16_t)(m16(a1) - 2) >> 1);
@@ -805,11 +805,11 @@ void EASNLogo(void)
 static void dispen(struct Team *tm)
 {
     for (int pass = 0; pass < 2; pass++) {
-        const uint8_t *a0 = tm->penbox;
+        const uint8_t *a0 = tm->tmboxlist;
         for (;;) {
             uint8_t d0 = *a0++;
             if ((int8_t)d0 < 0) break;
-            int coin = (tm->pdst[d0 / 2] & 0x4000) != 0;
+            int coin = (tm->tmpdst[d0 / 2] & 0x4000) != 0;
             if (coin != pass) continue;
             pplpen(tm, d0);
         }
@@ -833,8 +833,8 @@ void USBoard(void)
 void pplpen(struct Team *tm, uint16_t d0)
 {
     if (g.printy > 0xA) return;
-    uint16_t d2 = (uint16_t)(tm->pdst[d0 / 2] & 0x7FF);
-    uint16_t num = rosters_team(tm->team)->player[d0 >> 1].number;  /* his number (BCD) */
+    uint16_t d2 = (uint16_t)(tm->tmpdst[d0 / 2] & 0x7FF);
+    uint16_t num = rosters_team(tm->tmteam)->player[d0 >> 1].number;  /* his number (BCD) */
     uint16_t saved = g.printx;
     ConvertByteToDigits(num, text_buffer());
     wr16(g.mesarea, 4);                                   /* string length: 2 digits */
@@ -863,15 +863,15 @@ void linebar(uint16_t line, struct Team *tm)
  * that line's skaters. */
 uint16_t getlinee(uint16_t line, struct Team *tm)
 {
-    const uint8_t *a1 = tm->lines[line];                    /* the line set */
+    const uint8_t *a1 = tm->tmlines[line];                    /* the line set */
     const uint8_t *prio = rom_ptr(SYM_priolist);
     uint32_t d0 = 0;
     uint16_t d1 = 0;
-    for (int d4 = (int)tm->ap - 1; d4 >= 0; d4--) {
+    for (int d4 = (int)tm->tmap - 1; d4 >= 0; d4--) {
         uint8_t d5 = prio[d4];
         if (d5 == 0) continue;                            /* the goalie's energy does not count */
         d1++;
-        d0 += tm->pde[a1[d5] - 1];
+        d0 += tm->tmpde[a1[d5] - 1];
     }
     return (uint16_t)m68k_divu(d0, d1);
 }
@@ -881,10 +881,10 @@ uint16_t AvgCline(struct Team *tm)
 {
     uint32_t d0 = 0;
     uint16_t d1 = 0;
-    const struct SortObj *a0 = sortobj_at(tm->sort);
+    const struct SortObj *a0 = sortobj_at(tm->tmsort);
     for (int i = 0; i < 6; i++, a0++) {
         if (a0->position <= 0) continue;
-        d0 += tm->pde[a0->pnum];
+        d0 += tm->tmpde[a0->pnum];
         d1++;
     }
     if (d1 == 0) return (uint16_t)d0;
@@ -909,31 +909,31 @@ void ChkShotStat(void)
         uint8_t *a4 = g.ScoreSum + -6 + g.ScoreSumbytes;                                  /* the last goal entry */
         struct Team *tm = team_struct((a4[2] & 0x80) != 0);
         uint8_t pn = a4[3];
-        const struct SortObj *p = sortobj_at(tm->sort);
+        const struct SortObj *p = sortobj_at(tm->tmsort);
         int i;
         for (i = 0; i < 6; i++, p++)
             if (p->pnum == pn) break;
         if (i == 6) return;
         d0 = p->SCnum;
     } else {
-        g.crowdlevel += 0x64;
+        g.Crowdlevel += 0x64;
         g.CwdExciteLvl += 0xA;
         d0 = (int16_t)g.shotplayer;
     }
     struct SortObj *a3 = sortobj(d0);
     struct Team *a1;
     struct Team *a2 = loadTeamStruct(a3, &a1);
-    a2->shots++;                                          /* tmshots */
+    a2->tmshots++;                                          /* tmshots */
     if (g.sflags2 & HI(sf2pwrplay)) {
         int pp_away = (g.sflags2 & HI(sf2pwrtm)) != 0;
         if ((PFLAG(a3, pfteam) != 0) == pp_away)
-            a2->ppshots++;                                        /* power play shots */
+            a2->tmPPShots++;                                        /* power play shots */
     }
-    a2->pershots[g.gsp]++;                                                        /* shots by period */
-    a2->pshots[a3->pnum]++;
-    int16_t gk = (int16_t)a1->goalie;
+    a2->tmPerShots[g.gsp]++;                                                        /* shots by period */
+    a2->tmpshots[a3->pnum]++;
+    int16_t gk = (int16_t)a1->tmgoalie;
     if (gk < 0) return;                                   /* empty net */
-    a1->pshots[gk]++;
+    a1->tmpshots[gk]++;
 }
 
 /* penalty94.asm:loadTeamStruct. a2 = team struct of player a3, a1 = the other team's. */
@@ -948,13 +948,13 @@ struct Team *loadTeamStruct(const struct SortObj *o, struct Team **other)
 static void intermission_team(struct Team *a2, struct Team *a3)
 {
     reenergizeteam(a2);
-    a3->line = 0;
+    a3->tmline = 0;
     if (g.OptLine != 0) return;
-    int16_t d0 = (int16_t)(a3->ap - a2->ap);
+    int16_t d0 = (int16_t)(a3->tmap - a2->tmap);
     if (d0 == 0) return;
-    a3->line = 3;                                         /* Pw1 */
+    a3->tmline = 3;                                         /* Pw1 */
     if (d0 >= 0) return;
-    a3->line = 5;                                         /* PK1 */
+    a3->tmline = 5;                                         /* PK1 */
 }
 
 /* penalty94.asm:SetupTeamForIntermission. Reset the bench, then for each team refill the
@@ -970,7 +970,7 @@ void SetupTeamForIntermission(void)
 void RestoreTeamEnergy(struct Team *tm)
 {
     for (int16_t d0 = 0x32; d0 >= 0; d0 -= 2)
-        tm->pde[d0 / 2] = 0x1000;
+        tm->tmpde[d0 / 2] = 0x1000;
 }
 
 /* penalty94.asm:reenergizeteam. Max energy for team a2 except the players at tmpdst -4;
@@ -978,9 +978,9 @@ void RestoreTeamEnergy(struct Team *tm)
 void reenergizeteam(struct Team *tm)
 {
     for (int16_t d0 = 0x32; d0 >= 0; d0 -= 2) {
-        if (tm->pdst[d0 / 2] == 0xFFFC) continue;
-        tm->pde[d0 / 2] = 0x1000;
-        if (tm->pdst[d0 / 2] == 0xFFFD) tm->pdst[d0 / 2] = 0xFFFE;
+        if (tm->tmpdst[d0 / 2] == 0xFFFC) continue;
+        tm->tmpde[d0 / 2] = 0x1000;
+        if (tm->tmpdst[d0 / 2] == 0xFFFD) tm->tmpdst[d0 / 2] = 0xFFFE;
     }
 }
 
@@ -1001,7 +1001,7 @@ void Intermission(void)
     SetupTeamForIntermission();
     for (int i = 0; i < 0x10; i++) sortobj(i)->Xpos = 0;
     DecompressGraphicsPlain(ART(ZamFrameList) + 8, g.ExtraChars);
-    g.zamx = 0x140;
+    g.Zamx = 0x140;
     uint16_t list = g.gsp;
     if (g.OptPlayMode != 0) list += 5;
     uint32_t items = sslist[list];
@@ -1029,7 +1029,7 @@ void Intermission(void)
             if (d1 & 0x80) break;
         } while (g.cont1team != 0 || g.cont2team != 0);
     }
-    ST_W(g.zamx);
+    ST_W(g.Zamx);
 }
 
 /* penalty94.asm:InitScores. Initialize the other games' scores / period in the playoffs. */
@@ -1040,8 +1040,8 @@ void InitScores(void)
     for (; d1 >= 0; d1--) {
         struct Matchup *a0 = &g.matchups[d1];
         if ((uint16_t)d1 == g.gamenum) continue;
-        if (a0->flags & MU_SERIES_OVER) continue;
-        a0->per = 0;
+        if (a0->gsflags & MU_SERIES_OVER) continue;
+        a0->gsper = 0;
         for (int16_t d0 = (int16_t)randomd0(3); d0 > 0; d0--) SetScore(a0);
     }
 }
@@ -1054,8 +1054,8 @@ void UpdateScores(void)
     for (; d1 >= 0; d1--) {
         struct Matchup *a0 = &g.matchups[d1];
         if ((uint16_t)d1 == g.gamenum) continue;
-        a0->flags &= (uint8_t)~MU_HIGHLIGHT;
-        if (a0->flags & MU_SERIES_OVER) continue;
+        a0->gsflags &= (uint8_t)~MU_HIGHLIGHT;
+        if (a0->gsflags & MU_SERIES_OVER) continue;
         SetScore(a0);
     }
 }
@@ -1081,21 +1081,21 @@ static uint16_t getscore(uint16_t d0, uint16_t d1)
  * within one goal goes to overtime and asks for a highlight. */
 void SetScore(struct Matchup *a0)
 {
-    if ((int16_t)a0->per >= 4) return;
-    if (a0->per == 3) {
-        a0->per = 5;                                      /* final */
-        int16_t d0 = (int16_t)(a0->score1 - a0->score2);
+    if ((int16_t)a0->gsper >= 4) return;
+    if (a0->gsper == 3) {
+        a0->gsper = 5;                                      /* final */
+        int16_t d0 = (int16_t)(a0->gss1 - a0->gss2);
         if (d0 > 1) return;
         if (d0 < -1) return;
-        a0->per = 3;                                      /* close game: overtime */
-        a0->flags |= MU_HIGHLIGHT;
+        a0->gsper = 3;                                      /* close game: overtime */
+        a0->gsflags |= MU_HIGHLIGHT;
         return;
     }
-    a0->per++;
-    uint16_t s = getscore(a0->team1, a0->team2);
-    a0->score1 += s;
-    s = getscore(a0->team2, a0->team1);
-    a0->score2 += s;
+    a0->gsper++;
+    uint16_t s = getscore(a0->gst1, a0->gst2);
+    a0->gss1 += s;
+    s = getscore(a0->gst2, a0->gst1);
+    a0->gss2 += s;
 }
 
 /* penalty94.asm:NewTicker. Show the next ticker score once the clock is at 8:00 or less.
@@ -1121,8 +1121,8 @@ int16_t NewTicker2(struct Matchup **gs)
 int16_t CheckGameTickerStatus(int16_t d3, struct Matchup **gs)
 {
     struct Matchup *a0 = &g.matchups[d3];
-    if (a0->flags & MU_HIGHLIGHT) return NewTicker2(gs);  /* a highlight is coming */
-    if (a0->flags & MU_SERIES_OVER) return NewTicker2(gs);   /* the series is over */
+    if (a0->gsflags & MU_HIGHLIGHT) return NewTicker2(gs);  /* a highlight is coming */
+    if (a0->gsflags & MU_SERIES_OVER) return NewTicker2(gs);   /* the series is over */
     *gs = a0;
     return d3;
 }
@@ -1155,13 +1155,13 @@ void NewTicker3(int16_t d3, const struct Matchup *gs)
     d0 = (uint16_t)(1 + g.gamelevel);
     if (g.OptPlayMode == 0) d0 = 0;                       /* not the playoffs: 'EA Hockey Night' */
     Fprintsmall(SYM_GameLabels, d0);
-    uint32_t a1 = AdvanceStringPtr(SYM_PerLabels, (uint16_t)(gs->per - 1));
+    uint32_t a1 = AdvanceStringPtr(SYM_PerLabels, (uint16_t)(gs->gsper - 1));
     d0 = rd16(rom_ptr(a1)) >> 1;                          /* the period name centered on x + $17 */
     g.printx = (uint16_t)(x + 0x17 - d0);
     print(a1);
     g.printa = 0x8000;
-    ticker_team(gs->team2, gs->score2, x);
-    ticker_team(gs->team1, gs->score1, x);
+    ticker_team(gs->gst2, gs->gss2, x);
+    ticker_team(gs->gst1, gs->gss1, x);
 }
 
 /* penalty94.asm:ClearTickerArea. Erase the ticker box. */
@@ -1202,9 +1202,9 @@ void DoHiLights(void)
     int16_t n = (int16_t)GetShifter(NULL);
     do {
         struct Matchup *gs = &g.matchups[n];
-        if (!(gs->flags & MU_SERIES_OVER)) {
-            int hl = gs->flags & MU_HIGHLIGHT;
-            gs->flags &= (uint8_t)~MU_HIGHLIGHT;
+        if (!(gs->gsflags & MU_SERIES_OVER)) {
+            int hl = gs->gsflags & MU_HIGHLIGHT;
+            gs->gsflags &= (uint8_t)~MU_HIGHLIGHT;
             if (hl) StartHL(gs, n);
         }
     } while (n-- != 0);
@@ -1235,12 +1235,12 @@ static void hl_restore(void)
 /* StartHL2's .ranres: settle highlight game a0 at random when tied, and mark it final */
 static void hl_random_result(struct Matchup *gs)
 {
-    if (gs->score1 == gs->score2) {
+    if (gs->gss1 == gs->gss2) {
         uint16_t d0 = vdp_hv16() & 1;
-        gs->score1 += d0;
-        gs->score2 += d0 ^ 1;
+        gs->gss1 += d0;
+        gs->gss2 += d0 ^ 1;
     }
-    gs->per = 5;                                        /* final */
+    gs->gsper = 5;                                        /* final */
 }
 
 /* StartHL2's .setteam: refill the energy, personnel and player data of team a2 */
@@ -1249,10 +1249,10 @@ static void hl_set_team(struct Team *tm)
     reenergizeteam(tm);
     setpersonel(tm);
     forcepldata(tm);
-    ST_W(tm->lasttouch);
+    ST_W(tm->tmtouch1);
     g.sflags8 &= (uint8_t)~0x80;
-    ST_W(tm->assist1);
-    ST_W(tm->assist2);
+    ST_W(tm->tmtouch2);
+    ST_W(tm->tmtouch3);
 }
 
 /* penalty94.asm:StartHL2. Play the highlight of game a0 (d1 = its number): its ticker score,
@@ -1278,13 +1278,13 @@ void StartHL2(struct Matchup *gs, int16_t game)
         g.printy -= 2;
         printz(str_StartHL2_1, sizeof str_StartHL2_1);
         if (waitxsr(0xB4) & 0x80) { hl_restore(); hl_random_result(a0); g.sflags3 |= 1 << sf3sbut; return; }
-        ST_W(g.zamx);
+        ST_W(g.Zamx);
         g.CwdExciteLvl = 0;
-        g.HomeTeam = a0->team1;
-        g.VisTeam = a0->team2;
+        g.HomeTeam = a0->gst1;
+        g.VisTeam = a0->gst2;
         struct Team *home = team_struct(0), *away = team_struct(1);
-        home->goalie = 0;
-        away->goalie = 0;
+        home->tmgoalie = 0;
+        away->tmgoalie = 0;
         clearTeamStats();
         restoreteams();
         ST_W(g.c1playernum);
@@ -1292,9 +1292,9 @@ void StartHL2(struct Matchup *gs, int16_t game)
         g.cont1team = 0;
         g.cont2team = 0;
         g.gameclock = (uint16_t)(randomd0(0x78) + 0x3C);
-        g.gsp = (uint16_t)(a0->per - 1);
-        home->score = a0->score1;
-        away->score = a0->score2;
+        g.gsp = (uint16_t)(a0->gsper - 1);
+        home->tmscore = a0->gss1;
+        away->tmscore = a0->gss2;
         g.gmode = 1 << gmhl;
         if (g.gsp & 1) g.gmode |= 1 << gmdir;
         g.sflags &= 0x00FF;                               /* clr.b: the high byte */
@@ -1330,25 +1330,25 @@ void StartHL2(struct Matchup *gs, int16_t game)
         }
         SprSort();
         g.palcount = 0x18;
-        g.oldvcount = g.vcount;
+        g.OldVcount = g.Vcount;
         int16_t after = 0xB4;                             /* frames after the clock stops */
         for (;;) {
             DoGameFrame();
             if ((g.gmode & (1 << gmclock)) && --after < 0) break;
             uint16_t d1 = orjoy();
             if ((d1 & 0x20) || (d1 & 0x80)) {
-                if (home->score == away->score) {                       /* tied: a random winner */
+                if (home->tmscore == away->tmscore) {                       /* tied: a random winner */
                     uint16_t d0 = vdp_hv16() & 1;
-                    home->score += d0;
-                    away->score += d0 ^ 1;
+                    home->tmscore += d0;
+                    away->tmscore += d0 ^ 1;
                 }
                 break;
             }
         }
         KillCrowd();                                      /* the scores go to a0 as pushed: CheckGameTickerStatus's */
         p_turnoff();
-        a0->score1 = home->score;
-        a0->score2 = away->score;
+        a0->gss1 = home->tmscore;
+        a0->gss2 = away->tmscore;
         forceblack();
         for (int i = 0; i < 0x10; i++) sortobj(i)->Xpos = 0;
         hl_restore();
@@ -1359,9 +1359,9 @@ void StartHL2(struct Matchup *gs, int16_t game)
         DrawMenuScreen();
         g.palcount = 0x18;
         song(SYM_SngEOG);
-        gs->per = 4;                                    /* overtime */
-        if (gs->score1 == gs->score2) continue;           /* still tied: another highlight */
-        gs->per = 5;                                      /* final */
+        gs->gsper = 4;                                    /* overtime */
+        if (gs->gss1 == gs->gss2) continue;           /* still tied: another highlight */
+        gs->gsper = 5;                                      /* final */
         t = gs;
         d3 = CheckGameTickerStatus(game, &t);
         NewTicker3(d3, t);

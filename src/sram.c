@@ -5,13 +5,13 @@
 #include "symbols_gen.h"
 
 /* sram94.asm:InitSaveRAM. Copy save RAM to work RAM $0000-$1FFF and check it (ValidateSRAM); a
- * bad one is cleared and read again. With the vblank counting vcount only (VBcount). Two
+ * bad one is cleared and read again. With the vblank counting Vcount only (VBcount). Two
  * power-on tests that never return: Start+A+C held writes and reads back every bit of every
  * byte, then $12 $34 $56 $78 to bytes 0-3, and flashes the screen green (red at the first bad
  * byte); Start+B+C held flashes green if bytes 0-3 are $12345678, else red. */
 void InitSaveRAM(void)
 {
-    g.vbint = SYM_VBcount;
+    g.VBint = SYM_VBcount;
     cpu_set_sr(0x2500);
     g.ValidSRAM = 0;
     uint16_t d0, d1, d2, held;
@@ -55,10 +55,10 @@ void SRAMWaitVblank(void)
     MenuWaitVblank();
 }
 
-/* sram94.asm:VBcount. The vblank while InitSaveRAM runs: vcount + 1 only. */
+/* sram94.asm:VBcount. The vblank while InitSaveRAM runs: Vcount + 1 only. */
 void VBcount(void)
 {
-    g.vcount++;
+    g.Vcount++;
 }
 
 /* sram94.asm:ValidateSRAM. Check the copy of save RAM at work RAM 0: byte $1FFF must be the sum

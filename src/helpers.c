@@ -30,7 +30,7 @@ int PuckComingToward(struct SortObj *o)
  * goalie is pulled). */
 uint8_t ReadGoaliePulled(struct SortObj *o)
 {
-    uint16_t v = team_struct(o->pflags & (1 << pfteam))->goalie;
+    uint16_t v = team_struct(o->pflags & (1 << pfteam))->tmgoalie;
     return (uint8_t)((v == 0 ? CCR_Z : 0) | (v & 0x8000 ? CCR_N : 0));
 }
 

@@ -52,7 +52,7 @@ static void crowd_frame(int16_t d0, const uint8_t *a1, int16_t d4, int16_t d5, s
     for (; n >= 0; n--, a0 += 8) {
         int16_t sx = (int16_t)rd16(a0), sy = (int16_t)rd16(a0 + 2);
         if (y0 > sy || y1 < sy || x0 - view_more() > sx || x1 + view_more() < sx) continue;
-        uint16_t tile = (uint16_t)((rd16(a0 + 6) & 0xF800) + rd16(a0 + 4) + g.animchars);
+        uint16_t tile = (uint16_t)((rd16(a0 + 6) & 0xF800) + rd16(a0 + 4) + g.crowdvrcset);
         sat_entry(v, (uint16_t)(sy + 0x70 - y0), a0[7], tile, (uint16_t)(sx + 0x70 - x0));
         if (v->link == SAT_MAX) return;
     }
@@ -124,7 +124,7 @@ static void sso_arrow(const struct RinkObj *a0, struct SpriteHead *a3, uint16_t 
 
 /* video94.asm:VBlank. The main vblank code for game play: DumpSprites when the frame is
  * ready (dfok), the palette fade, then the game clock (a second every $AAA jiffies, the
- * shootout clock instead in a penalty shot / shootout, a beep at 60 seconds), vcount and the
+ * shootout clock instead in a penalty shot / shootout, a beep at 60 seconds), Vcount and the
  * music. */
 void VBlank(void)
 {
@@ -159,7 +159,7 @@ void VBlank(void)
             }
         }
     }
-    g.vcount++;
+    g.Vcount++;
     p_music_vblank();
 }
 
@@ -167,7 +167,7 @@ void VBlank(void)
 void vb2(void)
 {
     if (!(g.disflags & HI(dfng))) cramfade();
-    g.vcount++;
+    g.Vcount++;
     p_music_vblank();
 }
 
@@ -316,7 +316,7 @@ void checkfo(struct Vid *v)
  * or a frame by x. */
 void showzam(struct Vid *v)
 {
-    int16_t d0 = (int16_t)g.zamx;
+    int16_t d0 = (int16_t)g.Zamx;
     if (d0 < 0) return;
     d0 = (int16_t)((uint16_t)d0 >> 2);
     int16_t d1 = 0x12A;
@@ -326,7 +326,7 @@ void showzam(struct Vid *v)
     d2 += 2;
     SetSframe(ART(ZamFrameList), d0, d1, d2, d3, v);
     d2 = 5;
-    if (!(g.teams[0].score > g.teams[1].score)) { SetSframe(ART(ZamFrameList), d0, d1, d2, d3, v); return; }
+    if (!(g.teams[0].tmscore > g.teams[1].tmscore)) { SetSframe(ART(ZamFrameList), d0, d1, d2, d3, v); return; }
     int16_t t = (int16_t)(d0 - 0xDA);
     if (t < 0) t = 0;
     t = (int16_t)((uint16_t)t >> 2);
@@ -352,7 +352,7 @@ void SetSframe(uint32_t list, int16_t x, int16_t y, uint16_t frame, uint16_t sta
 }
 
 /* video94.asm:showcrowd. The crowd sprites: up to 3 frames per penalty box nibble, then the
- * two crowdframe frames. None in a reverse angle replay. */
+ * two Crowdframe frames. None in a reverse angle replay. */
 void showcrowd(struct Vid *v)
 {
     if (g.sflags4 & HI(4)) return;
@@ -366,8 +366,8 @@ void showcrowd(struct Vid *v)
         if (count > 3) count = 3;
         for (int i = count - 1; i >= 0; i--) crowd_frame((int16_t)(first + i), a1, d4, d5, v);
     }
-    crowd_frame((int8_t)(g.crowdframe >> 8), a1, d4, d5, v);
-    crowd_frame((int8_t)g.crowdframe, a1, d4, d5, v);
+    crowd_frame((int8_t)(g.Crowdframe >> 8), a1, d4, d5, v);
+    crowd_frame((int8_t)g.Crowdframe, a1, d4, d5, v);
 }
 
 /* video94.asm:showclock. The game clock on screen. Horizontal rink: printed with the big
@@ -608,10 +608,10 @@ void find3d(int16_t *x, int16_t *y, int16_t z)
 }
 
 /* video94.asm:updatesound. Move the crowd noise volume (psg noise channel, asv) toward
- * crowdlevel. */
+ * Crowdlevel. */
 void updatesound(void)
 {
-    uint16_t d0 = (uint16_t)((g.crowdlevel << 3) + 0x400);
+    uint16_t d0 = (uint16_t)((g.Crowdlevel << 3) + 0x400);
     if (d0 > 0xEFF) d0 = 0xEFF;
     int16_t d2 = 0x28;
     int16_t diff = (int16_t)(d0 - g.asv);

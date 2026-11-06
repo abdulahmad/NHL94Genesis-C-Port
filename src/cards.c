@@ -107,8 +107,8 @@ void PlayerCardScreen(void)
     if (rd32(rom_ptr(pic + 4)) == 0) map = ART(PicturePalette) + rd32(rom_ptr(ART(PicturePalette) + 4));   /* no map: the common one */
     else map = pic + rd32(rom_ptr(pic + 4));
     UnpackPicture(pic + 8);
-    uint16_t v = g.vcount;
-    while (g.vcount == v) hal_wait_vblank();
+    uint16_t v = g.Vcount;
+    while (g.Vcount == v) hal_wait_vblank();
     uint16_t keep[4];                                     /* (colours $11-$14 kept) */
     for (int i = 0; i < 4; i++) keep[i] = g.palfadenew[0x11 + i];
     dobitmap(pal, map, ram_addr(g.picturebuf), 0, 0, 6, 6, chars, 2);
@@ -366,7 +366,7 @@ void UpdateTeamRecord(uint32_t buf, uint32_t rec_no, uint16_t other, uint16_t te
 {
     uint8_t *rec = ram_bytes(ram_at(buf), 0x10);
     ReadTeamRecord(rec_no, buf);
-    int16_t s1 = (int16_t)a1->score, s2 = (int16_t)a2->score;
+    int16_t s1 = (int16_t)a1->tmscore, s2 = (int16_t)a2->tmscore;
     if ((int16_t)rd16(rec + 0xA) < 0x2328) {
         bump((rec + 0xA));
         if (s1 > s2) bump((rec + 8));
@@ -374,7 +374,7 @@ void UpdateTeamRecord(uint32_t buf, uint32_t rec_no, uint16_t other, uint16_t te
     }
     if (s1 > s2) {
         if ((int8_t)s1 > (int8_t)rec[0]) { rec[0] = (uint8_t)s1; rec[1] = (uint8_t)team; rec[2] = (uint8_t)vs; rec[3] = (uint8_t)other; }
-        int16_t margin = (int16_t)(a2->shots - s2);
+        int16_t margin = (int16_t)(a2->tmshots - s2);
         if ((int8_t)margin > (int8_t)rec[4]) { rec[4] = (uint8_t)margin; rec[5] = (uint8_t)team; rec[6] = (uint8_t)vs; rec[7] = (uint8_t)other; }
     }
     WriteTeamRecord(rec_no, buf);
@@ -389,7 +389,7 @@ void UpdateCrowdRecord(uint32_t buf, uint32_t team, uint16_t opp, uint16_t user,
     uint8_t *rec = ram_bytes(ram_at(buf), 0x10);
     int changed = 0;
     ReadCrowdRecord(team, buf);
-    uint8_t goals = (uint8_t)tm->score;
+    uint8_t goals = (uint8_t)tm->tmscore;
     if ((int8_t)goals > (int8_t)rec[0]) {
         rec[0] = goals; rec[1] = (uint8_t)user; rec[3] = (uint8_t)opp_user; rec[2] = (uint8_t)opp;
         changed = 1;
@@ -397,7 +397,7 @@ void UpdateCrowdRecord(uint32_t buf, uint32_t team, uint16_t opp, uint16_t user,
     uint8_t saves = 0;
     uint16_t n = (uint16_t)(goalies - 1);
     do {
-        uint8_t s = (uint8_t)(tm->pshots[n] - tm->pgoals[n]);
+        uint8_t s = (uint8_t)(tm->tmpshots[n] - tm->tmgoals[n]);
         g.TempWord1 = (uint16_t)((s << 8) | (g.TempWord1 & 0xFF));
         if ((int8_t)saves < (int8_t)s) saves = s;
     } while (n-- != 0);
@@ -420,8 +420,8 @@ void UpdatePlayerRecords(uint32_t team, uint32_t buf, struct Team *tm, uint16_t 
     uint8_t *rec = ram_bytes(ram_at(buf), 4);
     for (uint16_t slot = 0; slot < 0x1A; slot++) {
         ReadPlayerRecord(slot, (uint16_t)team, buf);
-        uint8_t best = (int16_t)slot >= (int16_t)goalies ? tm->pgoals[slot]
-                                                         : (uint8_t)(tm->pshots[slot] - tm->pgoals[slot]);                 /* goalie: saves */
+        uint8_t best = (int16_t)slot >= (int16_t)goalies ? tm->tmgoals[slot]
+                                                         : (uint8_t)(tm->tmpshots[slot] - tm->tmgoals[slot]);                 /* goalie: saves */
         if ((int8_t)best <= (int8_t)rec[0]) continue;
         rec[0] = best;
         int home = tm == team_struct(0);
@@ -768,8 +768,8 @@ uint16_t CalcAttrib(uint16_t player, struct Team *tm, uint32_t mask, uint16_t *d
     uint32_t weights = SYM_AttribWgtList;
     if (mask == rd32(rom_ptr(SYM_PAttribOverallMask))) weights = SYM_OvrPlayerWgtList;
     if (mask == rd32(rom_ptr(SYM_GAttribOverallMask))) weights = SYM_OvrGoalWgtList;
-    const struct RosterPlayer *P = &rosters_team(tm->team)->player[player];
-    const uint8_t *hotcold = tm->hotcold[player] + 0x10;                        /* the end of his hot / cold bytes */
+    const struct RosterPlayer *P = &rosters_team(tm->tmteam)->player[player];
+    const uint8_t *hotcold = tm->tmHotCold[player] + 0x10;                        /* the end of his hot / cold bytes */
     uint16_t d0 = 0, d1 = 0, bits = (uint16_t)(mask >> 16);
     for (int16_t d2 = 0xF; d2 >= 0; d2--) {
         if (!(bits & (1u << d2))) continue;
@@ -837,7 +837,7 @@ void PrintTeamRating(uint16_t x, uint16_t y)
 void PrintCardTeam(uint16_t y)
 {
     g.printy = y;
-    const struct RosterTeam *T = rosters_team(GetCardTeam()->team);
+    const struct RosterTeam *T = rosters_team(GetCardTeam()->tmteam);
     PrintCentered_p(roster_text(&T->city));
     g.printy++;
     PrintCentered_p(roster_text(&T->nickname));
@@ -855,7 +855,7 @@ void PrintCentered_p(struct Text s)
  * (a space for a leading 0). */
 void GetJerseyString(uint16_t player, uint32_t buf)
 {
-    uint8_t num = rosters_team(GetCardTeam()->team)->player[player].number;
+    uint8_t num = rosters_team(GetCardTeam()->tmteam)->player[player].number;
     uint8_t *b = ram_bytes(ram_at(buf), 4);
     wr16(b, 4);
     b[2] = (num >> 4) ? (uint8_t)((num >> 4) + '0') : ' ';
@@ -867,8 +867,8 @@ void GetJerseyString(uint16_t player, uint32_t buf)
 void PrintGoalsAssists(uint16_t player, uint16_t x, uint16_t y)
 {
     struct Team *tm = GetCardTeam();
-    uint16_t goals = (uint16_t)(int16_t)(int8_t)tm->pgoals[(int16_t)player];
-    uint16_t assists = (uint16_t)(int16_t)(int8_t)tm->passists[(int16_t)player];
+    uint16_t goals = (uint16_t)(int16_t)(int8_t)tm->tmgoals[(int16_t)player];
+    uint16_t assists = (uint16_t)(int16_t)(int8_t)tm->tmassists[(int16_t)player];
     g.printx = x;
     g.printy = y;
     printsmallz(str_PrintGoalsAssists_1, sizeof str_PrintGoalsAssists_1);
@@ -886,8 +886,8 @@ void PrintGoalsAssists(uint16_t player, uint16_t x, uint16_t y)
 void PrintSaves(uint16_t player, uint16_t x, uint16_t y)
 {
     struct Team *tm = GetCardTeam();
-    int16_t against = (int8_t)tm->pgoals[(int16_t)player];
-    int16_t shots = (int8_t)tm->pshots[(int16_t)player];
+    int16_t against = (int8_t)tm->tmgoals[(int16_t)player];
+    int16_t shots = (int8_t)tm->tmpshots[(int16_t)player];
     uint16_t saves = (uint16_t)(shots - against);
     g.printx = x;
     g.printy = y;
@@ -969,7 +969,7 @@ void BuildCardPlayerLists(void)
  * line at +6) in roster order, then the others from a1 + 6. */
 void BuildCardPlayerList(struct Team *tm, uint8_t *list)
 {
-    const uint8_t *line = rosters_team(tm->team)->lines[0];
+    const uint8_t *line = rosters_team(tm->tmteam)->lines[0];
     uint8_t *rest = list + 6;
     for (uint16_t p = 0; p < SYM_RosterSlots; p++) {
         int starter = 0;

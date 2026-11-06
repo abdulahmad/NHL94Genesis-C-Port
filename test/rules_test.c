@@ -20,20 +20,20 @@ static void periods(void)
 {
     static const uint16_t classic[4] = { 300, 600, 1200, 30 }, more[8] = { 300, 420, 600, 900, 1200, 120, 180, 30 };
     classic_rules();
-    for (int i = 0; i < 4; i++) { g.OptPerlen = (uint16_t)i; CHECK(GetPeriodTime() == classic[i]); }
+    for (int i = 0; i < 4; i++) { g.Optperlen = (uint16_t)i; CHECK(GetPeriodTime() == classic[i]); }
     rules[RULE_PERIOD_LENGTHS] = 1;
-    for (int i = 0; i < 8; i++) { g.OptPerlen = (uint16_t)i; CHECK(GetPeriodTime() == more[i]); }
+    for (int i = 0; i < 8; i++) { g.Optperlen = (uint16_t)i; CHECK(GetPeriodTime() == more[i]); }
     g.OptPlayMode = 0;
     g.FourWayPlay = 0;
     rules[RULE_PERIOD_LENGTHS] = 0;                       /* the original: three, round from 20 to 5 */
-    g.OptPerlen = 2; ChangeOption(8, 1); CHECK(g.OptPerlen == 0);
-    g.OptPerlen = 0; ChangeOption(8, -1); CHECK(g.OptPerlen == 2);
-    g.OptPerlen = 6; ChangeOption(8, 0); CHECK(g.OptPerlen == 0);   /* (one the rules allowed, back in range) */
+    g.Optperlen = 2; ChangeOption(8, 1); CHECK(g.Optperlen == 0);
+    g.Optperlen = 0; ChangeOption(8, -1); CHECK(g.Optperlen == 2);
+    g.Optperlen = 6; ChangeOption(8, 0); CHECK(g.Optperlen == 0);   /* (one the rules allowed, back in range) */
     rules[RULE_PERIOD_LENGTHS] = 1;                       /* more: seven, up from 5 and round from 20 to 2 */
-    g.OptPerlen = 0; ChangeOption(8, 1); CHECK(g.OptPerlen == 1 && GetPeriodTime() == 420);
-    g.OptPerlen = 4; ChangeOption(8, 1); CHECK(g.OptPerlen == 5 && GetPeriodTime() == 120);
-    g.OptPerlen = 6; ChangeOption(8, 1); CHECK(g.OptPerlen == 0 && GetPeriodTime() == 300);
-    g.OptPerlen = 0; ChangeOption(8, -1); CHECK(g.OptPerlen == 6 && GetPeriodTime() == 180);
+    g.Optperlen = 0; ChangeOption(8, 1); CHECK(g.Optperlen == 1 && GetPeriodTime() == 420);
+    g.Optperlen = 4; ChangeOption(8, 1); CHECK(g.Optperlen == 5 && GetPeriodTime() == 120);
+    g.Optperlen = 6; ChangeOption(8, 1); CHECK(g.Optperlen == 0 && GetPeriodTime() == 300);
+    g.Optperlen = 0; ChangeOption(8, -1); CHECK(g.Optperlen == 6 && GetPeriodTime() == 180);
     classic_rules();
 }
 
@@ -42,7 +42,7 @@ static void periods(void)
 static void overtime(void)
 {
     static const uint8_t minutes[5] = { 10, 5, 3, 7, 1 };
-    g.OptPerlen = 0;
+    g.Optperlen = 0;
     for (int v = 0; v < 5; v++) {
         rules[RULE_OVERTIME] = minutes[v];
         g.gsp = 3; g.OptPlayMode = 0;
@@ -104,14 +104,14 @@ static void assists(void)
         rules[RULE_ASSIST_FIX] = (uint8_t)fix;
         memset(&g, 0, sizeof g);
         struct Team *tm = team_struct(0);
-        tm->lasttouch = 0xFF00;
-        tm->assist1 = 0xFF00;
-        tm->assist2 = 0xFF00;
+        tm->tmtouch1 = 0xFF00;
+        tm->tmtouch2 = 0xFF00;
+        tm->tmtouch3 = 0xFF00;
         touch(pl, 5, puck);                               /* Z */
         touch(pl, 6, puck);                               /* B */
         touch(pl, 7, puck);                               /* A */
         touch(pl, 6, puck);                               /* B again */
-        uint16_t last = tm->lasttouch, a1 = tm->assist1, a2 = tm->assist2;
+        uint16_t last = tm->tmtouch1, a1 = tm->tmtouch2, a2 = tm->tmtouch3;
         printf("  assists %s: last %04X, assists %04X %04X\n", fix ? "with the rule" : "classic", last, a1, a2);
         CHECK(last == 6 && a1 == 7);
         if (fix) CHECK(a2 == 5);                          /* Z keeps his */
@@ -156,7 +156,7 @@ static void stats_list(void)
     memset(&g, 0, sizeof g);
     rules_clear_stats();
     struct Team *tm = team_struct(0);
-    tm->data = rd32(rom_ptr(SYM_TeamList));       /* Anaheim's players */
+    tm->tmdata = rd32(rom_ptr(SYM_TeamList));       /* Anaheim's players */
     uint16_t players = GetPlayerCount(tm), goalies = GetGoalieCount(tm);
     rules[RULE_MORE_STATS] = 1;
     for (uint16_t p = goalies; p < players; p++) rule_plusminus[0][p] = (int8_t)((int)p % 7 - 3);   /* -3 ... 3 */
@@ -189,7 +189,7 @@ static struct SortObj *skater(void)
     o->legspd = 20;
     o->endurance = 6;
     o->facedir = 2;                                       /* (right) */
-    team_struct(0)->pde[6 / 2] = 0x1000;             /* full energy */
+    team_struct(0)->tmpde[6 / 2] = 0x1000;             /* full energy */
     return o;
 }
 
@@ -239,12 +239,12 @@ static void play_rules(void)
         rules[RULE_BENCH_REST] = r ? 150 : 100;
         rules[RULE_BOX_REST] = (uint8_t)r;
         struct Team *tm = team_struct(0);
-        tm->pdst[0 / 2] = 0xFFFE;                    /* on the bench */
-        tm->pdst[2 / 2] = 120;                       /* in the box, two minutes */
-        tm->pdst[4 / 2] = 0xFFFF;                    /* on the ice */
-        for (int k = 0; k < 3; k++) tm->pde[k] = 0x800;
+        tm->tmpdst[0 / 2] = 0xFFFE;                    /* on the bench */
+        tm->tmpdst[2 / 2] = 120;                       /* in the box, two minutes */
+        tm->tmpdst[4 / 2] = 0xFFFF;                    /* on the ice */
+        for (int k = 0; k < 3; k++) tm->tmpde[k] = 0x800;
         RestoreBenchEnergy();
-        uint16_t bench = tm->pde[0], box = tm->pde[2 / 2], ice = tm->pde[4 / 2];
+        uint16_t bench = tm->tmpde[0], box = tm->tmpde[2 / 2], ice = tm->tmpde[4 / 2];
         CHECK(bench == 0x800 + (r ? 13 : 9) && box == (r ? 0x800 + 13 : 0x800) && ice == 0x800);
     }
     classic_rules();
@@ -254,7 +254,7 @@ static void play_rules(void)
     for (int r = 0; r < 3; r++) {
         rules[RULE_STREAKS] = (uint8_t)(100 - 50 * r);
         struct SortObj *o = skater();
-        team_struct(0)->hotcold[o->pnum][0] = 12;
+        team_struct(0)->tmHotCold[o->pnum][0] = 12;
         CHECK(AttributeCalc(4, o) == want[r]);
     }
     classic_rules();
@@ -299,9 +299,9 @@ static void overall_ratings(void)
     for (int t = 0; t < (int)SYM_NumTeams; t++) {
         memset(&g, 0, sizeof g);
         struct Team *tm = team_struct(0);
-        memset(tm->hotcold, 0, sizeof tm->hotcold);               /* (no streaks) */
-        tm->team = (uint16_t)t;                           /* (as InitTeamStructure makes it) */
-        tm->data = rosters_team((uint16_t)t)->data;
+        memset(tm->tmHotCold, 0, sizeof tm->tmHotCold);               /* (no streaks) */
+        tm->tmteam = (uint16_t)t;                           /* (as InitTeamStructure makes it) */
+        tm->tmdata = rosters_team((uint16_t)t)->data;
         uint16_t count = GetPlayerCount(tm), goalies = GetGoalieCount(tm);
         for (uint16_t p = 0; p < count; p++) {
             const struct RosterPlayer *P = &rosters_team((uint16_t)t)->player[p];   /* his number, then his 14 ratings */
@@ -327,8 +327,8 @@ static void column_ratings(void)
     for (int t = 0; t < (int)SYM_NumTeams; t++) {
         memset(&g, 0, sizeof g);
         struct Team *tm = team_struct(0);                 /* (no streaks) */
-        tm->team = (uint16_t)t;
-        tm->data = rosters_team((uint16_t)t)->data;
+        tm->tmteam = (uint16_t)t;
+        tm->tmdata = rosters_team((uint16_t)t)->data;
         uint16_t count = GetPlayerCount(tm), goalies = GetGoalieCount(tm);
         for (uint16_t p = 0; p < count; p++) {
             const struct RosterPlayer *P = &rosters_team((uint16_t)t)->player[p];

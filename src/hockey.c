@@ -13,8 +13,8 @@
 
 #define PFLAG(o, b) ((o)->pflags & (1 << (b)))
 
-/* hockey94.asm:VBjsr. The vblank interrupt: jump to the handler in vbint. */
-void VBjsr(void) { call68k(g.vbint); }
+/* hockey94.asm:VBjsr. The vblank interrupt: jump to the handler in VBint. */
+void VBjsr(void) { call68k(g.VBint); }
 
 /* hockey94.asm:Begin. The cold start from Start: clear the game's RAM ($B000-$DEF3), note PAL,
  * start the sound, look for the 4 Way Play adaptor, the EA Sports screen, save RAM, the line
@@ -57,7 +57,7 @@ void StartGame(void)
     g.awaydirpresses = 0;
     uint16_t d0, d1, d2, d3;
     ReadJoy1(&d0, &d1, &d2, &d3);
-    if ((uint8_t)d3 == 0xE0) g.OptPerlen = rules[RULE_PERIOD_LENGTHS] ? 7 : 3;   /* (the secret 30 seconds) */
+    if ((uint8_t)d3 == 0xE0) g.Optperlen = rules[RULE_PERIOD_LENGTHS] ? 7 : 3;   /* (the secret 30 seconds) */
     g.gmode = 0;
     if (g.OptPen == 1) g.gmode |= 1 << gmoffs;
     if ((int16_t)g.OptPlayMode > 1) ClearShotData();
@@ -88,8 +88,8 @@ void restoreteams(void)
 {
     for (int t = 0; t < 2; t++) {
         struct Team *tm = team_struct(t);
-        tm->ap = 6;
-        for (int16_t d0 = 0x32; d0 >= 0; d0 -= 2) tm->pdst[d0 / 2] = 0xFFFE;
+        tm->tmap = 6;
+        for (int16_t d0 = 0x32; d0 >= 0; d0 -= 2) tm->tmpdst[d0 / 2] = 0xFFFE;
     }
 }
 
@@ -113,8 +113,8 @@ void ResetClock(void)
 static const uint16_t more_periodtimes[8] = { 5*60, 7*60, 10*60, 15*60, 20*60, 2*60, 3*60, 30 };
 uint16_t GetPeriodTime(void)
 {
-    if (rules[RULE_PERIOD_LENGTHS]) return more_periodtimes[g.OptPerlen & 7];
-    return periodtimes[g.OptPerlen];
+    if (rules[RULE_PERIOD_LENGTHS]) return more_periodtimes[g.Optperlen & 7];
+    return periodtimes[g.Optperlen];
 }
 
 /* StartPer after the stack reset */
@@ -140,7 +140,7 @@ static void start_period(void)
     g.sflags &= (uint16_t)~HI(sfwrap);                    /* reset the replay */
     g.lastsfx = 0xFFFF;
     g.recbpr = RAM_BASE;                                  /* the replay starts at M68K_RAM */
-    g.oldvcount = g.vcount;
+    g.OldVcount = g.Vcount;
     DoGameFrame();                                        /* two frames before the loop */
     g.palcount = 0xFFFF;
     DoGameFrame();
@@ -180,8 +180,8 @@ void Gameloop(void)
 void DoGameFrame(void)
 {
     int16_t d7;
-    while ((d7 = (int16_t)(g.vcount - g.oldvcount)) == 0) hal_wait_vblank();
-    g.oldvcount = g.vcount;
+    while ((d7 = (int16_t)(g.Vcount - g.OldVcount)) == 0) hal_wait_vblank();
+    g.OldVcount = g.Vcount;
     elapsed = d7;
     periodicevents();
     updateplayers();
@@ -234,12 +234,12 @@ void RestoreBenchEnergy(void)
     for (int t = 0; t < 2; t++) {
         struct Team *tm = team_struct(t);
         for (int16_t d0 = 0x32; d0 >= 0; d0 -= 2) {
-            uint16_t at = tm->pdst[d0 / 2];               /* (rules: the box rests too: penalty time, not injured) */
+            uint16_t at = tm->tmpdst[d0 / 2];               /* (rules: the box rests too: penalty time, not injured) */
             int box = rules[RULE_BOX_REST] && (int16_t)at >= 0 && !(at & 0x1000);
             if (at != 0xFFFE && !box) continue;
-            uint16_t e = (uint16_t)(tm->pde[d0 / 2] + rule_scale(RULE_BENCH_REST, 9));         /* (rules: bench rest) */
+            uint16_t e = (uint16_t)(tm->tmpde[d0 / 2] + rule_scale(RULE_BENCH_REST, 9));         /* (rules: bench rest) */
             if ((int16_t)e >= 0x1000) e = 0x1000;
-            tm->pde[d0 / 2] = e;
+            tm->tmpde[d0 / 2] = e;
         }
     }
 }
@@ -274,27 +274,27 @@ void UpdateCwdExcite(void)
  * animation frame is picked from it (cd0: frame / time pairs by level and step). */
 void updatecrowdf(void)
 {
-    if ((int16_t)g.crowdlevel >= 0x15E) g.crowdlevel -= 3;   /* a loud crowd calms down faster */
-    g.crowdlevel = (uint16_t)(g.crowdlevel - elapsed);
-    if ((int16_t)g.crowdlevel < 0) g.crowdlevel = 0;
-    g.crowdcnt = (uint16_t)(g.crowdcnt - elapsed);
-    if ((int16_t)g.crowdcnt < 0) {
-        uint16_t d0 = g.crowdlevel >> 1;
+    if ((int16_t)g.Crowdlevel >= 0x15E) g.Crowdlevel -= 3;   /* a loud crowd calms down faster */
+    g.Crowdlevel = (uint16_t)(g.Crowdlevel - elapsed);
+    if ((int16_t)g.Crowdlevel < 0) g.Crowdlevel = 0;
+    g.Crowdcnt = (uint16_t)(g.Crowdcnt - elapsed);
+    if ((int16_t)g.Crowdcnt < 0) {
+        uint16_t d0 = g.Crowdlevel >> 1;
         if (d0 > 0x7F) d0 = 0x7F;
         d0 &= 0x60;
-        g.crowdstep = (uint16_t)((g.crowdstep + 2) & 0x1E);
-        d0 += g.crowdstep;
+        g.Crowdstep = (uint16_t)((g.Crowdstep + 2) & 0x1E);
+        d0 += g.Crowdstep;
         const uint8_t *tab = rom_ptr(SYM_cd0) + d0;
-        g.crowdframe = (uint16_t)((g.crowdframe & 0xFF00) | tab[0]);
+        g.Crowdframe = (uint16_t)((g.Crowdframe & 0xFF00) | tab[0]);
         uint16_t d1 = tab[1];
         uint16_t d2 = (uint16_t)(vdp_hv16() & d1);        /* random 0..time */
-        g.crowdcnt = (uint16_t)(d1 + d2);
+        g.Crowdcnt = (uint16_t)(d1 + d2);
     }
-    g.crowdframe &= 0xFF;
-    if (g.crowdlevel <= 0x118) return;
+    g.Crowdframe &= 0xFF;
+    if (g.Crowdlevel <= 0x118) return;
     uint16_t d0 = (uint16_t)(vdp_hv16() & 0x7F);
     if ((int16_t)d0 < 0x13 || (int16_t)d0 > 0x19) return;
-    g.crowdframe = (uint16_t)((d0 << 8) | (g.crowdframe & 0xFF));   /* a random extra frame when loud */
+    g.Crowdframe = (uint16_t)((d0 << 8) | (g.Crowdframe & 0xFF));   /* a random extra frame when loud */
 }
 
 /* hockey94.asm:clockcont. Monitor the period clock: at zero stop everything and end the
@@ -330,16 +330,16 @@ void clockcont_0(void)
         if (g.bosgames == 7) cup = 1;
         else {                                            /* the Stanley Cup after 3 series wins */
             const struct Matchup *gs = &g.matchups[g.gamenum];
-            int bottom = (gs->flags & MU_FLIPPED) != 0;  /* (the home team the tree's bottom team) */
-            if ((int16_t)(g.teams[0].score - g.teams[1].score) < 0) bottom = !bottom;
-            if ((bottom ? gs->botwins : gs->topwins) == 3) cup = 1;
+            int bottom = (gs->gsflags & MU_FLIPPED) != 0;  /* (the home team the tree's bottom team) */
+            if ((int16_t)(g.teams[0].tmscore - g.teams[1].tmscore) < 0) bottom = !bottom;
+            if ((bottom ? gs->gspobwins : gs->gspotwins) == 3) cup = 1;
         }
     }
     if (cup) {
         d0 = 8;                                           /* stanley cup assignment */
         for (int i = 0; i < 12; i++) sortobj(i)->pflags &= (uint8_t)~(1 << pfjoycon);
     }
-    int16_t d1 = (int16_t)(g.teams[0].score - g.teams[1].score);
+    int16_t d1 = (int16_t)(g.teams[0].tmscore - g.teams[1].tmscore);
     if (d1 != 0) {
         if (d1 < 0) a3 = sortobj(6);                      /* the away team leads */
         for (int i = 0; i < 6; i++, a3++) {
@@ -355,7 +355,7 @@ void clockcont_0(void)
     }
 eog:
     ClearPenaltyBuffer();
-    g.crowdlevel += 0x3E8;
+    g.Crowdlevel += 0x3E8;
     g.gmode |= 1 << gmclock;
     g.gmode |= 0x40;
     ClearPenalties();
@@ -406,14 +406,14 @@ void startpause4(void) { g.pausepad = 4; g.sflags |= HI(sfpj); startpause(); }
 void Pausemode(void)
 {
     forceblack();
-    uint16_t v = g.vcount;
-    while (g.vcount == v) hal_wait_vblank();
+    uint16_t v = g.Vcount;
+    while (g.Vcount == v) hal_wait_vblank();
     p_turnoff();
     uint16_t saved = g.sflags;
     struct Team *tm = seta2();
     uint32_t items = SYM_PauseText;
     if (g.gmode2 & HI(0)) items = SYM_PauseMenuItems;
-    else if (tm->flags & 4) items = SYM_PauseText2;
+    else if (tm->tmflags & 4) items = SYM_PauseText2;
     Pausemode_top(items, SYM_Pausemode_pall);
     for (;;) {
         MenuWaitVblank();
@@ -441,7 +441,7 @@ void Pausemode(void)
     setvideo();
     g.palcount = 0x18;
     while ((int16_t)g.palcount >= 0) hal_wait_vblank();
-    g.oldvcount = g.vcount;
+    g.OldVcount = g.Vcount;
 }
 
 /* hockey94.asm:Pausemode_pall. The draw routine of the pause menu: the window plane over

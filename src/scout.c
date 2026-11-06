@@ -37,7 +37,7 @@ void ScoutingReport(void)
     BuildHotColdLists();
     g.advframe = 0;
     song(SYM_SngScout);
-    g.vbint = SYM_vb2;
+    g.VBint = SYM_vb2;
     clearTeamStats();
     Create_HotCold_Table(team_struct(0));
     Create_HotCold_Table(team_struct(1));
@@ -51,7 +51,7 @@ void ScoutingReport(void)
     c += 0x24;
     g.vispicchars = c;
     c += 0x24;
-    g.BigFontChars = c;
+    g.BigFontchars = c;
     c = DecompressGraphicsWithRemap(ART(BigFontMap) + 8, c, rom_find(SYM_ScoutingReport, SYM_PageMatchup, bigfont, 8));
     c = AddSmallFont(c);
     g.smallfont2chars = c;
@@ -85,7 +85,7 @@ void ScoutingReport(void)
     DrawMatchupPictures();
     PrintMatchupRatings();
     g.palcount = 0x18;
-    g.vbint = SYM_vb2;
+    g.VBint = SYM_vb2;
     cpu_set_sr(0x2500);
     InitScoutingDisplay();                                /* the paragraphs of ScoutTextScript, to TestList */
     int k = 0;
@@ -321,7 +321,7 @@ void GetMatchupPlayers(void)
  * of the first of its line sets. */
 uint16_t GetMatchupPlayer(struct Team *tm)
 {
-    const uint8_t *lines = rosters_team(tm->team)->lines[0];
+    const uint8_t *lines = rosters_team(tm->tmteam)->lines[0];
     int16_t slot = (int8_t)rom_ptr(SYM_MatchupLineSlots)[g.matchup];
     g.matchupslot = (uint16_t)slot;
     return (uint16_t)((int8_t)lines[slot] - 1);
@@ -358,10 +358,10 @@ void PrintAdvantageMarks(void)
  * team's nickname, or 'Home' / 'Visitors' when it has none (the all-star teams). */
 struct Text GetTeamNickname(struct Team *tm)
 {
-    struct Text a1 = roster_text(&rosters_team(tm->team)->nickname);
+    struct Text a1 = roster_text(&rosters_team(tm->tmteam)->nickname);
     if (text_len(a1) == 2) a1 = (struct Text){ NULL, tm == team_struct(0) ? SYM_HomeTxt : SYM_VisitorsTxt };
     return a1;
 }
 
 /* scout94.asm:GetTeamArena. The text player's '^' and ';' -> a1 = the team's arena. */
-struct Text GetTeamArena(struct Team *tm) { return roster_text(&rosters_team(tm->team)->arena); }
+struct Text GetTeamArena(struct Team *tm) { return roster_text(&rosters_team(tm->tmteam)->arena); }

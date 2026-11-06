@@ -110,9 +110,9 @@ static void goalie_timer_reload(struct SortObj *o)
 static void breakaway_crowd(struct SortObj *o)
 {
     struct Team *tm = own_team(o);
-    tm->breakaways++;
+    tm->tmBreakaways++;
     g.CwdExciteLvl += 0x14;
-    g.crowdlevel += 0xC8;
+    g.Crowdlevel += 0xC8;
 }
 /* a random point inside skating zone z of a zone table: {x base, x range, y base, y range} */
 static void zone_target(const uint16_t *zones, unsigned z, struct SortObj *o)
@@ -144,14 +144,14 @@ static void reset_ice_objects(void)
 /* the body of ChkGoalies for one team: d0 = team number, a2 = the team, a1 = the other */
 static void chkgoalie(uint16_t d0, struct Team *a2, struct Team *a1)
 {
-    if ((int16_t)a2->goalie < 0) return;                  /* no goalie */
+    if ((int16_t)a2->tmgoalie < 0) return;                  /* no goalie */
     int16_t d1 = puckc();
     if (d1 < 0) return;
     d1 = (int16_t)(d1 - 6);
     if (a2 != team_struct(0)) d1 = (int16_t)~d1;
     if (d1 >= 0) return;                                  /* the other team has the puck */
     if (g.gmode & (1 << gmpendel)) {
-        ST_W(a2->goalie);                                 /* pull him on the delayed penalty */
+        ST_W(a2->tmgoalie);                                 /* pull him on the delayed penalty */
         setpersonel(a2);
         return;
     }
@@ -161,8 +161,8 @@ static void chkgoalie(uint16_t d0, struct Team *a2, struct Team *a1)
 
 static void returngoalie(uint16_t d0, struct Team *a2, struct Team *a1)
 {
-    if (a2->goalie == 0xFFFF) return;                     /* still no goalie */
-    a2->goalie &= 0xFF;                                   /* the goalie returns */
+    if (a2->tmgoalie == 0xFFFF) return;                     /* still no goalie */
+    a2->tmgoalie &= 0xFF;                                   /* the goalie returns */
     if (d0 == g.cont1team || d0 == g.cont2team) return;
     CPgoalie((int16_t)g.foy, a1, a2);
 }
@@ -296,7 +296,7 @@ void updateplayers(void)
             o->nopuck[1] = tick_byte(o->nopuck[1]);
             if ((g.sflags3 & 0x40) && !(o->pnum & 0x80)) {       /* the penalty timer is up: time on ice */
                 struct Team *tm = loadTeamStruct(o, NULL);
-                tm->ptoi[o->pnum]++;
+                tm->tmpice[o->pnum]++;
             }
             if (o->SPA != SYM_SPAinjuryfall && o->SPA != SYM_SPAinjury1) {
                 uint16_t d4 = (uint16_t)((g.PalMode ? 0x16 : 0x11) * (uint16_t)elapsed);
@@ -547,8 +547,8 @@ void doinput(uint16_t d0, uint16_t d1, uint16_t d2, uint16_t d3, int16_t d4, str
     if (g.sflags2 & HI(sf2faceoff)) { faceoffinput(d0, d1, o); return; }
     if (o->pflags2 & 8) { lineinput(d0, d1, d2, o); return; }
     if (!PFLAG(o, pfjoycon)) return;
-    if ((uint16_t)o->SCnum == g.lastplayer && (int16_t)g.passplayer >= 0 && (int16_t)g.onetimerplayer < 0 && (d1 & BUT_C)) {
-        struct SortObj *rcv = sortobj((int16_t)g.passplayer);   /* C after a pass: the receiver one-times it */
+    if ((uint16_t)o->SCnum == g.lastplayer && (int16_t)g.passReceiverPlayerNum >= 0 && (int16_t)g.onetimerplayer < 0 && (d1 & BUT_C)) {
+        struct SortObj *rcv = sortobj((int16_t)g.passReceiverPlayerNum);   /* C after a pass: the receiver one-times it */
         if (rcv->position != 0 && !PuckOnAttackHalf(rcv) && !PFLAG(rcv, pfjoycon) && !(rcv->pflags3 & (1 << pf3onetimer))) {
             g.inputjoy = (uint16_t)d4;
             g.TmpJoyPuckCarrier = g.joypuckcarrier;
@@ -612,7 +612,7 @@ noswitch:
     SetSPA(o, SPAgdive);
     o->pflags2 |= 2;
     o->pflags |= 1 << pfalock;
-    g.crowdlevel += 0x96;
+    g.Crowdlevel += 0x96;
 }
 
 /* logic94.asm:doinput_cbut. C button (bit 5) for the goalie: a press reads the shot and
@@ -685,7 +685,7 @@ void doinput_onetimer(uint16_t d1, int16_t d4, struct SortObj *o)
     if (o->pflags3 & (1 << pf3onetimer)) return;
     if (!(d1 & BUT_C)) { doplayeracc(d0, o); return; }
     if (sortobj((int16_t)g.lastplayer)->position == 0) { burst(o); return; }
-    if ((uint16_t)o->SCnum != g.passplayer) { burst(o); return; }
+    if ((uint16_t)o->SCnum != g.passReceiverPlayerNum) { burst(o); return; }
     if (puckc() >= 0) { burst(o); return; }
     if (PuckOnAttackHalf(o)) { burst(o); return; }
     g.inputjoy = (uint16_t)d4;
@@ -768,8 +768,8 @@ void SetLCmode(struct SortObj *o)
     if (g.OptLine != 0) return;
     if (g.sflags7 & 0x10) return;
     struct Team *tm = loadTeamStruct(o, NULL);
-    int was = tm->flags & 2;
-    tm->flags |= 2;
+    int was = tm->tmflags & 2;
+    tm->tmflags |= 2;
     if (was) return;
     if (!(g.sflags5 & 8)) g.sflags &= (uint16_t)~HI(sfspdir);
     g.sflags &= (uint16_t)~HI(sfssdir);
@@ -796,9 +796,9 @@ void SetLCmode2(struct Team *tm)
     for (int16_t d4 = 2; d4 >= 0; d4--) {
         int16_t line = getlchoice(d4, tm);
         if (line < 0) continue;
-        if (!(tm->flags & 2)) {
-            if ((uint16_t)d4 != tm->lchoice) { g.printy -= 1; continue; }
-            line = (int16_t)tm->line;
+        if (!(tm->tmflags & 2)) {
+            if ((uint16_t)d4 != tm->tmlcchoice) { g.printy -= 1; continue; }
+            line = (int16_t)tm->tmline;
         }
         uint8_t *mes = g.mesarea;                             /* "A " .. "C " */
         wr32(mes, 0x00044120);
@@ -810,7 +810,7 @@ void SetLCmode2(struct Team *tm)
         g.printy -= 1;
     }
     g.printx += 2;
-    print_p(roster_text(&rosters_team(tm->team)->abbr));                /* the team's abbreviation */
+    print_p(roster_text(&rosters_team(tm->tmteam)->abbr));                /* the team's abbreviation */
 }
 
 /* logic94.asm:setlccords. Set printx / printy to the coordinates of the line change box of
@@ -834,7 +834,7 @@ void setlccords(struct Team *tm, uint16_t *d0, uint16_t *d1)
  * the current line and the power play situation; -1 = no such choice. */
 int16_t getlchoice(int16_t choice, struct Team *tm)
 {
-    int16_t d2 = (int16_t)team_struct(tm == team_struct(0))->ap;                 /* the other team's skaters */
+    int16_t d2 = (int16_t)team_struct(tm == team_struct(0))->tmap;                 /* the other team's skaters */
     return getlchoice2(choice, d2, tm);
 }
 
@@ -842,12 +842,12 @@ int16_t getlchoice(int16_t choice, struct Team *tm)
  * has on the ice, 3 x the current line, then look it up. */
 int16_t getlchoice2(int16_t d0, int16_t d2, struct Team *tm)
 {
-    d2 = (int16_t)(d2 - (int16_t)tm->ap);
+    d2 = (int16_t)(d2 - (int16_t)tm->tmap);
     if (d2 != 0) {
         d0 = (int16_t)(d0 + 0x15);
         if (d2 >= 0) d0 = (int16_t)(d0 + 0x15);
     }
-    int16_t d1 = (int16_t)tm->line;
+    int16_t d1 = (int16_t)tm->tmline;
     d0 = (int16_t)(d0 + d1 + d1 + d1);
     return (int8_t)lchoice_tab[d0];
 }
@@ -858,8 +858,8 @@ void lineinput(uint16_t d0, uint16_t d1, uint16_t d2, struct SortObj *o)
 {
     if (g.sflags5 & 8) passmode(d0, d2, o);
     struct Team *tm = team_struct(PFLAG(o, pfteam));
-    if (tm->flags & 1) {
-        tm->flags &= (uint8_t)~1;
+    if (tm->tmflags & 1) {
+        tm->tmflags &= (uint8_t)~1;
         lcfound_close(tm);
         SetLCmode2(tm);
     }
@@ -874,14 +874,14 @@ void lineinput(uint16_t d0, uint16_t d1, uint16_t d2, struct SortObj *o)
 /* logic94.asm:lcfound. d2 = choice made 0-2: set the team's line and close the box. */
 void lcfound(uint16_t choice, struct Team *tm, struct SortObj *o)
 {
-    tm->lchoice = choice;
+    tm->tmlcchoice = choice;
     int16_t line = getlchoice((int16_t)choice, tm);
     if (line < 0) return;
     o->pflags2 &= (uint8_t)~8;
     o->pflags |= 1 << pfjoycon;
     tm = loadTeamStruct(o, NULL);
-    tm->flags &= (uint8_t)~2;
-    tm->line = (uint16_t)line;
+    tm->tmflags &= (uint8_t)~2;
+    tm->tmline = (uint16_t)line;
     setpersonel(tm);
     lcfound_close(tm);
 }
@@ -1061,8 +1061,8 @@ void passto(struct SortObj *rcv, struct SortObj *o)
 void passtoa0(struct SortObj *rcv, struct SortObj *o)
 {
     struct Team *tm = loadTeamStruct(o, NULL);
-    tm->passes++;                                                /* pass attempts */
-    g.passplayer = (uint16_t)rcv->SCnum;
+    tm->tmpasses++;                                                /* pass attempts */
+    g.passReceiverPlayerNum = (uint16_t)rcv->SCnum;
     int16_t d5 = (int16_t)((int16_t)g.passspeed >> 2);
     assinsert(0x13, rcv);                                 /* apassrec */
     int16_t hx, hy;
@@ -1411,7 +1411,7 @@ void assbench(struct Team *tm, struct SortObj *o)
     if (o->temp1 == 0x64) {                               /* through the gate */
         o->frame = 0;
         struct Team *a0 = own_team(o);
-        a0->pdst[(int8_t)o->pnum] = 0xFFFE;               /* he is on the bench */
+        a0->tmpdst[(int8_t)o->pnum] = 0xFFFE;               /* he is on the bench */
         uint8_t d3 = o->newpnum;
         take_new_position(o);
         setplayer(d3, o);
@@ -1697,7 +1697,7 @@ void assdefo(struct Team *tm, struct SortObj *o)
         SET_HIB(o->temp1, o->aioff);
         if ((ReadGoaliePulled(o) & CCR_N) || ((g.sflags7 & 0x40) && HIB(o->temp1) != 0))
             SET_HIB(o->temp1, HIB(o->temp1) - 1);
-        if (tm->flags & 0x10) { assreplace(2, o); return; }         /* assdefd */
+        if (tm->tmflags & 0x10) { assreplace(2, o); return; }         /* assdefd */
         int16_t d1 = pucky();
         if (!PFLAG(o, pfgoal)) d1 = (int16_t)-d1;
         if (d1 < 0x5D) { assreplace(2, o); return; }      /* puck out of the attack zone */
@@ -1723,7 +1723,7 @@ void assdefd(struct Team *tm, struct SortObj *o)
         if (!PFLAG(o, pfgoal)) { d1 = (int16_t)-d1; d3 = (int16_t)-d3; }
         if (d3 < 0) d3 = 0;
         d3 = (int16_t)(d3 + d1);
-        if (d3 >= 0x58 && !(tm->flags & 0x10)) {
+        if (d3 >= 0x58 && !(tm->tmflags & 0x10)) {
             d1 = puckc();
             if (d1 >= 0 && !chkpk(o) && !carrier_is_opponent(d1, o)) {
                 assreplace(1, o);                         /* assdefo */
@@ -1784,7 +1784,7 @@ void asswingd(struct Team *tm, struct SortObj *o)
         d0 = (int16_t)-d0;
         d1 = (int16_t)-d1;
         d2 = -0x4E;
-        if (tm->flags & 0x10) d1 = d2;
+        if (tm->tmflags & 0x10) d1 = d2;
         else if (d2 > pucky()) {                          /* puck in the defensive zone */
             d2 = -0x108;
             if (!(d2 < pucky())) d1 = d2;                 /* behind the goal line */
@@ -1792,7 +1792,7 @@ void asswingd(struct Team *tm, struct SortObj *o)
             d1 = pucky();
     } else {
         d2 = 0x4E;
-        if (tm->flags & 0x10) d1 = d2;
+        if (tm->tmflags & 0x10) d1 = d2;
         else if (d2 < pucky()) {
             d2 = 0x108;
             if (!(d2 > pucky())) d1 = d2;
@@ -1829,7 +1829,7 @@ void asswingo(struct Team *tm, struct SortObj *o)
         int16_t zone = 0;                                 /* byte offset into the zone table */
         if (d3 >= -0x58) {
             zone = 8;
-            if (d0 >= 0x58 && !(tm->flags & 0x10)) {
+            if (d0 >= 0x58 && !(tm->tmflags & 0x10)) {
                 zone = 0x10;
                 if (d3 >= 0x108) zone = 0x18;
             }
@@ -1900,7 +1900,7 @@ void asscentero(struct Team *tm, struct SortObj *o)
         int16_t zone = 0;
         if (d0 >= -0x58) {
             zone = 8;
-            if (d0 >= 0x58 && !(tm->flags & 0x10)) {
+            if (d0 >= 0x58 && !(tm->tmflags & 0x10)) {
                 zone = 0x10;
                 if (d0 >= 0x108) zone = 0x18;
             }
@@ -2070,7 +2070,7 @@ void checkanim(struct Team *tm, struct SortObj *o)
     o->nopuck[0] = 8;
     SetSPA(o, SPAgdive);
     o->pflags2 |= 2;
-    g.crowdlevel += 0x96;
+    g.Crowdlevel += 0x96;
     return;
 de1:
     pc = &g.puckcross[0];                                 /* x / frames to the goal line, top then bottom */
@@ -2126,8 +2126,8 @@ de1:
         {
             struct Team *a1 = team_struct(0), *a2 = team_struct(1);
             if (PFLAG(o, pfteam)) { struct Team *t = a1; a1 = a2; a2 = t; }
-            if ((int32_t)a1->neardist < 0x1324) goto de5;
-            if ((int32_t)a2->neardist < 0x9C4) goto de5;
+            if ((int32_t)a1->tmnear < 0x1324) goto de5;
+            if ((int32_t)a2->tmnear < 0x9C4) goto de5;
         }
         if (pucky() <= 0xE0 && pucky() > -0xE0) goto de5;
         {
@@ -2234,7 +2234,7 @@ void goaliesave(const struct PuckCross *pcross, int16_t goalline, struct SortObj
     if (d1 == SPAgglovel && (d3 & 3) != 0 && (int8_t)gk->aggress >= 0xB)
         d1 = SPAgglovel2;                                 /* reach out glove save */
     SetSPA(gk, (uint16_t)d1);
-    g.crowdlevel += 0x96;
+    g.Crowdlevel += 0x96;
     g.CwdExciteLvl += 0xA;
     gk->Xvel = (int16_t)(gk->Xvel >> 2);
     gk->Yvel = (int16_t)(gk->Yvel >> 2);
@@ -2259,8 +2259,8 @@ void assgoalietopuck(struct Team *tm, struct SortObj *o)
         if (n) { assexit(o); return; }
         struct Team *a1 = team_struct(0), *a2 = team_struct(1);
         if (PFLAG(o, pfteam)) { struct Team *t = a1; a1 = a2; a2 = t; }
-        if ((int32_t)a1->neardist < 0xE10) { assexit(o); return; }
-        if ((int32_t)a2->neardist < 0x640) { assexit(o); return; }
+        if ((int32_t)a1->tmnear < 0xE10) { assexit(o); return; }
+        if ((int32_t)a2->tmnear < 0x640) { assexit(o); return; }
     }
     skatetopuck(o);
 }
@@ -2364,7 +2364,7 @@ void asspuckc(struct Team *tm, struct SortObj *o)
         int shot = 1;
         if (!(o->pflags3 & (1 << pf3break))) {
             uint16_t d0 = PFLAG(o, pfteam) ? 2 : 1;
-            if (d0 != g.cont1team && d0 != g.cont2team && (g.vcount & 2))
+            if (d0 != g.cont1team && d0 != g.cont2team && (g.Vcount & 2))
                 shot = 0;
         }
         if (shot && chk4shot(o)) return;
@@ -2635,7 +2635,7 @@ void assnearest(struct Team *tm, struct SortObj *o)
                 if ((uint8_t)d1 == 0) SET_HIB(o->temp1, 1);
             }
         }
-    tm->neardist = 0;
+    tm->tmnear = 0;
     struct SortObj *a1 = NULL;
     d2 = (int32_t)assign_d2;                              /* (the caller's d2, as the 68k leaves it below) */
     d1 = puckc();
@@ -2643,7 +2643,7 @@ void assnearest(struct Team *tm, struct SortObj *o)
         a1 = sortobj(d1);                                 /* our carrier is the nearest */
     else {
         d2 = -1;
-        struct SortObj *a0 = sortobj_at(tm->sort);
+        struct SortObj *a0 = sortobj_at(tm->tmsort);
         for (int i = 0; i < 6; i++, a0++) {
             if (a0->position <= 0) continue;
             if (a0->nopuck[0] != 0) continue;
@@ -2661,7 +2661,7 @@ void assnearest(struct Team *tm, struct SortObj *o)
             a1 = a0;
         }
         if (d2 < 0) goto de1;                             /* nobody can take it */
-        tm->neardist = (uint32_t)d2;
+        tm->tmnear = (uint32_t)d2;
     }
     if (a1 != o && !(g.gmode & (1 << gmclock)) && !(a1->pflags2 & 4) && !(a1->pflags3 & (1 << pf3onetimer))) {
         a1->pflags &= (uint8_t)~(1 << pfdoff);
@@ -2693,7 +2693,7 @@ de1:
         if (g.gmode & (1 << gmclock)) { donothing(o); return; }
     }
     if (PFLAG(o, pfjoycon)) return;
-    if (!(tm->flags & 4)) {
+    if (!(tm->tmflags & 4)) {
         if (puckc() < 0) goto topuck;
         o->temp3 = (int16_t)(o->temp3 - elapsed);
         if (o->temp3 >= 0) goto topuck;
@@ -2708,7 +2708,7 @@ de1:
         d0 = (int16_t)((d0 >> 1) + fx);
         d1 = (int16_t)((d1 >> 1) + fy);
     }
-    if (tm->flags & 4) {
+    if (tm->tmflags & 4) {
         if (PFLAG(o, pfgoal)) { if (d1 >= 0x53) d1 = 0x44; }
         else if (d1 <= -0x53) d1 = -0x44;
     }
@@ -2846,7 +2846,7 @@ void puckshootout(struct Team *tm, struct SortObj *o)
         else {
             StartShootoutPath(o);
             struct Team *t = team_struct(g.BA_Team != 0);
-            t->psattempts++;
+            t->tmPenShots++;
         }
         g.BA_PS_flags &= (uint16_t)~(HI(2) | HI(4) | HI(5) | HI(6));
         g.sflags6 |= HI(1);
@@ -2904,7 +2904,7 @@ found:
 int SelectPenaltyShotSkater(void)
 {
     struct Team *a0 = team_struct(g.BA_Team != 0);
-    const struct RosterTeam *T = rosters_team(a0->team);
+    const struct RosterTeam *T = rosters_team(a0->tmteam);
     int16_t d6 = -1, d5 = -1;
     for (uint16_t d1 = 0; d1 < T->players; ) {
         const uint8_t *r = T->player[d1].rating;
@@ -2912,7 +2912,7 @@ int SelectPenaltyShotSkater(void)
         uint8_t d0 = r[LR_SHOT_ACCURACY];
         if ((int8_t)d0 > 1) {
             if (g.gmode2 & HI(0)) goto setskater;
-            uint16_t st = a0->pdst[d7 / 2];
+            uint16_t st = a0->tmpdst[d7 / 2];
             if (st == 0xFFFE || st == 0xFFFF) {           /* bench or ice */
                 int16_t d3 = (int16_t)(r[LR_AGILITY] + r[LR_OFF_AWARENESS] + r[LR_SPEED] + r[LR_SHOT_POWER] + r[LR_DEF_AWARENESS]
                                        + r[LR_SHOT_ACCURACY] + r[LR_STICK_HANDLING] + r[LR_ENDURANCE] + r[LR_PASS_ACCURACY]);
@@ -2944,8 +2944,8 @@ void puckpenshot(struct Team *tm, struct SortObj *o)
     o->pflags &= (uint8_t)~(1 << pfna);
     forceblack();
     while (g.disflags & HI(dfok)) hal_wait_vblank();      /* wait for dfok clear */
-    if (g.crowdlevel > 0x258) {
-        g.crowdlevel = 0x258;
+    if (g.Crowdlevel > 0x258) {
+        g.Crowdlevel = 0x258;
         g.CwdExciteLvl += 0x14;
     }
     DecompressGraphicsPlain(ART(RefsMap) + 8, g.ExtraChars);
@@ -2956,7 +2956,7 @@ void puckpenshot(struct Team *tm, struct SortObj *o)
     g.iflags = 0;
     ST_W(g.RefCnt);
     g.sflags2 &= (uint16_t)~HI(sf2refref);
-    ST_W(g.passplayer);
+    ST_W(g.passReceiverPlayerNum);
     ClrHor();
     g.Vpos = 0;
     g.Hpos = 0;
@@ -3104,7 +3104,7 @@ void puckfaceoff(struct Team *tm, struct SortObj *o)
     g.gmode2 &= (uint16_t)~HI(1);
     if (g.gameclock == 0) { PeriodOver(); return; }
     if (g.gmode & 0x40) { PeriodOver(); return; }
-    if (g.gsp == 3 && g.teams[0].score != g.teams[1].score) { clockcont_0(); return; }   /* overtime goal */
+    if (g.gsp == 3 && g.teams[0].tmscore != g.teams[1].tmscore) { clockcont_0(); return; }   /* overtime goal */
     if (g.gmode & (1 << gmpendel)) { Stop4Pen(SYM_puckfaceoff, o); return; }            /* a0 = this routine */
     {
         uint16_t half = (uint16_t)((int16_t)g.PerTimeTotal >> 1);
@@ -3122,8 +3122,8 @@ void puckfaceoff(struct Team *tm, struct SortObj *o)
     ST_W(o->temp1);
     ST_W(o->temp2);
     if (g.OptLine != 0) { WaitForFaceoffLineChanges(o); return; }
-    team_struct(0)->flags &= (uint8_t)~2;
-    team_struct(1)->flags &= (uint8_t)~2;
+    team_struct(0)->tmflags &= (uint8_t)~2;
+    team_struct(1)->tmflags &= (uint8_t)~2;
     for (int i = 0; i < 12; i++) sortobj(i)->pflags2 &= (uint8_t)~8;
     if ((g.cont1team | g.cont2team) != 0 && (g.sflags & HI(sfhor))) {
         forceblack();
@@ -3229,14 +3229,14 @@ void ReturnGoalies(void)
 void CPgoalie(int16_t y, struct Team *a1, struct Team *a2)
 {
     if (g.gsp != 2) return;
-    int16_t d0 = (int16_t)(a1->score - a2->score);
+    int16_t d0 = (int16_t)(a1->tmscore - a2->tmscore);
     if (d0 < 0) return;
     if (d0 != 2) return;
     if ((int16_t)g.gameclock > 0x3C) return;
-    const struct SortObj *a0 = sortobj_at(a2->sort);
+    const struct SortObj *a0 = sortobj_at(a2->tmsort);
     if (!PFLAG(a0, pfgoal)) y = (int16_t)-y;
     if (y < 0) return;
-    ST_W(a2->goalie);
+    ST_W(a2->tmgoalie);
     setpersonel(a2);
 }
 
@@ -3245,38 +3245,38 @@ void CPgoalie(int16_t y, struct Team *a1, struct Team *a2)
  * opponent's. */
 void CompLine(struct Team *a2, struct Team *a1)
 {
-    int16_t d1 = (int16_t)(a2->ap - a1->ap);
+    int16_t d1 = (int16_t)(a2->tmap - a1->tmap);
     if (d1 != 0) {
         uint16_t d0 = 3;
         if (d1 < 0) d0 = 5;
         uint16_t e1 = getlinee(d0, a2);
         uint16_t e2 = getlinee((uint16_t)(d0 + 1), a2);
         if ((int16_t)e1 < (int16_t)e2) d0++;
-        a2->line = d0;
+        a2->tmline = d0;
         return;
     }
     if (a2 == team_struct(0)) {
         const uint16_t *tab = homelines;
         if (g.gsp == 2) {
-            int16_t d2 = (int16_t)a2->score;
-            if (d2 != (int16_t)a1->score) {
+            int16_t d2 = (int16_t)a2->tmscore;
+            if (d2 != (int16_t)a1->tmscore) {
                 tab += 7;
-                if (!(d2 > (int16_t)a1->score)) tab += 7;
+                if (!(d2 > (int16_t)a1->tmscore)) tab += 7;
             }
         }
-        uint16_t idx = a1->line;
+        uint16_t idx = a1->tmline;
         uint16_t d0 = tab[idx];
         if (getlinee(d0, a2) > 0xC00) {
-            a2->line = tab[idx];
+            a2->tmline = tab[idx];
             return;
         }
     }
     const uint16_t *tab = awaylines;
     if (g.gsp == 2) {
-        int16_t d2 = (int16_t)a2->score;
-        if (d2 != (int16_t)a1->score) {
+        int16_t d2 = (int16_t)a2->tmscore;
+        if (d2 != (int16_t)a1->tmscore) {
             tab += 3;
-            if (!(d2 > (int16_t)a1->score)) tab += 3;
+            if (!(d2 > (int16_t)a1->tmscore)) tab += 3;
         }
     }
     int16_t d1c = 2;
@@ -3285,7 +3285,7 @@ void CompLine(struct Team *a2, struct Team *a1)
         if (getlinee(d0, a2) > 0xC00) break;
         if (--d1c == -1) break;
     }
-    a2->line = *--tab;
+    a2->tmline = *--tab;
 }
 
 /* logic94.asm:puckfaceoff2. Face off control logic and general setup for action: on a new
@@ -3311,7 +3311,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     g.holdreset = 0x3C;
     if (g.fox == 0 && g.foy == 0) g.faceoffanim[0] = 0xFFFF;   /* center ice: no arena animation */
     else cpu_set_sr(0x2700);                              /* (masked until the end of the setup) */
-    if (g.crowdlevel > 0x258) g.crowdlevel = 0x258;
+    if (g.Crowdlevel > 0x258) g.Crowdlevel = 0x258;
     g.disflags |= HI(dfclock);                                  /* dfclock */
     g.sflags &= (uint16_t)~HI(sfpz);
     g.sflags3 &= (uint8_t)~(1 << sf3llcs);                /* no line changes */
@@ -3323,7 +3323,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     g.sflags2 &= (uint16_t)~HI(sf2refref);
     g.sflags2 |= HI(sf2faceoff);
     g.sflags2 |= HI(sf2drec);
-    ST_W(g.passplayer);
+    ST_W(g.passReceiverPlayerNum);
     ST_W(g.onetimerplayer);
     g.disflags |= HI(4);
     ClrHor();
@@ -3354,17 +3354,17 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
             uint16_t d0 = 0x16;                           /* assfaceoff */
             if (d1 == 4) {                                /* the center takes the draw */
                 struct Team *tc = own_team(pl);
-                tc->lasttouch = 0;
-                tc->lasttouch = (uint16_t)((tc->lasttouch & 0xFF00) | (uint8_t)(pl->pnum));
+                tc->tmtouch1 = 0;
+                tc->tmtouch1 = (uint16_t)((tc->tmtouch1 & 0xFF00) | (uint8_t)(pl->pnum));
                 g.sflags8 &= (uint8_t)~0x80;
-                ST_W(tc->assist1);
-                ST_W(tc->assist2);
-                tc->flags &= (uint8_t)~8;
+                ST_W(tc->tmtouch2);
+                ST_W(tc->tmtouch3);
+                tc->tmflags &= (uint8_t)~8;
                 d0 = 0x17;                                /* assfaceoffpl */
             }
             assinsert(d0, pl);
         }
-        int16_t d4 = (int16_t)team_struct(PFLAG(pl, pfteam))->ap;            /* skaters on the ice 4-6 */
+        int16_t d4 = (int16_t)team_struct(PFLAG(pl, pfteam))->tmap;            /* skaters on the ice 4-6 */
         d4 = (int16_t)((6 - d4) << 3);
         d4 = (int16_t)(fo_apl[d4 + d1] << 2);
         int16_t d0 = (int16_t)fo_ptab[d4 / 2];
@@ -3414,7 +3414,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     if (g.OptLine == 0) {                                 /* the two lines on the ice */
         printsmallz(str_puckfaceoff2_2, sizeof str_puckfaceoff2_2);
         Framer(0xC, 3);
-        uint16_t l0 = team_struct(0)->line, l1 = team_struct(1)->line;
+        uint16_t l0 = team_struct(0)->tmline, l1 = team_struct(1)->tmline;
         if (!(g.gmode & (1 << gmdir))) { uint16_t t = l0; l0 = l1; l1 = t; }
         printsmallz(str_puckfaceoff2_3, sizeof str_puckfaceoff2_3);
         Fprintsmall(SYM_linelist, l0);
@@ -3612,11 +3612,11 @@ void ChkOffsides(int16_t d0, struct SortObj *puck)
         if (d0 >= puck->OldYpos) return;
         d0 = (int16_t)(d0 - 0xA);
         if (!(g.gmode & (1 << gmdir))) { struct Team *t = a1; a1 = a2; a2 = t; }
-        const struct SortObj *a0 = sortobj_at(a2->sort);
+        const struct SortObj *a0 = sortobj_at(a2->tmsort);
         for (int i = 0; i < 6; i++, a0++) {
             if (a0->position < 0) continue;
             if (d0 <= a0->Ypos) continue;
-            a2->flags |= 0x10;
+            a2->tmflags |= 0x10;
             return;
         }
         return;
@@ -3624,11 +3624,11 @@ void ChkOffsides(int16_t d0, struct SortObj *puck)
     if (d0 <= puck->OldYpos) return;                      /* did not just cross it */
     d0 = (int16_t)(d0 + 0xA);
     if (g.gmode & (1 << gmdir)) { struct Team *t = a1; a1 = a2; a2 = t; }
-    const struct SortObj *a0 = sortobj_at(a2->sort);
+    const struct SortObj *a0 = sortobj_at(a2->tmsort);
     for (int i = 0; i < 6; i++, a0++) {
         if (a0->position < 0) continue;
         if (d0 >= a0->Ypos) continue;
-        a2->flags |= 0x10;
+        a2->tmflags |= 0x10;
         return;
     }
 }
@@ -3637,8 +3637,8 @@ void ChkOffsides(int16_t d0, struct SortObj *puck)
  * no skater is past the line. d0 is left over from the caller for objects with no position. */
 void ClearOffsidesIfAllPlayers(struct Team *tm, int16_t *d0)
 {
-    if (!(tm->flags & 0x10)) return;
-    const struct SortObj *a0 = sortobj_at(tm->sort);
+    if (!(tm->tmflags & 0x10)) return;
+    const struct SortObj *a0 = sortobj_at(tm->tmsort);
     for (int d1 = 5; ; a0++) {
         if (a0->position >= 0) {
             *d0 = a0->Ypos;
@@ -3647,7 +3647,7 @@ void ClearOffsidesIfAllPlayers(struct Team *tm, int16_t *d0)
         if (*d0 > 0x58) return;
         if (--d1 == -1) break;
     }
-    tm->flags &= (uint8_t)~0x10;
+    tm->tmflags &= (uint8_t)~0x10;
 }
 
 /* logic94.asm:a2offsides. Player a2 touched the puck: offsides penalty if his team is flagged
@@ -3659,7 +3659,7 @@ void a2offsides(struct SortObj *pl, struct SortObj *puck)
     if (!PFLAG(pl, pfgoal)) d0 = (int16_t)-d0;
     if (d0 < 0x68) return;
     struct Team *a0 = own_team(pl);
-    if (!(a0->flags & 0x10)) return;
+    if (!(a0->tmflags & 0x10)) return;
     if (g.gmode & (1 << gmhl)) return;
     AddPenalty(0x10, pl);
 }
@@ -3674,16 +3674,16 @@ void a2touchpuck(struct SortObj *pl, struct SortObj *puck)
     struct Team *a0 = own_team(pl);
     uint16_t d0 = pl->pnum;
     if (pl->pflags3 & (1 << pf3onetimer)) g.sflags8 |= 0x80;
-    if (d0 != a0->lasttouch) {
-        int was = a0->flags & 8;
-        a0->flags &= (uint8_t)~8;
+    if (d0 != a0->tmtouch1) {
+        int was = a0->tmflags & 8;
+        a0->tmflags &= (uint8_t)~8;
         if (!was) {
-            if (!rules[RULE_ASSIST_FIX] || d0 != a0->assist1)            /* (rules: a give-and-go keeps the second assist) */
-                a0->assist2 = a0->assist1;
-            a0->assist1 = a0->lasttouch;
+            if (!rules[RULE_ASSIST_FIX] || d0 != a0->tmtouch2)            /* (rules: a give-and-go keeps the second assist) */
+                a0->tmtouch3 = a0->tmtouch2;
+            a0->tmtouch2 = a0->tmtouch1;
         }
-        a0->lasttouch = d0;
-        if (d0 == a0->assist2) ST_W(a0->assist2);               /* no assist to himself */
+        a0->tmtouch1 = d0;
+        if (d0 == a0->tmtouch3) ST_W(a0->tmtouch3);               /* no assist to himself */
     }
     g.sflags2 &= (uint16_t)~HI(sf2shot);
     a2offsides(pl, puck);
@@ -3702,7 +3702,7 @@ void a2touchpuck(struct SortObj *pl, struct SortObj *puck)
         y = (int16_t)-y;
     }
     if (y < 0) return;                                    /* past center: icing possible */
-    int16_t d = (int16_t)(team_struct(0)->ap - team_struct(1)->ap);
+    int16_t d = (int16_t)(team_struct(0)->tmap - team_struct(1)->tmap);
     if (PFLAG(pl, pfteam)) d = (int16_t)-d;
     if (d < 0) return;                                    /* short handed: no icing */
     g.iflags |= 4;
@@ -4183,7 +4183,7 @@ void playeracc(int16_t dir, struct SortObj *o)
     if (e < 0xC00) { setpde(tm, pd1, e); return; }
     e = (int16_t)(e + ((uint16_t)(int16_t)(int8_t)o->endurance >> 1));
     setpde(tm, pd1, e);
-    if ((o->endurance & 1) && (g.vcount & 1))
+    if ((o->endurance & 1) && (g.Vcount & 1))
         setpde(tm, pd1, (int16_t)(e + 1));
 }
 

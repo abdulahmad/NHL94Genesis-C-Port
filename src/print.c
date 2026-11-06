@@ -7,13 +7,13 @@
 
 /* ---- printing --------------------------------------------------------------------------- */
 
-/* the map selected by printm (a byte offset from VmMap1: 0, 4 or 8, though the 68000 takes any):
+/* the map selected by printm (a byte offset from VmMAP1: 0, 4 or 8, though the 68000 takes any):
  * its VRAM address and row shift */
 static struct Plane print_map(void)
 {
     int16_t k = (int16_t)g.printm;
     if (k == 0 || k == 4 || k == 8) return g.maps[k / 4];
-    rp m = rp_add(RAM(VmMap1), k);                        /* (another offset: the words there) */
+    rp m = rp_add(RAM(VmMAP1), k);                        /* (another offset: the words there) */
     return (struct Plane){ r16(m, 0), r16(m, 2) };
 }
 /* asl.w Dn: the count is taken mod 64 and 16 or more clears the word */
@@ -363,7 +363,7 @@ struct Text printbig_p(struct Text s)
 {
     uint16_t saved = g.disflags;
     g.disflags |= HI(dfng);
-    struct BigPen pen = { g.printx, g.printy, (uint16_t)(g.printa + g.BigFontChars) };
+    struct BigPen pen = { g.printx, g.printy, (uint16_t)(g.printa + g.BigFontchars) };
     uint16_t n = (uint16_t)(text_word(&s) - 2);
     while (n-- != 0) {
         int8_t c = (int8_t)text_next(&s);
@@ -371,7 +371,7 @@ struct Text printbig_p(struct Text s)
         if (c < 0) {
             uint16_t code = (uint16_t)-c;
             g.printa = (uint16_t)((code << 9) & 0xF800);
-            pen.attr = (uint16_t)(g.printa + g.BigFontChars);
+            pen.attr = (uint16_t)(g.printa + g.BigFontchars);
             g.printm = (uint16_t)(((code & 3) << 2) - 4);
             g.printx = pen.x = (uint16_t)(int8_t)text_next(&s);
             g.printy = pen.y = (uint16_t)(int8_t)text_next(&s);
