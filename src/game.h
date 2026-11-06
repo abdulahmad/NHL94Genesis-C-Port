@@ -653,6 +653,7 @@ void DrawPlayoffSprite(void);
 void HiScoreScreen(void);
 struct Team *GetTeamStruct(uint16_t team);              /* d2 -> a2 */
 void CountButtonPress(int16_t pad, struct SortObj *o);  /* d4, a3 */
+void TerminateLogName(void);
 uint32_t PlayedByHome(void);                            /* -> a1 */
 uint32_t PlayedByText(uint16_t user);                   /* d0 -> a1 */
 uint32_t PlayedByExit(uint32_t a1);
