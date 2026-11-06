@@ -15,6 +15,176 @@
 /* the replay frame at a4 (the game keeps the frames' 68000 addresses: recbpr) */
 static struct ReplayFrame *replay_frame(uint32_t a4) { return RAM_AT(struct ReplayFrame, ram_at(a4)); }
 
+/* ReplayMode's .dirtab: the camera step per d-pad direction 0-7 (x, y) */
+static const int16_t replay_dirtab[16] = { 0, 2, 2, 2, 2, 0, 2, -2, 0, -2, -2, -2, -2, 0, -2, 2 };
+
+/* replay94.asm:ReplayMode. The instant replay, from the pause menu. Rewind to the oldest
+ * frame, then each pass (at most one recorded frame per vblank, d7 = elapsed): the d-pad moves
+ * the camera or picks the nearest object in that direction to follow, A rewinds, B steps or
+ * fast-forwards, C plays / stops; start shows the banner, where start again resumes the game,
+ * B leaves, C reverses the angle. Leaving restores the frame at the record point and the rink. */
+void ReplayMode(void)
+{
+    g.sflags5 &= (uint8_t)~1;
+    forceblack();
+    uint16_t saved = g.disflags;
+    g.sflags2 |= HI(sf2replay);
+    g.sflags4 &= (uint16_t)~HI(4);
+    ClrHor();
+    DoFill(0x400, g.maps[2].vram, 0x7FF);
+    DecompressGraphicsPlain(ART(ReplayMap) + 8, g.ExtraChars);
+    ShowReplayIcon();
+    g.sflags &= (uint16_t)~HI(sfscrl);
+    g.sflags3 &= (uint8_t)~0x20;
+    g.pads[3].Yfrac |= 0xFF00;                            /* st replayactive: the camera's Yfrac, its high byte */
+    struct RinkObj *cam = &g.pads[3];                     /* a5, the camera (ReplayStarStruct): Xpos, Ypos its place, Yfrac the
+                                                           * object it follows, Zpos < 0 none (not read while sfscrl is clear) */
+    uint32_t a4 = g.recbpr;
+    do elapsed = (int16_t)suba4(&a4, cam); while (elapsed != 0);
+    SprSort();
+    setvideo();
+    g.sflags3 &= (uint8_t)~2;
+    memset(g.padcont, 0, sizeof g.padcont);
+    g.palcount = 0x18;
+    elapsed = 1;
+    for (;;) {                                            /* .top */
+        while ((uint16_t)elapsed > (uint16_t)(g.vcount - g.oldvcount)) hal_wait_vblank();
+        g.oldvcount = g.vcount;
+        if ((int16_t)g.replayicontimer >= 0) {
+            g.replayicontimer = (uint16_t)(g.replayicontimer - elapsed);
+            if ((int16_t)g.replayicontimer < 0) { g.replayicontimer = 0; EraseReplayIcon(); }
+        }
+        sortobj(12)->oldframe = 1;
+        sortobj(13)->oldframe = 1;
+        elapsed = 1;
+        uint16_t d0, d1, d2, d3;
+        getpzjoy(&d0, &d1, &d2, &d3);
+        if (g.sflags5 & 1) {                              /* the banner is up: no d-pad */
+            d0 = (uint16_t)((d0 & 0xFFF0) | 8);
+            d1 &= 0xFFF0;
+            d3 &= 0xFFF0;
+        }
+        int manual = !(d0 & 8);
+        if ((g.sflags3 & 0x20) && (d1 & 0xF) == 0) manual = 0;
+        if (manual) {                                     /* .dir: move or retarget the camera */
+            if (cam->Xpos <= -0xA0) cam->Xpos = 0;
+            if (cam->Ypos <= -0x130) cam->Ypos = 0;
+            int scrolling = (g.sflags & HI(sfscrl)) != 0;
+            g.sflags |= HI(sfscrl);
+            if (!scrolling) { cam->Xpos = (int16_t)g.Hpos; cam->Ypos = (int16_t)g.Vpos; }
+            uint16_t dir = (uint16_t)((d0 & 7) ^ 4);
+            uint16_t skip = 0xFF;                         /* st d3 */
+            int tracking = (g.sflags3 & 0x20) != 0;
+            g.sflags3 &= (uint8_t)~0x20;
+            if (tracking) skip = cam->Yfrac;
+            int16_t cx = cam->Xpos, cy = cam->Ypos;
+            uint32_t best = 0x100;
+            for (int i = 0; i < 12; i++) {
+                const struct SortObj *o = sortobj(i);
+                if ((uint16_t)o->SCnum == skip) continue;
+                int16_t dx = (int16_t)(cx - o->Xpos), dy = (int16_t)(cy - o->Ypos);
+                uint16_t v = vtoa(dx, dy);
+                if (v & 8) continue;
+                if (((uint16_t)(v - dir + 1) & 7) > 2) continue;
+                uint32_t dist = (uint32_t)((int32_t)dx * dx) + (uint32_t)((int32_t)dy * dy);
+                if (dist <= 4 || dist > best) continue;
+                best = dist;
+                cam->Yfrac = (uint16_t)o->SCnum;
+                g.sflags3 |= 0x20;
+            }
+            if (g.sflags3 & 0x20) {                       /* follow the object found */
+                struct SortObj *o = sortobj((int16_t)cam->Yfrac);
+                setpads(4, o);
+                UpdateCameraPos(&o->rink, cam);
+                setvideo();
+                continue;
+            }
+            g.sflags |= HI(sfscrl);                       /* .scrl: move the camera */
+            dir ^= 4;
+            int16_t nx = (int16_t)(replay_dirtab[2 * dir] + cam->Xpos);
+            if (nx <= 0x88 && nx >= -0x88) cam->Xpos = nx;
+            int16_t ny = (int16_t)(replay_dirtab[2 * dir + 1] + cam->Ypos);
+            if (ny <= 0x126 && ny >= -0x126) cam->Ypos = ny;
+            cam->Zpos = 0;
+            g.PadControlBits = (uint16_t)((g.PadControlBits & 0xFFF) | 0xE000);
+            UpdateCameraPos(cam, cam);
+            setvideo();
+            continue;
+        }
+        cam->Zpos = (int16_t)(cam->Zpos | 0xFF00);        /* .nomans (st: Zpos's high byte) */
+        if ((d1 & 0x20) && !(g.sflags5 & 1)) g.sflags3 ^= 1 << sf3rmplay;
+        if ((d3 & 0x40) && !(g.sflags5 & 1)) {            /* A: rewind */
+            for (int i = 0; i < 4; i++) elapsed = (int16_t)suba4(&a4, cam);
+            SprSort();
+            setvideo();
+            elapsed = 1;
+            g.sflags3 &= (uint8_t)~2;
+        }
+        if (!(g.sflags5 & 1) && (d3 & 0x10)) {            /* B */
+            if (d3 & 0x40) {                              /* with A: stop tracking */
+                g.sflags3 &= (uint8_t)~0x20;
+                g.sflags &= (uint16_t)~HI(sfscrl);
+                g.PadControlBits = (uint16_t)((g.PadControlBits & 0xFFF) | 0xE000);
+                continue;
+            }
+            elapsed = (int16_t)adda4(&a4, cam);           /* step / fast forward */
+            SprSort();
+            setvideo();
+            elapsed = (int16_t)(elapsed << 1);
+            g.sflags3 &= (uint8_t)~2;
+        }
+        if (g.sflags3 & (1 << sf3rmplay)) {               /* play */
+            ST_W(g.lastsfx);
+            elapsed = (int16_t)adda4(&a4, cam);
+            sfx((int16_t)g.lastsfx);
+            SprSort();
+        }
+        setvideo();
+        if (!(g.sflags5 & 1)) {
+            if (!(d1 & 0x80)) continue;
+            ShowReplayBanner();
+            g.sflags3 &= (uint8_t)~2;
+            int up = g.sflags5 & 1;
+            g.sflags5 |= 1;
+            if (!up) continue;
+        }
+        if (d1 & 0x80) {                                  /* start: resume the game */
+            g.menu.item = 0;
+            g.sflags5 |= 2;
+            break;
+        }
+        if (d1 & 0x40) continue;
+        if (d1 & 0x10) break;                             /* B: leave */
+        if (!(d1 & 0x20)) continue;
+        g.sflags4 |= HI(6);                               /* C: reverse angle */
+        g.sflags5 &= (uint8_t)~1;
+        EraseReplayBanner();
+        elapsed = (int16_t)adda4(&a4, cam);
+        SprSort();
+    }
+    forceblack();
+    g.PadControlBits |= 0xF000;
+    g.sflags &= (uint16_t)~HI(sfscrl);
+    a4 = g.recbpr;
+    g.sflags4 &= (uint16_t)~HI(4);
+    RestoreReplayFrame(a4, cam);
+    SprSort();
+    g.sflags2 &= (uint16_t)~HI(sf2replay);
+    g.disflags = saved;
+    ReloadRinkGraphics();
+    setupEASportsMap();
+    ReloadEnergyBarTiles();
+    ReloadCrowdTiles();
+    ReloadRefTiles();
+    if (g.disflags & HI(4)) {
+        ReloadFaceOffMap();
+        ReloadFaceOffTiles();
+    }
+    SetHor();
+    setvideo();
+    g.palcount = 0x18;
+}
+
 /* replay94.asm:getpzjoy. Read the joystick of the pad that paused: pads 3 and 4 on the four way
  * play (pausepad 3 or 4), else pad 2 when sfpj is set, pad 1 otherwise. */
 void getpzjoy(uint16_t *d0, uint16_t *d1, uint16_t *d2, uint16_t *d3)
@@ -298,174 +468,4 @@ void updatereplay(void)
     f->padbits34 = (uint8_t)(g.PadControlBits34 >> 4);
     f->hpos = g.Hpos;
     f->vpos = g.Vpos;
-}
-
-/* ReplayMode's .dirtab: the camera step per d-pad direction 0-7 (x, y) */
-static const int16_t replay_dirtab[16] = { 0, 2, 2, 2, 2, 0, 2, -2, 0, -2, -2, -2, -2, 0, -2, 2 };
-
-/* replay94.asm:ReplayMode. The instant replay, from the pause menu. Rewind to the oldest
- * frame, then each pass (at most one recorded frame per vblank, d7 = elapsed): the d-pad moves
- * the camera or picks the nearest object in that direction to follow, A rewinds, B steps or
- * fast-forwards, C plays / stops; start shows the banner, where start again resumes the game,
- * B leaves, C reverses the angle. Leaving restores the frame at the record point and the rink. */
-void ReplayMode(void)
-{
-    g.sflags5 &= (uint8_t)~1;
-    forceblack();
-    uint16_t saved = g.disflags;
-    g.sflags2 |= HI(sf2replay);
-    g.sflags4 &= (uint16_t)~HI(4);
-    ClrHor();
-    DoFill(0x400, g.maps[2].vram, 0x7FF);
-    DecompressGraphicsPlain(ART(ReplayMap) + 8, g.ExtraChars);
-    ShowReplayIcon();
-    g.sflags &= (uint16_t)~HI(sfscrl);
-    g.sflags3 &= (uint8_t)~0x20;
-    g.pads[3].Yfrac |= 0xFF00;                            /* st replayactive: the camera's Yfrac, its high byte */
-    struct RinkObj *cam = &g.pads[3];                     /* a5, the camera (ReplayStarStruct): Xpos, Ypos its place, Yfrac the
-                                                           * object it follows, Zpos < 0 none (not read while sfscrl is clear) */
-    uint32_t a4 = g.recbpr;
-    do elapsed = (int16_t)suba4(&a4, cam); while (elapsed != 0);
-    SprSort();
-    setvideo();
-    g.sflags3 &= (uint8_t)~2;
-    memset(g.padcont, 0, sizeof g.padcont);
-    g.palcount = 0x18;
-    elapsed = 1;
-    for (;;) {                                            /* .top */
-        while ((uint16_t)elapsed > (uint16_t)(g.vcount - g.oldvcount)) hal_wait_vblank();
-        g.oldvcount = g.vcount;
-        if ((int16_t)g.replayicontimer >= 0) {
-            g.replayicontimer = (uint16_t)(g.replayicontimer - elapsed);
-            if ((int16_t)g.replayicontimer < 0) { g.replayicontimer = 0; EraseReplayIcon(); }
-        }
-        sortobj(12)->oldframe = 1;
-        sortobj(13)->oldframe = 1;
-        elapsed = 1;
-        uint16_t d0, d1, d2, d3;
-        getpzjoy(&d0, &d1, &d2, &d3);
-        if (g.sflags5 & 1) {                              /* the banner is up: no d-pad */
-            d0 = (uint16_t)((d0 & 0xFFF0) | 8);
-            d1 &= 0xFFF0;
-            d3 &= 0xFFF0;
-        }
-        int manual = !(d0 & 8);
-        if ((g.sflags3 & 0x20) && (d1 & 0xF) == 0) manual = 0;
-        if (manual) {                                     /* .dir: move or retarget the camera */
-            if (cam->Xpos <= -0xA0) cam->Xpos = 0;
-            if (cam->Ypos <= -0x130) cam->Ypos = 0;
-            int scrolling = (g.sflags & HI(sfscrl)) != 0;
-            g.sflags |= HI(sfscrl);
-            if (!scrolling) { cam->Xpos = (int16_t)g.Hpos; cam->Ypos = (int16_t)g.Vpos; }
-            uint16_t dir = (uint16_t)((d0 & 7) ^ 4);
-            uint16_t skip = 0xFF;                         /* st d3 */
-            int tracking = (g.sflags3 & 0x20) != 0;
-            g.sflags3 &= (uint8_t)~0x20;
-            if (tracking) skip = cam->Yfrac;
-            int16_t cx = cam->Xpos, cy = cam->Ypos;
-            uint32_t best = 0x100;
-            for (int i = 0; i < 12; i++) {
-                const struct SortObj *o = sortobj(i);
-                if ((uint16_t)o->SCnum == skip) continue;
-                int16_t dx = (int16_t)(cx - o->Xpos), dy = (int16_t)(cy - o->Ypos);
-                uint16_t v = vtoa(dx, dy);
-                if (v & 8) continue;
-                if (((uint16_t)(v - dir + 1) & 7) > 2) continue;
-                uint32_t dist = (uint32_t)((int32_t)dx * dx) + (uint32_t)((int32_t)dy * dy);
-                if (dist <= 4 || dist > best) continue;
-                best = dist;
-                cam->Yfrac = (uint16_t)o->SCnum;
-                g.sflags3 |= 0x20;
-            }
-            if (g.sflags3 & 0x20) {                       /* follow the object found */
-                struct SortObj *o = sortobj((int16_t)cam->Yfrac);
-                setpads(4, o);
-                UpdateCameraPos(&o->rink, cam);
-                setvideo();
-                continue;
-            }
-            g.sflags |= HI(sfscrl);                       /* .scrl: move the camera */
-            dir ^= 4;
-            int16_t nx = (int16_t)(replay_dirtab[2 * dir] + cam->Xpos);
-            if (nx <= 0x88 && nx >= -0x88) cam->Xpos = nx;
-            int16_t ny = (int16_t)(replay_dirtab[2 * dir + 1] + cam->Ypos);
-            if (ny <= 0x126 && ny >= -0x126) cam->Ypos = ny;
-            cam->Zpos = 0;
-            g.PadControlBits = (uint16_t)((g.PadControlBits & 0xFFF) | 0xE000);
-            UpdateCameraPos(cam, cam);
-            setvideo();
-            continue;
-        }
-        cam->Zpos = (int16_t)(cam->Zpos | 0xFF00);        /* .nomans (st: Zpos's high byte) */
-        if ((d1 & 0x20) && !(g.sflags5 & 1)) g.sflags3 ^= 1 << sf3rmplay;
-        if ((d3 & 0x40) && !(g.sflags5 & 1)) {            /* A: rewind */
-            for (int i = 0; i < 4; i++) elapsed = (int16_t)suba4(&a4, cam);
-            SprSort();
-            setvideo();
-            elapsed = 1;
-            g.sflags3 &= (uint8_t)~2;
-        }
-        if (!(g.sflags5 & 1) && (d3 & 0x10)) {            /* B */
-            if (d3 & 0x40) {                              /* with A: stop tracking */
-                g.sflags3 &= (uint8_t)~0x20;
-                g.sflags &= (uint16_t)~HI(sfscrl);
-                g.PadControlBits = (uint16_t)((g.PadControlBits & 0xFFF) | 0xE000);
-                continue;
-            }
-            elapsed = (int16_t)adda4(&a4, cam);           /* step / fast forward */
-            SprSort();
-            setvideo();
-            elapsed = (int16_t)(elapsed << 1);
-            g.sflags3 &= (uint8_t)~2;
-        }
-        if (g.sflags3 & (1 << sf3rmplay)) {               /* play */
-            ST_W(g.lastsfx);
-            elapsed = (int16_t)adda4(&a4, cam);
-            sfx((int16_t)g.lastsfx);
-            SprSort();
-        }
-        setvideo();
-        if (!(g.sflags5 & 1)) {
-            if (!(d1 & 0x80)) continue;
-            ShowReplayBanner();
-            g.sflags3 &= (uint8_t)~2;
-            int up = g.sflags5 & 1;
-            g.sflags5 |= 1;
-            if (!up) continue;
-        }
-        if (d1 & 0x80) {                                  /* start: resume the game */
-            g.menu.item = 0;
-            g.sflags5 |= 2;
-            break;
-        }
-        if (d1 & 0x40) continue;
-        if (d1 & 0x10) break;                             /* B: leave */
-        if (!(d1 & 0x20)) continue;
-        g.sflags4 |= HI(6);                               /* C: reverse angle */
-        g.sflags5 &= (uint8_t)~1;
-        EraseReplayBanner();
-        elapsed = (int16_t)adda4(&a4, cam);
-        SprSort();
-    }
-    forceblack();
-    g.PadControlBits |= 0xF000;
-    g.sflags &= (uint16_t)~HI(sfscrl);
-    a4 = g.recbpr;
-    g.sflags4 &= (uint16_t)~HI(4);
-    RestoreReplayFrame(a4, cam);
-    SprSort();
-    g.sflags2 &= (uint16_t)~HI(sf2replay);
-    g.disflags = saved;
-    ReloadRinkGraphics();
-    setupEASportsMap();
-    ReloadEnergyBarTiles();
-    ReloadCrowdTiles();
-    ReloadRefTiles();
-    if (g.disflags & HI(4)) {
-        ReloadFaceOffMap();
-        ReloadFaceOffTiles();
-    }
-    SetHor();
-    setvideo();
-    g.palcount = 0x18;
 }

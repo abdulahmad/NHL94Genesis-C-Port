@@ -7,183 +7,38 @@
 #include "hal.h"
 #include "cards_strings_gen.h"
 
-/* cards94.asm:wallcollduringcheck. During a check, skater a2 (not a goalie) is tested against
- * the corners and walls at his position with his size + $17. */
-void wallcollduringcheck(struct SortObj *a2, struct SortObj *a3)
-{
-    if (a2->position == 0) return;
-    g.wcradiusx = (uint16_t)(a2->radiusx + 0x17);
-    g.wcradiusy = (uint16_t)(a2->radiusy + 0x17);
-    checkcornercoll(a2->Xpos, a2->Ypos, a2);
-}
-
-/* cards94.asm:CountGoalies. homegoalies / awaygoalies = the goalies of each team. */
-void CountGoalies(void)
-{
-    g.homegoalies = GetGoalieCount(team_struct(0));
-    g.awaygoalies = GetGoalieCount(team_struct(1));
-}
-
-/* cards94.asm:CrowdRecordIO. Team d1's 16-byte crowd record (CrowdRecBase + team * 16) in save
- * RAM from / to a0: written when sflags6 bit 6 is set, else read. */
-void CrowdRecordIO(uint32_t team, uint32_t buf)
-{
-    uint32_t at = (team & 0xFFFF0000u) + rosters_crowd_record((uint16_t)team);   /* (asl.w #4 of the long; the roster set's place) */
-    if (g.sflags6 & HI(6)) WriteSRAM(at, 0x10, buf);
-    else ReadSRAM(at, 0x10, buf);
-}
-
-/* cards94.asm:ReadCrowdRecord. Read team d1's crowd record to a0. */
-void ReadCrowdRecord(uint32_t team, uint32_t buf)
-{
-    g.sflags6 &= (uint16_t)~HI(6);
-    CrowdRecordIO(team, buf);
-}
-
-/* cards94.asm:setSlotBit. sflags6 bit 5 (the slot) = the puck carrier is in the slot: in his
- * attacking zone (y past $58 toward the net he shoots at) within $47 of the middle. */
-void setSlotBit(void)
-{
-    g.sflags6 &= (uint16_t)~HI(5);
-    if ((int16_t)puck_carrier() < 0) return;
-    const struct SortObj *o = sortobj((int16_t)puck_carrier());
-    int16_t y = o->Ypos;
-    if (!(o->pflags & 0x80)) y = (int16_t)-y;
-    if (y < 0x58 || o->Xpos > 0x47 || o->Xpos < -0x47) return;
-    g.sflags6 |= HI(5);
-}
-
-/* cards94.asm:CountPlayers. homeplayers / awayplayers = the players of each team. */
-void CountPlayers(void)
-{
-    g.homeplayers = GetPlayerCount(team_struct(0));
-    g.awayplayers = GetPlayerCount(team_struct(1));
-}
-
-/* cards94.asm:PlayerRecordIO. The 4-byte record of roster slot d0 of team d1
- * (PlayerRecordOffsets) in save RAM from / to a0: written when sflags6 bit 6 is set. */
-void PlayerRecordIO(uint32_t slot, uint16_t team, uint32_t buf)
-{
-    uint32_t at = slot << 2;
-    at += (uint32_t)(int32_t)(int16_t)(rosters_team(team)->records << 2);
-    if (g.sflags6 & HI(6)) WriteSRAM(at, 4, buf);
-    else ReadSRAM(at, 4, buf);
-}
-
-/* cards94.asm:ReadPlayerRecord. */
-void ReadPlayerRecord(uint32_t slot, uint16_t team, uint32_t buf) { g.sflags6 &= (uint16_t)~HI(6); PlayerRecordIO(slot, team, buf); }
-/* cards94.asm:WritePlayerRecord. */
-void WritePlayerRecord(uint32_t slot, uint16_t team, uint32_t buf) { g.sflags6 |= HI(6); PlayerRecordIO(slot, team, buf); }
-
-/* cards94.asm:TeamRecordIO. Team (or user) d1's 16-byte record (TeamRecBase + d1 * 16) from /
- * to a0. */
-void TeamRecordIO(uint32_t team, uint32_t buf)
-{
-    uint32_t at = (team & 0xFFFF0000u) | (uint16_t)(team << 4);
-    at += SYM_TeamRecBase;
-    if (g.sflags6 & HI(6)) WriteSRAM(at, 0x10, buf);
-    else ReadSRAM(at, 0x10, buf);
-}
-
-/* cards94.asm:ReadTeamRecord. */
-void ReadTeamRecord(uint32_t team, uint32_t buf) { g.sflags6 &= (uint16_t)~HI(6); TeamRecordIO(team, buf); }
-/* cards94.asm:WriteTeamRecord. */
-void WriteTeamRecord(uint32_t team, uint32_t buf) { g.sflags6 |= HI(6); TeamRecordIO(team, buf); }
-/* cards94.asm:WriteCrowdRecord. */
-void WriteCrowdRecord(uint32_t team, uint32_t buf) { g.sflags6 |= HI(6); CrowdRecordIO(team, buf); }
-
-/* cards94.asm:UpdatePlayerRecords. After a game, team a2 (number d1, d5 goalies, opponent d6):
- * each roster slot's record keeps the best game (goals, or saves for the goalies) with the user
- * names and the opponent. a0 = a 4-byte buffer. */
-void UpdatePlayerRecords(uint32_t team, uint32_t buf, struct Team *tm, uint16_t goalies, uint16_t opponent)
-{
-    uint8_t *rec = ram_bytes(ram_at(buf), 4);
-    for (uint16_t slot = 0; slot < 0x1A; slot++) {
-        ReadPlayerRecord(slot, (uint16_t)team, buf);
-        uint8_t best = (int16_t)slot >= (int16_t)goalies ? tm->pgoals[slot]
-                                                         : (uint8_t)(tm->pshots[slot] - tm->pgoals[slot]);                 /* goalie: saves */
-        if ((int8_t)best <= (int8_t)rec[0]) continue;
-        rec[0] = best;
-        int home = tm == team_struct(0);
-        rec[1] = (uint8_t)(home ? g.homeuser : g.awayuser);
-        rec[3] = (uint8_t)(home ? g.awayuser : g.homeuser);
-        rec[2] = (uint8_t)opponent;
-        WritePlayerRecord(slot, (uint16_t)team, buf);
-    }
-}
-
 /* add one to a big-endian word kept as two bytes */
 static void bump(uint8_t *p) { wr16(p, (uint16_t)(rd16(p) + 1)); }
 
-/* cards94.asm:UpdateTeamRecord. After a game: record d1 (a user's) of team a1 against a2 (team
- * numbers d3 / d4, the other user d2): count the game (up to 9000), the win or the tie, and on
- * a win keep the most goals and the biggest margin (as the 68k computes it: word 0 of a2 minus
- * a2's goals) with who and against whom. a0 = a 16-byte buffer. */
-void UpdateTeamRecord(uint32_t buf, uint32_t rec_no, uint16_t other, uint16_t team, uint16_t vs, struct Team *a1, struct Team *a2)
+/* printsmall in the setup font (sflags6 bit 3) */
+static void print_setup(uint32_t s)
 {
-    uint8_t *rec = ram_bytes(ram_at(buf), 0x10);
-    ReadTeamRecord(rec_no, buf);
-    int16_t s1 = (int16_t)a1->score, s2 = (int16_t)a2->score;
-    if ((int16_t)rd16(rec + 0xA) < 0x2328) {
-        bump((rec + 0xA));
-        if (s1 > s2) bump((rec + 8));
-        else if (s1 == s2) bump((rec + 0xC));
-    }
-    if (s1 > s2) {
-        if ((int8_t)s1 > (int8_t)rec[0]) { rec[0] = (uint8_t)s1; rec[1] = (uint8_t)team; rec[2] = (uint8_t)vs; rec[3] = (uint8_t)other; }
-        int16_t margin = (int16_t)(a2->shots - s2);
-        if ((int8_t)margin > (int8_t)rec[4]) { rec[4] = (uint8_t)margin; rec[5] = (uint8_t)team; rec[6] = (uint8_t)vs; rec[7] = (uint8_t)other; }
-    }
-    WriteTeamRecord(rec_no, buf);
+    g.sflags6 |= HI(3);
+    printsmall(s);
+    g.sflags6 &= (uint16_t)~HI(3);
 }
 
-/* cards94.asm:UpdateCrowdRecord. Team a1 (number d1, d6 goalies, opponent d2, users d4 / d5):
- * the crowd record keeps the most goals, the most saves by one goalie (worked out in the high
- * byte of TempWord1) and, for the home team, the loudest crowd (CrowdPeak); written when
- * anything changed. a0 = a 16-byte buffer. */
-void UpdateCrowdRecord(uint32_t buf, uint32_t team, uint16_t opp, uint16_t user, uint16_t opp_user, uint16_t goalies, struct Team *tm)
+/* the player record a0, or (a0 = 0) player d1 of team d0's read to $FFFF0000 */
+static uint32_t player_record(uint16_t team, uint16_t player, uint32_t rec)
 {
-    uint8_t *rec = ram_bytes(ram_at(buf), 0x10);
-    int changed = 0;
-    ReadCrowdRecord(team, buf);
-    uint8_t goals = (uint8_t)tm->score;
-    if ((int8_t)goals > (int8_t)rec[0]) {
-        rec[0] = goals; rec[1] = (uint8_t)user; rec[3] = (uint8_t)opp_user; rec[2] = (uint8_t)opp;
-        changed = 1;
+    if (rec == 0) {
+        ReadPlayerRecord((uint32_t)(int32_t)(int16_t)player, (uint16_t)(int16_t)team, RAM_BASE);
+        rec = RAM_BASE;
     }
-    uint8_t saves = 0;
-    uint16_t n = (uint16_t)(goalies - 1);
-    do {
-        uint8_t s = (uint8_t)(tm->pshots[n] - tm->pgoals[n]);
-        g.TempWord1 = (uint16_t)((s << 8) | (g.TempWord1 & 0xFF));
-        if ((int8_t)saves < (int8_t)s) saves = s;
-    } while (n-- != 0);
-    if ((int8_t)saves > (int8_t)rec[4]) {
-        changed = 1;
-        rec[4] = saves; rec[5] = (uint8_t)user; rec[7] = (uint8_t)opp_user; rec[6] = (uint8_t)opp;
-    }
-    if ((uint16_t)team == g.HomeTeam && (int16_t)rec[8] < (int16_t)g.CrowdPeak) {
-        changed = 1;
-        rec[8] = (uint8_t)g.CrowdPeak; rec[9] = (uint8_t)user; rec[0xB] = (uint8_t)opp_user; rec[0xA] = (uint8_t)opp;
-    }
-    if (changed) WriteCrowdRecord(team, buf);
+    return rec;
 }
 
-/* cards94.asm:UpdateRecords. After a game, with save RAM and user records on: the player, crowd
- * and team records of both teams (ThreeStars is the buffer), then the save RAM checksum. */
-void UpdateRecords(void)
+/* ---- the Player Cards menu item ------------------------------------------------------------------ */
+
+/* the card's team: the visitors when cardvis is set */
+static uint16_t card_team(void) { return g.cardvis ? g.VisTeam : g.HomeTeam; }
+
+/* the record label: "<n> Saves" / "Saves by" (with a holder), the singular after it for 1 */
+static uint32_t record_label(uint32_t plain, uint32_t by, uint8_t value, uint8_t holder)
 {
-    if ((int16_t)g.ValidSRAM < 0 || g.OptUserRec != 0) return;
-    CountGoalies();
-    CountPlayers();
-    uint32_t buf = ram_addr(g.ThreeStars);
-    UpdatePlayerRecords(g.HomeTeam, buf, team_struct(0), g.homegoalies, g.VisTeam);
-    UpdatePlayerRecords(g.VisTeam, buf, team_struct(1), g.awaygoalies, g.HomeTeam);
-    UpdateCrowdRecord(buf, g.HomeTeam, g.VisTeam, g.homeuser, g.awayuser, g.homegoalies, team_struct(0));
-    UpdateCrowdRecord(buf, g.VisTeam, g.HomeTeam, g.awayuser, g.homeuser, g.awaygoalies, team_struct(1));
-    UpdateTeamRecord(buf, g.homeuser, g.awayuser, g.HomeTeam, g.VisTeam, team_struct(0), team_struct(1));
-    UpdateTeamRecord(buf, g.awayuser, g.homeuser, g.VisTeam, g.HomeTeam, team_struct(1), team_struct(0));
-    MakeSRAMChecksum();
+    uint32_t a1 = holder ? by : plain;
+    if (value == 1) a1 += rd16(rom_ptr(a1));
+    return a1;
 }
 
 /* ---- the player cards of the setup screen --------------------------------------------------- */
@@ -216,14 +71,6 @@ void PlayerCardTimer(void)
     ST_W(g.setupvis);
     g.setupcardflags &= (uint16_t)~(CARD(6) | CARD(7));
     PlayerCardScreen();
-}
-
-/* printsmall in the setup font (sflags6 bit 3) */
-static void print_setup(uint32_t s)
-{
-    g.sflags6 |= HI(3);
-    printsmall(s);
-    g.sflags6 &= (uint16_t)~HI(3);
 }
 
 /* cards94.asm:PlayerCardScreen. A player card on one side (bit 1: the visitors' on the left,
@@ -307,6 +154,29 @@ void PlayerCardScreen(void)
     g.palcount = 0x64;
 }
 
+/* cards94.asm:wallcollduringcheck. During a check, skater a2 (not a goalie) is tested against
+ * the corners and walls at his position with his size + $17. */
+void wallcollduringcheck(struct SortObj *a2, struct SortObj *a3)
+{
+    if (a2->position == 0) return;
+    g.wcradiusx = (uint16_t)(a2->radiusx + 0x17);
+    g.wcradiusy = (uint16_t)(a2->radiusy + 0x17);
+    checkcornercoll(a2->Xpos, a2->Ypos, a2);
+}
+
+/* cards94.asm:setSlotBit. sflags6 bit 5 (the slot) = the puck carrier is in the slot: in his
+ * attacking zone (y past $58 toward the net he shoots at) within $47 of the middle. */
+void setSlotBit(void)
+{
+    g.sflags6 &= (uint16_t)~HI(5);
+    if ((int16_t)puck_carrier() < 0) return;
+    const struct SortObj *o = sortobj((int16_t)puck_carrier());
+    int16_t y = o->Ypos;
+    if (!(o->pflags & 0x80)) y = (int16_t)-y;
+    if (y < 0x58 || o->Xpos > 0x47 || o->Xpos < -0x47) return;
+    g.sflags6 |= HI(5);
+}
+
 /* cards94.asm:PrintRecordValue. The record line of player d1 of team d0 at a1: "Record " (a copy
  * of RecordTxt), the value (GetRecordValue) and goals / goal or saves / save; an empty String
  * when there is no value. */
@@ -381,16 +251,6 @@ void PrintRecordVs(uint32_t buf, uint16_t team, uint16_t player, uint32_t rec)
     appstring(TEMPBUF, buf);
 }
 
-/* the player record a0, or (a0 = 0) player d1 of team d0's read to $FFFF0000 */
-static uint32_t player_record(uint16_t team, uint16_t player, uint32_t rec)
-{
-    if (rec == 0) {
-        ReadPlayerRecord((uint32_t)(int32_t)(int16_t)player, (uint16_t)(int16_t)team, RAM_BASE);
-        rec = RAM_BASE;
-    }
-    return rec;
-}
-
 /* cards94.asm:AppendRecordHolder. The user name of the record holder (byte 1 of record a0) as a
  * String at a1 (AppendUserName, trimmed). */
 void AppendRecordHolder(uint32_t buf, uint16_t team, uint16_t player, uint32_t rec)
@@ -410,6 +270,54 @@ void AppendRecordVs(uint32_t buf, uint16_t team, uint16_t player, uint32_t rec)
     appstring(SYM_RecSpaceTxt, buf);
     AppendTeamName(m8(r + 2), buf);
 }
+
+/* cards94.asm:ReadPlayerRecord. */
+void ReadPlayerRecord(uint32_t slot, uint16_t team, uint32_t buf) { g.sflags6 &= (uint16_t)~HI(6); PlayerRecordIO(slot, team, buf); }
+
+/* cards94.asm:PlayerRecordIO. The 4-byte record of roster slot d0 of team d1
+ * (PlayerRecordOffsets) in save RAM from / to a0: written when sflags6 bit 6 is set. */
+void PlayerRecordIO(uint32_t slot, uint16_t team, uint32_t buf)
+{
+    uint32_t at = slot << 2;
+    at += (uint32_t)(int32_t)(int16_t)(rosters_team(team)->records << 2);
+    if (g.sflags6 & HI(6)) WriteSRAM(at, 4, buf);
+    else ReadSRAM(at, 4, buf);
+}
+/* cards94.asm:WritePlayerRecord. */
+void WritePlayerRecord(uint32_t slot, uint16_t team, uint32_t buf) { g.sflags6 |= HI(6); PlayerRecordIO(slot, team, buf); }
+
+/* cards94.asm:ReadCrowdRecord. Read team d1's crowd record to a0. */
+void ReadCrowdRecord(uint32_t team, uint32_t buf)
+{
+    g.sflags6 &= (uint16_t)~HI(6);
+    CrowdRecordIO(team, buf);
+}
+
+/* cards94.asm:CrowdRecordIO. Team d1's 16-byte crowd record (CrowdRecBase + team * 16) in save
+ * RAM from / to a0: written when sflags6 bit 6 is set, else read. */
+void CrowdRecordIO(uint32_t team, uint32_t buf)
+{
+    uint32_t at = (team & 0xFFFF0000u) + rosters_crowd_record((uint16_t)team);   /* (asl.w #4 of the long; the roster set's place) */
+    if (g.sflags6 & HI(6)) WriteSRAM(at, 0x10, buf);
+    else ReadSRAM(at, 0x10, buf);
+}
+/* cards94.asm:WriteCrowdRecord. */
+void WriteCrowdRecord(uint32_t team, uint32_t buf) { g.sflags6 |= HI(6); CrowdRecordIO(team, buf); }
+
+/* cards94.asm:ReadTeamRecord. */
+void ReadTeamRecord(uint32_t team, uint32_t buf) { g.sflags6 &= (uint16_t)~HI(6); TeamRecordIO(team, buf); }
+
+/* cards94.asm:TeamRecordIO. Team (or user) d1's 16-byte record (TeamRecBase + d1 * 16) from /
+ * to a0. */
+void TeamRecordIO(uint32_t team, uint32_t buf)
+{
+    uint32_t at = (team & 0xFFFF0000u) | (uint16_t)(team << 4);
+    at += SYM_TeamRecBase;
+    if (g.sflags6 & HI(6)) WriteSRAM(at, 0x10, buf);
+    else ReadSRAM(at, 0x10, buf);
+}
+/* cards94.asm:WriteTeamRecord. */
+void WriteTeamRecord(uint32_t team, uint32_t buf) { g.sflags6 |= HI(6); TeamRecordIO(team, buf); }
 
 /* cards94.asm:WriteNameLog. The user name log to save RAM (NameLogIO). */
 void WriteNameLog(void)
@@ -433,6 +341,111 @@ void NameLogIO(void)
     else ReadSRAM(SYM_NameLogBase, SYM_NameLogBytes, ram_addr(g.namelog));
 }
 
+/* cards94.asm:UpdateRecords. After a game, with save RAM and user records on: the player, crowd
+ * and team records of both teams (ThreeStars is the buffer), then the save RAM checksum. */
+void UpdateRecords(void)
+{
+    if ((int16_t)g.ValidSRAM < 0 || g.OptUserRec != 0) return;
+    CountGoalies();
+    CountPlayers();
+    uint32_t buf = ram_addr(g.ThreeStars);
+    UpdatePlayerRecords(g.HomeTeam, buf, team_struct(0), g.homegoalies, g.VisTeam);
+    UpdatePlayerRecords(g.VisTeam, buf, team_struct(1), g.awaygoalies, g.HomeTeam);
+    UpdateCrowdRecord(buf, g.HomeTeam, g.VisTeam, g.homeuser, g.awayuser, g.homegoalies, team_struct(0));
+    UpdateCrowdRecord(buf, g.VisTeam, g.HomeTeam, g.awayuser, g.homeuser, g.awaygoalies, team_struct(1));
+    UpdateTeamRecord(buf, g.homeuser, g.awayuser, g.HomeTeam, g.VisTeam, team_struct(0), team_struct(1));
+    UpdateTeamRecord(buf, g.awayuser, g.homeuser, g.VisTeam, g.HomeTeam, team_struct(1), team_struct(0));
+    MakeSRAMChecksum();
+}
+
+/* cards94.asm:UpdateTeamRecord. After a game: record d1 (a user's) of team a1 against a2 (team
+ * numbers d3 / d4, the other user d2): count the game (up to 9000), the win or the tie, and on
+ * a win keep the most goals and the biggest margin (as the 68k computes it: word 0 of a2 minus
+ * a2's goals) with who and against whom. a0 = a 16-byte buffer. */
+void UpdateTeamRecord(uint32_t buf, uint32_t rec_no, uint16_t other, uint16_t team, uint16_t vs, struct Team *a1, struct Team *a2)
+{
+    uint8_t *rec = ram_bytes(ram_at(buf), 0x10);
+    ReadTeamRecord(rec_no, buf);
+    int16_t s1 = (int16_t)a1->score, s2 = (int16_t)a2->score;
+    if ((int16_t)rd16(rec + 0xA) < 0x2328) {
+        bump((rec + 0xA));
+        if (s1 > s2) bump((rec + 8));
+        else if (s1 == s2) bump((rec + 0xC));
+    }
+    if (s1 > s2) {
+        if ((int8_t)s1 > (int8_t)rec[0]) { rec[0] = (uint8_t)s1; rec[1] = (uint8_t)team; rec[2] = (uint8_t)vs; rec[3] = (uint8_t)other; }
+        int16_t margin = (int16_t)(a2->shots - s2);
+        if ((int8_t)margin > (int8_t)rec[4]) { rec[4] = (uint8_t)margin; rec[5] = (uint8_t)team; rec[6] = (uint8_t)vs; rec[7] = (uint8_t)other; }
+    }
+    WriteTeamRecord(rec_no, buf);
+}
+
+/* cards94.asm:UpdateCrowdRecord. Team a1 (number d1, d6 goalies, opponent d2, users d4 / d5):
+ * the crowd record keeps the most goals, the most saves by one goalie (worked out in the high
+ * byte of TempWord1) and, for the home team, the loudest crowd (CrowdPeak); written when
+ * anything changed. a0 = a 16-byte buffer. */
+void UpdateCrowdRecord(uint32_t buf, uint32_t team, uint16_t opp, uint16_t user, uint16_t opp_user, uint16_t goalies, struct Team *tm)
+{
+    uint8_t *rec = ram_bytes(ram_at(buf), 0x10);
+    int changed = 0;
+    ReadCrowdRecord(team, buf);
+    uint8_t goals = (uint8_t)tm->score;
+    if ((int8_t)goals > (int8_t)rec[0]) {
+        rec[0] = goals; rec[1] = (uint8_t)user; rec[3] = (uint8_t)opp_user; rec[2] = (uint8_t)opp;
+        changed = 1;
+    }
+    uint8_t saves = 0;
+    uint16_t n = (uint16_t)(goalies - 1);
+    do {
+        uint8_t s = (uint8_t)(tm->pshots[n] - tm->pgoals[n]);
+        g.TempWord1 = (uint16_t)((s << 8) | (g.TempWord1 & 0xFF));
+        if ((int8_t)saves < (int8_t)s) saves = s;
+    } while (n-- != 0);
+    if ((int8_t)saves > (int8_t)rec[4]) {
+        changed = 1;
+        rec[4] = saves; rec[5] = (uint8_t)user; rec[7] = (uint8_t)opp_user; rec[6] = (uint8_t)opp;
+    }
+    if ((uint16_t)team == g.HomeTeam && (int16_t)rec[8] < (int16_t)g.CrowdPeak) {
+        changed = 1;
+        rec[8] = (uint8_t)g.CrowdPeak; rec[9] = (uint8_t)user; rec[0xB] = (uint8_t)opp_user; rec[0xA] = (uint8_t)opp;
+    }
+    if (changed) WriteCrowdRecord(team, buf);
+}
+
+/* cards94.asm:UpdatePlayerRecords. After a game, team a2 (number d1, d5 goalies, opponent d6):
+ * each roster slot's record keeps the best game (goals, or saves for the goalies) with the user
+ * names and the opponent. a0 = a 4-byte buffer. */
+void UpdatePlayerRecords(uint32_t team, uint32_t buf, struct Team *tm, uint16_t goalies, uint16_t opponent)
+{
+    uint8_t *rec = ram_bytes(ram_at(buf), 4);
+    for (uint16_t slot = 0; slot < 0x1A; slot++) {
+        ReadPlayerRecord(slot, (uint16_t)team, buf);
+        uint8_t best = (int16_t)slot >= (int16_t)goalies ? tm->pgoals[slot]
+                                                         : (uint8_t)(tm->pshots[slot] - tm->pgoals[slot]);                 /* goalie: saves */
+        if ((int8_t)best <= (int8_t)rec[0]) continue;
+        rec[0] = best;
+        int home = tm == team_struct(0);
+        rec[1] = (uint8_t)(home ? g.homeuser : g.awayuser);
+        rec[3] = (uint8_t)(home ? g.awayuser : g.homeuser);
+        rec[2] = (uint8_t)opponent;
+        WritePlayerRecord(slot, (uint16_t)team, buf);
+    }
+}
+
+/* cards94.asm:CountGoalies. homegoalies / awaygoalies = the goalies of each team. */
+void CountGoalies(void)
+{
+    g.homegoalies = GetGoalieCount(team_struct(0));
+    g.awaygoalies = GetGoalieCount(team_struct(1));
+}
+
+/* cards94.asm:CountPlayers. homeplayers / awayplayers = the players of each team. */
+void CountPlayers(void)
+{
+    g.homeplayers = GetPlayerCount(team_struct(0));
+    g.awayplayers = GetPlayerCount(team_struct(1));
+}
+
 /* cards94.asm:AppendUserName. User d2's name (12 bytes of namelog, a 0 as a space) as a String at
  * a1, trimmed (TrimSpaces) with sflags6 bit 7; user 0: an empty String (NoNameTxt). */
 void AppendUserName(uint32_t buf, uint16_t user)
@@ -448,98 +461,6 @@ void AppendUserName(uint32_t buf, uint16_t user)
     wr16(b, 0xE);
     if (g.sflags6 & HI(7)) TrimSpaces(buf);
 }
-
-/* cards94.asm:AppendTeamName. Append the abbreviation of team d0 (its low byte) to a1. */
-void AppendTeamName(uint16_t team, uint32_t buf)
-{
-    appstring_p(roster_text(&rosters_team((uint16_t)(int16_t)(int8_t)team)->abbr), buf);
-}
-
-/* cards94.asm:TrimSpaces. Drop the trailing spaces of String a2 (zeroed) and pad its length to
- * even. */
-void TrimSpaces(uint32_t str)
-{
-    uint8_t *s = ram_bytes(ram_at(str), m16(str)), *p = s + rd16(s);
-    while (*--p == ' ') {
-        *p = 0;
-        wr16(s, (uint16_t)(rd16(s) - 1));
-    }
-    wr16(s, (uint16_t)((rd16(s) + 1) & 0xFE));
-}
-
-/* ---- the matchups' pictures and ratings (scouting report) ------------------------------------ */
-
-/* cards94.asm:DrawPlayerPicture. -> a0 = the picture of player d0 of team d1: his from the team's
- * FeaturedPictures list, else a stock one (NoPicGoalie1 / 2, NoPicSkater1 / 2 by the bit 0 of his
- * fifth attribute byte; the first as many players as the team's .sodds word has nibbles are its
- * goalies). */
-uint32_t DrawPlayerPicture(uint16_t player, uint16_t team)
-{
-    const struct RosterTeam *T = rosters_team(team);
-    for (int k = 0; k < T->pictures; k++)
-        if (T->picture[k].slot == player) return T->picture[k].pic;
-    int pic1 = T->player[player].rating[LR_HANDED_FIGHTING] & 1;
-    if ((int16_t)player < (int16_t)T->goalies) return pic1 ? ART(NoPicGoalie1) : ART(NoPicGoalie2);
-    return pic1 ? ART(NoPicSkater2) : ART(NoPicSkater1);
-}
-
-/* cards94.asm:CalcAttrib. The rating of player d0 of team a2 for the attributes set in the high
- * word of d4 (bit 15 down to 0, a nibble each, from the end of his 8 attribute bytes back): each
- * nibble times its weight / 2 (OvrPlayerWgtList / OvrGoalWgtList for the overall masks, else
- * AttribWgtList; the Wgt and Fight nibbles as they are). The overall ratings add the average of
- * his hot / cold bytes ($1A2 of the team struct: OvrDivisor / OvrDividend); the others scale each
- * nibble by 18 and add its hot / cold byte (a negative low byte cleared) -> d0 = the sum, d1 =
- * 100 a nibble counted (100 for the overall ones); d0 at or past d1 becomes d1 - 1. */
-uint16_t CalcAttrib(uint16_t player, struct Team *tm, uint32_t mask, uint16_t *div)
-{
-    g.OvrDivisor = 0;
-    g.OvrDividend = 0;
-    uint32_t weights = SYM_AttribWgtList;
-    if (mask == rd32(rom_ptr(SYM_PAttribOverallMask))) weights = SYM_OvrPlayerWgtList;
-    if (mask == rd32(rom_ptr(SYM_GAttribOverallMask))) weights = SYM_OvrGoalWgtList;
-    const struct RosterPlayer *P = &rosters_team(tm->team)->player[player];
-    const uint8_t *hotcold = tm->hotcold[player] + 0x10;                        /* the end of his hot / cold bytes */
-    uint16_t d0 = 0, d1 = 0, bits = (uint16_t)(mask >> 16);
-    for (int16_t d2 = 0xF; d2 >= 0; d2--) {
-        if (!(bits & (1u << d2))) continue;
-        uint16_t d3 = roster_attr(P, 7 - (d2 >> 1));        /* (his 8 bytes from the end back: 7, his last ratings, to 0, his number) */
-        if (d2 & 1) d3 >>= 4;
-        d3 &= 0xF;
-        if (d2 != 0xD && d2 != 6) {
-            int16_t w = (int8_t)rom_ptr(weights)[d2];
-            if (w != 2) d3 = (uint16_t)((int16_t)(uint16_t)(d3 * (uint16_t)w) >> 1);   /* (the 68k adds it w - 1 more times, mod 2^16) */
-            if (weights != SYM_AttribWgtList) {
-                g.OvrDivisor += (uint16_t)(int8_t)hotcold[-d2 - 1];
-                g.OvrDividend++;
-            } else {
-                d3 = (uint16_t)(d3 * 18);
-                uint8_t lo = (uint8_t)(d3 + hotcold[-d2 - 1]);
-                if (lo & 0x80) lo = 0;
-                d3 = (uint16_t)((d3 & 0xFF00) | lo);
-            }
-        }
-        d0 = (uint16_t)(d0 + d3);
-        d1 = (uint16_t)(d1 + 100);
-    }
-    if (weights != SYM_AttribWgtList) {
-        d1 = 100;
-        d0 = (uint16_t)(d0 + (uint16_t)m68k_divs((int32_t)(int16_t)g.OvrDivisor, (int16_t)g.OvrDividend));
-    }
-    if ((int16_t)d0 >= (int16_t)d1) {
-        d1 = d0;
-        d0--;
-    }
-    *div = d1;
-    return d0;
-}
-
-/* ---- the Player Cards menu item ------------------------------------------------------------------ */
-
-/* the card's team: the visitors when cardvis is set */
-static uint16_t card_team(void) { return g.cardvis ? g.VisTeam : g.HomeTeam; }
-
-/* cards94.asm:GetCardTeam. a0 = the card's team struct. */
-struct Team *GetCardTeam(void) { return team_struct(g.cardvis != 0); }
 
 /* cards94.asm:PlayerCards. The Player Cards (a menu item, with save RAM only): 40 columns, the
  * card screen picture, the corner logo and the arena, the card orders (BuildCardPlayerLists),
@@ -738,6 +659,27 @@ void ClearCardText(uint16_t x, uint16_t y)
     for (int i = 0; i < 4; i++) g.palfadenew[0x11 + i] = keep[i];
 }
 
+/* cards94.asm:PrintCrowdRecordLine. The crowd level record line (CrowdLevelTxt). */
+void PrintCrowdRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam)
+{
+    g.TempMaxSpd = SYM_CrowdLevelTxt;
+    PrintCardRecordLine(x, y, value, holder, vsuser, vsteam);
+}
+
+/* cards94.asm:PrintSaveRecordLine. The saves record line (CardSavesTxt / CardSavesByTxt). */
+void PrintSaveRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam)
+{
+    g.TempMaxSpd = record_label(SYM_CardSavesTxt, SYM_CardSavesByTxt, value, holder);
+    PrintCardRecordLine(x, y, value, holder, vsuser, vsteam);
+}
+
+/* cards94.asm:PrintGoalRecordLine. The goals record line (CardGoalsTxt / CardGoalsByTxt). */
+void PrintGoalRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam)
+{
+    g.TempMaxSpd = record_label(SYM_CardGoalsTxt, SYM_CardGoalsByTxt, value, holder);
+    PrintCardRecordLine(x, y, value, holder, vsuser, vsteam);
+}
+
 /* cards94.asm:PrintCardRecordLine. A record line at (d0, d1) when there is one (d2): the value and
  * its label (TempMaxSpd), then the holder (d3) and " vs.", then the opponent's user (d4) and
  * city (d5). */
@@ -764,33 +706,10 @@ void PrintCardRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, 
     printsmall(MESAREA);
 }
 
-/* cards94.asm:PrintCrowdRecordLine. The crowd level record line (CrowdLevelTxt). */
-void PrintCrowdRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam)
+/* cards94.asm:AppendTeamName. Append the abbreviation of team d0 (its low byte) to a1. */
+void AppendTeamName(uint16_t team, uint32_t buf)
 {
-    g.TempMaxSpd = SYM_CrowdLevelTxt;
-    PrintCardRecordLine(x, y, value, holder, vsuser, vsteam);
-}
-
-/* the record label: "<n> Saves" / "Saves by" (with a holder), the singular after it for 1 */
-static uint32_t record_label(uint32_t plain, uint32_t by, uint8_t value, uint8_t holder)
-{
-    uint32_t a1 = holder ? by : plain;
-    if (value == 1) a1 += rd16(rom_ptr(a1));
-    return a1;
-}
-
-/* cards94.asm:PrintSaveRecordLine. The saves record line (CardSavesTxt / CardSavesByTxt). */
-void PrintSaveRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam)
-{
-    g.TempMaxSpd = record_label(SYM_CardSavesTxt, SYM_CardSavesByTxt, value, holder);
-    PrintCardRecordLine(x, y, value, holder, vsuser, vsteam);
-}
-
-/* cards94.asm:PrintGoalRecordLine. The goals record line (CardGoalsTxt / CardGoalsByTxt). */
-void PrintGoalRecordLine(uint16_t x, uint16_t y, uint8_t value, uint8_t holder, uint8_t vsuser, uint8_t vsteam)
-{
-    g.TempMaxSpd = record_label(SYM_CardGoalsTxt, SYM_CardGoalsByTxt, value, holder);
-    PrintCardRecordLine(x, y, value, holder, vsuser, vsteam);
+    appstring_p(roster_text(&rosters_team((uint16_t)(int16_t)(int8_t)team)->abbr), buf);
 }
 
 /* cards94.asm:PrintOverallRating. "Overall Rating" at (d1, d2): player d0's (CalcAttrib with the
@@ -833,6 +752,56 @@ void PrintStartingLine(uint16_t x, uint16_t y)
         printsmall(FormatPlayerNameShort(p, tm));
         g.printy++;
     }
+}
+
+/* cards94.asm:CalcAttrib. The rating of player d0 of team a2 for the attributes set in the high
+ * word of d4 (bit 15 down to 0, a nibble each, from the end of his 8 attribute bytes back): each
+ * nibble times its weight / 2 (OvrPlayerWgtList / OvrGoalWgtList for the overall masks, else
+ * AttribWgtList; the Wgt and Fight nibbles as they are). The overall ratings add the average of
+ * his hot / cold bytes ($1A2 of the team struct: OvrDivisor / OvrDividend); the others scale each
+ * nibble by 18 and add its hot / cold byte (a negative low byte cleared) -> d0 = the sum, d1 =
+ * 100 a nibble counted (100 for the overall ones); d0 at or past d1 becomes d1 - 1. */
+uint16_t CalcAttrib(uint16_t player, struct Team *tm, uint32_t mask, uint16_t *div)
+{
+    g.OvrDivisor = 0;
+    g.OvrDividend = 0;
+    uint32_t weights = SYM_AttribWgtList;
+    if (mask == rd32(rom_ptr(SYM_PAttribOverallMask))) weights = SYM_OvrPlayerWgtList;
+    if (mask == rd32(rom_ptr(SYM_GAttribOverallMask))) weights = SYM_OvrGoalWgtList;
+    const struct RosterPlayer *P = &rosters_team(tm->team)->player[player];
+    const uint8_t *hotcold = tm->hotcold[player] + 0x10;                        /* the end of his hot / cold bytes */
+    uint16_t d0 = 0, d1 = 0, bits = (uint16_t)(mask >> 16);
+    for (int16_t d2 = 0xF; d2 >= 0; d2--) {
+        if (!(bits & (1u << d2))) continue;
+        uint16_t d3 = roster_attr(P, 7 - (d2 >> 1));        /* (his 8 bytes from the end back: 7, his last ratings, to 0, his number) */
+        if (d2 & 1) d3 >>= 4;
+        d3 &= 0xF;
+        if (d2 != 0xD && d2 != 6) {
+            int16_t w = (int8_t)rom_ptr(weights)[d2];
+            if (w != 2) d3 = (uint16_t)((int16_t)(uint16_t)(d3 * (uint16_t)w) >> 1);   /* (the 68k adds it w - 1 more times, mod 2^16) */
+            if (weights != SYM_AttribWgtList) {
+                g.OvrDivisor += (uint16_t)(int8_t)hotcold[-d2 - 1];
+                g.OvrDividend++;
+            } else {
+                d3 = (uint16_t)(d3 * 18);
+                uint8_t lo = (uint8_t)(d3 + hotcold[-d2 - 1]);
+                if (lo & 0x80) lo = 0;
+                d3 = (uint16_t)((d3 & 0xFF00) | lo);
+            }
+        }
+        d0 = (uint16_t)(d0 + d3);
+        d1 = (uint16_t)(d1 + 100);
+    }
+    if (weights != SYM_AttribWgtList) {
+        d1 = 100;
+        d0 = (uint16_t)(d0 + (uint16_t)m68k_divs((int32_t)(int16_t)g.OvrDivisor, (int16_t)g.OvrDividend));
+    }
+    if ((int16_t)d0 >= (int16_t)d1) {
+        d1 = d0;
+        d0--;
+    }
+    *div = d1;
+    return d0;
 }
 
 /* cards94.asm:PrintCardPosition. At (d1, d2) player d0's number (GetJerseyString) and Goalie,
@@ -934,6 +903,22 @@ void PrintSaves(uint16_t player, uint16_t x, uint16_t y)
     printsmall(MESAREA);
 }
 
+/* ---- the matchups' pictures and ratings (scouting report) ------------------------------------ */
+
+/* cards94.asm:DrawPlayerPicture. -> a0 = the picture of player d0 of team d1: his from the team's
+ * FeaturedPictures list, else a stock one (NoPicGoalie1 / 2, NoPicSkater1 / 2 by the bit 0 of his
+ * fifth attribute byte; the first as many players as the team's .sodds word has nibbles are its
+ * goalies). */
+uint32_t DrawPlayerPicture(uint16_t player, uint16_t team)
+{
+    const struct RosterTeam *T = rosters_team(team);
+    for (int k = 0; k < T->pictures; k++)
+        if (T->picture[k].slot == player) return T->picture[k].pic;
+    int pic1 = T->player[player].rating[LR_HANDED_FIGHTING] & 1;
+    if ((int16_t)player < (int16_t)T->goalies) return pic1 ? ART(NoPicGoalie1) : ART(NoPicGoalie2);
+    return pic1 ? ART(NoPicSkater2) : ART(NoPicSkater1);
+}
+
 /* cards94.asm:DrawPictureBox. The card player's picture (DrawPlayerPicture; no map: the common
  * one) unpacked and drawn at (1, 8), its palette's second half to palette 2. */
 void DrawPictureBox(void)
@@ -947,6 +932,21 @@ void DrawPictureBox(void)
     UnpackPicture(pic + 8);
     pal_load(0x20, rom_ptr(pal + 0x20), 0x10);
     dobitmap(pal, map, ram_addr(g.picturebuf), 0, 0, 6, 6, g.cardlogochars2, 0);
+}
+
+/* cards94.asm:GetCardTeam. a0 = the card's team struct. */
+struct Team *GetCardTeam(void) { return team_struct(g.cardvis != 0); }
+
+/* cards94.asm:TrimSpaces. Drop the trailing spaces of String a2 (zeroed) and pad its length to
+ * even. */
+void TrimSpaces(uint32_t str)
+{
+    uint8_t *s = ram_bytes(ram_at(str), m16(str)), *p = s + rd16(s);
+    while (*--p == ' ') {
+        *p = 0;
+        wr16(s, (uint16_t)(rd16(s) - 1));
+    }
+    wr16(s, (uint16_t)((rd16(s) + 1) & 0xFE));
 }
 
 /* cards94.asm:GetCardPlayer. cardplayer = the roster index of card cardindex (from 1) of the card

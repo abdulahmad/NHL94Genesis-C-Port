@@ -2,10 +2,6 @@
 #include "game.h"
 #include "hal.h"
 
-/* fourway94.asm:Set4WayPlayerStub. An empty Set4WayPlayer (an rts): forcepldata calls it with
- * SCnum $F when a goalie is pulled. */
-void Set4WayPlayerStub(struct SortObj *o) {}
-
 /* fourway94.asm:Detect4WayPlay. Look for EA's 4 Way Play adaptor on port 2 (FourWayPlay = 1
  * when found), with the Z80 held in reset. */
 void Detect4WayPlay(void)
@@ -24,3 +20,7 @@ void Detect4WayPlay(void)
     }
     z80_reset(0x100);
 }
+
+/* fourway94.asm:Set4WayPlayerStub. An empty Set4WayPlayer (an rts): forcepldata calls it with
+ * SCnum $F when a goalie is pulled. */
+void Set4WayPlayerStub(struct SortObj *o) {}

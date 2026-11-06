@@ -585,12 +585,6 @@ static void setass(uint16_t ass, struct Team *team)
     }
 }
 
-/* collide94.asm:GetPeriodTimeRemaining. d0 = (gsp << 14 | PerTimeTotal) - gameclock. */
-uint16_t GetPeriodTimeRemaining(void)
-{
-    return (uint16_t)(((g.gsp << 14) | g.PerTimeTotal) - g.gameclock);
-}
-
 /* collide94.asm:checkgoal. a2 = goal object, a3 = object, d2/d3 = x/y. A puck under the
  * crossbar hits a post or the net (deflecting, with a sound and the crowd) or goes in; a
  * player goes to checkgoalp. Called from checkwallcoll. */
@@ -781,6 +775,12 @@ goal:
     assreplace(0x1A, o);                                 /* puckunflip */
     SetSPA(o + 1, SPAsiren);                             /* the goal light object follows the puck */
     AddPenalty2(0xE, sortobj_at(a1->sort));              /* the other team's first object: faceoff */
+}
+
+/* collide94.asm:GetPeriodTimeRemaining. d0 = (gsp << 14 | PerTimeTotal) - gameclock. */
+uint16_t GetPeriodTimeRemaining(void)
+{
+    return (uint16_t)(((g.gsp << 14) | g.PerTimeTotal) - g.gameclock);
 }
 
 /* collide94.asm:checkgoalp. Player a3 against goal a2 (oval): CheckBump, then wallcoll without
@@ -1276,13 +1276,6 @@ void deflect(struct SortObj *puck)
     puckflip(puck->Zvel, puck);
 }
 
-/* collide94.asm:getpde. a3 = player -> d0 = his energy level (tmpde of his team). */
-int16_t getpde(struct SortObj *pl)
-{
-    struct Team *tm = team_struct(pl->pflags & (1 << pfteam));
-    return (int16_t)tm->pde[(int8_t)pl->pnum];
-}
-
 /* collide94.asm:makepde. Scale d0 by player a0's energy level (full while sflags7 bit 4). */
 uint16_t makepde(int8_t v, struct SortObj *pl)
 {
@@ -1291,6 +1284,13 @@ uint16_t makepde(int8_t v, struct SortObj *pl)
         e = 0x1000;
     uint32_t prod = (uint32_t)((int32_t)e * v) << 4;
     return (uint16_t)(prod >> 16);
+}
+
+/* collide94.asm:getpde. a3 = player -> d0 = his energy level (tmpde of his team). */
+int16_t getpde(struct SortObj *pl)
+{
+    struct Team *tm = team_struct(pl->pflags & (1 << pfteam));
+    return (int16_t)tm->pde[(int8_t)pl->pnum];
 }
 
 /* collide94.asm:setpde. d1 = roster number * 2, a2 = team, d0 = new energy level (floor 0). */
@@ -1352,20 +1352,6 @@ void setpersonel(struct Team *team)
     }
 }
 
-/* collide94.asm:TryAddPlayerToList. d0 = player number (1 based), d4 = PlList slot. Put him in
- * the slot if he is on the bench or ice and not in the list yet; returns 0 if not. */
-int TryAddPlayerToList(struct Team *team, uint16_t player, int slot)
-{
-    int16_t st = (int16_t)team->pdst[player - 1];
-    if (st > 0 || st == -3 || st == -4)
-        return 0;
-    for (int i = 5; i >= 0; i--)
-        if (g.PlList[i] == (uint8_t)player)
-            return 0;
-    g.PlList[slot] = (uint8_t)player;
-    return 1;
-}
-
 /* collide94.asm:SetPlList. Build PlList, the players wanted on the ice now, from the current
  * line by position priority; an unavailable player is replaced from the substitution list for
  * his position, or from the whole roster. */
@@ -1411,6 +1397,20 @@ void SetPlList(struct Team *team)
             }
         }
     }
+}
+
+/* collide94.asm:TryAddPlayerToList. d0 = player number (1 based), d4 = PlList slot. Put him in
+ * the slot if he is on the bench or ice and not in the list yet; returns 0 if not. */
+int TryAddPlayerToList(struct Team *team, uint16_t player, int slot)
+{
+    int16_t st = (int16_t)team->pdst[player - 1];
+    if (st > 0 || st == -3 || st == -4)
+        return 0;
+    for (int i = 5; i >= 0; i--)
+        if (g.PlList[i] == (uint8_t)player)
+            return 0;
+    g.PlList[slot] = (uint8_t)player;
+    return 1;
 }
 
 /* collide94.asm:SetupPenaltyShot. Team a2: the shooter plays centre, the goalie stays, every
@@ -1510,16 +1510,6 @@ void Setplass(struct SortObj *o)
     assreplace(alist[o->position], o);
 }
 
-/* collide94.asm:ClampNibble. Clamp byte d3 to 0-$1E. */
-uint8_t ClampNibble(uint8_t v)
-{
-    if ((int8_t)v < 0)
-        return 0;
-    if ((int8_t)v > 0x1E)
-        return 0x1E;
-    return v;
-}
-
 /* collide94.asm:setplayer. Bring player d3 of the roster onto the ice as sort object a3 and set
  * his attributes from the team data, through AttributeCalc, with the power play / penalty kill,
  * home / away and third period bonuses. */
@@ -1611,4 +1601,14 @@ void setplayer(uint16_t roster, struct SortObj *o)
     o->aggress = roster_attr(P, 7);                           /* (pass accuracy and aggressiveness, a moment) */
     g.TempWord2 = 0xF; d3 = AttributeCalc(o->aggress & 0xF, o);
     o->aggress = d3 & 0xF;
+}
+
+/* collide94.asm:ClampNibble. Clamp byte d3 to 0-$1E. */
+uint8_t ClampNibble(uint8_t v)
+{
+    if ((int8_t)v < 0)
+        return 0;
+    if ((int8_t)v > 0x1E)
+        return 0x1E;
+    return v;
 }

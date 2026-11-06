@@ -10,23 +10,6 @@
 #define PRINTZ(s) printz(s, sizeof s)
 #define BUF (ram_addr(g.nameentrybuf))
 
-/* records94.asm:UserNameEntry. With user records on (OptUserRec 0): the name entry for pad 1's
- * team, then pad 2's when it has the other. */
-void UserNameEntry(void)
-{
-    if (g.OptUserRec != 0) return;
-    g.homeuser = 0;
-    g.awayuser = 0;
-    if (g.cont1team != 0) {
-        g.nameentryvis = (uint16_t)(g.cont1team - 1);
-        NameEntryScreen();
-    }
-    if (g.cont2team != 0 && g.cont1team != g.cont2team) {
-        g.nameentryvis = (uint16_t)(g.cont2team - 1);
-        NameEntryScreen();
-    }
-}
-
 /* the letter grid cursor: erase the box at letter d5 (eraser with char 1) and print the letter
  * over it without the frame */
 static void unframe_letter(uint16_t d5)
@@ -471,6 +454,23 @@ void WriteNameRecord(void)
     for (int b = 0; b < 0x10; b++) r[b] = 0;
     WriteSRAM(at, 0x10, ram_addr(g.ThreeStars));
     MakeSRAMChecksum();
+}
+
+/* records94.asm:UserNameEntry. With user records on (OptUserRec 0): the name entry for pad 1's
+ * team, then pad 2's when it has the other. */
+void UserNameEntry(void)
+{
+    if (g.OptUserRec != 0) return;
+    g.homeuser = 0;
+    g.awayuser = 0;
+    if (g.cont1team != 0) {
+        g.nameentryvis = (uint16_t)(g.cont1team - 1);
+        NameEntryScreen();
+    }
+    if (g.cont2team != 0 && g.cont1team != g.cont2team) {
+        g.nameentryvis = (uint16_t)(g.cont2team - 1);
+        NameEntryScreen();
+    }
 }
 
 /* records94.asm:SkipOtherUserName. When namelogsel is the name the other pad picked, step past it

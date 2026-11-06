@@ -31,6 +31,24 @@ void ShootoutModeBox(void)
     print(PushNumberWidth(g.shootoutround, 2));
 }
 
+/* shootout94.asm:ClearShootout. Clear the player structs ($800 bytes from SortCords) and the
+ * shootout state: round 1, no goals, both shooter lists. */
+void ClearShootout(void)
+{
+    ram_fill(RAM(SortCords), 0, 0x800);
+    g.shootoutdelay = 0;
+    g.shootoutround = 1;
+    g.gmode2 &= (uint16_t)~HI(3);
+    g.homeshootgoals = 0;
+    g.awayshootgoals = 0;
+    g.homeshootnum = 0;
+    g.shootoutteam = 0;
+    InitShooters();
+    g.shootoutteam = 1;
+    InitShooters();
+    g.shootoutteam = 0;
+}
+
 /* shootout94.asm:NextShooter. The next shootout shooter: BA_Team, the goalie he faces, his
  * roster slot from the team's shooter list, and a new skate path (for a3). After the end of the
  * shootout (gmode2 bit 3), back to the front end. */
@@ -62,18 +80,6 @@ void CountShootoutGoals(void)
     g.shootoutround++;
 }
 
-/* shootout94.asm:ShootoutWonBy. "SHOOTOUT WON BY" and the winning team's name, in the big font. */
-void ShootoutWonBy(void)
-{
-    printz(str_ShootoutWonBy_1, sizeof str_ShootoutWonBy_1);
-    Framer(0x1E, 6);
-    printbigz(str_ShootoutWonBy_2, sizeof str_ShootoutWonBy_2);
-    g.printy += 2;
-    uint16_t team = (int16_t)g.homeshootgoals > (int16_t)g.awayshootgoals ? g.HomeTeam : g.VisTeam;
-    g.printx = 2;
-    printbig_p(roster_text(&rosters_team(team)->city));
-}
-
 /* shootout94.asm:InitShooters. The six starters of the home team (shootoutteam 0: the list
  * below homeshootnum) or the away team (below shootoutteam), roster index - 1 each. */
 void InitShooters(void)
@@ -85,22 +91,16 @@ void InitShooters(void)
     for (int i = 5; i >= 0; i--) wr16(list + 2 * i, (uint16_t)(*a1++ - 1));   /* (written from the end) */
 }
 
-/* shootout94.asm:ClearShootout. Clear the player structs ($800 bytes from SortCords) and the
- * shootout state: round 1, no goals, both shooter lists. */
-void ClearShootout(void)
+/* shootout94.asm:ShootoutWonBy. "SHOOTOUT WON BY" and the winning team's name, in the big font. */
+void ShootoutWonBy(void)
 {
-    ram_fill(RAM(SortCords), 0, 0x800);
-    g.shootoutdelay = 0;
-    g.shootoutround = 1;
-    g.gmode2 &= (uint16_t)~HI(3);
-    g.homeshootgoals = 0;
-    g.awayshootgoals = 0;
-    g.homeshootnum = 0;
-    g.shootoutteam = 0;
-    InitShooters();
-    g.shootoutteam = 1;
-    InitShooters();
-    g.shootoutteam = 0;
+    printz(str_ShootoutWonBy_1, sizeof str_ShootoutWonBy_1);
+    Framer(0x1E, 6);
+    printbigz(str_ShootoutWonBy_2, sizeof str_ShootoutWonBy_2);
+    g.printy += 2;
+    uint16_t team = (int16_t)g.homeshootgoals > (int16_t)g.awayshootgoals ? g.HomeTeam : g.VisTeam;
+    g.printx = 2;
+    printbig_p(roster_text(&rosters_team(team)->city));
 }
 
 /* ---- the Shootout Shooters menu item ------------------------------------------------------------- */
