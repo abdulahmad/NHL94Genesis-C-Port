@@ -61,16 +61,11 @@ uint16_t LoadHomeTeamGfx(uint16_t start)
     return DecompressGraphicsPlain(gfx, (uint16_t)(start - 0x18));
 }
 
-/* PrintPlayerGoals / PrintPlayerAssists: " (n)" with byte d0 of the team table, then the next
- * row at x $E */
-void PrintParenNumber(const uint8_t *table, uint16_t player)
+/* ui94.asm:PrintPlayerAssists. d0 = player, a2 = team: " (assists)", next row. */
+void PrintPlayerAssists(uint16_t player, struct Team *tm)
 {
-    int16_t n = (int8_t)table[(int16_t)player];
-    uint16_t width = n > 0x63 ? 3 : n > 9 ? 2 : 1;
-    print(PushNumberWidth((uint16_t)n, width));
-    printz(str_PrintParenNumber_1, sizeof str_PrintParenNumber_1);
-    g.printy++;
-    g.printx = 0xE;
+    printz(str_PrintPlayerAssists_1, sizeof str_PrintPlayerAssists_1);
+    PrintParenNumber(tm->passists, player);
 }
 
 /* ui94.asm:PrintPlayerGoals. d0 = player, a2 = team: " (goals)", next row. */
@@ -80,11 +75,16 @@ void PrintPlayerGoals(uint16_t player, struct Team *tm)
     PrintParenNumber(tm->pgoals, player);
 }
 
-/* ui94.asm:PrintPlayerAssists. d0 = player, a2 = team: " (assists)", next row. */
-void PrintPlayerAssists(uint16_t player, struct Team *tm)
+/* ui94.asm:PrintParenNumber. " (n)" with byte d0 of the team table, then the next
+ * row at x $E */
+void PrintParenNumber(const uint8_t *table, uint16_t player)
 {
-    printz(str_PrintPlayerAssists_1, sizeof str_PrintPlayerAssists_1);
-    PrintParenNumber(tm->passists, player);
+    int16_t n = (int8_t)table[(int16_t)player];
+    uint16_t width = n > 0x63 ? 3 : n > 9 ? 2 : 1;
+    print(PushNumberWidth((uint16_t)n, width));
+    printz(str_PrintParenNumber_1, sizeof str_PrintParenNumber_1);
+    g.printy++;
+    g.printx = 0xE;
 }
 
 /* move a coordinate half way to a target (sub / asr.w #1 / add) */
@@ -221,9 +221,6 @@ void CountButtonPress(int16_t pad, struct SortObj *o)
  * (PlayedByText), or an empty String. */
 uint32_t PlayedByHome(void) { return PlayedByText(g.homeuser); }
 
-/* ui94.asm:PlayedByAway. The same for awayuser ('%'). */
-uint32_t PlayedByAway(void) { return PlayedByText(g.awayuser); }
-
 /* ui94.asm:PlayedByText. User d0's name (GetLogName from the name log, as a String at
  * nameentrybuf) in "(played by NAME)" at TempBuffer -> a1; user 0: PlayedByNone. */
 uint32_t PlayedByText(uint16_t user)
@@ -240,9 +237,12 @@ uint32_t PlayedByText(uint16_t user)
     return PlayedByExit(ram_addr(g.TempBuffer));
 }
 
+/* ui94.asm:PlayedByExit. The common exit -> a1. */
+uint32_t PlayedByExit(uint32_t a1) { return a1; }
+
 /* ui94.asm:PlayedByNone. No user: the empty String. */
 uint32_t PlayedByNone(void) { return PlayedByExit(SYM_PlayedByEmptyTxt); }
 
-/* ui94.asm:PlayedByExit. The common exit -> a1. */
-uint32_t PlayedByExit(uint32_t a1) { return a1; }
+/* ui94.asm:PlayedByAway. The same for awayuser ('%'). */
+uint32_t PlayedByAway(void) { return PlayedByText(g.awayuser); }
 

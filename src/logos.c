@@ -5,12 +5,6 @@
 #include "ram.h"
 #include "mem.h"
 
-/* logos94.asm:ClearLeadSong. */
-void ClearLeadSong(void) { g.sflags2 &= (uint16_t)~HI(5); }
-
-/* logos94.asm:LeadSongExit. LeadSong's exit: sflags2 as it was on entry. */
-void LeadSongExit(uint16_t sflags2) { g.sflags2 = sflags2; }
-
 /* logos94.asm:LeadSong. Outside a shootout, when one team leads: choose the lead song (SongIndex
  * 1 when the home team leads, 4 when the away team does) and flag it in sflags8 bit 6. The
  * sflags2 bits it tests on the way are put back on exit. */
@@ -37,12 +31,11 @@ void LeadSong(void)
     LeadSongExit(saved);
 }
 
-/* logos94.asm:clrTmPdst. Team a0: all 26 roster slots on the bench (-2), then the end word -1. */
-void clrTmPdst(struct Team *tm)
-{
-    for (int i = 0; i < 26; i++) tm->pdst[i] = 0xFFFE;
-    tm->penbox[0] = tm->penbox[1] = 0xFF;                 /* (the end word -1 after them: the penalty box empty) */
-}
+/* logos94.asm:ClearLeadSong. */
+void ClearLeadSong(void) { g.sflags2 &= (uint16_t)~HI(5); }
+
+/* logos94.asm:LeadSongExit. LeadSong's exit: sflags2 as it was on entry. */
+void LeadSongExit(uint16_t sflags2) { g.sflags2 = sflags2; }
 
 /* logos94.asm:ClearPenalties. No penalties: the counters, PenBuf and both teams' slots. */
 void ClearPenalties(void)
@@ -53,6 +46,13 @@ void ClearPenalties(void)
     ram_fill(RAM(PenBuf), 0, 0x44);                       /* 17 longs: PenBuf and the word after */
     clrTmPdst(team_struct(0));
     clrTmPdst(team_struct(1));
+}
+
+/* logos94.asm:clrTmPdst. Team a0: all 26 roster slots on the bench (-2), then the end word -1. */
+void clrTmPdst(struct Team *tm)
+{
+    for (int i = 0; i < 26; i++) tm->pdst[i] = 0xFFFE;
+    tm->penbox[0] = tm->penbox[1] = 0xFF;                 /* (the end word -1 after them: the penalty box empty) */
 }
 
 /* logos94.asm:HotColdIcon. Team a2: the icon by the name of iconplayer (x 2 away, $20 home,
