@@ -59,6 +59,8 @@ make nhl94
 ./build/nhl94          # the first time, it asks for your ROM (or give it with --rom FILE)
 ```
 
+**PortMaster / RG35XX:** zip layout and launch script are in [`portmaster/`](portmaster/). Handheld first launch is 60 Hz, overlay only, SDL_Renderer / KMSDRM (no desktop OpenGL). Copy your dump to `roms/nhl94.gen`. `./portmaster/pack.sh` builds `nhl94g.zip`. Private zip; the ROM is never included.
+
 | | Player 1 | Player 2 |
 |---|---|---|
 | D-pad | arrows | I J K L |
@@ -69,24 +71,16 @@ Game controllers work too (the first two are players 1 and 2).
 
 | Key | |
 |---|---|
-| F1 | mute |
-| F2 / F3 | volume down / up |
-| F4 (held) | rewind |
-| F5 | pause |
-| F6 (held) | fast-forward |
-| F7 | slow motion on / off |
-| F8 | a frame at a time, while paused |
-| F10 | save the replay: the last 20 seconds, as a GIF (in `videos/`) |
-| F11 | start / stop recording a GIF |
-| F12 | screenshot (a PNG in `screenshots/`) |
-| Esc | the menu: save and load states there |
+| `` ` `` / F11 | overlay menu. Esc backs out of a page |
+| F12 | stats |
 | Alt+Enter | full screen |
 
 ## Playing
 
 ### The menu
 
-Esc (or a controller's Back button) opens it; arrows and Enter, or the d-pad, A and B, work it.
+`` ` ``, F11, or a controller's Back button opens it. Esc backs out of a page. Arrows and Enter, or the d-pad, A and B, work it. The window's menu bar (windowed desktop) changes the same video settings and does not list Resume or Quit.
+The picture is Overbar's 4:3 dest of a 240-line canvas with the 224-line source unpadded (H40 PAR 1.0, H32 PAR 5:4).
 
 - **Game ROM**: your cartridge dump, in a file browser.
 - **Reset**, and **Save state** / **Load state**: eight slots, each with a picture of the
@@ -99,9 +93,9 @@ Esc (or a controller's Back button) opens it; arrows and Enter, or the d-pad, A 
   dithering blended as a television blended it; a picture tube's scanlines and its aperture
   grille, slot mask or shadow mask; full screen; and **Vsync**, so nothing tears (on unless you
   turn it off).
-- **Capture**: the last 20 seconds are always kept; F10 (or this page) saves them, and F11
-  records until you press it again. They go to `videos/` as GIFs (exact colours, 30 frames a
-  second, no sound). The page sets how long the replay is and a GIF's size.
+- **Capture**: the last 20 seconds are always kept. This page saves that replay, or records
+  until you stop it. They go to `videos/` as GIFs (exact colours, 30 frames a second, no sound).
+  The page sets how long the replay is and a GIF's size.
 - **Sound**: volume, and the FM core and chip (hear the difference as you play).
 - **Players**: which controller each player has, a controller's buttons (press the new one),
   turbo A / B / C, the stick's dead zone, and EA's **4 Way Play** for four players (as on the
@@ -236,8 +230,12 @@ art's sizes and colours, what is and is not taken from a hack, packages, records
 ## Build
 
 The hardware side is [pulseman](https://github.com/1nputs/pulseman), our Mega Drive runtime,
-included as a git submodule in `ext/pulseman`: clone with `--recursive`, or after a plain clone
-run `git submodule update --init`. `make nhl94` builds it too. Besides that you need GCC (C and
+included as a git submodule in `ext/pulseman` (the upstream commit, unchanged). The host menu,
+overlay and scaler are [Overbar](https://github.com/abdulahmad/overbar), the git submodule
+`native/overbar`. Clone with `--recursive`, or after a plain clone run `git submodule update
+--init`. `make nhl94` builds both. The window, sound and input side is `native/pulseman/sdl2.c`,
+a copy of pulseman's SDL2 platform with this game's host hooks, so pulseman itself is not
+changed. Besides that you need GCC (C and
 C++), `make`, `pkg-config` and SDL2. The game builds with Clang as well and plays bit for bit
 the same: `make golden-cross` builds it and pulseman with Clang (`XCC=` and `XCXX=` name it, or
 `ZIG=path/to/zig` takes Zig's) and checks its golden runs against the GCC build's (Clang 22 here:
@@ -294,8 +292,9 @@ a whole under its bundle identifier, so macOS can ask it for the local network.
   661-byte sound relay is ported too (`src/z80.c`). It runs on **pulseman**
   ([1nputs/pulseman](https://github.com/1nputs/pulseman), MIT, the git submodule `ext/pulseman`;
   its C API keeps the `mdrt_` prefix): the VDP, PSG, YM2612, pads and save RAM as C modules,
-  with an SDL2 platform. There is no 68k or Z80 emulation. A change to pulseman is committed and
-  pushed there, then the submodule's new commit is committed here.
+  with an SDL2 platform (here, the copy in `native/pulseman/`). There is no 68k or Z80
+  emulation. A change to pulseman's core is committed and pushed there, then the submodule's new
+  commit is committed here; host changes go into Overbar or `native/`.
 - **How it is verified.** Genesis Plus GX with a hook (the oracle, a development tool only)
   records real play. `make test` replays 10,276 recorded routine calls. `make lockstep` runs 18
   whole sessions against the oracle, checking work RAM and VDP at every vblank. `make
