@@ -223,6 +223,23 @@ int mdrt_menu_erase(mdrt_menu *m)
 
 static int selectable(const mdrt_menu *m, int i) { return i >= 0 && i < m->count && m->items[i].kind != MDRT_ITEM_TEXT; }
 
+int mdrt_menu_at(const mdrt_menu *m, int x, int y, int w, int h)
+{
+    int cols, rows, x0, y0, list, row, i;
+    if (!m || w <= 0 || h <= 0) return -1;
+    cols = w / CW;
+    rows = h / CH;
+    if (cols < 12 || rows < 8) return -1;
+    x0 = (w - cols * CW) / 2;
+    y0 = (h - rows * CH) / 2;
+    list = rows - 6;
+    if (x < x0 || y < y0) return -1;
+    row = (y - y0) / CH;
+    if (row < 3 || row >= 3 + list) return -1;
+    i = m->top + (row - 3);
+    return selectable(m, i) ? i : -1;
+}
+
 mdrt_menu_item *mdrt_menu_find(mdrt_menu *m, int id)
 {
     for (int i = 0; i < m->count; i++) if (m->items[i].id == id) return &m->items[i];

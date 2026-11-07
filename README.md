@@ -71,24 +71,15 @@ Game controllers work too (the first two are players 1 and 2).
 
 | Key | |
 |---|---|
-| F1 | mute |
-| F2 / F3 | volume down / up |
-| F4 (held) | rewind |
-| F5 | pause |
-| F6 (held) | fast-forward |
-| F7 | slow motion on / off |
-| F8 | a frame at a time, while paused |
-| F10 | save the replay: the last 20 seconds, as a GIF (in `videos/`) |
-| `` ` `` / F11 | overlay menu (Overbar; first launch binds PulseMan `key.menu` to Grave). Record a GIF from Capture, not F11 |
-| F12 | screenshot (a PNG in `screenshots/`) |
-| Esc | not overlay (backs out of a PulseMan page when the overlay is already open) |
+| `` ` `` / F11 | overlay menu. Esc backs out of a page |
+| F12 | stats |
 | Alt+Enter | full screen |
 
 ## Playing
 
 ### The menu
 
-`` ` `` or F11 (or a controller's Back button) opens it; arrows and Enter, or the d-pad, A and B, work it.
+`` ` ``, F11, or a controller's Back button opens it. Esc backs out of a page. Arrows and Enter, or the d-pad, A and B, work it. The window's menu bar (windowed desktop) changes the same video settings and does not list Resume or Quit.
 The picture is Overbar's 4:3 dest of a 240-line canvas with the 224-line source unpadded (H40 PAR 1.0, H32 PAR 5:4).
 
 - **Game ROM**: your cartridge dump, in a file browser.
@@ -102,9 +93,9 @@ The picture is Overbar's 4:3 dest of a 240-line canvas with the 224-line source 
   dithering blended as a television blended it; a picture tube's scanlines and its aperture
   grille, slot mask or shadow mask; full screen; and **Vsync**, so nothing tears (on unless you
   turn it off).
-- **Capture**: the last 20 seconds are always kept; F10 (or this page) saves them, and F11
-  records until you press it again. They go to `videos/` as GIFs (exact colours, 30 frames a
-  second, no sound). The page sets how long the replay is and a GIF's size.
+- **Capture**: the last 20 seconds are always kept. This page saves that replay, or records
+  until you stop it. They go to `videos/` as GIFs (exact colours, 30 frames a second, no sound).
+  The page sets how long the replay is and a GIF's size.
 - **Sound**: volume, and the FM core and chip (hear the difference as you play).
 - **Players**: which controller each player has, a controller's buttons (press the new one),
   turbo A / B / C, the stick's dead zone, and EA's **4 Way Play** for four players (as on the

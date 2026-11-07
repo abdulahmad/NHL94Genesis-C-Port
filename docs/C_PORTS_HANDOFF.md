@@ -7,7 +7,7 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 
 ## Now
 
-Overbar overlay/bar on [#13](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/13) (`cursor/overbar-genesis-6801`): vendored `pulseman_menu.o` (opaque overlay) linked ahead of libmdrt, Win32 `CreateMenu` on window shown, no GLES2/`PORTMASTER` on Win32. Win32 build: `str_has_i` is `#ifndef _WIN32` so `-Werror` unused-function does not fail `host.c`. Host-only; do not merge. Asstab names remain on `main` ([#12](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/12)). G0–G6 remain on `main`. Names 840/0/0/0. Frame gates need a machine with captures. E6 Original lockstep stays parked.
+Overbar overlay/bar on [#13](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/13) (`cursor/overbar-genesis-6801`): `` ` `` / F11 open Overbar's menu (Resume, Video, Sound, Input, Capture, Online Play, Quit). The Win32 bar is the same tree without Resume or Quit, with a divider between setting groups. Overlay Scale Mode cycles in place. Sharp steps are 2x, 3x (default), 4x, 5x, 6x, and 9x. Scale2x, Scale3x, MMPX, xBR, and MiSTer coefficient files prescale, then the picture is fit to the 224-in-240 4:3 dest (the extra 16 rows are not drawn). F12 shows FPS, new pictures, refresh and vsync, CPU and GPU. No GLES2/`PORTMASTER` on Win32. Host-only; do not merge. Asstab names remain on `main` ([#12](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/12)). G0–G6 remain on `main`. Names 840/0/0/0. Frame gates need a machine with captures. E6 Original lockstep stays parked.
 
 ## Done
 

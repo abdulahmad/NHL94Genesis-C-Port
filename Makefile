@@ -122,7 +122,7 @@ $(OBJ)/icon.o: res/icon.rc res/icon.ico
 	$(WINDRES) -I res $< -O coff -o $@
 $(OBJ)/native/overbar/%.o: native/overbar/src/%.c native/overbar/include/overbar/overbar.h
 	@mkdir -p $(dir $@)
-	$(CC) $(NFLAGS) -c $< -o $@
+	$(CC) $(NFLAGS) -DOB_SDL_BASE -c $< -o $@
 $(OBJ)/native/overbar/pulseman_menu.o: native/overbar/third_party/pulseman/menu.c native/overbar/include/mdrt/menu.h
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -c $< -o $@
