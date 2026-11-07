@@ -21,6 +21,7 @@
 #endif
 #include "mdrt/look.h"
 #include "mdrt/menu.h"
+#include "mdrt/net_udp.h"
 #include "mdrt/platform_sdl2.h"
 #include "mdrt/upscale.h"
 #include "mdrt/view.h"
@@ -29,6 +30,8 @@
 
 static ob_host g_host;
 static int g_menu_inited;
+static int g_text_on;
+static void online_setup(void);
 
 /* PulseMan is the Genesis host. Overbar owns the menu and calls these. The CRT looks and the
  * MiSTer filters are Overbar's software versions of the 95 PC shader, drawn at the picture's size. */
@@ -107,7 +110,7 @@ static void shell_quit(void)
 
 static const ob_shell g_shell = {
     shell_picture, shell_capture, mdrt_sdl_host_hold, mdrt_sdl_host_redraw,
-    mdrt_sdl_host_draw_now, mdrt_sdl_host_vsync, mdrt_sdl_host_fps, shell_quit
+    mdrt_sdl_host_draw_now, mdrt_sdl_host_vsync, mdrt_sdl_host_fps, shell_quit, NULL
 };
 
 #ifdef _WIN32
@@ -146,6 +149,7 @@ static int watch(void *user, SDL_Event *e)
 #else
             ob_filemenu_init(NULL);
 #endif
+            online_setup();
             ob_filemenu_sync(&g_host);
             g_menu_inited = 1;
         }
@@ -263,12 +267,22 @@ static int host_quit(void)
     return g_host.request_quit;
 }
 
+/* Typed text for a field of the Online page: SDL's text input is on while one is edited */
+static void sync_text_input(void)
+{
+    int want = g_host.overlay_open && ob_overlay_editing(&g_host);
+    if (want && !g_text_on) SDL_StartTextInput();
+    else if (!want && g_text_on) SDL_StopTextInput();
+    g_text_on = want;
+}
+
 static void host_after(int r)
 {
     if (r == OB_ID_CONTROLLERS) {
         ob_overlay_close(&g_host);
         mdrt_sdl_host_open_players();
     }
+    sync_text_input();
     ob_picture_apply(&g_host);
     mdrt_sdl_host_redraw();
 }
@@ -277,12 +291,24 @@ static void host_toggle(void)
 {
     if (g_host.overlay_open) ob_overlay_input(&g_host, MDRT_MENU_BACK);
     else ob_overlay_open(&g_host);
+    sync_text_input();
     ob_picture_apply(&g_host);
     mdrt_sdl_host_redraw();
 }
 
+static int host_text(const char *utf8)
+{
+    return g_host.overlay_open && ob_overlay_editing(&g_host) && ob_overlay_text(&g_host, utf8);
+}
+
 static int host_move(int scancode)
 {
+    if (ob_overlay_editing(&g_host)) {                  /* a field: only these (its text comes as SDL_TEXTINPUT) */
+        if (scancode == SDL_SCANCODE_RETURN || scancode == SDL_SCANCODE_KP_ENTER) return MDRT_MENU_OK;
+        if (scancode == SDL_SCANCODE_ESCAPE) return MDRT_MENU_BACK;
+        if (scancode == SDL_SCANCODE_BACKSPACE) return MDRT_MENU_LEFT;
+        return -1;
+    }
     if (scancode == SDL_SCANCODE_UP) return MDRT_MENU_UP;
     if (scancode == SDL_SCANCODE_DOWN) return MDRT_MENU_DOWN;
     if (scancode == SDL_SCANCODE_LEFT) return MDRT_MENU_LEFT;
@@ -297,7 +323,14 @@ static int host_move(int scancode)
 
 static void host_key(int scancode)
 {
-    int in = host_move(scancode);
+    int in;
+    if (ob_overlay_editing(&g_host) && scancode == SDL_SCANCODE_V && (SDL_GetModState() & (KMOD_CTRL | KMOD_GUI))) {
+        char *clip = SDL_GetClipboardText();             /* (paste, as PulseMan's fields take it) */
+        if (clip) { ob_overlay_text(&g_host, clip); SDL_free(clip); }
+        mdrt_sdl_host_redraw();
+        return;
+    }
+    in = host_move(scancode);
     if (in < 0) return;
     host_after(ob_overlay_input(&g_host, in));
 }
@@ -331,8 +364,58 @@ static void host_pointer(int x, int y, int w, int h, int what)
 }
 
 static const mdrt_host_menu g_menu = {
-    host_is_open, host_toggle, host_key, host_button, host_paint, host_quit, host_pointer
+    host_is_open, host_toggle, host_key, host_button, host_paint, host_quit, host_pointer, host_text
 };
+
+/* ---- Online play: the Online page's hooks, on PulseMan's netplay (sdl2.c). The overlay's input comes
+ * in on the window's thread, as PulseMan's own menu's does, which is where net_begin runs. A session is
+ * not paused by the overlay (PulseMan holds the game for a menu only when there is no session), so
+ * the overlay only draws over it; pads read 0 for the game while it is open, as under PulseMan's menu. */
+static int online_start(const ob_online *o, char *msg, int msg_size)
+{
+    int r;
+    ob_overlay_close(&g_host);                          /* (the connect room draws its own page, not under this one) */
+    r = mdrt_sdl_host_net_start(o->role, o->addr, o->port, o->delay, o->name, o->here, o->all, msg, msg_size);
+    if (r != 0) ob_online_open(&g_host);                /* (it stays on the page, with the reason) */
+    sync_text_input();
+    return r;
+}
+
+static void online_leave(void)
+{
+    mdrt_sdl_host_net_leave();
+}
+
+static int online_status(char *line, int line_size)
+{
+    return mdrt_sdl_host_net_status(line, line_size);
+}
+
+static const char *online_lan(char *buf, int size)
+{
+    const char *a = mdrt_udp_lan_address(buf, (size_t)size);
+    return a && a[0] ? a : NULL;
+}
+
+/* with the window: the ops (the game's pad count is known once PulseMan has its settings), and the page's values from the
+ * settings, so what was set on PulseMan's page shows */
+static void online_setup(void)
+{
+    ob_online_ops ops;
+    ob_online *o = &g_host.online;
+    int role = 0, port = OB_NET_PORT_DEFAULT, delay = 2, here = 1, all = 2;
+    memset(&ops, 0, sizeof ops);
+    ops.max_pads = mdrt_sdl_host_net_pads();
+    ops.max_delay = MDRT_NET_MAX_DELAY;
+    ops.roles = 3;
+    ops.start = online_start;
+    ops.leave = online_leave;
+    ops.status = online_status;
+    ops.lan_address = online_lan;
+    ob_online_set_ops(&g_host, &ops);
+    mdrt_sdl_host_net_get(&role, o->addr, (int)sizeof o->addr, &port, &delay, o->name, (int)sizeof o->name, &here, &all);
+    o->role = role; o->port = port; o->delay = delay; o->here = here; o->all = all;
+}
 
 void overbar_install(void)
 {

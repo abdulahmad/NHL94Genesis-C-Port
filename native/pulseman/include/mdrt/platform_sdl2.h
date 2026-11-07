@@ -257,7 +257,16 @@ typedef struct mdrt_host_menu {
     int (*quit)(void);
     /* Overlay buffer pixel and what: 0 move, 1 left, 2 right, 3 wheel up, 4 wheel down. NULL if unused. */
     void (*pointer)(int x, int y, int w, int h, int what);
+    /* SDL_TEXTINPUT's text, while the host menu edits a field (it turns SDL_StartTextInput on). 1 if used. NULL if unused. */
+    int (*text)(const char *utf8);
 } mdrt_host_menu;
+/* The host menu's Online page: this window's netplay (the window's thread only). start: 0 once a session is on (the
+ * game restarted in it), else -1 with msg; status: 1 while a session goes on, line is what it is doing or why the last one ended. */
+int mdrt_sdl_host_net_pads(void);
+void mdrt_sdl_host_net_get(int *role, char *addr, int addr_size, int *port, int *delay, char *name, int name_size, int *here, int *all);
+int mdrt_sdl_host_net_start(int role, const char *addr, int port, int delay, const char *name, int here, int all, char *msg, int msg_size);
+void mdrt_sdl_host_net_leave(void);
+int mdrt_sdl_host_net_status(char *line, int line_size);
 void mdrt_sdl_set_host_menu(const mdrt_host_menu *menu);
 
 /* where the game's files go (the settings, saves, states, screenshots, videos: all relative to the

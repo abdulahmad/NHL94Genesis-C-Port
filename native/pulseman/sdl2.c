@@ -3234,6 +3234,73 @@ void mdrt_sdl_host_open_players(void)
     open_menu(g_app, PAGE_PLAYERS, 0);
 }
 
+/* The host menu's Online page (Overbar's), on the Online page's session. All from the window's thread,
+ * the one the host menu's input comes in on. */
+int mdrt_sdl_host_net_pads(void)
+{
+    return g_app ? game_pads(g_app) : 2;
+}
+
+void mdrt_sdl_host_net_get(int *role, char *addr, int addr_size, int *port, int *delay, char *name, int name_size, int *here, int *all)
+{
+    sdl *s = g_app;
+    if (!s) return;
+    *role = s->net_role; *port = s->net_port; *delay = s->net_delay; *here = s->net_here; *all = s->net_all;
+    snprintf(addr, (size_t)addr_size, "%s", s->net_addr);
+    snprintf(name, (size_t)name_size, "%s", s->net_name);
+}
+
+int mdrt_sdl_host_net_start(int role, const char *addr, int port, int delay, const char *name, int here, int all, char *msg, int msg_size)
+{
+    sdl *s = g_app;
+    if (msg_size > 0) msg[0] = 0;
+    if (!s || !s->o->net_identity) { if (msg_size > 0) snprintf(msg, (size_t)msg_size, "Not in this build"); return -1; }
+    s->net_role = clamp(role, NET_HOST, NET_BOTH);
+    snprintf(s->net_addr, sizeof s->net_addr, "%s", addr ? addr : "");
+    s->net_port = clamp(port, 1, 65535);
+    s->net_delay = clamp(delay, 0, MDRT_NET_MAX_DELAY);
+    snprintf(s->net_name, sizeof s->net_name, "%.24s", name ? name : "");
+    s->net_here = clamp(here, 1, MDRT_PADS - 1);
+    s->net_all = clamp(all, 2, MDRT_PADS);
+    mdrt_settings_set(s->set, "netplay.role", net_role_name[s->net_role]);
+    mdrt_settings_set(s->set, "netplay.address", s->net_addr);
+    mdrt_settings_set_int(s->set, "netplay.port", s->net_port);
+    mdrt_settings_set_int(s->set, "netplay.delay", s->net_delay);
+    mdrt_settings_set(s->set, "netplay.name", s->net_name);
+    mdrt_settings_set_int(s->set, "netplay.here", s->net_here);
+    mdrt_settings_set_int(s->set, "netplay.players", s->net_all);
+    s->menu.message[0] = 0;
+    net_begin(s);
+    if (s->menu_open) close_menu(s);                      /* (net_begin opens PulseMan's page when it fails: not under the host's menu) */
+    if (SDL_AtomicGet(&s->session)) return 0;
+    if (msg_size > 0) {
+        const char *why = s->menu.message[0] ? s->menu.message : !strncmp(s->net_line, "netplay: ", 9) ? s->net_line + 9 : "Could not connect";
+        snprintf(msg, (size_t)msg_size, "%s", why);
+    }
+    return -1;
+}
+
+void mdrt_sdl_host_net_leave(void)
+{
+    sdl *s = g_app;
+    if (!s || !SDL_AtomicGet(&s->session)) return;
+    SDL_AtomicSet(&s->net_leave, 1);
+    notice(s, "netplay: leaving");
+}
+
+int mdrt_sdl_host_net_status(char *line, int line_size)
+{
+    sdl *s = g_app;
+    if (line_size > 0) line[0] = 0;
+    if (!s) return 0;
+    if (line_size > 0) {
+        SDL_LockMutex(s->lock);
+        snprintf(line, (size_t)line_size, "%s", !strncmp(s->net_line, "netplay: ", 9) ? s->net_line + 9 : s->net_line);
+        SDL_UnlockMutex(s->lock);
+    }
+    return SDL_AtomicGet(&s->session) ? 1 : 0;
+}
+
 void mdrt_sdl_set_host_menu(const mdrt_host_menu *menu)
 {
     g_host_menu = menu;
@@ -3312,6 +3379,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
                 if (e.type == SDL_KEYDOWN) key_pressed(s, k, (SDL_Keymod)e.key.keysym.mod, e.key.repeat);
             } else if (e.type == SDL_TEXTINPUT) {
                 if (s->menu_open && s->menu.editing >= 0 && mdrt_menu_type(&s->menu, e.text.text)) s->redraw = 1;
+                else if (host_menu_open() && g_host_menu->text && g_host_menu->text(e.text.text)) s->redraw = 1;   /* (a field of the host's menu) */
             } else if (e.type == SDL_CONTROLLERBUTTONDOWN) pad_pressed(s, (SDL_GameControllerButton)e.cbutton.button);
             else if (host_menu_open() && g_host_menu->pointer && s->over_w > 0 && s->over_h > 0
                      && (e.type == SDL_MOUSEMOTION || e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEWHEEL)) {
