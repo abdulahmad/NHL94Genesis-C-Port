@@ -230,8 +230,12 @@ art's sizes and colours, what is and is not taken from a hack, packages, records
 ## Build
 
 The hardware side is [pulseman](https://github.com/1nputs/pulseman), our Mega Drive runtime,
-included as a git submodule in `ext/pulseman`: clone with `--recursive`, or after a plain clone
-run `git submodule update --init`. `make nhl94` builds it too. Besides that you need GCC (C and
+included as a git submodule in `ext/pulseman` (the upstream commit, unchanged). The host menu,
+overlay and scaler are [Overbar](https://github.com/abdulahmad/overbar), the git submodule
+`native/overbar`. Clone with `--recursive`, or after a plain clone run `git submodule update
+--init`. `make nhl94` builds both. The window, sound and input side is `native/pulseman/sdl2.c`,
+a copy of pulseman's SDL2 platform with this game's host hooks, so pulseman itself is not
+changed. Besides that you need GCC (C and
 C++), `make`, `pkg-config` and SDL2. The game builds with Clang as well and plays bit for bit
 the same: `make golden-cross` builds it and pulseman with Clang (`XCC=` and `XCXX=` name it, or
 `ZIG=path/to/zig` takes Zig's) and checks its golden runs against the GCC build's (Clang 22 here:
@@ -288,8 +292,9 @@ a whole under its bundle identifier, so macOS can ask it for the local network.
   661-byte sound relay is ported too (`src/z80.c`). It runs on **pulseman**
   ([1nputs/pulseman](https://github.com/1nputs/pulseman), MIT, the git submodule `ext/pulseman`;
   its C API keeps the `mdrt_` prefix): the VDP, PSG, YM2612, pads and save RAM as C modules,
-  with an SDL2 platform. There is no 68k or Z80 emulation. A change to pulseman is committed and
-  pushed there, then the submodule's new commit is committed here.
+  with an SDL2 platform (here, the copy in `native/pulseman/`). There is no 68k or Z80
+  emulation. A change to pulseman's core is committed and pushed there, then the submodule's new
+  commit is committed here; host changes go into Overbar or `native/`.
 - **How it is verified.** Genesis Plus GX with a hook (the oracle, a development tool only)
   records real play. `make test` replays 10,276 recorded routine calls. `make lockstep` runs 18
   whole sessions against the oracle, checking work RAM and VDP at every vblank. `make

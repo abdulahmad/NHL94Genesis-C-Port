@@ -2,7 +2,8 @@
  * Copyright (c) 2026 abdulahmad and contributors
  *
  * Thin Overbar client for the Genesis C-port. Replaces PulseMan mdrt_view_place
- * (linked ahead of libmdrt.a) with L5 dest-rect: 4:3 as if 240 high, source 224.
+ * (linked ahead of libmdrt.a) with L5 dest-rect: the pixel shape of a 4:3 screen of 240
+ * lines, only the 224 real lines drawn (no 8+8 border).
  * The overlay is Overbar's menu (the same tree as the window bar). ` and F11
  * open it. Esc backs out of a page and does not open the overlay.
  * The window menu bar is the same settings without Resume and Quit, and is
@@ -368,18 +369,17 @@ mdrt_view mdrt_view_place(int win_w, int win_h, int pic_w, int pic_h, int scale,
         ob_view(&in, &out);
         if (look->mode == OB_MODE_SHARP
             && (look->height == OB_HEIGHT_INTEGER || look->height == OB_HEIGHT_OVERSCAN)) {
+            /* the Sharp step caps the rows per source line (3x: 3 rows for each of the 224) */
             int want = ob_sharp_mul(look->sharp);
-            int unit = in.line_double ? 480 : 240;
-            int k = unit > 0 ? out.canvas_h / unit : 1;
+            int unit = pic_h * (in.line_double ? 2 : 1);
+            int k = unit > 0 ? out.blit_h / unit : 1;
             if (k > want) {
                 int ch = want * unit;
-                int cw = ch * 4 / 3;
-                out.canvas_w = cw;
-                out.canvas_h = ch;
-                out.blit_w = cw;
-                out.blit_h = ch * pic_h / 240;
-                out.blit_x = (win_w - cw) / 2;
-                out.blit_y = (win_h - ch) / 2 + (ch - out.blit_h) / 2;
+                int cw = (int)((long)ch * 4 * in.dar_h / (3L * pic_h));
+                out.canvas_w = out.blit_w = cw;
+                out.canvas_h = out.blit_h = ch;
+                out.canvas_x = out.blit_x = (win_w - cw) / 2;
+                out.canvas_y = out.blit_y = (win_h - ch) / 2;
             }
         }
         v.x = out.blit_x;
