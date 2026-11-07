@@ -113,6 +113,7 @@ static int str_ieq(const char *a, const char *b)
     return *a == 0 && *b == 0;
 }
 
+#ifndef _WIN32
 static int str_has_i(const char *s, const char *sub)
 {
     int n, m, i, j;
@@ -129,6 +130,7 @@ static int str_has_i(const char *s, const char *sub)
     }
     return 0;
 }
+#endif
 
 static int driver_handheld(const char *d)
 {

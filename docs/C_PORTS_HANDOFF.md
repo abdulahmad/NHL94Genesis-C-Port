@@ -7,7 +7,7 @@ Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md)
 
 ## Now
 
-Overbar overlay/bar on [#13](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/13) (`cursor/overbar-genesis-6801`): vendored `pulseman_menu.o` (opaque overlay) linked ahead of libmdrt, Win32 `CreateMenu` on window shown, no GLES2/`PORTMASTER` on Win32. Host-only; do not merge. Asstab names remain on `main` ([#12](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/12)). G0–G6 remain on `main`. Names 840/0/0/0. Frame gates need a machine with captures. E6 Original lockstep stays parked.
+Overbar overlay/bar on [#13](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/13) (`cursor/overbar-genesis-6801`): vendored `pulseman_menu.o` (opaque overlay) linked ahead of libmdrt, Win32 `CreateMenu` on window shown, no GLES2/`PORTMASTER` on Win32. Win32 build: `str_has_i` is `#ifndef _WIN32` so `-Werror` unused-function does not fail `host.c`. Host-only; do not merge. Asstab names remain on `main` ([#12](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/12)). G0–G6 remain on `main`. Names 840/0/0/0. Frame gates need a machine with captures. E6 Original lockstep stays parked.
 
 ## Done
 
