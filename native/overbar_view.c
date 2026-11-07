@@ -51,6 +51,7 @@ static void shell_picture(const ob_host *h)
     switch (look->mode) {
     case OB_MODE_SCALE2X: up = MDRT_UPSCALE_SCALE2X; break;
     case OB_MODE_SCALE3X: up = MDRT_UPSCALE_SCALE3X; break;
+    case OB_MODE_SCALE4X: up = MDRT_UPSCALE_SCALE2X; break;   /* twice, below */
     case OB_MODE_MMPX2X: up = MDRT_UPSCALE_MMPX2X; break;
     case OB_MODE_MMPX4X: up = MDRT_UPSCALE_MMPX4X; break;
     case OB_MODE_XBR2X: up = MDRT_UPSCALE_XBR2X; break;
@@ -73,6 +74,7 @@ static void shell_picture(const ob_host *h)
     else if (look->mode == OB_MODE_SHARP || ob_look_renders(look) || up != MDRT_UPSCALE_OFF)
         scale = MDRT_SCALE_SHARP;
     mdrt_sdl_host_upscale(up);
+    mdrt_sdl_host_upscale_twice(look->mode == OB_MODE_SCALE4X);
     mdrt_sdl_host_prescale(ob_look_renders(look) ? genesis_look : NULL);
     mdrt_sdl_host_hz(h->refresh == OB_REFRESH_70 ? 70 : h->refresh == OB_REFRESH_60 ? 60 : 0);
     mdrt_sdl_host_scale(scale);

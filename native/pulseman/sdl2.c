@@ -230,7 +230,8 @@ typedef struct sdl {
     SDL_atomic_t frame_posted;  /* (one at a time) */
     int upscale;                /* MDRT_UPSCALE_: the game's frames through it, before the scaling */
     int colours, blend, scanlines, mask;   /* colours_*; MDRT_BLEND_, _SCANLINES_, _MASK_ */
-    uint32_t *frame, *blended, *big, *big_scratch;   /* the frame taken from the game thread; it blended; upscaled; mmpx4x's halfway */
+    uint32_t *frame, *blended, *big, *big_scratch, *twice;   /* (twice: Scale2x's first pass, for Scale4x) */
+    int upscale_twice;          /* the upscaler twice: Scale2x into Scale4x (Overbar's Scale2x 4x) */   /* the frame taken from the game thread; it blended; upscaled; mmpx4x's halfway */
     SDL_Texture *tube;          /* the scanlines and mask over the picture, for: */
     int tube_w, tube_h, tube_cols, tube_lines, tube_scan, tube_mask;
     SDL_Texture *big_tex;       /* the upscaled frame, big_f times the picture's texture */
@@ -2604,7 +2605,9 @@ static void draw(sdl *s)
     int tube = game && mdrt_look_tube(s->scanlines, s->mask);
     if (!s->prescale) s->filt_on = 0;
     if ((method || blend || want_pre) && !frame_ready(s)) { method = blend = 0; want_pre = 0; }
-    int f = mdrt_upscale_factor(method);
+    int f = mdrt_upscale_factor(method), twice = method == MDRT_UPSCALE_SCALE2X && s->upscale_twice;
+    if (twice && !s->twice) s->twice = malloc(640 * 480 * sizeof *s->twice);
+    if (twice && s->twice) f = 4; else twice = 0;
     if (method && !big_ready(s, f)) { method = MDRT_UPSCALE_OFF; f = 1; }
     int work = method || blend || want_pre;
     SDL_LockMutex(s->lock);
@@ -2654,7 +2657,11 @@ static void draw(sdl *s)
                 }
             }
             if (!s->filt_on && method) {                  /* the game's frame, magnified */
-                mdrt_upscale(method, px, w, h, 320, s->big, w * f, s->big_scratch);
+                if (twice) {                              /* Scale2x, then Scale2x of that */
+                    mdrt_upscale(method, px, w, h, 320, s->twice, w * 2, s->big_scratch);
+                    mdrt_upscale(method, s->twice, w * 2, h * 2, w * 2, s->big, w * f, s->big_scratch);
+                } else
+                    mdrt_upscale(method, px, w, h, 320, s->big, w * f, s->big_scratch);
                 SDL_Rect r = { 0, 0, w * f, h * f };
                 SDL_UpdateTexture(s->big_tex, &r, s->big, w * f * 4);
             } else if (!s->filt_on) {
@@ -3092,6 +3099,13 @@ static int clamp_enum(int set, int n)
     return set < 0 ? 0 : set >= n ? n - 1 : set;
 }
 
+void mdrt_sdl_host_upscale_twice(int on)
+{
+    if (!g_app) return;
+    g_app->upscale_twice = on;
+    g_app->redraw = 1;
+}
+
 int mdrt_sdl_host_upscale(int set)
 {
     if (!g_app) return -1;
@@ -3376,7 +3390,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     mdrt_settings_free(s->set);
     mdrt_menu_free(&s->menu);
     free_entries(s);
-    free(s->frame); free(s->blended); free(s->big); free(s->big_scratch); free(s->pending_pic); free(s->opt_values);
+    free(s->frame); free(s->blended); free(s->big); free(s->big_scratch); free(s->twice); free(s->pending_pic); free(s->opt_values);
     for (int i = 0; s->opt_custom && i < s->o->noptions; i++) free(s->opt_custom[i].labels);
     free(s->opt_custom);
     free(s->sess_values);

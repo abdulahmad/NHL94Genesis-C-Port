@@ -233,6 +233,8 @@ int mdrt_sdl_host_pointer(int set);     /* 0 auto, 1 show, 2 hide; set < 0 reads
 int mdrt_sdl_host_fm(int which, int set); /* which 0 core, 1 chip; set < 0 reads */
 /* 0 is VRR. The stats display prints this next to vsync. */
 void mdrt_sdl_host_hz(int hz);
+/* The upscaler run twice (Scale2x into Scale4x); only Scale2x uses it. */
+void mdrt_sdl_host_upscale_twice(int on);
 /* Optional prescale of the game frame (Overbar's CRT looks and MiSTer filters): out_w x out_h
  * is the picture's size in the window. NULL clears it. 1 when *dst (dw x dh, the callee's) holds
  * the frame to scale into that rect. */
