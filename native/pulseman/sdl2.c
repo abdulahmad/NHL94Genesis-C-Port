@@ -2634,7 +2634,14 @@ static void draw(sdl *s)
             int fw = 0, fh = 0;
             if (blend) { mdrt_look_blend(blend, s->frame, w, h, 320, s->blended, 320); px = s->blended; }
             s->filt_on = 0;
-            if (want_pre && s->prescale(px, w, h, &filt, &fw, &fh) && filt && fw > 0 && fh > 0) {
+            int pw = 0, ph = 0;
+            if (want_pre) {                               /* (the rect the picture gets, for the looks' masks) */
+                SDL_GetRendererOutputSize(s->ren, &pw, &ph);
+                mdrt_view pv = mdrt_view_place(pw, ph, w, h, s->scale, s->aspect);
+                pw = pv.w;
+                ph = pv.h;
+            }
+            if (want_pre && s->prescale(px, w, h, pw, ph, &filt, &fw, &fh) && filt && fw > 0 && fh > 0) {
                 if (!s->filt_tex || s->filt_w != fw || s->filt_h != fh) {
                     if (s->filt_tex) SDL_DestroyTexture(s->filt_tex);
                     s->filt_tex = SDL_CreateTexture(s->ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, fw, fh);

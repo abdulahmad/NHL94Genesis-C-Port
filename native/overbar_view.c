@@ -30,10 +30,12 @@
 static ob_host g_host;
 static int g_menu_inited;
 
-/* PulseMan is the Genesis host. Overbar owns the menu and calls these. */
-static int genesis_prescale(const uint32_t *src, int sw, int sh, uint32_t **dst, int *dw, int *dh)
+/* PulseMan is the Genesis host. Overbar owns the menu and calls these. The CRT looks and the
+ * MiSTer filters are Overbar's software versions of the 95 PC shader, drawn at the picture's size. */
+static int genesis_look(const uint32_t *src, int sw, int sh, int out_w, int out_h, uint32_t **dst, int *dw, int *dh)
 {
-    return ob_mister_prescale(&g_host.lores, src, sw, sh, 320, dst, dw, dh);
+    const ob_look *look = g_host.video_class == OB_CLASS_HIRES ? &g_host.hires : &g_host.lores;
+    return ob_look_render(look, src, sw, sh, 320, out_w, out_h, dst, dw, dh);
 }
 
 static void shell_picture(const ob_host *h)
@@ -41,8 +43,7 @@ static void shell_picture(const ob_host *h)
     const ob_look *look;
     int up = MDRT_UPSCALE_OFF;
     int scale = MDRT_SCALE_FIT;
-    int scan = MDRT_SCANLINES_OFF;
-    int mask = MDRT_MASK_OFF;
+    const int scan = MDRT_SCANLINES_OFF, mask = MDRT_MASK_OFF;   /* (the looks draw their own) */
     int blend;
     if (!h) return;
     look = h->video_class == OB_CLASS_HIRES ? &h->hires : &h->lores;
@@ -55,13 +56,6 @@ static void shell_picture(const ob_host *h)
     case OB_MODE_XBR2X: up = MDRT_UPSCALE_XBR2X; break;
     case OB_MODE_XBR3X: up = MDRT_UPSCALE_XBR3X; break;
     case OB_MODE_XBR4X: up = MDRT_UPSCALE_XBR4X; break;
-    case OB_MODE_CRT:
-        if (look->crt == OB_CRT_LIGHT) scan = MDRT_SCANLINES_LIGHT;
-        else if (look->crt == OB_CRT_STRONG) scan = MDRT_SCANLINES_HEAVY;
-        else scan = MDRT_SCANLINES_MEDIUM;
-        if (look->crt == OB_CRT_SOFT || look->crt == OB_CRT_SOFT_APERTURE) blend = MDRT_BLEND_SOFT;
-        if (look->crt == OB_CRT_SOFT_APERTURE) mask = MDRT_MASK_APERTURE;
-        break;
     case OB_MODE_RETROARCH: {
         static const int live[] = {
             MDRT_UPSCALE_SCALE2X, MDRT_UPSCALE_SCALE3X, MDRT_UPSCALE_MMPX2X, MDRT_UPSCALE_MMPX4X,
@@ -76,10 +70,10 @@ static void shell_picture(const ob_host *h)
     }
     if (look->height == OB_HEIGHT_INTEGER || look->height == OB_HEIGHT_OVERSCAN)
         scale = MDRT_SCALE_INTEGER;
-    else if (look->mode == OB_MODE_SHARP || look->mode == OB_MODE_MISTER || up != MDRT_UPSCALE_OFF)
+    else if (look->mode == OB_MODE_SHARP || ob_look_renders(look) || up != MDRT_UPSCALE_OFF)
         scale = MDRT_SCALE_SHARP;
     mdrt_sdl_host_upscale(up);
-    mdrt_sdl_host_prescale(look->mode == OB_MODE_MISTER ? genesis_prescale : NULL);
+    mdrt_sdl_host_prescale(ob_look_renders(look) ? genesis_look : NULL);
     mdrt_sdl_host_hz(h->refresh == OB_REFRESH_70 ? 70 : h->refresh == OB_REFRESH_60 ? 60 : 0);
     mdrt_sdl_host_scale(scale);
     mdrt_sdl_host_scanlines(scan);

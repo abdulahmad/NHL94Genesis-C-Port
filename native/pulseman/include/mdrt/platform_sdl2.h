@@ -233,9 +233,11 @@ int mdrt_sdl_host_pointer(int set);     /* 0 auto, 1 show, 2 hide; set < 0 reads
 int mdrt_sdl_host_fm(int which, int set); /* which 0 core, 1 chip; set < 0 reads */
 /* 0 is VRR. The stats display prints this next to vsync. */
 void mdrt_sdl_host_hz(int hz);
-/* Optional prescale of the game frame (MiSTer taps). NULL clears it.
- * *dst stays valid until the next call. Return 1 when a frame was written. */
-typedef int (*mdrt_sdl_prescale_fn)(const uint32_t *src, int sw, int sh, uint32_t **dst, int *dw, int *dh);
+/* Optional prescale of the game frame (Overbar's CRT looks and MiSTer filters): out_w x out_h
+ * is the picture's size in the window. NULL clears it. 1 when *dst (dw x dh, the callee's) holds
+ * the frame to scale into that rect. */
+typedef int (*mdrt_sdl_prescale_fn)(const uint32_t *src, int sw, int sh, int out_w, int out_h,
+                                    uint32_t **dst, int *dw, int *dh);
 void mdrt_sdl_host_prescale(mdrt_sdl_prescale_fn fn);
 void mdrt_sdl_host_capture(int which, int value); /* 0 save replay, 1 toggle record, 2 seconds index, 3 gif scale */
 void mdrt_sdl_host_hold(int on);   /* 1: game thread waits (a menu bar's modal loop) */
