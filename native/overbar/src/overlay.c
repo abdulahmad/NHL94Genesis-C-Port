@@ -120,7 +120,12 @@ int ob_overlay_input(ob_host *h, int mdrt_input)
 
 void ob_overlay_draw(ob_host *h, uint32_t *px, int w, int hgt, int pitch)
 {
-    if (h->overlay_open) mdrt_menu_draw(&h->overlay, px, w, hgt, pitch);
+    int y, x;
+    if (!h->overlay_open) return;
+    mdrt_menu_draw(&h->overlay, px, w, hgt, pitch);
+    for (y = 0; y < hgt; y++)
+        for (x = 0; x < w; x++)
+            if (!(px[y * pitch + x] >> 24)) px[y * pitch + x] |= 0xFF000000u;
 }
 
 int ob_overlay_toggle_key(ob_host *h, int sdl_scancode)

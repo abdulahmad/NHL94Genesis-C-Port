@@ -5,6 +5,8 @@
  * (linked ahead of libmdrt.a) with L5 dest-rect: 4:3 as if 240 high, source 224.
  * Overlay keys ` and F11 are remapped to PulseMan's menu key; first launch sets
  * key.menu to Grave so Esc does not open the overlay (Esc still backs out of it).
+ * Opaque overlay pixels come from the vendored PulseMan menu.c (linked ahead of
+ * libmdrt). Win32 file menu is attached when the window is shown.
  */
 #include <stdio.h>
 #include <string.h>
@@ -13,6 +15,20 @@
 #include "native.h"
 #include "overbar/overbar.h"
 
+static ob_host g_host;
+static int g_menu_inited;
+
+static void filemenu_show_for_window(SDL_Window *w)
+{
+    Uint32 f;
+    int full, handheld;
+    if (!w) return;
+    f = SDL_GetWindowFlags(w);
+    full = !!(f & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP));
+    handheld = g_host.profile == OB_PROFILE_HANDHELD;
+    ob_filemenu_show(ob_filemenu_wanted(!full && !handheld, full, handheld));
+}
+
 static int watch(void *user, SDL_Event *e)
 {
     (void)user;
@@ -20,6 +36,19 @@ static int watch(void *user, SDL_Event *e)
         if (e->key.keysym.scancode == SDL_SCANCODE_F11)
             e->key.keysym.scancode = SDL_SCANCODE_GRAVE;
     }
+    if (e->type == SDL_WINDOWEVENT &&
+        (e->window.event == SDL_WINDOWEVENT_SHOWN
+         || e->window.event == SDL_WINDOWEVENT_SIZE_CHANGED)) {
+        SDL_Window *w = SDL_GetWindowFromID(e->window.windowID);
+        if (w && !g_menu_inited) {
+            ob_filemenu_init(w);
+            ob_filemenu_sync(&g_host);
+            g_menu_inited = 1;
+        }
+        filemenu_show_for_window(w);
+    }
+    if (e->type == SDL_SYSWMEVENT && e->syswm.msg)
+        ob_filemenu_event(e->syswm.msg);
     return 1;
 }
 
@@ -45,6 +74,7 @@ void overbar_install(void)
     ob_profile profile = ob_profile_from_env();
     ob_present_apply_hints(profile);
     seed_keys(profile);
+    ob_host_init(&g_host, OB_PORT_GENESIS, profile);
     SDL_AddEventWatch(watch, NULL);
 }
 

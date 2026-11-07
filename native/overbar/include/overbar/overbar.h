@@ -316,11 +316,11 @@ void ob_overlay_draw(ob_host *h, uint32_t *px, int w, int hgt, int pitch);
 int ob_overlay_toggle_key(ob_host *h, int sdl_scancode);  /* ` / F11; 1 if handled */
 int ob_stats_toggle_key(ob_host *h, int sdl_scancode);    /* F12; 1 if handled */
 
-/* ---- file-menu shell (Win32 later; v1 is the item list + show policy) */
+/* ---- file-menu shell (Win32 CreateMenu; other OS bars later) */
 
 int ob_filemenu_wanted(int windowed, int fullscreen, int handheld);
 int ob_filemenu_items(const ob_host *h, ob_item *out, int cap);
-void ob_filemenu_init(void *sdl_window);                  /* Win32 stub: remember HWND */
+void ob_filemenu_init(void *sdl_window);                  /* Win32: HWND from SDL_Window */
 void ob_filemenu_sync(const ob_host *h);
 void ob_filemenu_show(int on);
 void ob_filemenu_event(void *syswm_msg);

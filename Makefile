@@ -94,7 +94,9 @@ ifeq ($(OS),Windows_NT)
 ICONO  := $(OBJ)/icon.o                                  # (the exe's icon, res/icon.ico)
 endif
 NOBJ   := $(SRC:%.c=$(OBJ)/%.o) $(NATIVE:%.c=$(OBJ)/%.o)
-OVERBARO := $(OBJ)/native/overbar/scaler.o $(OBJ)/native/overbar/host.o $(OBJ)/native/overbar/present.o
+OVERBARO := $(OBJ)/native/overbar/scaler.o $(OBJ)/native/overbar/host.o $(OBJ)/native/overbar/present.o \
+	$(OBJ)/native/overbar/menu.o $(OBJ)/native/overbar/overlay.o $(OBJ)/native/overbar/filemenu.o \
+	$(OBJ)/native/overbar/pulseman_menu.o
 NFLAGS  = $(CFLAGS) $(SANITIZE) -O2 -Isrc -Inative -I$(MDRT)/include -Inative/overbar/include $(shell pkg-config --cflags sdl2)
 MDRTHDR := $(wildcard $(MDRT)/include/mdrt/*.h)
 nhl94: $(BIN)
@@ -119,6 +121,9 @@ $(OBJ)/icon.o: res/icon.rc res/icon.ico
 	@mkdir -p $(dir $@)
 	$(WINDRES) -I res $< -O coff -o $@
 $(OBJ)/native/overbar/%.o: native/overbar/src/%.c native/overbar/include/overbar/overbar.h
+	@mkdir -p $(dir $@)
+	$(CC) $(NFLAGS) -c $< -o $@
+$(OBJ)/native/overbar/pulseman_menu.o: native/overbar/third_party/pulseman/menu.c native/overbar/include/mdrt/menu.h
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -c $< -o $@
 $(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt
