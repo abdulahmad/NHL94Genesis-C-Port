@@ -35,6 +35,7 @@
 #include "mdrt/settings.h"
 #include "mdrt/upscale.h"
 #include "mdrt/view.h"
+#include "overbar/overbar.h"   /* (this game: the stats box) */
 
 /* ---- the keys: what each does, its setting and its default ------------------------------------ */
 
@@ -108,7 +109,8 @@ static const char *const net_role_label[3] = { "host", "join", "both connect" };
 #define ROM_MAX (16u << 20)                               /* (no cartridge is larger) */
 
 enum { SECTIONS = 16 };                                   /* (the client's lines' sections a page has room for) */
-enum { FPS_W = 168, FPS_H = 28 };                        /* three lines: FPS/new, refresh, CPU/GPU */
+enum { FPS_W = 168, FPS_H = 28 };
+enum { OVER_W = 640, OVER_H = 480 };                     /* the overlay's largest buffer */                        /* three lines: FPS/new, refresh, CPU/GPU */
 enum { SAY_W = 320, SAY_H = 10 };                         /* (a line said at the bottom of the picture) */
 
 /* the menu's pages and items */
@@ -273,6 +275,7 @@ typedef struct sdl {
     uint32_t menu_px[320 * 240];
     SDL_Texture *over_tex;      /* overlay text, blended over the filtered picture */
     int over_x, over_y, over_w, over_h, over_mw, over_mh;
+    uint32_t over_px[OVER_W * OVER_H];  /* the overlay, finer than the game's picture (smaller text) */
     char dir[1024];             /* the ROM page's directory */
     int pick;                   /* the client's option the browser finds a choice for (PAGE_PICK) */
     char pick_dir[1024];        /* its directory */
@@ -2516,7 +2519,6 @@ static void fps_draw(sdl *s, const SDL_Rect *dst, int cols, int lines)
 {
     uint32_t now = SDL_GetTicks();
     char l1[40], l2[40], l3[40];
-    int y;
     if (cols <= 0 || lines <= 0) return;
     if (!s->stat_at || now - s->stat_at >= 500) {
         uint32_t ms = s->stat_at ? now - s->stat_at : 500;
@@ -2535,12 +2537,10 @@ static void fps_draw(sdl *s, const SDL_Rect *dst, int cols, int lines)
     else snprintf(l3, sizeof l3, "CPU %d%%", s->stat_cpu);
     if (s->stat_gpu >= 0) snprintf(l3 + strlen(l3), sizeof l3 - strlen(l3), " GPU %d%%", s->stat_gpu);
     else snprintf(l3 + strlen(l3), sizeof l3 - strlen(l3), " GPU --");
-    const uint32_t clear = 0x01000000u;
-    for (y = 0; y < FPS_W * FPS_H; y++) s->fps_px[y] = clear;
-    mdrt_menu_text(s->fps_px, FPS_W, FPS_H, FPS_W, 0, 0, l1, 0xFFFFFF);
-    mdrt_menu_text(s->fps_px, FPS_W, FPS_H, FPS_W, 0, 9, l2, 0xFFFFFF);
-    mdrt_menu_text(s->fps_px, FPS_W, FPS_H, FPS_W, 0, 18, l3, 0xFFFFFF);
-    for (y = 0; y < FPS_W * FPS_H; y++) s->fps_px[y] = s->fps_px[y] == clear ? 0 : 0xFF000000u | s->fps_px[y];
+    /* Overbar's stats box, as 95 PC draws it (small, flush with the window's top right) */
+    const char *const line[3] = { l1, l2, l3 };
+    int bw = 0, bh = 0, ww = 0, wh = 0;
+    ob_stats_draw(line, s->fps_px, FPS_W, FPS_W, FPS_H, &bw, &bh);
     if (s->fps_tex) {
         int tw = 0, th = 0;
         SDL_QueryTexture(s->fps_tex, NULL, NULL, &tw, &th);
@@ -2551,9 +2551,10 @@ static void fps_draw(sdl *s, const SDL_Rect *dst, int cols, int lines)
     if (!s->fps_tex) return;
     SDL_UpdateTexture(s->fps_tex, NULL, s->fps_px, FPS_W * 4);
     SDL_SetTextureScaleMode(s->fps_tex, SDL_ScaleModeNearest);
-    SDL_Rect src = { 0, 0, FPS_W, FPS_H };
-    SDL_Rect to = { dst->x + dst->w - (FPS_W + 2) * dst->w / cols, dst->y + 2 * dst->h / lines,
-                    FPS_W * dst->w / cols, FPS_H * dst->h / lines };
+    SDL_GetRendererOutputSize(s->ren, &ww, &wh);
+    (void)dst;
+    SDL_Rect src = { 0, 0, bw, bh }, to;
+    ob_stats_place(ww, wh, bw, bh, &to.x, &to.y, &to.w, &to.h);
     SDL_RenderCopy(s->ren, s->fps_tex, &src, &to);
 }
 
@@ -2663,6 +2664,15 @@ static void draw(sdl *s)
     SDL_GetRendererOutputSize(s->ren, &ww, &wh);
     /* Aspect uses the game's size. A pixel filter or the MiSTer taps are a prescale into that rect. */
     mdrt_view v = mdrt_view_place(ww, wh, src_w, src_h, s->scale, s->aspect);
+    if (tube && src_h > 0 && v.h >= 2 * src_h && v.h % src_h) {
+        /* scanlines and masks need the same whole number of rows for every line, or every
+         * few lines one comes out a row taller and the pattern drifts: shrink to that */
+        int nh = v.h / src_h * src_h, nw = (int)((long)v.w * nh / v.h);
+        v.x += (v.w - nw) / 2;
+        v.y += (v.h - nh) / 2;
+        v.w = nw;
+        v.h = nh;
+    }
     SDL_Rect src = { 0, 0, w, h }, dst = { v.x, v.y, v.w, v.h }, *from = &src;
     SDL_SetRenderDrawColor(s->ren, 0, 0, 0, 255);
     SDL_RenderClear(s->ren);
@@ -2699,27 +2709,34 @@ static void draw(sdl *s)
         }
     }
     if (host && g_host_menu->paint) {
-        int mw = cols > 0 ? cols : 320, mh = lines > 0 ? lines : 224, y;
-        if (mw > 320) mw = 320;
-        if (mh > 240) mh = 240;
-        for (y = 0; y < 320 * 240; y++) s->menu_px[y] = 0x00040404u;
-        g_host_menu->paint(s->menu_px, mw, mh, 320);
+        /* The overlay's text a little smaller than the game's pixels: its buffer is the picture
+         * at a whole fraction, each font pixel about 0.8 of a game pixel (and whole window
+         * pixels, so the letters stay even). */
+        int pl = lines > 0 ? lines : 224, t = (int)(dst.h * 0.8 / pl + 0.5), mw, mh, y;
+        if (t < 1) t = 1;
+        mw = dst.w / t;
+        mh = dst.h / t;
+        while ((mw > OVER_W || mh > OVER_H) && t < 64) { t++; mw = dst.w / t; mh = dst.h / t; }
+        if (mw < 1 || mh < 1) { mw = cols > 0 ? cols : 320; mh = pl; }
+        for (y = 0; y < mw * mh; y++) s->over_px[y] = 0x00040404u;
+        g_host_menu->paint(s->over_px, mw, mh, mw);
+        if (s->over_tex && (s->over_mw != mw || s->over_mh != mh)) { SDL_DestroyTexture(s->over_tex); s->over_tex = NULL; }
         if (!s->over_tex) {
-            s->over_tex = SDL_CreateTexture(s->ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 320, 240);
+            s->over_tex = SDL_CreateTexture(s->ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, mw, mh);
             if (s->over_tex) SDL_SetTextureBlendMode(s->over_tex, SDL_BLENDMODE_BLEND);
         }
         if (s->over_tex) {
-            SDL_Rect msrc = { 0, 0, mw, mh };
-            SDL_UpdateTexture(s->over_tex, NULL, s->menu_px, 320 * 4);
+            SDL_Rect msrc = { 0, 0, mw, mh }, mdst = { dst.x + (dst.w - mw * t) / 2, dst.y + (dst.h - mh * t) / 2, mw * t, mh * t };
+            SDL_UpdateTexture(s->over_tex, NULL, s->over_px, mw * 4);
             SDL_SetTextureBlendMode(s->over_tex, SDL_BLENDMODE_BLEND);
             SDL_SetTextureScaleMode(s->over_tex, SDL_ScaleModeNearest);
             SDL_SetRenderDrawBlendMode(s->ren, SDL_BLENDMODE_BLEND);
             SDL_SetRenderDrawColor(s->ren, 0, 0, 0, 96);
             SDL_RenderFillRect(s->ren, &dst);
-            SDL_RenderCopy(s->ren, s->over_tex, &msrc, &dst);
-            s->over_x = dst.x; s->over_y = dst.y; s->over_w = dst.w; s->over_h = dst.h;
-            s->over_mw = mw; s->over_mh = mh;
+            SDL_RenderCopy(s->ren, s->over_tex, &msrc, &mdst);
+            s->over_x = mdst.x; s->over_y = mdst.y; s->over_w = mdst.w; s->over_h = mdst.h;
         }
+        s->over_mw = mw; s->over_mh = mh;
     }
     if (game) { s->stat_shown++; if (fresh) s->stat_fresh++; }
     if (s->show_fps && game) fps_draw(s, &dst, cols, lines);
