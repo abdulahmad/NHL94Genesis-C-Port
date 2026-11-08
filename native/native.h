@@ -11,7 +11,6 @@
 extern mdrt *native_m;                  /* the console */
 
 /* Overbar dest-rect + overlay keys (native/overbar_view.c). Call before mdrt_sdl_run. */
-void overbar_install(void);
 
 /* the game's session: from the snapshot into the game loop, until it stops */
 void native_game(mdrt *m, void *user);

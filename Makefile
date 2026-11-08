@@ -99,8 +99,7 @@ NOBJ   := $(SRC:%.c=$(OBJ)/%.o) $(NATIVE:%.c=$(OBJ)/%.o)
 # Overbar, the host menu and scaler: the git submodule native/overbar (git submodule update --init)
 OVERBAR_DIR := native/overbar
 -include $(OVERBAR_DIR)/overbar.mk
-OVERBARO := $(OVERBAR_LIB_NAMES:%=$(OBJ)/native/overbar/%.o) $(OBJ)/native/overbar/pulseman_menu.o \
-	$(OBJ)/native/pulseman/sdl2.o
+OVERBARO := $(OVERBAR_LIB_NAMES:%=$(OBJ)/native/overbar/%.o) $(OBJ)/native/overbar/pulseman_menu.o
 # (native/pulseman/include and Overbar's include come before PulseMan's: the SDL2 header with the
 # host hooks, and the menu header with mdrt_menu_at)
 NFLAGS  = $(CFLAGS) $(SANITIZE) -O2 -Isrc -Inative -Inative/pulseman/include $(OVERBAR_INC) -I$(MDRT)/include $(shell pkg-config --cflags sdl2)
@@ -114,7 +113,7 @@ $(OBJ)/native/%.o: native/%.c $(HDR) native/native.h native/routines_gen.h $(MDR
 	$(CC) $(NFLAGS) -c $< -o $@
 $(OBJ)/native/clock.o: native/costs.inc
 $(OBJ)/native/net.o: build/build_id.h
-NFLAGS += -Ibuild
+NFLAGS += -Ibuild $(OVERBAR_DEFS)
 # the build's identity, which netplay's peers compare (the same code on both): the commit, "-dirty"
 # with changes not committed; written again only when it changes
 build/build_id.h: FORCE
@@ -132,9 +131,6 @@ $(OBJ)/native/overbar/%.o: $(OVERBAR_DIR)/src/%.c $(OVERBAR_HDRS) | overbar
 $(OBJ)/native/overbar/pulseman_menu.o: $(OVERBAR_PULSEMAN_SRC) $(OVERBAR_HDRS) | overbar
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -c $< -o $@
-$(OBJ)/native/pulseman/sdl2.o: native/pulseman/sdl2.c native/pulseman/include/mdrt/platform_sdl2.h $(MDRTHDR) | overbar
-	@mkdir -p $(dir $@)
-	$(CC) $(NFLAGS) -c $< -o $@
 overbar:
 	@test -f $(OVERBAR_DIR)/overbar.mk || { echo "no Overbar at $(OVERBAR_DIR): git submodule update --init"; exit 1; }
 .PHONY: overbar
@@ -148,7 +144,8 @@ $(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt | $(MISTER)/README.md
 	$(CC) $(CFLAGS) $(SANITIZE) -O2 $(LDFLAGS) -o $@ $(NOBJ) $(OVERBARO) $(ICONO) $(MDRTLIBS) $(SDLLIBS) -lm $(CXXLIB) $(NETLIB)
 mdrt:
 	@test -f $(MDRT)/Makefile || { echo "no pulseman at $(MDRT): git submodule update --init (or make MDRT=path/to/pulseman)"; exit 1; }
-	$(MAKE) -C $(MDRT) MODE=release B=$(MDRTB) $(MDRTB)/libmdrt.a
+	@# (env -u MAKEFLAGS: the flags given to this make, such as a CFLAGS override, are not PulseMan's)
+	env -u MAKEFLAGS -u MFLAGS $(MAKE) -C $(MDRT) MODE=release B=$(MDRTB) CC="$(CC)" CXX="$(CXX)" AR="$(AR)" $(MDRTB)/libmdrt.a
 
 # the saved states, snapshots and vectors (tools/oracle/vectors.py holds the recipes)
 vectors: build/nhl_oracle.so
