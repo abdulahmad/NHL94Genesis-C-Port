@@ -138,7 +138,12 @@ $(OBJ)/native/pulseman/sdl2.o: native/pulseman/sdl2.c native/pulseman/include/md
 overbar:
 	@test -f $(OVERBAR_DIR)/overbar.mk || { echo "no Overbar at $(OVERBAR_DIR): git submodule update --init"; exit 1; }
 .PHONY: overbar
-$(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt
+# the MiSTer filter files Overbar ships (native/overbar/mister), copied beside the program, where
+# Overbar looks for its mister folder; copied again when Overbar's copy changes
+MISTER := $(patsubst %/,%,$(dir $(BIN)))/mister
+$(MISTER)/README.md: $(OVERBAR_DIR)/mister/README.md $(OVERBAR_DIR)/overbar.mk | overbar
+	$(call overbar_copy_mister,$(patsubst %/,%,$(dir $(BIN))))
+$(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt | $(MISTER)/README.md
 	@mkdir -p $(dir $@) out
 	$(CC) $(CFLAGS) $(SANITIZE) -O2 $(LDFLAGS) -o $@ $(NOBJ) $(OVERBARO) $(ICONO) $(MDRTLIBS) $(SDLLIBS) -lm $(CXXLIB) $(NETLIB)
 mdrt:
