@@ -154,11 +154,33 @@ static void text(int col, int row, const char *s, uint32_t rgb)
     mdrt_menu_text(buf, src_w, src_h, src_w, 4 + col * CW, 4 + row * CH, t, rgb);
 }
 
+/* text with newlines (a line each), a tab (the value after its label), and a form feed (a heading); as many rows as fit above the footer */
+static int block(int row, const char *s, int cols)
+{
+    int last = (src_h - 8) / CH - 3;
+    char line[160];
+    while (*s && row <= last) {
+        size_t n = 0;
+        uint32_t rgb = DIM;
+        if (*s == '\f') { rgb = GOLD; s++; }
+        while (*s && *s != '\n' && n < sizeof line - 2) {
+            line[n++] = *s == '\t' ? ':' : *s;
+            if (*s == '\t') line[n++] = ' ';
+            s++;
+        }
+        if (*s == '\n') s++;
+        line[n] = 0;
+        if ((int)n > cols) line[cols] = 0;
+        text(0, row++, line, rgb);
+    }
+    return row;
+}
+
 void options_ui_draw(const SDL_Rect *dst)
 {
     SDL_Renderer *ren = ob_plat_renderer();
     mdrt_sdl_page pg;
-    char line[120], val[64], extra[200];
+    char line[120], val[64], extra[2400];
     int row = 0, cols = (src_w - 8) / CW - 2;
     if (!is_open || !ren) return;
     if (!buf && !(buf = malloc((size_t)src_w * (size_t)src_h * 4))) return;
@@ -181,11 +203,11 @@ void options_ui_draw(const SDL_Rect *dst)
     }
     extra[0] = 0;
     if (O->options_text) O->options_text(page, V, extra, sizeof extra, U);
-    if (extra[0]) { row++; snprintf(line, sizeof line, "%.*s", cols, extra); text(0, row++, line, DIM); }
+    row = block(row + 1, extra, cols);
     if (pg.count && O->options_detail) {
         extra[0] = 0;
         O->options_detail(pg.first + sel, V[pg.first + sel], extra, sizeof extra, U);
-        if (extra[0]) { snprintf(line, sizeof line, "%.*s", cols, extra); text(0, row++, line, DIM); }
+        row = block(row, extra, cols);
     }
     text(0, (src_h - 8) / CH - 2, "Up/Down: choose  Left/Right: change  Tab: page", DIM);
     text(0, (src_h - 8) / CH - 1, "Esc: save, close (next game start)", DIM);
