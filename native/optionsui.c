@@ -13,6 +13,7 @@
 #include "mdrt/platform_sdl2.h"
 #include "mdrt/settings.h"
 #include "overbar/plat.h"
+#include "optionsui.h"
 
 enum { CW = MDRT_MENU_CELL_W, CH = MDRT_MENU_CELL_H };
 #define SHADE 0xD0000000u
@@ -140,9 +141,17 @@ void options_ui_button(int slot, int b)
     else if (b == SDL_CONTROLLER_BUTTON_B || b == SDL_CONTROLLER_BUTTON_START || b == SDL_CONTROLLER_BUTTON_BACK) close_ui();
 }
 
+/* the font has plain ASCII only: any other character (a UTF-8 bullet) is drawn as a bar */
 static void text(int col, int row, const char *s, uint32_t rgb)
 {
-    mdrt_menu_text(buf, src_w, src_h, src_w, 4 + col * CW, 4 + row * CH, s, rgb);
+    char t[256];
+    size_t n = 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p && n < sizeof t - 1; p++) {
+        if (*p < 0x80) t[n++] = (char)*p;
+        else if (*p >= 0xC0) t[n++] = '|';
+    }
+    t[n] = 0;
+    mdrt_menu_text(buf, src_w, src_h, src_w, 4 + col * CW, 4 + row * CH, t, rgb);
 }
 
 void options_ui_draw(const SDL_Rect *dst)
@@ -179,7 +188,7 @@ void options_ui_draw(const SDL_Rect *dst)
         if (extra[0]) { snprintf(line, sizeof line, "%.*s", cols, extra); text(0, row++, line, DIM); }
     }
     text(0, (src_h - 8) / CH - 2, "Up/Down: choose  Left/Right: change  Tab: page", DIM);
-    text(0, (src_h - 8) / CH - 1, "Esc: save and close (applies from the next game start)", DIM);
+    text(0, (src_h - 8) / CH - 1, "Esc: save, close (next game start)", DIM);
     for (int i = 0; i < src_w * src_h; i++) if (!(buf[i] >> 24)) buf[i] |= 0xFF000000u;
     SDL_UpdateTexture(tex, NULL, buf, src_w * 4);
     SDL_RenderCopy(ren, tex, NULL, dst);

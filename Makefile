@@ -79,7 +79,7 @@ MDRTLIBS := $(MDRT)/$(MDRTB)/libmdrt.a
 ifeq ($(OS),Windows_NT)
 EXE    ?= .exe
 NETLIB ?= -lws2_32                                       # (pulseman's online play: Winsock)
-WINDRES ?= $(patsubst %gcc,%windres,$(CC))
+WINDRES ?= $(if $(findstring gcc,$(CC)),$(patsubst %gcc,%windres,$(CC)),windres)
 # (Windows: the C++ runtime linked in, so the game needs only SDL2.dll beside it)
 CXXLIB ?= -static-libgcc -Wl,-Bstatic -lstdc++ -Wl,--whole-archive -lwinpthread -Wl,--no-whole-archive -Wl,-Bdynamic
 endif

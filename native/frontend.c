@@ -22,17 +22,11 @@
 #include "overbar/plat.h"
 #include "overbar/plat_pads.h"
 #include "native.h"
+#include "optionsui.h"
 
 #define SETTINGS "settings.ini"
 
-/* native/optionsui.c: the rules pages */
-void options_ui_init(const mdrt_sdl_options *o, int *values, mdrt_settings *set, void *user, void (*save)(void));
-int options_ui_active(void);
-int options_ui_pages(void);
-int options_ui_open(void *ctx);
-void options_ui_key(int k);
-void options_ui_button(int slot, int b);
-void options_ui_draw(const SDL_Rect *dst);
+
 #define SQUEUE 3                                      /* frames of sound queued before the game is let go on */
 
 enum { BUTTONS = 12 };
