@@ -24,6 +24,15 @@
 #include "native.h"
 
 #define SETTINGS "settings.ini"
+
+/* native/optionsui.c: the rules pages */
+void options_ui_init(const mdrt_sdl_options *o, int *values, mdrt_settings *set, void *user, void (*save)(void));
+int options_ui_active(void);
+int options_ui_pages(void);
+int options_ui_open(void *ctx);
+void options_ui_key(int k);
+void options_ui_button(int slot, int b);
+void options_ui_draw(const SDL_Rect *dst);
 #define SQUEUE 3                                      /* frames of sound queued before the game is let go on */
 
 enum { BUTTONS = 12 };
@@ -382,11 +391,11 @@ static const uint32_t *hook_frame(int *w, int *h)
     }
 }
 
-static int hook_captures(void) { return ob_pads_setup_active(); }
-static void hook_raw_key(int sc) { ob_pads_setup_key(sc); }
-static void hook_raw_button(int slot, int b) { ob_pads_setup_button(slot, b); }
+static int hook_captures(void) { return ob_pads_setup_active() || options_ui_active(); }
+static void hook_raw_key(int sc) { if (options_ui_active()) options_ui_key(sc); else ob_pads_setup_key(sc); }
+static void hook_raw_button(int slot, int b) { if (options_ui_active()) options_ui_button(slot, b); else ob_pads_setup_button(slot, b); }
 static int hook_action(int id) { if (id == OB_ID_CONTROLLERS) ob_pads_setup_open(-1); return 1; }
-static void hook_draw_over(const SDL_Rect *dst) { ob_pads_setup_draw(dst); }
+static void hook_draw_over(const SDL_Rect *dst) { ob_pads_setup_draw(dst); options_ui_draw(dst); }
 static void hook_changed(void) { settings_write(); }
 /* the game stopped, its save RAM and the settings written */
 static void shutdown_game(void)
@@ -401,12 +410,19 @@ static void shutdown_game(void)
 
 static void hook_quit(void) { shutdown_game(); }
 
+static ob_host host;
+
+static int rules_open(void *ctx)
+{
+    ob_overlay_close(&host);                          /* the rules screen takes the place of the overlay */
+    return options_ui_open(ctx);
+}
+
 static void shell_controllers(void) { ob_pads_setup_open(-1); }
 
 int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game, void *user)
 {
     ob_profile profile = OB_PROFILE_DESKTOP;
-    static ob_host host;
     char why[600];
     memset(&F, 0, sizeof F);
     F.o = o; F.cfg = cfg; F.game = game; F.user = user;
@@ -428,6 +444,8 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     options_from_settings();
     settings_write();
     ob_host_init(&host, OB_PORT_GENESIS, profile);
+    options_ui_init(o, F.opt_values, F.set, user, settings_write);
+    if (options_ui_pages()) ob_host_add_addon(&host, OB_ID_ADDON, "Rules", rules_open);
     {
         ob_shell shell;
         memset(&shell, 0, sizeof shell);
@@ -454,7 +472,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_plat_pump();
         ob_pads_tick();
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
-        hold_state = ob_pads_setup_active() || host.overlay_open;
+        hold_state = ob_pads_setup_active() || options_ui_active() || host.overlay_open;
         ob_plat_present();
         ob_plat_frame_done(SDL_AtomicSet(&F.fresh, 0));
         if (SDL_AtomicGet(&F.done)) break;
