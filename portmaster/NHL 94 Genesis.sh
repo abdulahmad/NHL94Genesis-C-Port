@@ -22,7 +22,7 @@ GAMEDIR="/$directory/ports/nhl94g"
 CONFDIR="$GAMEDIR/conf"
 BIN="nhl94g.${DEVICE_ARCH}"
 
-mkdir -p "$CONFDIR" "$GAMEDIR/roms" "$GAMEDIR/states"
+mkdir -p "$CONFDIR"
 cd "$GAMEDIR" || exit 1
 
 > "$GAMEDIR/log.txt" && exec > >(tee "$GAMEDIR/log.txt") 2>&1
@@ -33,8 +33,11 @@ export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 export OVERBAR_HANDHELD=1
 export PORTMASTER=1
 
-if [ ! -f "$GAMEDIR/roms/nhl94.gen" ]; then
-  pm_message "Copy your NHL '94 Genesis dump to roms/nhl94.gen (1 MB US/Europe)."
+# The game finds its ROM by itself: any file next to the program with a common extension (any name), checked to be the right game.
+FOUND=""
+for f in *.gen *.md *.bin *.smd; do [ -f "$f" ] && FOUND="$f" && break; done
+if [ -z "$FOUND" ]; then
+  pm_message "Copy your NHL '94 Genesis dump into the port folder (any file name)."
   pm_finish
   exit 1
 fi
@@ -45,9 +48,9 @@ if [ ! -x "$GAMEDIR/$BIN" ]; then
   exit 1
 fi
 
-# gptokeyb: quit combo (Select+Start) plus L1 rewind / R1 fast-forward.
+# gptokeyb: quit combo (Select+Start).
 # Face buttons stay with SDL GameController.
 $GPTOKEYB "$BIN" -c "$GAMEDIR/nhl94g.gptk" &
 pm_platform_helper "$GAMEDIR/$BIN"
-./"$BIN" --rom "$GAMEDIR/roms/nhl94.gen" --sram "$CONFDIR/nhl94.srm"
+./"$BIN"
 pm_finish
