@@ -68,6 +68,4 @@ int native_net_on(void) { return 0; }
 const void *native_net_settings(size_t *size) { *size = 0; return NULL; }
 void native_net_load_at(long frame, const char *path) { (void)frame; (void)path; }
 void native_net_power_on(mdrt *m) { (void)m; }
-mdrt_net *native_net(void) { return NULL; }
-mdrt_udp *native_net_udp(void) { return NULL; }
 void native_net_close(void) {}

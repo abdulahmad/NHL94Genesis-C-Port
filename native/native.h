@@ -73,8 +73,6 @@ void native_net_power_on(mdrt *m);                      /* in a session: its set
 /* the session's rules (RULE_COUNT of them) into v, whether its roster set is one sent and whether this
  * player hosts it: 1, or 0 when the game has no session's settings (yet) */
 int native_net_session(uint8_t *v, int *sent, int *host);
-mdrt_net *native_net(void);                             /* the command line's session, and its link */
-mdrt_udp *native_net_udp(void);
 void native_net_close(void);
 
 /* game rules (rules.c; src/rules.h): the menu's catalogue, the next game's rules (the platform's
