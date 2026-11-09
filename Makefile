@@ -108,7 +108,7 @@ nhl94: $(BIN)
 $(OBJ)/src/%.o: src/%.c $(HDR) $(MDRTHDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -finstrument-functions -c $< -o $@
-$(OBJ)/native/%.o: native/%.c $(HDR) native/native.h native/routines_gen.h $(MDRTHDR)
+$(OBJ)/native/%.o: native/%.c $(wildcard $(OVERBAR_DIR)/include/overbar/*.h) $(HDR) native/native.h native/routines_gen.h $(MDRTHDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -c $< -o $@
 $(OBJ)/native/clock.o: native/costs.inc
