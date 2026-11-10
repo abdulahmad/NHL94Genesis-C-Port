@@ -64,18 +64,10 @@ int native_net_four_way(void) { return 0; }
 void native_net_start(mdrt *m) { (void)m; }
 void native_net_stop_at(long frame) { (void)frame; }
 void native_net_wait(void) {}
-int native_net_window_start(const mdrt_net_options *o, native_input_fn input, char *msg, size_t size)
-{
-    (void)o; (void)input;
-    snprintf(msg, size, "online play is not in this build");
-    return -1;
-}
-int native_net_window_poll(void) { return 0; }
-int native_net_window_session(void) { return 0; }
-void native_net_window_leave(void) {}
-int native_net_window_status(char *line, size_t size) { if (size) line[0] = 0; return 0; }
 int native_net_on(void) { return 0; }
 const void *native_net_settings(size_t *size) { *size = 0; return NULL; }
 void native_net_load_at(long frame, const char *path) { (void)frame; (void)path; }
 void native_net_power_on(mdrt *m) { (void)m; }
+mdrt_net *native_net(void) { return NULL; }
+mdrt_udp *native_net_udp(void) { return NULL; }
 void native_net_close(void) {}
