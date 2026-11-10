@@ -74,6 +74,14 @@ void native_net_power_on(mdrt *m);                      /* in a session: its set
  * player hosts it: 1, or 0 when the game has no session's settings (yet) */
 int native_net_session(uint8_t *v, int *sent, int *host);
 void native_net_close(void);
+/* the window's sessions (its Online page; main thread): open one (0, or -1 with msg); poll it in the room every
+ * frame (1 once its match has begun: the window powers the console on again for it); a session's console now
+ * (no save RAM); leave; what it does (1 while it goes on; else why the last one ended) */
+int native_net_window_start(const mdrt_net_options *o, native_input_fn input, char *msg, size_t size);
+int native_net_window_poll(void);
+int native_net_window_session(void);
+void native_net_window_leave(void);
+int native_net_window_status(char *line, size_t size);
 
 /* game rules (rules.c; src/rules.h): the menu's catalogue, the next game's rules (the platform's
  * options_use, or the command line's --rule NAME=VALUE), set at power on, and the state part */

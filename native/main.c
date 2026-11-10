@@ -813,7 +813,7 @@ int main(int argc, char **argv)
         o.state_check = native_state_check;               /* (of the session's roster set) */
         o.options_session = rules_page_session;            /* (the pages in a session: the host's) */
         o.net_pads = 4;                                   /* (up to four players online: 4 Way Play) */
-        if (netopt.on) { fprintf(stderr, "netplay in the window is not in this front end yet: --headless\n"); return 2; }
+        if (netopt.on) { fprintf(stderr, "netplay in the window: its Online page (` or F11); --host / --join / --peer are for --headless\n"); return 2; }
         int r = mdrt_sdl_run(&c, &o, native_game, NULL);
         native_net_close();
         return r;

@@ -319,8 +319,9 @@ a whole under its bundle identifier, so macOS can ask it for the local network.
   states) and rosters (`src/rosters.h`'s tables; `native/rosters.c` reads and builds them,
   `native/romsrc.c` reads hacks, `native/art.c` the pictures, `docs/ROSTERS.md` the format), the
   Rosters and Game rules pages. Rollback netplay (`native/net.c`: Overbar's `ob_net` and its console
-  features, resuming at the game loop's wait as a state does; `--host`, `--join`, `--peer`, the
-  window's Online page to come; the host's rosters and rules sent; two to four machines, any
+  features, resuming at the game loop's wait as a state does; `--host`, `--join`, `--peer` headless,
+  the window's Online page (the console powers on again when the match begins; on screen check
+  to come); the host's rosters and rules sent; two to four machines, any
   players at each, up to four; the host's reset and its state loaded for everyone on the same
   frame; a desync goes on from the host's state). The downloads (`make release`, `tools/release.sh`: Linux, Windows, a universal macOS
   app). In pulseman: the console's state as a value, a client-owned clock

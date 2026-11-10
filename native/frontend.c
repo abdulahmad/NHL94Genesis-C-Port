@@ -8,7 +8,9 @@
  * The ROM is looked for beside the program (any name, a common Genesis extension: .gen .md .bin
  * .smd) and each candidate is asked whether it is the right cartridge. Not in this front end (PulseMan's
  * window had them): the ROM browser, screenshots and GIF recording, rewind, state slots, the pixel
- * filters (Scale2x, MMPX, xBR) and netplay in the window (next step).
+ * filters (Scale2x, MMPX, xBR). Online play: the overlay's Online page (net.c's window sessions);
+ * once a session's match begins the console powers on again for it, from a new cartridge (no save RAM
+ * read or written while it lasts).
  */
 #include <ctype.h>
 #include <dirent.h>
@@ -21,6 +23,7 @@
 #include "mdrt/vdp.h"
 #include "overbar/plat.h"
 #include "overbar/plat_pads.h"
+#include "overbar/net.h"
 #include "native.h"
 #include "optionsui.h"
 
@@ -59,6 +62,7 @@ static struct {
     uint8_t *rom;
     int *opt_values;
     int adaptor;
+    int session;                                      /* the console is a session's */
 } F;
 
 /* ---- settings: settings.ini beside the program ---- */
@@ -348,9 +352,9 @@ static int idle(void *user)
 static int game_thread(void *user)
 {
     (void)user;
-    sram_load();
+    if (!F.session) sram_load();
     F.game(F.m, F.user);
-    sram_save();
+    if (!F.session) sram_save();
     SDL_AtomicSet(&F.done, 1);
     return 0;
 }
@@ -360,10 +364,10 @@ static int start_game(void)
     const char *save;
     F.m = mdrt_new(F.cfg);
     if (!F.m) return 0;
-    mdrt_pads_set_adaptor(mdrt_get_pads(F.m), F.adaptor);
+    mdrt_pads_set_adaptor(mdrt_get_pads(F.m), F.session ? (native_net_four_way() ? MDRT_ADAPTOR_EA4WAY : MDRT_ADAPTOR_NONE) : F.adaptor);
     if (F.o->options_use && F.opt_values) F.o->options_use(F.opt_values, F.user);
     save = F.o->sram_file ? F.o->sram_file(F.user) : NULL;
-    snprintf(F.sram_file, sizeof F.sram_file, "%s", save ? save : F.o->sram_path ? F.o->sram_path : "");
+    snprintf(F.sram_file, sizeof F.sram_file, "%s", F.session ? "" : save ? save : F.o->sram_path ? F.o->sram_path : "");
     F.thread = SDL_CreateThread(game_thread, "game", NULL);
     if (!F.thread) { mdrt_free(F.m); F.m = NULL; }
     return F.thread != NULL;
@@ -402,7 +406,94 @@ static void shutdown_game(void)
     if (F.dev) { SDL_CloseAudioDevice(F.dev); F.dev = 0; }
 }
 
-static void hook_quit(void) { shutdown_game(); }
+static void hook_quit(void) { native_net_window_leave(); shutdown_game(); }
+
+/* ---- online play: the Online page (net.c's window sessions) ---- */
+
+/* the k-th pad this machine plays: the window's pad k (its first players) */
+static int test_press;                                /* (test aid NHL94_PRESS: the local pads press buttons by themselves) */
+static uint16_t window_pad(int pad, int k)
+{
+    (void)pad;
+    if (test_press) {
+        static uint32_t x = 12345;
+        static int n, b;
+        if (n-- <= 0) { x = x * 1103515245u + 12345u; n = 5 + (int)(x >> 16) % 40; b = (int)(x >> 8) & 0xFFF; }
+        return (uint16_t)(b & ~MDRT_PAD_START);
+    }
+    return k >= 0 && k < MDRT_PADS ? (uint16_t)SDL_AtomicGet(&F.buttons[k]) : 0;
+}
+
+static int online_start(const ob_online *o, char *msg, int msg_size)
+{
+    mdrt_net_options n;
+    mdrt_net_options_init(&n);
+    n.on = 1;
+    n.role = o->role;                                 /* (the same numbers: host, join, both) */
+    snprintf(n.peer, sizeof n.peer, "%.95s", o->addr);
+    n.port = (uint16_t)(o->port > 0 ? o->port : 0);
+    n.delay = o->delay;
+    snprintf(n.name, sizeof n.name, "%s", o->name[0] ? o->name : "Player");
+    n.here = o->here > 0 ? o->here : 1;
+    n.players = o->all > 0 ? o->all : 2;
+    {
+        const char *sim = getenv("NHL94_NETSIM");    /* (test aid) */
+        if (sim) sscanf(sim, "%d,%d,%d", &n.sim[0], &n.sim[1], &n.sim[2]);
+    }
+    return native_net_window_start(&n, window_pad, msg, (size_t)msg_size);
+}
+static void online_leave(void) { native_net_window_leave(); }
+static int online_status(char *line, int line_size) { return native_net_window_status(line, (size_t)line_size); }
+
+/* test aid: NHL94_ONLINE=host|join arms a session on 127.0.0.1 (NHL94_PORT, default 41994) as the Online page
+ * would; NHL94_QUIT_AFTER=SECONDS closes the window then; NHL94_PRESS=1 has the local pads press buttons by
+ * themselves; NHL94_NETSIM=MS,MS,% a bad link; each new status line goes to stderr */
+static Uint32 test_quit_at;
+static void test_aid_arm(void)
+{
+    const char *r = getenv("NHL94_ONLINE"), *port = getenv("NHL94_PORT"), *q = getenv("NHL94_QUIT_AFTER");
+    if (q && atoi(q) > 0) test_quit_at = SDL_GetTicks() + (Uint32)atoi(q) * 1000u;
+    if (!r || (strcmp(r, "host") && strcmp(r, "join"))) return;
+    test_press = getenv("NHL94_PRESS") != NULL;
+    ob_online o;
+    char msg[200];
+    memset(&o, 0, sizeof o);
+    snprintf(o.name, sizeof o.name, "%s", r);
+    o.role = strcmp(r, "host") ? 1 : 0;
+    snprintf(o.addr, sizeof o.addr, "127.0.0.1");
+    o.port = port && atoi(port) > 0 ? atoi(port) : 41994;
+    o.delay = 2;
+    o.here = 1;
+    o.all = 2;
+    if (online_start(&o, msg, sizeof msg)) fprintf(stderr, "NHL94_ONLINE: %s\n", msg);
+}
+static void test_aid_tick(void)
+{
+    static char last[160];
+    char line[160];
+    if (getenv("NHL94_ONLINE")) {
+        online_status(line, sizeof line);
+        if (strcmp(line, last)) { fprintf(stderr, "online: %s\n", line); snprintf(last, sizeof last, "%s", line); }
+    }
+    if (test_quit_at && SDL_TICKS_PASSED(SDL_GetTicks(), test_quit_at)) SDL_AtomicSet(&F.quit, 1);
+}
+
+/* the session's match began: the console powered on again for it (the game on its thread anew) */
+static void restart_for_session(void)
+{
+    SDL_AtomicSet(&F.stop, 1);
+    for (int i = 0; F.thread && i < 300 && !SDL_AtomicGet(&F.done); i++) SDL_Delay(10);
+    if (!SDL_AtomicGet(&F.done)) { fprintf(stderr, "netplay: the game did not stop for the session\n"); native_net_window_leave(); SDL_AtomicSet(&F.stop, 0); return; }
+    SDL_WaitThread(F.thread, NULL);
+    F.thread = NULL;
+    mdrt_free(F.m);
+    F.m = NULL;
+    SDL_AtomicSet(&F.stop, 0);
+    SDL_AtomicSet(&F.done, 0);
+    F.session = 1;
+    if (F.dev) { SDL_ClearQueuedAudio(F.dev); SDL_PauseAudioDevice(F.dev, 1); F.queued = 0; }
+    if (!start_game()) { fprintf(stderr, "the game could not start\n"); SDL_AtomicSet(&F.quit, 1); }
+}
 
 static ob_host host;
 
@@ -420,7 +511,6 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     char why[600];
     memset(&F, 0, sizeof F);
     F.o = o; F.cfg = cfg; F.game = game; F.user = user;
-    if (o->net) { fprintf(stderr, "netplay in the window is not in this front end yet\n"); return 2; }
     if (!ob_plat_init(&profile)) return 1;
     F.lock = SDL_CreateMutex();
     settings_load();
@@ -440,6 +530,18 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     ob_host_init(&host, OB_PORT_GENESIS, profile);
     options_ui_init(o, F.opt_values, F.set, user, settings_write);
     if (options_ui_pages()) ob_host_add_addon(&host, OB_ID_ADDON, "Rules", rules_open);
+    {
+        ob_online_ops ops;
+        memset(&ops, 0, sizeof ops);
+        ops.max_pads = MDRT_PADS;                     /* (up to four players: 4 Way Play) */
+        ops.max_delay = 10;
+        ops.roles = 3;
+        ops.start = online_start;
+        ops.leave = online_leave;
+        ops.status = online_status;
+        ops.lan_address = ob_net_lan_address;
+        ob_online_set_ops(&host, &ops);
+    }
     {
         ob_shell shell;
         memset(&shell, 0, sizeof shell);
@@ -462,7 +564,10 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     }
     cfg->platform = (mdrt_platform){ .user = NULL, .present = present, .audio = audio, .wait = frame_wait, .input = input, .idle = idle };
     if (!start_game()) { fprintf(stderr, "the game could not start\n"); return 1; }
+    test_aid_arm();
     while (!SDL_AtomicGet(&F.quit)) {
+        test_aid_tick();
+        if (native_net_window_poll()) restart_for_session();
         ob_plat_pump();
         ob_pads_tick();
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));

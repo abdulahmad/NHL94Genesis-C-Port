@@ -22,7 +22,13 @@
  * at the wait after the step that carries them (once a pass: a rollback that plays the step again
  * does it again). Headless, a run that reaches --frames plays on until every machine has every
  * button up to it: the host then ends the match and says goodbye a moment later; a guest stops when
- * the match ends. */
+ * the match ends.
+ *
+ * The window (frontend.c, its Online page): the session opens on the main thread, which polls it in
+ * the room (native_net_window_poll) until the match begins; the window then powers the console on
+ * again for it, and from there only the game thread touches the session (the main thread reads a line
+ * it leaves, and asks it to leave). A session that ends leaves the console playing on alone, on the
+ * window's pads. */
 #include <stdio.h>
 #include <string.h>
 #include <stdatomic.h>
@@ -55,6 +61,12 @@ static size_t event_size;
 static long load_done = -1, reset_done = -1;   /* the frame whose event was carried out this pass */
 static long resets, loads;
 static long said_at = -1;
+/* the window's session */
+static int window, window_go;           /* (main thread) a window session; its match has begun */
+static atomic_int window_leave, window_over;   /* asked to leave; the game thread is done with the session */
+static atomic_flag line_lock = ATOMIC_FLAG_INIT;
+static char window_line[128];           /* what the session does now, or why it ended (the game thread's) */
+static int window_live;                 /* (with the line) the session goes on */
 
 static void nap(void)
 {
@@ -293,7 +305,7 @@ static void pad_source(void *user, uint16_t b[MDRT_PADS])
 void native_net_start(mdrt *m)
 {
     console = m;
-    if (!headless || started || !net) return;
+    if ((!headless && !window_go) || started || !net || atomic_load(&window_over)) return;
     mdrt_set_pad_source(m, pad_source, NULL);
     started = 1;
 }
@@ -330,11 +342,27 @@ static void report(void)
             (unsigned)mdrt_frame_count(console), s.rollbacks, s.replayed, s.most_replayed, s.gave_back, s.checks, s.rtt_ms, resets, loads);
 }
 
+static void line_set(const char *line, int live)
+{
+    while (atomic_flag_test_and_set(&line_lock)) {}
+    snprintf(window_line, sizeof window_line, "%.127s", line);
+    window_live = live;
+    atomic_flag_clear(&line_lock);
+}
+
 static void over(void)
 {
     const char *why = ob_net_state(net) == OB_NET_ENDED ? ob_net_why(net) : ob_net_match_why(net);
     if (headless) fprintf(stderr, "netplay: %s\n", why && why[0] ? why : "the match ended");
     report();
+    if (window) {                                         /* (the console plays on alone, on the window's pads) */
+        line_set(why && why[0] ? why : "the match ended", 0);
+        mdrt_set_pad_source(console, NULL, NULL);
+        mdrt_set_quiet(console, 0);
+        latched_step = NONE;
+        ob_net_quit(net);
+        atomic_store(&window_over, 1);
+    }
 }
 
 /* (headless) the run's end: report, goodbye, done */
@@ -394,9 +422,24 @@ static void carry_out(uint32_t f)
 /* at every wait, before the handshake (a rollback: the game loop from its wait, as a state loaded) */
 void native_net_wait(void)
 {
+    if (atomic_load(&window_over)) return;                /* (the window's session is over: the console plays on alone) */
     ob_net *n = playing();
     if (!n) return;                                       /* (none, or over: the console plays on alone) */
     uint32_t f = (uint32_t)mdrt_frame_count(console);
+    if (window && atomic_exchange(&window_leave, 0)) {    /* (the Online page's Leave) */
+        line_set("you left", 0);
+        mdrt_set_pad_source(console, NULL, NULL);
+        mdrt_set_quiet(console, 0);
+        latched_step = NONE;
+        ob_net_quit(n);
+        atomic_store(&window_over, 1);
+        return;
+    }
+    if (window && f % 30 == 0 && !ob_net_replaying(n)) {
+        char line[128];
+        ob_net_status(n, line, sizeof line);
+        line_set(line, 1);
+    }
     carry_out(f);
     if (f && f % CHECK_EVERY == 0) ob_net_check(n, f - 1, mdrt_sim_hash(console));
     messages();
@@ -435,6 +478,81 @@ void native_net_wait(void)
     latched_step = NONE;
     if (headless) done(r == OB_NET_OVER && stop_at >= 0 && (long)f >= stop_at);
     else over();
+}
+
+/* ---- the window's sessions (frontend.c) ---- */
+
+int native_net_window_start(const mdrt_net_options *o, native_input_fn input, char *msg, size_t size)
+{
+    size_t n;
+    const void *set;
+    if (net && !atomic_load(&window_over) && window) { snprintf(msg, size, "Already in a session: Leave first"); return -1; }
+    if (net) { ob_net_free(net); ob_console_free(&con); net = NULL; }
+    set = native_net_settings(&n);
+    started = window_go = 0;
+    latched_step = NONE;
+    load_done = reset_done = -1;
+    atomic_store(&window_over, 0);
+    atomic_store(&window_leave, 0);
+    window = 1;
+    line_set("", 0);
+    if (!native_net_open(o, "", set, n, input, msg, size)) { window = 0; return -1; }
+    return 0;
+}
+
+int native_net_window_poll(void)
+{
+    char err[200];
+    int s;
+    if (!window || !net || window_go) return 0;
+    s = ob_net_poll(net);
+    messages();
+    if (s == OB_NET_ENDED) {
+        line_set(ob_net_why(net), 0);
+        ob_net_free(net);
+        ob_console_free(&con);
+        net = NULL;
+        window = 0;
+        return 0;
+    }
+    if (s == OB_NET_LOBBY && ob_net_is_host(net) && begin_match(err, sizeof err) < 0) {
+        line_set(err, 0);
+        ob_net_quit(net);
+        ob_net_free(net);
+        ob_console_free(&con);
+        net = NULL;
+        window = 0;
+        return 0;
+    }
+    if (s != OB_NET_GO) return 0;
+    window_go = 1;                                        /* (from here the game thread's, from the console's power on) */
+    line_set("playing", 1);
+    return 1;
+}
+
+int native_net_window_session(void) { return window && window_go && !atomic_load(&window_over); }
+
+void native_net_window_leave(void)
+{
+    if (!window || !net) return;
+    if (window_go) { atomic_store(&window_leave, 1); return; }
+    ob_net_quit(net);                                     /* (still in the room: the main thread's) */
+    ob_net_free(net);
+    ob_console_free(&con);
+    net = NULL;
+    window = 0;
+    line_set("you left", 0);
+}
+
+int native_net_window_status(char *line, size_t size)
+{
+    int live;
+    if (window && net && !window_go) { ob_net_status(net, line, (int)size); return 1; }
+    while (atomic_flag_test_and_set(&line_lock)) {}
+    snprintf(line, size, "%s", window_line);
+    live = window_live && window && !atomic_load(&window_over);
+    atomic_flag_clear(&line_lock);
+    return live;
 }
 
 void native_net_close(void)
