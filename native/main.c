@@ -563,6 +563,16 @@ static uint16_t script_pad(int pad, int k)
     return script_buttons(pad, (long)mdrt_frame_count(native_m));   /* (the console's frames: on through a reset) */
 }
 
+/* netplay's local player in the window: the window's player k's controls (pad 1's for the first pad
+ * this peer plays) */
+static uint16_t window_pad(int pad, int k)
+{
+    (void)pad;
+    uint16_t b[MDRT_PADS];
+    mdrt_platform_input(native_m, b);
+    return b[k];
+}
+
 /* pictures to files */
 static void write_ppm(const char *path)
 {
@@ -813,7 +823,13 @@ int main(int argc, char **argv)
         o.state_check = native_state_check;               /* (of the session's roster set) */
         o.options_session = rules_page_session;            /* (the pages in a session: the host's) */
         o.net_pads = 4;                                   /* (up to four players online: 4 Way Play) */
-        if (netopt.on) { fprintf(stderr, "netplay in the window: its Online page (` or F11); --host / --join / --peer are for --headless\n"); return 2; }
+        if (netopt.on) {                                  /* (the window connects, then powers on: by the command line's rules and roster set) */
+            size_t n;
+            const void *set = native_net_settings(&n);
+            if (!native_net_open(&netopt, "", set, n, window_pad, err, sizeof err)) { fprintf(stderr, "netplay: %s\n", err); return 1; }
+            o.net = native_net();
+            o.net_udp = native_net_udp();
+        }
         int r = mdrt_sdl_run(&c, &o, native_game, NULL);
         native_net_close();
         return r;
