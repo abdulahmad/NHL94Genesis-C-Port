@@ -10,6 +10,8 @@
 
 extern mdrt *native_m;                  /* the console */
 
+/* Overbar dest-rect + overlay keys (native/overbar_view.c). Call before mdrt_sdl_run. */
+
 /* the game's session: from the snapshot into the game loop, until it stops */
 void native_game(mdrt *m, void *user);
 /* stop the session (the window closed, the run's frames done, lockstep finished): back out of the game */
@@ -71,9 +73,15 @@ void native_net_power_on(mdrt *m);                      /* in a session: its set
 /* the session's rules (RULE_COUNT of them) into v, whether its roster set is one sent and whether this
  * player hosts it: 1, or 0 when the game has no session's settings (yet) */
 int native_net_session(uint8_t *v, int *sent, int *host);
-mdrt_net *native_net(void);                             /* the command line's session, and its link */
-mdrt_udp *native_net_udp(void);
 void native_net_close(void);
+/* the window's sessions (its Online page; main thread): open one (0, or -1 with msg); poll it in the room every
+ * frame (1 once its match has begun: the window powers the console on again for it); a session's console now
+ * (no save RAM); leave; what it does (1 while it goes on; else why the last one ended) */
+int native_net_window_start(const mdrt_net_options *o, native_input_fn input, char *msg, size_t size);
+int native_net_window_poll(void);
+int native_net_window_session(void);
+void native_net_window_leave(void);
+int native_net_window_status(char *line, size_t size);
 
 /* game rules (rules.c; src/rules.h): the menu's catalogue, the next game's rules (the platform's
  * options_use, or the command line's --rule NAME=VALUE), set at power on, and the state part */

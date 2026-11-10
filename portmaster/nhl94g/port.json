@@ -1,0 +1,27 @@
+{
+  "version": 4,
+  "name": "nhl94g.zip",
+  "items": [
+    "NHL 94 Genesis.sh",
+    "nhl94g"
+  ],
+  "items_opt": [],
+  "attr": {
+    "title": "NHL 94 Genesis",
+    "porter": ["abdulahmad"],
+    "desc": "EA Sports NHL '94 for Sega Genesis, rebuilt in C, hosted by Overbar. Exhibition hockey with the original teams, skating, passing and shooting. Overlay menu on Select. Bring your own 1 MB US/Europe dump.",
+    "desc_md": null,
+    "inst": "Copy your NHL '94 Genesis ROM into nhl94g/roms/nhl94.gen (1 MB US/Europe cartridge, SHA-1 7b1489ab501258133bf03e5f0892b77d04312580).",
+    "inst_md": null,
+    "genres": ["sports"],
+    "image": null,
+    "rtr": false,
+    "exp": false,
+    "runtime": [],
+    "store": [],
+    "availability": "full",
+    "reqs": [],
+    "arch": ["aarch64"],
+    "min_glibc": ""
+  }
+}

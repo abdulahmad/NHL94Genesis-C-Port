@@ -73,12 +73,13 @@ BIN    ?= build/nhl94-vanilla$(EXE)
 OBJ    ?= build/obj-vanilla
 endif
 MDRTB  ?= build/release
-MDRTLIBS := $(MDRT)/$(MDRTB)/libmdrt_sdl2.a $(MDRT)/$(MDRTB)/libmdrt.a
+# PulseMan's core only: its SDL2 front end is native/pulseman/sdl2.c, a copy with this game's host
+# changes, so ext/pulseman stays the upstream commit
+MDRTLIBS := $(MDRT)/$(MDRTB)/libmdrt.a
 ifeq ($(OS),Windows_NT)
 EXE    ?= .exe
 NETLIB ?= -lws2_32                                       # (pulseman's online play: Winsock)
-WINDRES ?= $(patsubst %gcc,%windres,$(CC))
-ICONO  := $(OBJ)/icon.o                                  # (the exe's icon, res/icon.ico)
+WINDRES ?= $(if $(findstring gcc,$(CC)),$(patsubst %gcc,%windres,$(CC)),windres)
 # (Windows: the C++ runtime linked in, so the game needs only SDL2.dll beside it)
 CXXLIB ?= -static-libgcc -Wl,-Bstatic -lstdc++ -Wl,--whole-archive -lwinpthread -Wl,--no-whole-archive -Wl,-Bdynamic
 endif
@@ -91,19 +92,28 @@ SDLLIBS := $(filter-out -mwindows,$(shell pkg-config --libs sdl2))
 # game is in, so states know where it waits), the native side not
 BIN    ?= build/nhl94$(EXE)
 OBJ    ?= build/obj
+ifeq ($(OS),Windows_NT)
+ICONO  := $(OBJ)/icon.o                                  # (the exe's icon, res/icon.ico)
+endif
 NOBJ   := $(SRC:%.c=$(OBJ)/%.o) $(NATIVE:%.c=$(OBJ)/%.o)
-NFLAGS  = $(CFLAGS) $(SANITIZE) -O2 -Isrc -Inative -I$(MDRT)/include $(shell pkg-config --cflags sdl2)
+# Overbar, the host menu and scaler: the git submodule native/overbar (git submodule update --init)
+OVERBAR_DIR := native/overbar
+-include $(OVERBAR_DIR)/overbar.mk
+OVERBARO := $(OVERBAR_LIB_NAMES:%=$(OBJ)/native/overbar/%.o) $(OBJ)/native/overbar/pulseman_menu.o
+# (native/pulseman/include and Overbar's include come before PulseMan's: the SDL2 header with the
+# host hooks, and the menu header with mdrt_menu_at)
+NFLAGS  = $(CFLAGS) $(SANITIZE) -O2 -Isrc -Inative -Inative/pulseman/include $(OVERBAR_INC) -I$(MDRT)/include $(shell pkg-config --cflags sdl2)
 MDRTHDR := $(wildcard $(MDRT)/include/mdrt/*.h)
 nhl94: $(BIN)
 $(OBJ)/src/%.o: src/%.c $(HDR) $(MDRTHDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -finstrument-functions -c $< -o $@
-$(OBJ)/native/%.o: native/%.c $(HDR) native/native.h native/routines_gen.h $(MDRTHDR)
+$(OBJ)/native/%.o: native/%.c $(wildcard $(OVERBAR_DIR)/include/overbar/*.h) $(HDR) native/native.h native/routines_gen.h $(MDRTHDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -c $< -o $@
 $(OBJ)/native/clock.o: native/costs.inc
 $(OBJ)/native/net.o: build/build_id.h
-NFLAGS += -Ibuild
+NFLAGS += -Ibuild $(OVERBAR_DEFS)
 # the build's identity, which netplay's peers compare (the same code on both): the commit, "-dirty"
 # with changes not committed; written again only when it changes
 build/build_id.h: FORCE
@@ -115,12 +125,27 @@ FORCE:
 $(OBJ)/icon.o: res/icon.rc res/icon.ico
 	@mkdir -p $(dir $@)
 	$(WINDRES) -I res $< -O coff -o $@
-$(BIN): $(NOBJ) $(ICONO) mdrt
+$(OBJ)/native/overbar/%.o: $(OVERBAR_DIR)/src/%.c $(OVERBAR_HDRS) | overbar
+	@mkdir -p $(dir $@)
+	$(CC) $(NFLAGS) $(OVERBAR_DEFS) -c $< -o $@
+$(OBJ)/native/overbar/pulseman_menu.o: $(OVERBAR_PULSEMAN_SRC) $(OVERBAR_HDRS) | overbar
+	@mkdir -p $(dir $@)
+	$(CC) $(NFLAGS) -c $< -o $@
+overbar:
+	@test -f $(OVERBAR_DIR)/overbar.mk || { echo "no Overbar at $(OVERBAR_DIR): git submodule update --init"; exit 1; }
+.PHONY: overbar
+# the MiSTer filter files Overbar ships (native/overbar/mister), copied beside the program, where
+# Overbar looks for its mister folder; copied again when Overbar's copy changes
+MISTER := $(patsubst %/,%,$(dir $(BIN)))/mister
+$(MISTER)/README.md: $(OVERBAR_DIR)/mister/README.md $(OVERBAR_DIR)/overbar.mk | overbar
+	$(call overbar_copy_mister,$(patsubst %/,%,$(dir $(BIN))))
+$(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt | $(MISTER)/README.md
 	@mkdir -p $(dir $@) out
-	$(CC) $(CFLAGS) $(SANITIZE) -O2 $(LDFLAGS) -o $@ $(NOBJ) $(ICONO) $(MDRTLIBS) $(SDLLIBS) -lm $(CXXLIB) $(NETLIB)
+	$(CC) $(CFLAGS) $(SANITIZE) -O2 $(LDFLAGS) -o $@ $(NOBJ) $(OVERBARO) $(ICONO) $(MDRTLIBS) $(SDLLIBS) -lm $(CXXLIB) $(NETLIB)
 mdrt:
 	@test -f $(MDRT)/Makefile || { echo "no pulseman at $(MDRT): git submodule update --init (or make MDRT=path/to/pulseman)"; exit 1; }
-	$(MAKE) -C $(MDRT) MODE=release B=$(MDRTB) sdl
+	@# (env -u MAKEFLAGS: the flags given to this make, such as a CFLAGS override, are not PulseMan's)
+	env -u MAKEFLAGS -u MFLAGS $(MAKE) -C $(MDRT) MODE=release B=$(MDRTB) CC="$(CC)" CXX="$(CXX)" AR="$(AR)" $(MDRTB)/libmdrt.a
 
 # the saved states, snapshots and vectors (tools/oracle/vectors.py holds the recipes)
 vectors: build/nhl_oracle.so
