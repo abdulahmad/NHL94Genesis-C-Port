@@ -23,3 +23,12 @@ A change passes only when those programs say so. Renames and moves must not chan
 never go in comments; lineage lives in the asm repo's `docs/name_map.csv`.
 
 The ROM is never committed.
+
+## Netplay security
+
+Everything that comes over the network is hostile. The rules and a review checklist are in Overbar's
+`native/overbar/docs/NETPLAY_SECURITY.md`; read them before changing netplay, a saved state, a file route or the season code. In short:
+never run, load or write code from network data; a peer never chooses an address; check every length before use
+(`len > size - at`, never `at + len > size`); validate a state before it is applied and clean it after; a peer's names are text, not paths.
+`sh native/overbar/tests/netsec.sh .` must print `netsec ok` (CI runs it in the `netsec` job). When a change adds a network path or a state field,
+add a hostile test for it.
