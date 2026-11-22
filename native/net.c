@@ -121,7 +121,7 @@ static const char *settings_use(mdrt *m, const uint8_t *b, size_t size)
     at += k;
     size_t n = (size_t)b[at] | (size_t)b[at + 1] << 8 | (size_t)b[at + 2] << 16 | (size_t)b[at + 3] << 24;
     at += 4;
-    if (size != at + n) return "its roster set cut short";
+    if (n > size - at || size - at != n) return "its roster set cut short";      /* (written so that it cannot wrap) */
     if (rules_next_set(v, (int)k) < 0) return "a rule out of range";
     if (rosters_next_bytes(b + at, n) < 0) return rosters_error();
     mdrt_sram *r = mdrt_get_sram(m);                      /* (a new cartridge's on every machine) */
