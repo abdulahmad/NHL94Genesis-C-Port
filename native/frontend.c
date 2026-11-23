@@ -115,7 +115,7 @@ static void settings_load(void)
             "# none (A, 1, F1, Up, Return, Space, Tab, Left Shift, Keypad 8 ...). Controller buttons are SDL's\n"
             "# names: a b x y back start leftshoulder rightshoulder leftstick rightstick guide, and\n"
             "# lefttrigger righttrigger. playerN.controller: the controller slot player N plays with (0: none;\n"
-            "# controllers take slots 1-8 as they are plugged in). ` or F11 opens the Overbar overlay\n"
+            "# controllers take slots 1-8 as they are plugged in). `, F11 or Esc opens the Overbar overlay\n"
             "# (Controllers sets a controller up). F12 shows the stats. The EA 4 Way Play adaptor is in when\n"
             "# player 3 or 4 has keys or a controller at power on.\n";
         mdrt_settings_parse(F.set, head, sizeof head - 1);
@@ -552,7 +552,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_plat_hooks hooks = { .title = o->title ? o->title : "NHL '94", .win_w = 320 * (o->scale > 0 ? o->scale : 3), .win_h = 224 * (o->scale > 0 ? o->scale : 3),
                                 .cls = OB_CLASS_LORES, .src_w = 320, .src_h = 224, .frame = hook_frame, .changed = hook_changed,
                                 .action = hook_action, .captures = hook_captures, .raw_key = hook_raw_key, .raw_button = hook_raw_button,
-                                .draw_over = hook_draw_over, .quit = hook_quit };
+                                .draw_over = hook_draw_over, .quit = hook_quit, .esc_opens = 1 };
         if (!ob_plat_open(&hooks, &host)) return 1;
     }
     {
