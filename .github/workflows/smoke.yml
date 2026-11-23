@@ -53,3 +53,11 @@ jobs:
           sudo apt-get update -q && sudo apt-get install -y -q libsdl2-dev
           cp vault/NHL94-Genesis/nhl94retail.bin ./nhl94retail.bin
           make -j4 && make rulestest golden-check
+  netsec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: netplay security rules (Overbar docs/NETPLAY_SECURITY.md)
+        run: sh native/overbar/tests/netsec.sh .

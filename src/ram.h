@@ -327,12 +327,12 @@ struct RAM_PACKED ReplayFrame {
     uint8_t lastsfx;  /* the sound effect started */
     uint8_t elapsed;  /* the frames it lasted */
     uint16_t padbits;  /* PadControlBits (the low 12 bits) */
-    uint16_t Crowdframe;
-    uint16_t glovecords;
+    uint16_t Crowdframe; /* current crowd frame number */
+    uint16_t glovecords; /* cordinates of glove/sticks (fighting) */
     uint8_t pbnum;  /* PBnum's high byte */
     uint8_t padbits34;  /* PadControlBits34 >> 4 */
     uint16_t Hpos;  /* the view (Hpos, Vpos) */
-    uint16_t Vpos;
+    uint16_t Vpos; /* ice rink vertical position */
 };
 _Static_assert(sizeof(struct ReplayFrame) == 0x62, "ReplayFrame size");
 _Static_assert(offsetof(struct ReplayFrame, obj) == 0x000, "ReplayFrame obj");
