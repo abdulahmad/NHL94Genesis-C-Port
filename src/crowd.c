@@ -154,6 +154,7 @@ uint8_t AttributeCalc(uint8_t v, struct SortObj *o)
 /* crowd94.asm:NextHomeHotPlayer etc. The next hot / cold player of a team for the matchups
  * text (the one entry lists at homehotplayer ...), with its team struct. */
 static uint16_t listed(uint16_t list, uint16_t idx) { return m16(RAM_BASE + list + idx * 2); }
+/* NextHomeHotPlayer. d1 = the next home hot player (homehotidx index into the list at */
 uint16_t NextHomeHotPlayer(struct Team **team)
 {
     *team = team_struct(0);
@@ -161,6 +162,7 @@ uint16_t NextHomeHotPlayer(struct Team **team)
     if ((int16_t)g.homehotidx < 0) g.homehotidx++;       /* (only below 0: it stays at the first) */
     return d1;
 }
+/* NextAwayHotPlayer. The same for the away team (awayhotplayer, awayhotidx), a1 = awtmstruct. */
 uint16_t NextAwayHotPlayer(struct Team **team)
 {
     *team = team_struct(1);
@@ -214,6 +216,7 @@ void SortHotColdStarters(struct Team *tm)
         }
     } while (swapped);
 }
+/* NextHomeColdPlayer. d1 = the next home cold player (homecoldidx, homecoldplayer), a1 = */
 uint16_t NextHomeColdPlayer(struct Team **team)
 {
     *team = team_struct(0);
@@ -221,6 +224,7 @@ uint16_t NextHomeColdPlayer(struct Team **team)
     if ((int16_t)g.homecoldidx < 0) g.homecoldidx++;
     return d1;
 }
+/* NextAwayColdPlayer. The same for the away team (awaycoldidx, awaycoldplayer), a1 = */
 uint16_t NextAwayColdPlayer(struct Team **team)
 {
     *team = team_struct(1);
@@ -232,6 +236,7 @@ uint16_t NextAwayColdPlayer(struct Team **team)
 /* crowd94.asm:CopyHottestPlayer / CopyColdestPlayer. The hottest (first) or coldest (sixth)
  * player of TempBuffer, for the one word list at a0. */
 uint16_t CopyHottestPlayer(void) { return g.TempBuffer[0]; }
+/* CopyColdestPlayer. Copy the coldest player (TempBuffer+10) to the list at a0 */
 uint16_t CopyColdestPlayer(void) { return g.TempBuffer[10]; }
 
 /* crowd94.asm:CompareHotColdTotals. awayhotter = 1 when the away total is higher; d0 = -1, $22

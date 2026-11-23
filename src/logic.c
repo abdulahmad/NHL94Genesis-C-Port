@@ -254,6 +254,7 @@ static uint8_t tick_byte(uint8_t v)
  * assignment from asstab, collisions and the impact decay. d7 = elapsed frames. */
 uint32_t assign_d2 = ASSIGN_D2_START;
 
+/* updateplayers. this routine calls all collision/animation/assignment code for all */
 void updateplayers(void)
 {
     if (!(g.sflags & HI(sfhor))) {
@@ -1133,6 +1134,7 @@ void setc1player(uint16_t player)
     if (player == g.c1playernum) return;
     g.c1playernum = (uint16_t)restorepl((int16_t)g.c1playernum, (int16_t)player);
 }
+/* setc2player. restore old player and switch to new d0 player on cont. 2 */
 void setc2player(uint16_t player)
 {
     if (player == g.c2playernum) return;
@@ -1629,6 +1631,7 @@ void assfaceoffpl(struct Team *tm, struct SortObj *o)
 
 /* logic94.asm:assfight, assfwatch. rts only: there is no fighting. */
 void assfight(struct Team *tm, struct SortObj *o) { }
+/* assfwatch. rts only: there is no fighting */
 void assfwatch(struct Team *tm, struct SortObj *o) { }
 
 /* logic94.asm:donothing. The player should do nothing: coast. */

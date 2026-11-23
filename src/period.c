@@ -303,6 +303,7 @@ void SetStatScroll(void)
 
 /* period94.asm:StatScrollRow / StatScrollRowEnd. The row of the scroll position. */
 uint16_t StatScrollRow(void) { return g.VertLineScrolling >> 4; }
+/* StatScrollRowEnd. d3 = VertLineScrolling / 16 + 6 (StatsReport, at a scroll step) */
 uint16_t StatScrollRowEnd(void) { return (uint16_t)((g.VertLineScrolling >> 4) + 6); }
 
 /* period94.asm:PrintStatScrollArrows. The scroll arrows of the Game Statistics screen. */
