@@ -111,6 +111,7 @@ void ResetClock(void)
 /* hockey94.asm:GetPeriodTime. The period length in seconds for the option. (Rules: more lengths,
  * in the order the setup menu steps through them from 5 minutes, the secret 30 seconds last.) */
 static const uint16_t more_periodtimes[8] = { 5*60, 7*60, 10*60, 15*60, 20*60, 2*60, 3*60, 30 };
+/* GetPeriodTime. Return d0 = period length in seconds for the period length option */
 uint16_t GetPeriodTime(void)
 {
     if (rules[RULE_PERIOD_LENGTHS]) return more_periodtimes[g.Optperlen & 7];
@@ -391,13 +392,17 @@ int EndDemoOnPress(uint16_t d1)
     ExitToOpening();
     return 1;
 }
+/* startpause1. Demo end code 0, flag 1 cleared */
 void startpause1(void) { g.pausepad = 0; g.sflags &= (uint16_t)~HI(sfpj); startpause(); }
+/* startpause2. Demo end code 0, flag 1 set */
 void startpause2(void) { g.pausepad = 0; g.sflags |= HI(sfpj); startpause(); }
 
 /* hockey94.asm:startpause / startpause1-4. Pause at the end of this frame, remembering the
  * pad that asked. */
 void startpause(void) { g.sflags |= HI(sfpz); }
+/* startpause3. Demo end code 3, flag 1 cleared */
 void startpause3(void) { g.pausepad = 3; g.sflags &= (uint16_t)~HI(sfpj); startpause(); }
+/* startpause4. Demo end code 4, flag 1 set */
 void startpause4(void) { g.pausepad = 4; g.sflags |= HI(sfpj); startpause(); }
 
 /* hockey94.asm:Pausemode. The pause menu: fade out, silence, the menu for the pausing pad's team

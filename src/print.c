@@ -103,6 +103,7 @@ void Framer(uint16_t w, uint16_t h)
 /* print94.asm:printsmallz. printsmall of the String that follows the call. */
 void printsmallz(const uint8_t *s, unsigned n) { (void)n; printsmall_p((struct Text){ s, 0 }); }
 
+/* printsmall. Print string macro a1 at printx/y/m with printa; uses the setup font */
 uint32_t printsmall(uint32_t str) { return past(printsmall_p((struct Text){ NULL, str })); }
 
 /* print94.asm:ControlCode_SetMapAndPosition. Code -8: attribute, map, x, y. */
@@ -145,6 +146,7 @@ void ControlCode_SetFont(struct PrintState *st) { g.printfontset = (uint16_t)(te
 /* print94.asm:printz. print the String that follows the call. */
 void printz(const uint8_t *s, unsigned n) { (void)n; print_p((struct Text){ s, 0 }); }
 
+/* print. a1 = string macro, printx/y = x/y cordinate on map for printing, printm = */
 uint32_t print(uint32_t str) { return past(print_p((struct Text){ NULL, str })); }
 
 /* print94.asm:FormatAndPrintTime. d0 = period (bits 14-15) and seconds (bits 0-13): print the
@@ -210,11 +212,13 @@ uint32_t PushNumberWidth(uint16_t n, uint16_t width)
 /* print94.asm:appendz. appstring of the String that follows the call onto a3. */
 void appendz(const uint8_t *s, unsigned n, uint32_t buf) { (void)n; appstring_p((struct Text){ s, 0 }, buf); }
 
+/* appstring. append string a1 to string a3 */
 void appstring(uint32_t src, uint32_t buf) { appstring_p((struct Text){ NULL, src }, buf); }
 
 /* print94.asm:printbigz. printbig of the String that follows the call. */
 void printbigz(const uint8_t *s, unsigned n) { (void)n; printbig_p((struct Text){ s, 0 }); }
 
+/* printbig. same as print, only use bigfont.map graphics. a1 = string macro, printx/y */
 void printbig(uint32_t str) { printbig_p((struct Text){ NULL, str }); }
 
 /* print94.asm:PrintBigChar. d0 = ASCII: put its big font tiles (bfasciicon: map column, negative
