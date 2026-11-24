@@ -250,11 +250,11 @@ static void activate(int node, float sx, float sy)
     if (node == nsw) { sys_power(); return; }
     if (node == tap) bx_say(G.pads > 2 ? "<b>Multitap enabled.</b> EA 4 Way Play is plugged into the second controller port." : "<b>Multitap off.</b> Connect more than 2 controllers to enable it.");
 }
-/* the middle of the spine in the world (case.spine's origin is its back edge; the spine runs 1.1 toward the cover) */
+/* the middle of the spine in the world (case.spine's origin is its back edge; the spine runs 1.3 toward the cover) */
 static void spine_mid(float o[3])
 {
     const float *W = r3_world(BX_S, cspine);
-    float p[3] = { 0, 0, .55f };
+    float p[3] = { 0, 0, .65f };
     for (int k = 0; k < 3; k++) o[k] = W[k * 4] * p[0] + W[k * 4 + 1] * p[1] + W[k * 4 + 2] * p[2] + W[k * 4 + 3];
 }
 static void drag(int node, float dx, float dy)
