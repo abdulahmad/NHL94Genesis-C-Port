@@ -245,7 +245,7 @@ CROSS_DECL = [
 # ---- the plane maps (VmMap1-3 and their row shifts) -------------------------------------------
 PLANE_DECL = [
     (0x0, 'uint16_t vram;', "the map's VRAM address (VmMap1)"),
-    (0x2, 'uint16_t colshift;', 'a row is 1 << colshift tiles (Map1col1)'),
+    (0x2, 'uint16_t colshift;', 'a row is 1 << colshift tiles (Map1col)'),
 ]
 
 # ---- the game's structures (NATIVE-STATE.md, step 3) -------------------------------------
