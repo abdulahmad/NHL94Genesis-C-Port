@@ -139,7 +139,13 @@ overbar:
 MISTER := $(patsubst %/,%,$(dir $(BIN)))/mister
 $(MISTER)/README.md: $(OVERBAR_DIR)/mister/README.md $(OVERBAR_DIR)/overbar.mk | overbar
 	$(call overbar_copy_mister,$(patsubst %/,%,$(dir $(BIN))))
-$(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt | $(MISTER)/README.md
+# the box's 3D models (res/box, overbar/box.h), beside the program; copied again when they change
+BOXDATA := $(patsubst %/,%,$(dir $(BIN)))/box/gen94/scene.txt
+$(BOXDATA): $(wildcard res/box/gen94/* res/box/gen94/tex/*)
+	@mkdir -p $(dir $(BOXDATA))
+	cp -r res/box/gen94/. $(dir $(BOXDATA))
+	@touch $@
+$(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt | $(MISTER)/README.md $(BOXDATA)
 	@mkdir -p $(dir $@) out
 	$(CC) $(CFLAGS) $(SANITIZE) -O2 $(LDFLAGS) -o $@ $(NOBJ) $(OVERBARO) $(ICONO) $(MDRTLIBS) $(SDLLIBS) -lm $(CXXLIB) $(NETLIB)
 mdrt:

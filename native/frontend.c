@@ -22,6 +22,7 @@
 #include "mdrt/settings.h"
 #include "mdrt/vdp.h"
 #include "overbar/plat.h"
+#include "overbar/box.h"
 #include "overbar/plat_pads.h"
 #include "overbar/net.h"
 #include "native.h"
@@ -268,7 +269,7 @@ static int find_rom(char *why, size_t why_size)
 
 static int ending(void) { return SDL_AtomicGet(&F.quit) || SDL_AtomicGet(&F.stop); }
 
-static int hold_state;                                /* the overlay or the setup screen is open */
+static int hold_state;                                /* the overlay, the setup screen or a full-window screen (the box) is open */
 
 static void sram_save(void)
 {
@@ -532,6 +533,10 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     options_ui_init(o, F.opt_values, F.set, user, settings_write);
     if (options_ui_pages()) ob_host_add_addon(&host, OB_ID_ADDON, "Rules", rules_open);
     {
+        extern const bx_scene BOX_GEN94;              /* box_gen94.c: the box on the first launch (experimental) */
+        ob_box_init(&host, &BOX_GEN94);
+    }
+    {
         ob_online_ops ops;
         memset(&ops, 0, sizeof ops);
         ops.max_pads = MDRT_PADS;                     /* (up to four players: 4 Way Play) */
@@ -573,7 +578,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_plat_pump();
         ob_pads_tick();
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
-        hold_state = ob_pads_setup_active() || options_ui_active() || host.overlay_open;
+        hold_state = ob_pads_setup_active() || options_ui_active() || host.overlay_open || ob_screen_up();
         ob_plat_present();
         ob_plat_frame_done(SDL_AtomicSet(&F.fresh, 0));
         if (SDL_AtomicGet(&F.done)) break;
