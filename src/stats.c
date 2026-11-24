@@ -1144,7 +1144,7 @@ uint16_t ReadStatColumn(uint16_t player, uint16_t col, struct Team *tm, int play
     if (!playoff) {
         const uint8_t *a1 = rom_ptr(SYM_StatColumnOffsets) + (uint16_t)(col << 2);
         uint16_t v = r8(team_place(tm), (int16_t)(uint16_t)(rd16(a1) + player));
-        int16_t second = (int16_t)rd16(a1 + 2);
+        int16_t second = (int16_t)rd16(a1 + scoloff2);
         if (second < 0) return v;
         return (uint16_t)(v + r8(team_place(tm), (int16_t)(uint16_t)(second + player)));
     }
