@@ -207,12 +207,12 @@ void SortHotColdStarters(struct Team *tm)
     do {
         swapped = 0;
         a1 = g.TempBuffer;
-        for (int i = 0; i < 5; i++, a1 += 2) {
-            if ((int8_t)a1[3] <= (int8_t)a1[1]) continue;
+        for (int i = 0; i < 5; i++, a1 += hcsize) {
+            if ((int8_t)a1[hcsize + hcsum] <= (int8_t)a1[hcsum]) continue;
             swapped = 1;
-            uint8_t t0 = a1[0], t1 = a1[1];
-            a1[0] = a1[2]; a1[1] = a1[3];
-            a1[2] = t0; a1[3] = t1;
+            uint8_t t0 = a1[0], t1 = a1[hcsum];
+            a1[0] = a1[hcsize]; a1[hcsum] = a1[hcsize + hcsum];
+            a1[hcsize] = t0; a1[hcsize + hcsum] = t1;
         }
     } while (swapped);
 }
@@ -260,6 +260,6 @@ uint16_t GetHotColdTotal(struct Team *tm)
     SortHotColdStarters(tm);
     int16_t d1 = 0;
     for (int i = 0; i < 7; i++)
-        d1 = (int16_t)(d1 + (int8_t)g.TempBuffer[i * 2 + 1]);
+        d1 = (int16_t)(d1 + (int8_t)g.TempBuffer[i * hcsize + hcsum]);
     return (uint16_t)d1;
 }

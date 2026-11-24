@@ -113,6 +113,9 @@ enum { penmins = 1, penname = 2 };   /* Penaltylist entry: byte delay, byte minu
 enum { dmalen = 4, dmavram = 6 };    /* DMAList entry: source long, length in words, VRAM address */
 enum { lipy = 2, lipslots = 4 };     /* LineIconPosTable entry (6 bytes): x, y, slot count - 1 */
 enum { tsoff2 = 2, tssize = 4 };     /* TeamStatTextTbl row after its String: two team struct offsets */
+enum { pruser = 1, propp = 2, proppuser = 3 };  /* player record (AppendRecordHolder / Vs): the user, opponent team, opponent user */
+enum { scoloff2 = 2 };               /* StatColumnOffsets entry: second team struct array offset ($FFFF none) */
+enum { hcsum = 1, hcsize = 2 };      /* hot / cold pairs SortHotColdStarters builds in TempBuffer: slot byte, then the sum */
 
 /* ---- main94.asm: power on (src/main.c); sega/SegaInit.asm ---- */
 void Start(void);                                       /* power on; does not return */

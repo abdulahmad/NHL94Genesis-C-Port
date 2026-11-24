@@ -257,7 +257,7 @@ void AppendRecordHolder(uint32_t buf, uint16_t team, uint16_t player, uint32_t r
 {
     uint32_t r = player_record(team, player, rec);
     g.sflags6 |= HI(7);
-    AppendUserName(buf, (uint16_t)(int16_t)(int8_t)m8(r + 1));
+    AppendUserName(buf, (uint16_t)(int16_t)(int8_t)m8(r + pruser));
 }
 
 /* cards94.asm:AppendRecordVs. The user name (byte 3 of record a0), a space and the opponent's
@@ -266,9 +266,9 @@ void AppendRecordVs(uint32_t buf, uint16_t team, uint16_t player, uint32_t rec)
 {
     uint32_t r = player_record(team, player, rec);
     g.sflags6 |= HI(7);
-    AppendUserName(buf, (uint16_t)(int16_t)(int8_t)m8(r + 3));
+    AppendUserName(buf, (uint16_t)(int16_t)(int8_t)m8(r + proppuser));
     appstring(SYM_RecSpaceTxt, buf);
-    AppendTeamName(m8(r + 2), buf);
+    AppendTeamName(m8(r + propp), buf);
 }
 
 /* cards94.asm:ReadPlayerRecord. */
