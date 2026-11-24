@@ -1,13 +1,14 @@
 # Handoff
 
-Where the C-port work stands in this repository. Plan: `alignment-plan/c_ports_plan.md` in the project files.
-Project-wide handoff (always current, read it first): `alignment-plan/c_ports_HANDOFF.md` in the project files; how the project is run: `alignment-plan/HARNESS.md`.
+Where the C-port work stands in this repository (this file is the current handoff). Plan:
+[c_ports_plan.md](https://github.com/abdulahmad/nhl-disasm-report/blob/main/docs/project/c_ports_plan.md) in nhl-disasm-report (a history copy of the project files, with an older
+[c_ports_HANDOFF.md](https://github.com/abdulahmad/nhl-disasm-report/blob/main/docs/project/c_ports_HANDOFF.md)); how the project is run: [HARNESS.md](https://github.com/abdulahmad/nhl-disasm-report/blob/main/docs/project/HARNESS.md).
 
 Rules: [AGENTS.md](../AGENTS.md), [RULES.md](RULES.md), [VANILLA.md](VANILLA.md).
 
 ## Now
 
-Overbar overlay/bar on [#13](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/13) (`cursor/overbar-genesis-6801`): `` ` `` / F11 open Overbar's menu (Resume, Video, Sound, Input, Capture, Online Play, Quit). The Win32 bar is the same tree without Resume or Quit, with a divider between setting groups. Overlay Scale Mode cycles in place. Sharp steps are 2x, 3x (default), 4x, 5x, 6x, and 9x. Scale2x, Scale3x, MMPX, xBR, and MiSTer coefficient files prescale, then the picture is fit to the 224-in-240 4:3 dest (the extra 16 rows are not drawn). F12 shows FPS, new pictures, refresh and vsync, CPU and GPU. No GLES2/`PORTMASTER` on Win32. Host-only; do not merge. Asstab names remain on `main` ([#12](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/12)). G0–G6 remain on `main`. Names 840/0/0/0. Frame gates need a machine with captures. E6 Original lockstep stays parked.
+Overbar overlay/bar ([#13](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/13), merged 2026-11-09) is on `main`: Esc / `` ` `` open Overbar's menu (Backspace backs out of a page) (Resume, Video, Sound, Input, Capture, Online Play, Quit). The Win32 bar is the same tree without Resume or Quit, with a divider between setting groups. Overlay Scale Mode cycles in place. Sharp steps are 2x, 3x (default), 4x, 5x, 6x, and 9x. Scale2x, Scale3x, MMPX, xBR, and MiSTer coefficient files prescale, then the picture is fit to the 224-in-240 4:3 dest (the extra 16 rows are not drawn). F12 shows FPS, new pictures, refresh and vsync, CPU and GPU. No GLES2/`PORTMASTER` on Win32. Window, input and sound go through Overbar's platform layer (2026-11-08; PulseMan's SDL2 front end was removed). New work is a short branch off the current `main` and one PR into `main`. Asstab names remain on `main` ([#12](https://github.com/abdulahmad/NHL94Genesis-C-Port/pull/12)). G0–G6 remain on `main`. Names 840/0/0/0. Frame gates need a machine with captures. E6 Original lockstep stays parked.
 
 ## Done
 
@@ -80,7 +81,7 @@ Overbar overlay/bar on [#13](https://github.com/abdulahmad/NHL94Genesis-C-Port/p
 
 **gens94-c is ignored from 2026-11-03 (Abdul)**: no work or cross-checks on it; the E1/E3 results above are history. `test/crosscheck.sh` is not run any more.
 
-2026-11-04: file recut on `claude/project-thread-4gad59`; do not merge to main. E6 stays parked. SNES Smooth was not flipped.
+2026-11-04: file recut (now on `main`). E6 stays parked. SNES Smooth was not flipped.
 
 ## Next, in order
 

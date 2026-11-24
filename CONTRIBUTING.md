@@ -5,8 +5,8 @@ The Genesis C port base (1nput's ninety-four), checked against the cartridge by 
 Read [AGENTS.md](AGENTS.md) first (gates, units, credit). Alignment rules: [docs/RULES.md](docs/RULES.md). Where this
 repo stands: [docs/C_PORTS_HANDOFF.md](docs/C_PORTS_HANDOFF.md). What "vanilla" allows: [docs/VANILLA.md](docs/VANILLA.md).
 
-Work stays on `claude/project-thread-4gad59`. Do not branch from `main` and do not merge to `main`. PRs from that
-branch are for review only.
+Work on a short branch off the current `main` and open one pull request into `main` per topic; it is merged with a
+normal merge commit. Every commit must pass the checks in [AGENTS.md](AGENTS.md).
 
 This repository is a derivative of [NHL94Genesis](https://github.com/abdulahmad/NHL94Genesis). Keep the credit near
 the top of the README and in every release, as AGENTS.md requires.
