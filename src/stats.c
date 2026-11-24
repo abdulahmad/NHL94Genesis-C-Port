@@ -329,15 +329,15 @@ void DrawLineIcon(uint16_t line, struct Team *tm)
     if (g.OptLine != 0) a0 -= 6;
     const uint8_t *pos = rom_ptr(a0);
     g.printx = rd16(pos);
-    g.printy = rd16(pos + 2);
+    g.printy = rd16(pos + lipy);
     g.printa = 0x8000;
     Fprintsmall(SYM_linelist, line);
     printsmallz(str_DrawLineIcon_1, sizeof str_DrawLineIcon_1);
     g.printx = rd16(pos);
     uint16_t slot = (uint16_t)((line << 3) + 1);
-    g.printy = rd16(pos + 2);
+    g.printy = rd16(pos + lipy);
     const uint8_t *slots = tm->tmlines[0];                  /* (the line sets, row after row) */
-    for (int16_t n = (int16_t)rd16(pos + 4); n >= 0; n--, slot++) {
+    for (int16_t n = (int16_t)rd16(pos + lipslots); n >= 0; n--, slot++) {
         g.printx = rd16(pos);
         printsmallz(str_DrawLineIcon_2, sizeof str_DrawLineIcon_2);
         uint16_t player = (uint16_t)(slots[slot] - 1);
@@ -357,7 +357,7 @@ void ClearLineArea(void)
 {
     printsmallz(str_ClearLineArea_1, sizeof str_ClearLineArea_1);
     eraser(0x28, 0x12, 0x7FF);
-    g.printy = rd16(rom_ptr(SYM_LineIconPosTable + 2));
+    g.printy = rd16(rom_ptr(SYM_LineIconPosTable + lipy));
     g.printx = rd16(rom_ptr(SYM_LineIconPosTable));
     if (g.OptLine != 0) g.printx = rd16(rom_ptr(SYM_LineIconPosTable - 6));
     printsmallz(str_ClearLineArea_2, sizeof str_ClearLineArea_2);

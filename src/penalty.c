@@ -16,7 +16,7 @@ static inline int16_t puckx(void) { return (int16_t)g.puckx[0]; }
 static inline int16_t pucky(void) { return (int16_t)g.pucky; }
 static inline int16_t puckc(void) { return (int16_t)puck_carrier(); }
 /* the Penaltylist entry of penalty number d0 (a word offset into the table): byte 0 = delay before
- * the stop, byte 1 = minutes, +2 a String (the message), then the referee animation */
+ * the stop, byte 1 = minutes (penmins), +2 a String (penname) (the message), then the referee animation */
 static inline const uint8_t *penalty_entry(uint16_t pen) { const uint8_t *t = rom_ptr(SYM_Penaltylist); return t + rd16(t + pen); }
 static inline uint8_t *penbuf(void) { return g.PenBuf; }
 
@@ -55,7 +55,7 @@ void AddPenalty2(uint16_t pen, struct SortObj *o)
     a1[1] = (uint8_t)o->SCnum;
     a1[0] = (uint8_t)pen;
     const uint8_t *e = penalty_entry(pen);
-    if ((int8_t)e[1] <= 0) return;                        /* no minutes */
+    if ((int8_t)e[penmins] <= 0) return;                        /* no minutes */
     g.DelayedPen |= PFLAG(o, pfteam) ? 4 : 2;
     int was = o->pflags2 & 0x10;
     o->pflags2 |= 0x10;
@@ -101,7 +101,7 @@ cont:
     uint8_t *a0 = penbuf();
     for (;; a0 += 2) {                                    /* any penalty with minutes? */
         if (rd16(a0) == 0) return;
-        if ((int8_t)penalty_entry(a0[0])[1] > 0) break;
+        if ((int8_t)penalty_entry(a0[0])[penmins] > 0) break;
     }
     g.sflags2 |= HI(sf2drec);
     uint16_t vc = g.Vcount;
@@ -185,7 +185,7 @@ void InProgress(void)
         uint16_t pen = a0[0];
         const uint8_t *e = penalty_entry(pen);
         g.sflags5 &= (uint8_t)~0x20;
-        uint16_t d2 = e[1];
+        uint16_t d2 = e[penmins];
         if (d2 == 0 || (int8_t)d2 < 0) {                  /* no player involved */
             wr16(a0, 0);
             if (g.sflags & HI(sfhor)) continue;
@@ -275,7 +275,7 @@ void checkfornewpen(void)
         if (!(g.gmode & (1 << gmpen))) {
             const uint8_t *e = penalty_entry(a0[-2]);
             int delayed = 0;
-            if (e[1] != 0) {
+            if (e[penmins] != 0) {
                 int16_t d0 = puckc();
                 if (d0 < 0) delayed = 1;
                 else {
@@ -406,7 +406,7 @@ void SetPA2(void)
     if ((int16_t)g.RefStep >= 0) {
         d0 = g.RefStep;
         g.RefStep += 2;
-        const uint8_t *a0 = penalty_entry(g.RefPen) + 2;
+        const uint8_t *a0 = penalty_entry(g.RefPen) + penname;
         a0 += rd16(a0);
         d0 = rd16(a0 + d0);
         if ((int16_t)d0 < 0) {
@@ -451,7 +451,7 @@ void prefmes(int16_t pen)
         ClearPenaltyMessage();
         if (pen < 0) return;
         printz(str_prefmes_3, sizeof str_prefmes_3);
-        const uint8_t *a1 = penalty_entry((uint16_t)pen) + 2;
+        const uint8_t *a1 = penalty_entry((uint16_t)pen) + penname;
         g.printx -= rd16(a1) >> 1;
         print((uint32_t)(a1 - rom_cart));
         return;
@@ -462,7 +462,7 @@ void prefmes(int16_t pen)
         return;
     }
     printz(str_prefmes_2, sizeof str_prefmes_2);
-    const uint8_t *a1 = penalty_entry((uint16_t)pen) + 2;
+    const uint8_t *a1 = penalty_entry((uint16_t)pen) + penname;
     uint16_t d0 = (uint16_t)(rd16(a1) - 2);
     if (d0 == 0) return;                                  /* empty string */
     g.printx -= d0 >> 1;

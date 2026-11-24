@@ -108,6 +108,12 @@ static inline int32_t m68k_divs(int32_t dividend, int16_t divisor)
 /* d7 on the 68k: frames since the last game loop pass; set once per frame by DoGameFrame */
 extern int16_t elapsed;
 
+/* ---- record field offsets, named as the NHL94Genesis equates ---- */
+enum { penmins = 1, penname = 2 };   /* Penaltylist entry: byte delay, byte minutes, then the name String */
+enum { dmalen = 4, dmavram = 6 };    /* DMAList entry: source long, length in words, VRAM address */
+enum { lipy = 2, lipslots = 4 };     /* LineIconPosTable entry (6 bytes): x, y, slot count - 1 */
+enum { tsoff2 = 2, tssize = 4 };     /* TeamStatTextTbl row after its String: two team struct offsets */
+
 /* ---- main94.asm: power on (src/main.c); sega/SegaInit.asm ---- */
 void Start(void);                                       /* power on; does not return */
 void SegaInit(void);

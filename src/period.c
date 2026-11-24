@@ -338,7 +338,7 @@ void DisplayStats(void)
         PrintStatValue(rom_ptr(a0), team_struct(0));
         g.printx = 9;
         PrintStatValue(rom_ptr(a0), team_struct(1));
-        a1 = a0 + 4;
+        a1 = a0 + tssize;
         g.printy += 2;
     }
 }
@@ -367,7 +367,7 @@ void PrintStatValue(const uint8_t *a0, struct Team *tm)
             else a1 = PushTime(d0);
         }
         appstring(a1, mes);
-        int16_t off2 = (int16_t)rd16(a0 + 2);
+        int16_t off2 = (int16_t)rd16(a0 + tsoff2);
         if (off2 >= 0) {
             appendz(str_PrintStatValue_2, sizeof str_PrintStatValue_2, mes);
             appstring(PushNumber(r16(t, off2)), mes);

@@ -20,8 +20,8 @@ static inline uint8_t *satbase(void) { return g.Satt; }
 static inline void dma_entry(struct Vid *v, uint32_t src, uint16_t words, uint16_t vram)
 {
     wr32(v->dma, src);
-    wr16(v->dma + 4, words);
-    wr16(v->dma + 6, vram);
+    wr16(v->dma + dmalen, words);
+    wr16(v->dma + dmavram, vram);
     v->dma += 8;
 }
 /* one hardware sprite: y, size / link, tile word, x */
@@ -191,7 +191,7 @@ void dodmalist(void)
     const uint8_t *base = dmalist(), *a6 = base + (g.DMAlistend - ram_addr(base));   /* (DMAlistend: the 68000 address of its end) */
     while (a6 != base) {
         a6 -= 8;
-        DoDMA(rd32(a6), rd16(a6 + 4), rd16(a6 + 6));
+        DoDMA(rd32(a6), rd16(a6 + dmalen), rd16(a6 + dmavram));
     }
 }
 
@@ -451,7 +451,7 @@ void setffo(struct Vid *v)
         uint8_t *before = v->sat;
         addframe(a3, v);
         if (before == v->sat) continue;
-        int16_t d1 = (int16_t)a3->Xfrac;                  /* (the label's x offset) */
+        int16_t d1 = (int16_t)a3->Xfrac;                  /* (padxoff: the label's x offset) */
         wr16(before + 6, (uint16_t)(rd16(before + 6) + d1));
         wr16(before + 0xE, (uint16_t)(rd16(before + 0xE) + d1));
     }
@@ -498,7 +498,7 @@ void uppads(struct Vid *v)
 void QueuePadLabel(uint16_t code, struct RinkObj *pad, struct Vid *v)
 {
     static const char letters[] = " DDLCRX\xFF";
-    pad->Xfrac = 0;                                       /* (the label's x offset) */
+    pad->Xfrac = 0;                                       /* (padxoff: the label's x offset) */
     int16_t d2 = (int16_t)((code >> 4) & 0xF);
     if (d2 == 0) {
         d2 = -0x10;                                       /* a blank leading zero */
