@@ -250,15 +250,26 @@ static void activate(int node, float sx, float sy)
     if (node == nsw) { sys_power(); return; }
     if (node == tap) bx_say(G.pads > 2 ? "<b>Multitap enabled.</b> EA 4 Way Play is plugged into the second controller port." : "<b>Multitap off.</b> Connect more than 2 controllers to enable it.");
 }
+/* the middle of the spine in the world (case.spine's origin is its back edge; the spine runs 1.1 toward the cover) */
+static void spine_mid(float o[3])
+{
+    const float *W = r3_world(BX_S, cspine);
+    float p[3] = { 0, 0, .55f };
+    for (int k = 0; k < 3; k++) o[k] = W[k * 4] * p[0] + W[k * 4 + 1] * p[1] + W[k * 4 + 2] * p[2] + W[k * 4 + 3];
+}
 static void drag(int node, float dx, float dy)
 {
     if (st == S_DESK) return;
     int t = (node == cart && st == S_OPEN) ? cart : caseG;
     r3_node *n = bx_n(t);
+    float a[3], b[3];
+    int pivot = t == caseG && st == S_OPEN;                 /* open, the case turns about the middle of its spine, so it stays in view */
+    if (pivot) spine_mid(a);
     n->rot[1] += dx * .012f;
     n->rot[0] += dy * .012f;
     if (n->rot[0] > 1.2f) n->rot[0] = 1.2f;
     if (n->rot[0] < -1.2f) n->rot[0] = -1.2f;
+    if (pivot) { spine_mid(b); for (int k = 0; k < 3; k++) n->pos[k] += a[k] - b[k]; }
 }
 static void manual_entry(void) { open_manual(); }
 
