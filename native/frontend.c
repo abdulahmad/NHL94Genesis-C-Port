@@ -552,7 +552,8 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_plat_hooks hooks = { .title = o->title ? o->title : "NHL '94", .win_w = 320 * (o->scale > 0 ? o->scale : 3), .win_h = 224 * (o->scale > 0 ? o->scale : 3),
                                 .cls = OB_CLASS_LORES, .src_w = 320, .src_h = 224, .frame = hook_frame, .changed = hook_changed,
                                 .action = hook_action, .captures = hook_captures, .raw_key = hook_raw_key, .raw_button = hook_raw_button,
-                                .draw_over = hook_draw_over, .quit = hook_quit, .esc_opens = 1 };
+                                .draw_over = hook_draw_over, .quit = hook_quit, .esc_opens = 1,
+                                .game_name = "NHL 94", .game_platform = "For Sega Genesis" };
         if (!ob_plat_open(&hooks, &host)) return 1;
     }
     {
