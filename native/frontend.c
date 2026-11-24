@@ -528,6 +528,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     options_from_settings();
     settings_write();
     ob_host_init(&host, OB_PORT_GENESIS, profile);
+    ob_host_load_ini_beside(&host, "overbar.ini");   /* the Overbar settings stay set between runs */
     options_ui_init(o, F.opt_values, F.set, user, settings_write);
     if (options_ui_pages()) ob_host_add_addon(&host, OB_ID_ADDON, "Rules", rules_open);
     {
