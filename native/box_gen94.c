@@ -153,14 +153,22 @@ static void sys_power(void)
     G.sys = !G.sys; bx_sfx(SFX_KEY, 0); set_power(G.sys); tv_on(); check();
 }
 
-/* ---- the manual: the cover scan, then genManual1, 2, ... if they are in the art folder ---- */
+/* ---- the manual: the front cover scan (genManual), then the pages genManual1, 2, ... (the back cover last), read from the
+ * art folder as they are shown ---- */
 static void open_manual(void)
 {
-    r3_tex *p[80]; int n = 0;
-    r3_tex *c = bx_art("genManual"); if (c) p[n++] = c;
-    for (int i = 1; i < 80 && n < 80; i++) { char k[24]; snprintf(k, sizeof k, "genManual%d", i); r3_tex *t = bx_art(k); if (!t) break; p[n++] = t; }
+    static char keys[200][24];
+    static const char *k[200];
+    int n = 0;
+    if (bx_art_exists("genManual")) snprintf(keys[n++], sizeof keys[0], "genManual");
+    for (int i = 1; n < 200; i++) {
+        snprintf(keys[n], sizeof keys[0], "genManual%d", i);
+        if (!bx_art_exists(keys[n])) break;
+        n++;
+    }
     if (!n) { bx_say("<b>No manual scans.</b> Put them in the box art folder."); if (BX.manual_only) bx_manual_only_closed(0); return; }
-    bx_view_open("NHL '94 Genesis manual", p, n, 0, BX.manual_only ? bx_manual_only_closed : NULL);
+    for (int i = 0; i < n; i++) k[i] = keys[i];
+    bx_view_open_keys("NHL '94 Genesis manual", k, n, 0, BX.manual_only ? bx_manual_only_closed : NULL);
 }
 
 static void enter(int mode)
