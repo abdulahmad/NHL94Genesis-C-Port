@@ -116,7 +116,7 @@ static void settings_load(void)
             "# none (A, 1, F1, Up, Return, Space, Tab, Left Shift, Keypad 8 ...). Controller buttons are SDL's\n"
             "# names: a b x y back start leftshoulder rightshoulder leftstick rightstick guide, and\n"
             "# lefttrigger righttrigger. playerN.controller: the controller slot player N plays with (0: none;\n"
-            "# controllers take slots 1-8 as they are plugged in). `, F11 or Esc opens the Overbar overlay\n"
+            "# controllers take slots 1-8 as they are plugged in). Esc or ` opens and closes the Overbar overlay (Backspace is Back)\n"
             "# (Controllers sets a controller up). F12 shows the stats. The EA 4 Way Play adaptor is in when\n"
             "# player 3 or 4 has keys or a controller at power on.\n";
         mdrt_settings_parse(F.set, head, sizeof head - 1);
@@ -498,12 +498,6 @@ static void restart_for_session(void)
 
 static ob_host host;
 
-static int rules_open(void *ctx)
-{
-    ob_overlay_close(&host);                          /* the rules screen takes the place of the overlay */
-    return options_ui_open(ctx);
-}
-
 static void shell_controllers(void) { ob_pads_setup_open(-1); }
 
 int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game, void *user)
@@ -531,7 +525,6 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     ob_host_init(&host, OB_PORT_GENESIS, profile);
     ob_host_load_ini_beside(&host, "overbar.ini");   /* the Overbar settings stay set between runs */
     options_ui_init(o, F.opt_values, F.set, user, settings_write);
-    if (options_ui_pages()) ob_host_add_addon(&host, OB_ID_ADDON, "Rules", rules_open);
     {
         extern const bx_scene BOX_GEN94;              /* box_gen94.c: the box on the first launch (experimental) */
         ob_box_init(&host, &BOX_GEN94);
