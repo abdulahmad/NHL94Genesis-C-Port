@@ -71,7 +71,7 @@ Game controllers work too (the first two are players 1 and 2).
 
 | Key | |
 |---|---|
-| `` ` `` / F11 | overlay menu. Esc backs out of a page |
+| Esc / `` ` `` | overlay menu, open and close. Backspace backs out of a page |
 | F12 | stats |
 | Alt+Enter | full screen |
 
@@ -79,7 +79,7 @@ Game controllers work too (the first two are players 1 and 2).
 
 ### The menu
 
-`` ` ``, F11, or a controller's Back button opens it. Esc backs out of a page. Arrows and Enter, or the d-pad, A and B, work it. The window's menu bar (windowed desktop) changes the same video settings and does not list Resume or Quit.
+Esc, `` ` ``, or a controller's Back button opens it, and Esc or `` ` `` closes it. Backspace backs out of a page. Arrows and Enter, or the d-pad, A and B, work it. The window's menu bar (windowed desktop) changes the same video settings and does not list Resume or Quit.
 The picture is Overbar's 4:3 dest of a 240-line canvas with the 224-line source unpadded (H40 PAR 1.0, H32 PAR 5:4).
 
 - **Game ROM**: your cartridge dump, in a file browser.
