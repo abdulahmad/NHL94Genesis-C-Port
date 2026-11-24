@@ -1463,7 +1463,7 @@ void PenaltyShotBox(void)
     print(FormatPlayerNumInitial(shooter, team_struct(g.BA_Team != 0)));
     PRINTZ(str_PenaltyShotBox_2);
     const uint8_t *list = rom_ptr(SYM_Penaltylist);
-    print(SYM_Penaltylist + (int16_t)rd16(list + (int16_t)g.pspenalty) + 2);
+    print(SYM_Penaltylist + (int16_t)rd16(list + (int16_t)g.pspenalty) + penname);
     PRINTZ(str_PenaltyShotBox_3);
     print(FormatPlayerNumInitial(g.BA_Checker_Offset, team_struct(g.BA_Team == 0)));
 }
