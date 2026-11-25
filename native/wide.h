@@ -15,6 +15,14 @@
 enum { WIDE_ALL, WIDE_B, WIDE_BS, WIDE_A };   /* (WIDE_A: plane A and the window alone, colour 0 where they show nothing) */
 void wide_line(const mdrt_vdp *v, int line, int M, int what, uint8_t *idx);
 uint32_t wide_rgb(const mdrt_vdp *v, uint8_t c);
+/* one line of the screen as wide_line (WIDE_ALL, no sides), and where each pixel came from: its plane
+ * (WIDE_FROM_*, 0 a sprite or the backdrop) and its place in it */
+enum { WIDE_FROM_A = 1, WIDE_FROM_B, WIDE_FROM_WINDOW };
+#define WIDE_AT(plane, x, y) ((uint32_t)(plane) << 20 | (uint32_t)((y) & 1023) << 10 | (uint32_t)((x) & 1023))
+#define WIDE_AT_PLANE(a) ((int)((a) >> 20))
+#define WIDE_AT_X(a) ((int)((a) & 1023))
+#define WIDE_AT_Y(a) ((int)(((a) >> 10) & 1023))
+void wide_line_at(const mdrt_vdp *v, int line, uint8_t *idx, uint32_t *at);
 
 /* the frame pic (w x h, ARGB, rows pitch apart) made wide into out (rows opitch apart) -> its width.
  * sega_cd: pic is a Sega CD screen drawn by the port (segacd_present), not the VDP's */
