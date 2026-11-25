@@ -17,7 +17,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "overbar/overbar.h"
 #include "overbar/framegen.h"
 #include "overbar/grade.h"
 #include "overbar/postfx.h"
@@ -248,16 +247,9 @@ static void show(void)
 }
 
 /* the picture, handed to Overbar: drawn like the game's own, through the player's look (Sharp, CRT, MiSTer) */
-static int look_preset;
-static const ob_look *look_game;
-void segacd_movie_set_look(int preset, const ob_look *game) { look_preset = preset; look_game = game; }
-
 static const uint32_t *picture(void *ud, int *w, int *h, int *lines)
 {
-    ob_look l;                                          /* (each frame, so a change to the player's look shows) */
     (void)ud;
-    if (look_game && ob_video_look(look_preset, look_game, &l)) ob_screen_set_video_look(&l);
-    else ob_screen_set_video_look(NULL);
     *w = M.pw; *h = M.ph; *lines = M.fh;
     return M.pic;
 }
@@ -343,7 +335,6 @@ int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate,
 static void stop(void)
 {
     ob_screen_show(NULL);
-    ob_screen_set_video_look(NULL);
     if (M.dev) SDL_ClearQueuedAudio(M.dev);
     segacd_film_close(M.film);
     M.film = NULL;
