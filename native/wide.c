@@ -37,8 +37,9 @@ static int tile_pixel(const mdrt_vdp *v, uint16_t e, int x, int y)
     return (x & 1) ? (b & 0xF) : (b >> 4);
 }
 
-/* a layer's line, M pixels of side first: colour (palette << 4 | index, 0 clear) and priority */
-struct layer { uint8_t col[WIDE_MAX_W], pri[WIDE_MAX_W]; };
+/* a layer's line, M pixels of side first: colour (palette << 4 | index, 0 clear), priority, and where
+ * in its plane the pixel is (WIDE_AT) */
+struct layer { uint8_t col[WIDE_MAX_W], pri[WIDE_MAX_W]; uint32_t at[WIDE_MAX_W]; };
 
 static void plane_line(const mdrt_vdp *v, int line, uint32_t table, int hscroll, int plane, int width, int M, struct layer *out)
 {
@@ -54,6 +55,7 @@ static void plane_line(const mdrt_vdp *v, int line, uint32_t table, int hscroll,
         int c = tile_pixel(v, e, px & 7, py & 7);
         out->col[sx + M] = (uint8_t)(c ? (((e >> 13) & 3) << 4) | c : 0);
         out->pri[sx + M] = (uint8_t)(e >> 15);
+        out->at[sx + M] = WIDE_AT(plane ? WIDE_FROM_B : WIDE_FROM_A, px, py);
     }
 }
 
@@ -96,9 +98,9 @@ static void sprite_line(const mdrt_vdp *v, int line, int width, int M, struct la
     }
 }
 
-/* one line, M pixels a side past the screen: colour indices (0 the backdrop) into idx.
- * what: WIDE_ALL, WIDE_B (plane B alone) or WIDE_BS (plane B and the sprites) */
-void wide_line(const mdrt_vdp *v, int line, int M, int what, uint8_t *idx)
+/* one line, M pixels a side past the screen: colour indices (0 the backdrop) into idx, and (at, when
+ * given) where each came from. what: WIDE_ALL, WIDE_B (plane B alone) or WIDE_BS (plane B and the sprites) */
+static void compose(const mdrt_vdp *v, int line, int M, int what, uint8_t *idx, uint32_t *at)
 {
     int width = mdrt_vdp_width(v), ow = width + 2 * M;
     if (!(v->s.reg[1] & 0x40)) { memset(idx, 0, (size_t)ow); return; }
@@ -126,22 +128,28 @@ void wide_line(const mdrt_vdp *v, int line, int M, int what, uint8_t *idx)
             int c = tile_pixel(v, e, x & 7, line & 7);
             a.col[x + M] = (uint8_t)(c ? (((e >> 13) & 3) << 4) | c : 0);
             a.pri[x + M] = (uint8_t)(e >> 15);
+            a.at[x + M] = WIDE_AT(WIDE_FROM_WINDOW, x, line);
         }
     } else memset(a.col, 0, sizeof a.col);
-    if (what == WIDE_A) { memcpy(idx, a.col, (size_t)ow); return; }
+    if (what == WIDE_A) { memcpy(idx, a.col, (size_t)ow); if (at) memcpy(at, a.at, (size_t)ow * sizeof *at); return; }
     if (what != WIDE_B) sprite_line(v, line, width, M, &s);
     else memset(s.col, 0, sizeof s.col);
     for (int x = 0; x < ow; x++) {
         uint8_t c = 0;
+        uint32_t from = 0;
         if (s.col[x] && s.pri[x]) c = s.col[x];
-        else if (a.col[x] && a.pri[x]) c = a.col[x];
-        else if (b.col[x] && b.pri[x]) c = b.col[x];
+        else if (a.col[x] && a.pri[x]) c = a.col[x], from = a.at[x];
+        else if (b.col[x] && b.pri[x]) c = b.col[x], from = b.at[x];
         else if (s.col[x]) c = s.col[x];
-        else if (a.col[x]) c = a.col[x];
-        else if (b.col[x]) c = b.col[x];
+        else if (a.col[x]) c = a.col[x], from = a.at[x];
+        else if (b.col[x]) c = b.col[x], from = b.at[x];
         idx[x] = c;
+        if (at) at[x] = from;
     }
 }
+
+void wide_line(const mdrt_vdp *v, int line, int M, int what, uint8_t *idx) { compose(v, line, M, what, idx, NULL); }
+void wide_line_at(const mdrt_vdp *v, int line, uint8_t *idx, uint32_t *at) { compose(v, line, 0, WIDE_ALL, idx, at); }
 
 uint32_t wide_rgb(const mdrt_vdp *v, uint8_t c)
 {

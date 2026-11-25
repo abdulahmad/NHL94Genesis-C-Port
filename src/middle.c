@@ -540,7 +540,7 @@ void Vmaddr(uint16_t vram)
  * (char + d4, palette bits of printa), then the tiles unless sflags6 bit 0. -> d4 = next char. */
 uint16_t dobitmap(uint32_t pal, uint32_t map, uint32_t tiles, uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t start, uint16_t palbits)
 {
-    uint16_t keep_y = g.printy, saved = g.disflags;
+    uint16_t keep_y = g.printy, saved = g.disflags, first = start;
     g.disflags |= HI(dfng);
     for (unsigned c = 0; palbits; palbits >>= 1, pal += 0x20, c += 0x10) {   /* the palettes of palbits */
         if (!(palbits & 1)) continue;
@@ -565,5 +565,9 @@ uint16_t dobitmap(uint32_t pal, uint32_t map, uint32_t tiles, uint16_t x, uint16
     if (!(g.sflags6 & HI(0))) start = DecompressGraphicsPlain(tiles, start);
     g.disflags = saved;
     g.printy = keep_y;
+    if (tiles == ram_addr(g.picturebuf)) {                /* (a player's picture: a host's hook) */
+        if (picture_drawn_hook) picture_drawn_hook(picture_unpacked, map, first, attr);
+        picture_unpacked = 0;
+    }
     return start;
 }

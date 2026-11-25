@@ -37,6 +37,7 @@ void UnpackPicture(uint32_t pic)
 {
     uint32_t in = pic;
     uint8_t *out = g.picturebuf;
+    picture_unpacked = pic;                               /* (for a host's picture_drawn_hook) */
     uint16_t n = m16(in);
     in += 2;
     wr16(out, n);

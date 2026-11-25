@@ -30,6 +30,7 @@
 #include "rules.h"
 #include "overbar/postfx.h"
 #include "segacd.h"
+#include "cardcolor.h"
 #include "wide.h"
 
 #define SETTINGS "settings.ini"
@@ -306,6 +307,7 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     if (h > 240) h = 240;
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++) pic[y * 320 + x] = 0xFF000000u | mdrt_vdp_rgb(px[y * pitch + x], MDRT_RGB_GPGX);
+    if (w <= 320 && h <= 240) cardcolor_present(mdrt_get_vdp(F.m), pic, w, h, 320);   /* (the players' photos in colour, when on) */
     int cd = w <= 320 && h <= 224 && segacd_present(pic, w, h);   /* (the Sega CD's opening screens, when they are on) */
     if (cd) { w = 320; h = 224; }
     SDL_LockMutex(F.lock);
@@ -547,7 +549,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_COLOUR (CD_ROWS + 10)
 #define CD_PHOTOS (CD_ROWS + 11)
 #define CD_CAREER (CD_ROWS + 12)
-#define CD_OPTS (CD_ROWS + 13)
+#define CD_PCPHOTOS (CD_ROWS + 13)                        /* (the cartridge's photos in colour, from the player's PC files: cardcolor.c) */
+#define CD_OPTS (CD_ROWS + 14)
 static ob_game_opt cd_opts[CD_OPTS];
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
 static SDL_atomic_t cd_smooth, cd_colour;                 /* the movie at 30 fps; each shot's colour */
@@ -575,6 +578,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_COLOUR) { SDL_AtomicSet(&cd_colour, value); return; }
     if (index == CD_PHOTOS) { segacd_set_photos(value); return; }
     if (index == CD_CAREER) { segacd_set_career(value, ending); return; }
+    if (index == CD_PCPHOTOS) { cardcolor_set(value); return; }
     if (index == CD_SFX) { segacd_set_sfx(value); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
@@ -637,6 +641,15 @@ static void cd_no_disc(void)
     }
 }
 
+/* the colour photos' row says so when neither PC game's portraits were found */
+static void pc_no_files(void)
+{
+    static int done;
+    if (done || !cardcolor_searched()) return;
+    done = 1;
+    if (!cardcolor_found()) cd_opts[CD_PCPHOTOS].label = "Colour player photos (no NHL 95 or 94 PC files found)";
+}
+
 static void game_page_init(void)
 {
     static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
@@ -666,7 +679,9 @@ static void game_page_init(void)
     static const char *const career[2] = { "off", "B on a player card" };
     cd_opts[CD_CAREER] = (ob_game_opt){ "cd_career", "Career stats", career, 2, 0, 0, 3 };
     cd_opts[CD_SFX] = (ob_game_opt){ "cd_sfx", "Sound effects", music, 2, 0, 0, 3 };
+    cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 0, 0, 4 };
     segacd_start();
+    cardcolor_start();
     segacd_intro_hook = intro_hook;
     /* the presets: a quick select over the rows below (each row stays free to change; the row then reads Custom).
      * Cartridge = every row at its default; Sega CD = everything the disc gives, as the disc has it; Recommended =
@@ -675,6 +690,8 @@ static void game_page_init(void)
     for (int p = 0; p < 3; p++) for (int k = 0; k < CD_OPTS; k++) pv[p][k] = p == 1 ? 1 : 0;   /* Cartridge 0, Sega CD 1 */
     pv[1][CD_DEDITHER] = pv[1][CD_SMOOTH] = pv[1][CD_COLOUR] = 0;            /* (the movie as the disc has it) */
     pv[1][CD_VOICE] = 1; pv[1][CD_CROWD] = 1;
+    pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
+    pv[2][CD_PCPHOTOS] = 1;                                                    /* (Abdul: on in Recommended) */
     static const int disc_look[] = { CD_VOICE, CD_SCREENS, CD_TITLE, CD_INTRO, CD_SFX, CD_PHOTOS, CD_CAREER };
     for (size_t k = 0; k < sizeof disc_look / sizeof *disc_look; k++) pv[2][disc_look[k]] = 1;
     pv[2][CD_CROWD] = 2;                                                       /* (both beds) */
@@ -951,6 +968,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         intro_tick();
         segacd_career_tick(F.dev, F.rate, SDL_AtomicGet(&cd_dedither));
         cd_no_disc();
+        pc_no_files();
         hold_state = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open || ob_screen_up();
         ob_plat_present();
         ob_plat_frame_done(SDL_AtomicSet(&F.fresh, 0));

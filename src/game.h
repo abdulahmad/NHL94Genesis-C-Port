@@ -254,6 +254,11 @@ extern int (*cd_title_hook)(int what);
 extern int (*cd_picture_hook)(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32]);
 /* (the same host) B on team's roster player's card: his career (the Sega CD's), the game waiting until it is closed */
 extern void (*cd_career_hook)(uint16_t team, uint16_t player);
+/* (a host) a player's picture drawn: its tile data (what UnpackPicture read, 0 when picturebuf was filled
+ * another way), its map, the first char and the map's attribute bits (dobitmap's d4 and printa); its tiles
+ * are in VRAM from that char, its map on screen. Nothing of the game's changes. */
+extern void (*picture_drawn_hook)(uint32_t tiles, uint32_t map, uint16_t start, uint16_t attr);
+extern uint32_t picture_unpacked;          /* (the host's: the tile data UnpackPicture last read, 0 once drawn) */
 void ReadJoyData(void);
 uint8_t ReadPad4Way1(void);                /* -> d0 */
 uint8_t ReadPad4Way2(void);
