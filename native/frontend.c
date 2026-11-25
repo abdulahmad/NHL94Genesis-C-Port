@@ -1082,10 +1082,12 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_pads_tick();
         if (SDL_AtomicGet(&sides_state) == 1) { ob_pads_sides_open(); SDL_AtomicSet(&sides_state, 2); }
         else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);
+        int in_play = 0;
         {   /* the mouse steers in play (the game's frames are running) and steps through the menus otherwise */
             static unsigned seen_frames;
             static Uint32 play_ms;
             if (native_play_frames != seen_frames) { seen_frames = native_play_frames; play_ms = SDL_GetTicks(); }
+            in_play = play_ms && SDL_GetTicks() - play_ms < 250u;
             ob_pads_mouse_mode(play_ms && SDL_GetTicks() - play_ms < 250u);
             {   static unsigned seen_menu; static Uint32 menu_ms;       /* a game menu is being read: the mouse points at its rows */
                 static ob_menu_rect mr[OB_MENU_ROWS]; int rect[OB_MENU_ROWS][4], n, sel, lr;
@@ -1108,6 +1110,11 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         for (int p = 0; p < MDRT_PADS; p++) {
             int src = seat_n ? (p < seat_n ? seat_pad[p] : -1) : p;       /* (after the select-sides screen the pads are the seated players') */
             SDL_AtomicSet(&F.buttons[p], src >= 0 ? (int)ob_pads_read(src) : 0);
+        }
+        if (!in_play) {      /* in the menus any seated device (the keyboard too) drives the game's first pad, wherever the seating put it */
+            int any = 0;
+            for (int p = 0; p < 4 && p < MDRT_PADS; p++) if (ob_pads_seated(p) && p != ob_pads_mouse_player()) any |= (int)ob_pads_read(p);
+            SDL_AtomicSet(&F.buttons[0], SDL_AtomicGet(&F.buttons[0]) | any);
         }
         {   /* a left click on the logos, the title and the license page leaves them, as a press of Start does (the movie takes its own) */
             static int was_down;
