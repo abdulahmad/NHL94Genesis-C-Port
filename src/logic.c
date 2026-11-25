@@ -3315,6 +3315,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
         return;
     }
     o->pflags &= (uint8_t)~(1 << pfna);
+    if (hat_hook) hat_hook(HAT_END, 0);                      /* (the SNES clears its hats here) */
     g.BA_PS_flags &= (uint16_t)~(HI(2) | HI(5));
     g.sflags4 &= (uint16_t)~(HI(0) | HI(1));
     g.DelayedPen &= (uint8_t)~7;
