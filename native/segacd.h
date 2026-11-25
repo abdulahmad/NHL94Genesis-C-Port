@@ -11,6 +11,7 @@ void segacd_set_crowd(int v);            /* 0 the cartridge's PSG crowd, 1 the d
 void segacd_set_voice(int v);            /* Ron Barr's scouting report: 0 off, 1 on (no song under it), 2 on over the music */
 void segacd_set_screens(int v);          /* the opening screens: 0 the cartridge's, 1 the disc's */
 void segacd_set_photos(int v);           /* the player cards' photos: 0 the cartridge's, 1 the disc's where it has one */
+void segacd_set_sfx(int v);              /* the sound effects: 0 the cartridge's, 1 the disc's, 2 both */
 void segacd_set_session(int on);
 void segacd_set_career(int v, int (*ending)(void));   /* (the window's) B on a player's card: his career from the disc; on a team's card its team page; ending: give up waiting */         /* (a session's console: the photos stay the cartridge's) */
 void segacd_set_intro(int v);            /* the intro movie (HOCKEY.SEG) before the title: 0 off, 1 on */
@@ -20,6 +21,13 @@ void segacd_event(int ev, uint16_t n);   /* (cd_event_hook) */
 uint8_t segacd_ym(int port, uint8_t v);  /* a YM2612 port write on its way to the chip: v, or the song's notes dropped */
 uint8_t segacd_psg(uint8_t v);           /* a PSG write on its way to the chip */
 void segacd_mix(int16_t *out, int frames, unsigned rate);   /* the disc's track into a frame of sound */
+
+/* the disc's sound effects (native/segacd_sfx.c) */
+int segacd_sfx_play(ob_cd *cd, int id);   /* start effect id (0 when the disc has no such effect) */
+void segacd_sfx_mix(int16_t *out, int frames, unsigned rate);
+void segacd_sfx_stop(void);
+void segacd_sfx_prime(ob_cd *cd);        /* render them all ahead, on a thread */
+void segacd_sfx_dump(ob_cd *cd, const char *dir);   /* (--segacd-sfx-dump) every effect as a WAV */
 
 /* the disc's opening pictures (native/segacd_pics.c): 320 x 224 ARGB into out; 0 when it cannot */
 enum { SEGACD_PIC_HSP, SEGACD_PIC_TITLE, SEGACD_PIC_LICENSE };

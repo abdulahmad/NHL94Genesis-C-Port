@@ -33,7 +33,7 @@
 #define CROWD_LIVE 20                       /* frames the crowd bed keeps going after the game's last updatesound */
 
 static struct {
-    SDL_atomic_t music, crowd;              /* the Game page's rows (segacd_set_music / _crowd) */
+    SDL_atomic_t music, crowd, sfx;              /* the Game page's rows (segacd_set_music / _crowd) */
     ob_cd *cd;                              /* the disc (NULL: none found, or not looked for yet) */
     SDL_atomic_t found;                     /* 1: the search ended (cd is set, or NULL for none) */
     int track, loop, bed;                   /* playing: the track (0 none), looped, the crowd bed */
@@ -73,6 +73,7 @@ static int finder(void *dir)
     S.cd = cd;
     SDL_MemoryBarrierRelease();
     SDL_AtomicSet(&S.found, 1);
+    if (cd && SDL_AtomicGet(&S.sfx)) segacd_sfx_prime(cd);   /* (the Sound effects row was set before the disc was found) */
     SDL_free(dir);
     return 0;
 }
@@ -103,6 +104,11 @@ ob_cd *segacd_disc(void)
 
 void segacd_set_music(int on) { SDL_AtomicSet(&S.music, on ? 1 : 0); }
 void segacd_set_crowd(int v) { SDL_AtomicSet(&S.crowd, v); }
+void segacd_set_sfx(int v)
+{
+    SDL_AtomicSet(&S.sfx, v);
+    if (v && segacd_disc()) segacd_sfx_prime(S.cd);
+}
 void segacd_set_voice(int v) { SDL_AtomicSet(&S.voice, v); }
 void segacd_set_screens(int v) { SDL_AtomicSet(&S.screens, v); }
 void segacd_set_intro(int v) { SDL_AtomicSet(&S.intro, v); }
@@ -271,7 +277,7 @@ void segacd_event(int ev, uint16_t n)
     if (log < 0) log = SDL_getenv("SEGACD_LOG") != NULL;
     if (log && ev != CD_EV_CROWD)
         fprintf(stderr, "segacd: frame %ld %s %02X (track %d)\n", native_frames(),
-                ev == CD_EV_SONG ? "song" : ev == CD_EV_STOP ? "stop" : ev == CD_EV_PARAGRAPH ? "paragraph" : ev == CD_EV_SCREEN ? "screen" : "turnoff", n, S.track);
+                ev == CD_EV_SONG ? "song" : ev == CD_EV_SFX ? "sfx" : ev == CD_EV_STOP ? "stop" : ev == CD_EV_PARAGRAPH ? "paragraph" : ev == CD_EV_SCREEN ? "screen" : "turnoff", n, S.track);
     switch (ev) {
     case CD_EV_SONG: {
         S.song_on_cd = 0;
@@ -291,10 +297,14 @@ void segacd_event(int ev, uint16_t n)
         S.song_on_cd = 0;
         if (S.track && S.loop && !S.bed) stop();
         break;
+    case CD_EV_SFX:
+        if (SDL_AtomicGet(&S.sfx) && segacd_disc()) segacd_sfx_play(S.cd, n);
+        break;
     case CD_EV_TURNOFF:                       /* p_turnoff (pause, the full silences, leaving the scouting report): all of it */
         S.song_on_cd = 0;
         stop();
         voice_stop();
+        segacd_sfx_stop();
         break;
     case CD_EV_PARAGRAPH:
         paragraph(n);
@@ -337,9 +347,24 @@ static int owned(int out, int pcm)
     return 0;
 }
 
+/* output channel out (0-2, 4-6; pcm: the DAC) is playing one of the cartridge's sound effects (not the song's track) */
+static int sfx_owned(int out, int pcm)
+{
+    int t = song_track();
+    for (int k = pcm ? 5 : 0; k < (pcm ? 6 : 5); k++) {
+        struct Channel *ch = &g.fm_channels[k];
+        if ((pcm || ch->out == out) && ch->key != 0xFF && (t < 0 || (ch->key & 7) != t)) return 1;
+    }
+    return 0;
+}
+
 uint8_t segacd_ym(int port, uint8_t v)
 {
     if (port == 0) { S.ym_addr = v; return v; }
+    if (port == 1 && SDL_AtomicGet(&S.sfx) == 1) {          /* the disc's effects alone: the cartridge's are kept off */
+        if (S.ym_addr == 0x28 && (v & 0xF0) && sfx_owned(v & 7, 0)) return (uint8_t)(v & 0x07);
+        if (S.ym_addr == 0x2A && sfx_owned(6, 1)) return 0x80;
+    }
     if (port != 1 || !S.song_on_cd) return v;
     if (S.ym_addr == 0x28 && (v & 0xF0) && owned(v & 7, 0)) return (uint8_t)(v & 0x07);   /* key on: kept off */
     if (S.ym_addr == 0x2A && owned(6, 1)) return 0x80;                                     /* a drum sample: silence */
@@ -370,6 +395,7 @@ static void mix_voice(int16_t *out, int frames, unsigned rate)
 
 void segacd_mix(int16_t *out, int frames, unsigned rate)
 {
+    if (SDL_AtomicGet(&S.sfx) && rate) segacd_sfx_mix(out, frames, rate);
     if (S.clip && rate) mix_voice(out, frames, rate);
     if (S.clip && !SDL_AtomicGet(&S.voice)) voice_stop();
     if (S.crowd_live > 0 && --S.crowd_live == 0 && S.bed) stop();   /* (the game's crowd stopped: the menus) */

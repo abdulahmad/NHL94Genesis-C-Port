@@ -241,7 +241,8 @@ void stop_current_song(uint16_t d0);       /* d0 = the caller's d0 (its high byt
 /* the sound and screen events a host can follow (the Sega CD disc's extras: native/segacd.c); NULL: none. It changes
  * nothing in the game. */
 enum { CD_EV_SONG, CD_EV_STOP, CD_EV_TURNOFF, CD_EV_CROWD, CD_EV_PARAGRAPH /* the scouting report's, its number */,
-       CD_EV_SCREEN /* an opening screen: 0 none, 1 High Score Productions, 2 the title, 3 its credits */ };
+       CD_EV_SCREEN /* an opening screen: 0 none, 1 High Score Productions, 2 the title, 3 its credits */,
+       CD_EV_SFX /* a sound effect started (sound id $00-$2F) */ };
 extern void (*cd_event_hook)(int ev, uint16_t n);
 /* (the same host) the player card's picture for team's roster player: 1 with what UnpackPicture would leave in buf (the
  * tile count word, 36 tiles) and 16 colours (big-endian words) for palette 2; NULL or 0: the cartridge's */

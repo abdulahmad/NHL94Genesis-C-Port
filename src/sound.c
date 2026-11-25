@@ -110,7 +110,7 @@ void play_sfx_or_music_track(uint16_t n)
     if ((int16_t)n >= 0x30) {
         stop_current_song(n);
         if (cd_event_hook) cd_event_hook(CD_EV_SONG, n);
-    }
+    } else if (cd_event_hook) cd_event_hook(CD_EV_SFX, n);
     struct TrackSlot *slot = &g.fm_slots[0];
     int32_t low = (int32_t)slot->stream;
     uint16_t track = 7;
