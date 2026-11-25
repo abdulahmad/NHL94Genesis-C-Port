@@ -137,6 +137,14 @@ void play_sfx_or_music_track(uint16_t n)
     }
 }
 
+/* 1 while a song plays (a track slot holds a song's stream) */
+int song_playing(void)
+{
+    int32_t first = (int32_t)rd32(rom_ptr(SYM_SongPointerTable));
+    for (int i = 0; i < 8; i++) if (first <= (int32_t)g.fm_slots[i].stream) return 1;
+    return 0;
+}
+
 /* sound94.asm:stop_current_song. Free the slot playing a song (pointer at or past the first song
  * stream), key off and mute its channels and send the buffer. d0 = the caller's d0: the 68k
  * loads only the low byte of each channel number into d0 and indexes the attenuation table

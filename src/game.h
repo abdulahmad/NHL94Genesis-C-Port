@@ -237,6 +237,7 @@ void p_turnoff(void);
 void rtsfx(void);
 void rtscmd10(void);
 void play_sfx_or_music_track(uint16_t n);  /* d0 */
+int song_playing(void);                  /* 1 while a song plays (hold.c) */
 void stop_current_song(uint16_t d0);       /* d0 = the caller's d0 (its high byte leaks into an index) */
 /* the sound and screen events a host can follow (the Sega CD disc's extras: native/segacd.c); NULL: none. It changes
  * nothing in the game. */
