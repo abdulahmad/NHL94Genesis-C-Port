@@ -264,13 +264,16 @@ int segacd_hsp(ob_cd *cd, int t, uint32_t *out)
     return 1;
 }
 
-/* ---- the disc's title page with its credits (ScreenSetupC): the TitleCredits picture over the credits, which scroll up in the
- * small font (BootFont: a 32 x 4 map, a character's tile at its code) from below the screen, a page at a time; the first page
- * (STARTER.BIN $1AF0E) is up at once and stays 241 frames, then each page of the list ($1AF36) comes up 64 lines a line every two
- * frames and stays 121 frames, until two page ends in a row. A page is Strings (a length word, counting itself, and the text) to
- * one whose text starts with $FF; each is centred on column 16 ($10 - length / 2). Lines above 151 of that plane are swept
- * sideways by the page's line scroll ($7F + a moving count), off the picture most of the time: they are left out here. Pad's
- * Start ends it (the caller's). ---- */
+/* ---- the disc's title page with its credits (ScreenSetupC, starterscreen94cd.asm). The main CPU's screen (command 2: plane A
+ * $E000, plane B $C000, window $B000; command $1C: the window over rows 0-18, lines 0-151, and a scroll a line): the TitleCredits
+ * picture whole on the window with its four palettes, its rows 19-27 again on plane B, and the credits on plane A (command $B,
+ * PrintStringBox: BootFont's tiles, its map's tile for each character code, palette line 0, so the title's colours). Plane A's
+ * vertical scroll (command $1D) brings each page up from below the screen; the window hides plane A above line 152. The first
+ * page (STARTER.BIN $1AF0E) is up at once and stays 241 frames, then each page of the list ($1AF36) comes up 64 lines, a line
+ * every two frames, and stays 121 frames, until two page ends in a row. A page is Strings (a length word, counting itself, then
+ * the text) to one whose text starts with $FF; each is centred on column 16 ($10 - length / 2). The page's line scroll moves
+ * plane B's lines 0-150 sideways ($7F + a moving count), but plane B is empty there, so nothing shows of it. Start ends it (the
+ * caller's). ---- */
 #define T_FIRST 0x1AF0EL
 #define T_LIST 0x1AF36L
 #define T_TEXT_END 0x1B400L
@@ -367,23 +370,22 @@ int segacd_title_step(void)
 
 void segacd_title_draw(uint32_t *out)
 {
-    for (int i = 0; i < 320 * 224; i++) out[i] = T.col[0];
-    if (T.ready != 1) return;
-    for (int y = 152; y < 224; y++) {                       /* the credits (behind the picture), below the swept lines */
+    if (T.ready != 1) { for (int i = 0; i < 320 * 224; i++) out[i] = 0xFF000000u; return; }
+    for (int i = 0; i < 320 * 224; i++) out[i] = T.pix[i] ? T.pic[i] : T.col[0];
+    for (int y = 152; y < 224; y++) {                       /* (plane A, below the window: over the picture's lower rows on plane B) */
         int py = (y + T.vscroll) & 255, row = py >> 3, ly = py & 7;
         for (int c = 0; c < 40; c++) {
             unsigned ch = T.ring[row][c];
             if (!ch || ch >= 128) continue;
-            unsigned e = be16(T.fmap + 2 * ch), t = e & 0x7FF;
+            unsigned e = be16(T.fmap + 2 * ch), t = e & 0x7FF, pal = e >> 13 & 3;
             if (t >= T.nfont) continue;
             unsigned sy = e & 0x1000 ? 7 - (unsigned)ly : (unsigned)ly;
             for (unsigned x = 0; x < 8; x++) {
                 unsigned sx = e & 0x800 ? 7 - x : x;
                 uint8_t b = T.font[t * 32 + sy * 4 + sx / 2];
                 unsigned v = sx & 1 ? b & 15 : b >> 4;
-                if (v) out[y * 320 + c * 8 + (int)x] = T.col[16 + v];   /* (palette line 1: light grey letters, a dark blue edge) */
+                if (v) out[y * 320 + c * 8 + (int)x] = T.col[pal * 16 + v];   /* (the title's colours: BootFont's own are not loaded) */
             }
         }
     }
-    for (int i = 0; i < 320 * 224; i++) if (T.pix[i]) out[i] = T.pic[i];
 }
