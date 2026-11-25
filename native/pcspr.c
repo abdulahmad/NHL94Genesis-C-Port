@@ -492,6 +492,7 @@ static void ref_tick(void)
     find3d(&x, &y, 0);
     if (y == 0x4E20) return;
     R.sx = x + view_shift();
+    if (getenv("PCREF_AT")) { int ax, ay; if (sscanf(getenv("PCREF_AT"), "%d,%d", &ax, &ay) == 2) { R.sx = ax; R.sy = ay; } }   /* (a test: the referee put there) */
     R.sy = y;
     R.valid = 1;
     if (getenv("PCREF_LOG") && !(g.Vcount & 63)) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos);
@@ -503,10 +504,10 @@ static int ref_frame(void)
     const struct SortObj *pk = sortobj(puckscnum);
     int asn = pk->asslist[pk->assnum & 7];
     int d = R.dir & 7;
-    if (asn == pfaceoff || asn == pfaceoff2) return (d >= 2 && d <= 5) ? 711 : 703;       /* (SPAreffowait) */
+    if (asn == pfaceoff || asn == pfaceoff2) return (d >= 3 && d <= 6) ? 711 : 703;       /* (SPAreffowait) */
     if (R.drop > 0) {                                                                    /* (SPArefdrop: 8 ticks each) */
         int k = (24 - R.drop) / 8;
-        if (d >= 2 && d <= 5) return k == 0 ? 845 : k == 1 ? 846 : 711;
+        if (d >= 3 && d <= 6) return k == 0 ? 845 : k == 1 ? 846 : 711;
         return k == 0 ? 843 : k == 1 ? 844 : 703;
     }
     int b = 5 * ((8 - d) & 7);
@@ -635,12 +636,24 @@ static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch
     uint8_t pal[256][3];
     memcpy(pal, P.pal, sizeof pal);
     if (getenv("PCREF_LOG")) { int nb = 0, nf = 0; for (int i = 0; i < 320 * 240; i++) { nb += back[i] != base[i]; nf += front[i] != base[i]; } fprintf(stderr, "refdraw: frame %d at %d,%d size %dx%d back %d front %d\n", fr, x0, y0, s->w, s->h, nb, nf); }
+    int win = 0;                                                         /* (a window up in the corner: the penalty referee's or the face off's, drawn by the plane: nothing of the on ice referee over it) */
+    {
+        const uint8_t *vr = vdp->s.vram;
+        unsigned a = (unsigned)g.maps[0].vram;
+        for (int row = 2; row < 8 && !win; row++)
+            for (int col = 1; col < 10 && !win; col++) {
+                unsigned o = (a + (((unsigned)row << g.maps[0].colshift) + (unsigned)col) * 2u) & 0xFFFF;
+                unsigned t = (unsigned)(vr[o] << 8 | vr[o + 1]);
+                if ((t & 0x8000) && (t & 0x7FF) != 0x7FF) win = 1;
+            }
+    }
     for (int y = 0; y < s->h; y++)
         for (int x = 0; x < s->w; x++) {
             int v = s->px[y * s->w + x];
             if (v == 255) continue;
             int px_ = x0 + x, py = y0 + y;
             if (px_ < 0 || px_ >= w || py < 0 || py >= h) continue;
+            if (win && px_ < 112 && py < 112) continue;
             int p = py * 320 + px_;
             int ok = back[p] != base[p];
             if (!ok && front[p] != base[p]) {                      /* in front of a sprite or an overlay: if no skater nearer covers this */
