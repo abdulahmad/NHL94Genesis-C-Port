@@ -7,6 +7,19 @@
 #include "title_strings_gen.h"
 
 struct Picture { uint32_t pal, map, tiles; uint16_t w, h; };
+
+/* (cd_title_hook) the Sega CD's license page, which the host draws over the screen: up to 10 seconds, or until a button is pressed
+ * (one held from before does not count) */
+static void cd_license(void)
+{
+    if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 5);
+    int held = 1;
+    for (int i = 0; i < 600; i++) {
+        hal_wait_vblank();
+        if (!(orjoy() & 0xF0)) held = 0;
+        else if (!held) break;
+    }
+}
 static struct Picture picture(uint32_t img)
 {
     struct Picture p = { img + rd32(rom_ptr(img)), img + rd32(rom_ptr(img + 4)), img + 8, 0, 0 };
@@ -35,6 +48,11 @@ void TitleScreen(void)
 {
     static const uint8_t font[8] = { 0x0D, 0x10, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
     if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 2);
+    if (cd_title_hook && cd_title_hook(CD_TITLE_LICENSE)) {   /* (the Sega CD's: its license page before the title, no song yet) */
+        cd_license();
+        if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 2);
+    }
+    int cd_title = cd_title_hook && cd_title_hook(CD_TITLE_BEGIN);
     cpu_set_sr(0x2700);
     uint16_t hi = vdp_hv16();                             /* the seed from the HV counter: its high word first */
     g.seed = (uint32_t)hi << 16 | vdp_hv16();
@@ -84,6 +102,11 @@ void TitleScreen(void)
     song(SYM_SngTitle);
     CreditsLineScroll();
     cpu_set_sr(0x2500);
+    if (cd_title) {                                       /* (the Sega CD's title page: its credits, until they end or Start; its license page) */
+        while (!CreditsWait() && cd_title_hook(CD_TITLE_STEP)) {}
+        cd_license();
+        return;
+    }
     do if (CreditsWait()) return; while (g.clampcounter != 0);
     for (int i = 0; i <= 0x3C; i++) if (CreditsWait()) return;
     if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 3);

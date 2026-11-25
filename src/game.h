@@ -241,9 +241,14 @@ void stop_current_song(uint16_t d0);       /* d0 = the caller's d0 (its high byt
 /* the sound and screen events a host can follow (the Sega CD disc's extras: native/segacd.c); NULL: none. It changes
  * nothing in the game. */
 enum { CD_EV_SONG, CD_EV_STOP, CD_EV_TURNOFF, CD_EV_CROWD, CD_EV_PARAGRAPH /* the scouting report's, its number */,
-       CD_EV_SCREEN /* an opening screen: 0 none, 1 High Score Productions, 2 the title, 3 its credits */,
+       CD_EV_SCREEN /* an opening screen: 0 none, 1 High Score Productions, 2 the title, 3 its credits, 4 EA SPORTS, 5 the Sega CD's license page */,
        CD_EV_SFX /* a sound effect: its id, and its track slot in bits 8-11 (8: none was free) */ };
 extern void (*cd_event_hook)(int ev, uint16_t n);
+/* (the same host) the Sega CD's own pages around the title, which the host draws: CD_TITLE_LICENSE 1: its license page before the
+ * title; CD_TITLE_BEGIN 1: its title page in place of the cartridge's (the cartridge's set-up and song stay, its credits do not);
+ * CD_TITLE_STEP: a frame of that page's credits, 0 at their end. NULL or 0: the cartridge's (the game is unchanged then) */
+enum { CD_TITLE_LICENSE, CD_TITLE_BEGIN, CD_TITLE_STEP };
+extern int (*cd_title_hook)(int what);
 /* (the same host) the player card's picture for team's roster player: 1 with what UnpackPicture would leave in buf (the
  * tile count word, 36 tiles) and 16 colours (big-endian words) for palette 2; NULL or 0: the cartridge's */
 extern int (*cd_picture_hook)(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32]);

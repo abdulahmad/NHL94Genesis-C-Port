@@ -10,7 +10,8 @@ ob_cd *segacd_disc(void);                /* the disc, NULL while looking or when
 void segacd_set_music(int on);           /* the Game page: songs from the disc */
 void segacd_set_crowd(int v);            /* 0 the cartridge's PSG crowd, 1 the disc's track 2, 2 both */
 void segacd_set_voice(int v);            /* Ron Barr's scouting report: 0 off, 1 on (no song under it), 2 on over the music */
-void segacd_set_screens(int v);          /* the opening screens: 0 the cartridge's, 1 the disc's */
+void segacd_set_screens(int v);          /* the opening screens: 0 the cartridge's, 1 the disc's (EA SPORTS, High Score Productions, the license page) */
+void segacd_set_title(int v);            /* the title page: 0 the cartridge's, 1 the disc's (its credits, then the license page) */
 void segacd_set_photos(int v);           /* the player cards' photos: 0 the cartridge's, 1 the disc's where it has one */
 void segacd_set_session(int on);
 void segacd_set_career(int v, int (*ending)(void));   /* (the window's) B on a player's card: his career from the disc; on a team's card its team page; ending: give up waiting */         /* (a session's console: the photos stay the cartridge's) */
@@ -34,6 +35,11 @@ void segacd_sfx_wait(void);             /* (headless) until they are rendered */
 /* the disc's opening pictures (native/segacd_pics.c): 320 x 224 ARGB into out; 0 when it cannot */
 enum { SEGACD_PIC_HSP, SEGACD_PIC_TITLE, SEGACD_PIC_LICENSE };
 int segacd_picture(ob_cd *cd, int which, uint32_t *out);
+int segacd_ea_logo(ob_cd *cd, int pieces, uint32_t *out);   /* the disc's EA SPORTS logo with that many pieces up (320 x 224) */
+int segacd_hsp(ob_cd *cd, int t, uint32_t *out);            /* its High Score Productions page t frames in (its sparkles) */
+int segacd_title_begin(ob_cd *cd);                          /* its title page with the credits, from the first page: 0 not on this disc */
+int segacd_title_step(void);                                /* a frame of the credits: 0 at their end */
+void segacd_title_draw(uint32_t *out);                      /* the page now (320 x 224) */
 
 /* the disc's movies (native/segacd_film.c): an SM picture over the tiles the frame before left; 0 when it is not one */
 int segacd_sm_decode(const uint8_t *c, long n, uint8_t *tiles, int *w, int *h, uint16_t cram[64], uint8_t *line, int max_tiles);

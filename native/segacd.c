@@ -49,6 +49,9 @@ static struct {
     double clip_at;
     int clip_id, queue[8], nqueue;          /* its paragraph, and the ones waiting */
     SDL_atomic_t screens;                   /* the Opening screens row: 1 the disc's */
+    SDL_atomic_t title;                     /* the Title page row: 1 the disc's (its credits, then the license page) */
+    int title_live;                         /* the disc's title page is up (segacd_title_hook) */
+    int hsp_t;                              /* frames of the High Score Productions page shown (its sparkles' clock) */
     SDL_atomic_t intro;                     /* the Intro movie row: 1 HOCKEY.SEG before the title */
     SDL_atomic_t photos, session, career;   /* the Player photos and Career stats rows; a session's console (none then: the machines keep the same RAM) */
     int intro_done;                         /* it played (once a run) */
@@ -60,6 +63,11 @@ static struct {
     int dark;                               /* its first black frame came (the one before has faded out) */
     float last;                             /* the last frame's brightness */
     int out;                                /* the last picture fading out, the opening over */
+    uint32_t ea_t0;                         /* the EA SPORTS logo: SDL_GetTicks when it came up (0 not yet) */
+    int16_t *ea_pcm;                        /* its voice (STARTER.BIN's PCM bank, 16276 Hz), loaded with it */
+    long ea_len;
+    double ea_at;                           /* (the mixer's) where it is, -1 not playing */
+    SDL_atomic_t ea_go;                     /* 1: start it (the picture's thread to the mixer's) */
 } S;
 
 static const char *const need[2] = { "HOCKEY.BIN", "GRAPH2.BIN" };
@@ -79,14 +87,17 @@ static int finder(void *dir)
 }
 
 static int photo_hook(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32]);
+static int title_hook(int what);
 
 void segacd_start(void)
 {
     static int started;
     if (started) return;
     started = 1;
+    S.ea_at = -1;
     cd_event_hook = segacd_event;
     cd_picture_hook = photo_hook;
+    cd_title_hook = title_hook;
     char *base = SDL_GetBasePath();
     SDL_Thread *t = SDL_CreateThread(finder, "segacd", base ? base : SDL_strdup("."));
     if (t) SDL_DetachThread(t);
@@ -107,6 +118,7 @@ void segacd_set_music(int on) { SDL_AtomicSet(&S.music, on ? 1 : 0); }
 void segacd_set_crowd(int v) { SDL_AtomicSet(&S.crowd, v); }
 void segacd_set_voice(int v) { SDL_AtomicSet(&S.voice, v); }
 void segacd_set_screens(int v) { SDL_AtomicSet(&S.screens, v); }
+void segacd_set_title(int v) { SDL_AtomicSet(&S.title, v); }
 void segacd_set_intro(int v) { SDL_AtomicSet(&S.intro, v); }
 void segacd_set_photos(int v) { SDL_AtomicSet(&S.photos, v); }
 void segacd_set_session(int on) { SDL_AtomicSet(&S.session, on); }
@@ -313,9 +325,12 @@ void segacd_event(int ev, uint16_t n)
             S.intro_done = 1;                 /* (the disc's movie before its title, as the disc plays it: the game waits) */
             segacd_intro_hook();
         }
-        S.out = !n && S.screen >= 1 && S.screen <= 3 && S.pic_of > 0;   /* (the last picture fades out with the cartridge's screen) */
-        S.dark = (S.screen >= 1 && S.screen <= 3) || S.last < 16 * 255;   /* (after one of the disc's pictures, or black already: at once) */
+        S.out = !n && S.screen >= 1 && S.screen <= 5 && S.pic_of > 0;   /* (the last picture fades out with the cartridge's screen) */
+        S.dark = (S.screen >= 1 && S.screen <= 5) || S.last < 16 * 255;   /* (after one of the disc's pictures, or black already: at once) */
         S.screen = n;
+        S.ea_t0 = 0;
+        S.hsp_t = 0;
+        if (n != 2 && n != 3) S.title_live = 0;
         if (!S.out) { S.ramp = 0; S.full = 0; }
         break;
     case CD_EV_CROWD:
@@ -377,10 +392,41 @@ static void mix_voice(int16_t *out, int frames, unsigned rate)
     }
 }
 
+/* (cd_title_hook, the game's thread) the disc's pages around the title: CD_TITLE_LICENSE: its license page before the title (the
+ * Opening screens row); CD_TITLE_BEGIN: its own title page in place of the cartridge's (the Title page row); CD_TITLE_STEP: a frame
+ * of its credits, 0 at their end. Not in a session (the machines keep step) */
+static int title_hook(int what)
+{
+    ob_cd *cd = segacd_disc();
+    if (!cd || SDL_AtomicGet(&S.session)) return 0;
+    switch (what) {
+    case CD_TITLE_LICENSE: {
+        static uint32_t check[320 * 224];
+        return SDL_AtomicGet(&S.screens) && segacd_picture(cd, SEGACD_PIC_LICENSE, check);
+    }
+    case CD_TITLE_BEGIN: return S.title_live = SDL_AtomicGet(&S.title) && segacd_title_begin(cd);
+    case CD_TITLE_STEP: return S.title_live && segacd_title_step();
+    }
+    return 0;
+}
+
 void segacd_mix(int16_t *out, int frames, unsigned rate)
 {
     segacd_sfx_mix(out, frames, rate);
     if (S.clip && rate) mix_voice(out, frames, rate);
+    if (SDL_AtomicCAS(&S.ea_go, 1, 0)) { SDL_MemoryBarrierAcquire(); S.ea_at = 0; }
+    if (S.ea_pcm && S.ea_at >= 0 && rate) {               /* (the EA SPORTS logo's voice) */
+        double step = (double)VOICE_RATE / rate;
+        for (int i = 0; i < frames; i++, S.ea_at += step) {
+            long j = (long)S.ea_at;
+            if (j + 1 >= S.ea_len) { S.ea_at = -1; break; }
+            float v = (float)(S.ea_pcm[j] + (S.ea_pcm[j + 1] - S.ea_pcm[j]) * (S.ea_at - j)) * VOICE_GAIN;
+            for (int c = 0; c < 2; c++) {
+                float x = v + out[2 * i + c];
+                out[2 * i + c] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
+            }
+        }
+    }
     if (S.clip && !SDL_AtomicGet(&S.voice)) voice_stop();
     if (S.crowd_live > 0 && --S.crowd_live == 0 && S.bed) stop();   /* (the game's crowd stopped: the menus) */
     if (S.bed && !(crowd_bits() & 2)) stop();
@@ -422,12 +468,93 @@ void segacd_mix(int16_t *out, int frames, unsigned rate)
  * disc boots in (title from STARTER.BIN, then the license from GRAPH2.BIN before the menus).
  * The cartridge's own screen goes on underneath (its timing, Start, its song), so the game is
  * the same; the picture fades in by itself and out with the cartridge's frame. */
+/* the EA SPORTS logo's voice: the PCM bank at the end of STARTER.BIN's boot art (RF5C164 bytes up to the first $FF) */
+#define EA_PCM_AT 50540L
+#define EA_PCM_MAX 63284L
+
+static void ea_voice_load(void)
+{
+    uint8_t *b;
+    if (S.ea_pcm || !S.cd) return;
+    long size = ob_cd_read_file(S.cd, "STARTER.BIN", &b);
+    if (size >= EA_PCM_AT + EA_PCM_MAX) {
+        int16_t *c = SDL_malloc((size_t)EA_PCM_MAX * sizeof *c);
+        long len = 0;
+        if (c)
+            for (; len < EA_PCM_MAX && b[EA_PCM_AT + len] != 0xFF; len++) {
+                int v = (b[EA_PCM_AT + len] & 0x7F) << 8;
+                c[len] = (int16_t)(b[EA_PCM_AT + len] & 0x80 ? v : -v);
+            }
+        S.ea_len = len;
+        SDL_MemoryBarrierRelease();
+        S.ea_pcm = c;
+    }
+    free(b);
+}
+
+/* the disc's EA SPORTS logo now: ScreenSetupA's script (starterscreen94cd.asm) at 60 frames a second puts the first
+ * piece up at frame 11 with the voice, then one each 31 frames twice, then 5 frames, then one each 7 frames; 17 in all */
+static int ea_pieces(uint32_t ms)
+{
+    int t = (int)(ms * 60 / 1000), n = 0;
+    static const int first[4] = { 11, 42, 73, 104 };
+    for (int i = 0; i < 4; i++) if (t >= first[i]) n = i + 1;
+    if (t >= 109) n = 5 + (t - 109) / 7;
+    return n > 17 ? 17 : n;
+}
+
 int segacd_present(uint32_t *frame, int w, int h)
 {
-    static const int pic[4] = { 0, SEGACD_PIC_HSP + 1, SEGACD_PIC_TITLE + 1, SEGACD_PIC_LICENSE + 1 };
-    if (!SDL_AtomicGet(&S.screens) || !segacd_disc() || (!S.out && (!S.screen || S.screen > 3))) { S.last = 1e9f; S.out = 0; return 0; }
-    int want = S.out ? S.pic_of : pic[S.screen];
-    if (S.pic_of != want) {
+    enum { EA = 100, HSP, TITLE };
+    int on = SDL_AtomicGet(&S.screens), want = 0;
+    switch (S.screen) {
+    case 1: want = on ? HSP : 0; break;
+    case 2: case 3: want = S.title_live ? TITLE : 0; break;
+    case 4: want = on ? EA : 0; break;
+    case 5: want = SEGACD_PIC_LICENSE + 1; break;      /* (asked for by the game: segacd_title_hook) */
+    }
+    if (S.out) want = S.pic_of;
+    if (!segacd_disc() || !want) { S.last = 1e9f; S.out = 0; return 0; }
+    if (want == EA) {                                      /* (the EA SPORTS logo: built a piece at a time from the disc's sprites) */
+        if (!S.dark) S.ea_t0 = 0;
+        else if (!S.ea_t0) { S.ea_t0 = SDL_GetTicks() | 1; ea_voice_load(); }
+        int n = S.ea_t0 ? ea_pieces(SDL_GetTicks() - S.ea_t0) : 0;
+        static int shown = -1;
+        if (S.pic_of != want || n != shown) {
+            if (S.pic_of != want) { S.ramp = 0; S.full = 0; }
+            if (n >= 1 && shown < 1 && S.ea_pcm) SDL_AtomicSet(&S.ea_go, 1);
+            S.pic_of = segacd_ea_logo(S.cd, n, S.pic) ? want : -want;
+            shown = n;
+        }
+    } else if (want == HSP) {                              /* (its sparkles: a step a frame once it is up) */
+        if (S.pic_of != want) { S.ramp = 0; S.full = 0; }
+        S.pic_of = segacd_hsp(S.cd, S.dark ? S.hsp_t++ : 0, S.pic) ? want : -want;
+    } else if (want == TITLE) {
+        if (S.pic_of != want) { S.ramp = 0; S.full = 0; }
+        segacd_title_draw(S.pic);
+        S.pic_of = want;
+    } else if (S.screen == 5 && !S.out) {                  /* (the license page: already in pic, its own fade in over whatever the game shows) */
+        if (S.pic_of != want) {
+            if (!segacd_picture(S.cd, SEGACD_PIC_LICENSE, S.pic)) { S.pic_of = -want; return 0; }
+            S.pic_of = want; S.ramp = 0; S.full = 0;
+        }
+        if (S.ramp < 1) S.ramp += 1.0f / 24;
+        float sum = 0;                                     /* (the game's screen under it: the fade out follows it) */
+        for (int y = 0; y < h && y < 224; y += 2)
+            for (int x = 0; x < w && x < 320; x += 3) {
+                uint32_t c = frame[y * 320 + x];
+                sum += (float)(((c >> 16) & 255) + ((c >> 8) & 255) + (c & 255));
+            }
+        if (sum > S.full) S.full = sum;
+        S.last = sum;
+        float k = S.ramp < 1 ? S.ramp : 1;
+        for (int i = 0; i < 320 * 224; i++) {
+            uint32_t c = S.pic[i];
+            frame[i] = 0xFF000000u | (uint32_t)(((c >> 16) & 255) * k) << 16 | (uint32_t)(((c >> 8) & 255) * k) << 8 | (uint32_t)((c & 255) * k);
+        }
+        S.dark = 1;
+        return 1;
+    } else if (S.pic_of != want) {
         S.pic_of = segacd_picture(S.cd, want - 1, S.pic) ? want : -want;
         S.ramp = 0;
         S.full = 0;

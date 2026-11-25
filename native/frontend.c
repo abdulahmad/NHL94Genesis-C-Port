@@ -540,13 +540,14 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_SFX (CD_ROWS + 3)
 #define CD_VOICE (CD_ROWS + 4)
 #define CD_SCREENS (CD_ROWS + 5)
-#define CD_INTRO (CD_ROWS + 6)
-#define CD_DEDITHER (CD_ROWS + 7)
-#define CD_SMOOTH (CD_ROWS + 8)
-#define CD_COLOUR (CD_ROWS + 9)
-#define CD_PHOTOS (CD_ROWS + 10)
-#define CD_CAREER (CD_ROWS + 11)
-#define CD_OPTS (CD_ROWS + 12)
+#define CD_TITLE (CD_ROWS + 6)
+#define CD_INTRO (CD_ROWS + 7)
+#define CD_DEDITHER (CD_ROWS + 8)
+#define CD_SMOOTH (CD_ROWS + 9)
+#define CD_COLOUR (CD_ROWS + 10)
+#define CD_PHOTOS (CD_ROWS + 11)
+#define CD_CAREER (CD_ROWS + 12)
+#define CD_OPTS (CD_ROWS + 13)
 static ob_game_opt cd_opts[CD_OPTS];
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
 static SDL_atomic_t cd_smooth, cd_colour;                 /* the movie at 30 fps; each shot's colour */
@@ -567,6 +568,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_CROWD) { segacd_set_crowd(value); return; }
     if (index == CD_VOICE) { segacd_set_voice(value); return; }
     if (index == CD_SCREENS) { segacd_set_screens(value); return; }
+    if (index == CD_TITLE) { segacd_set_title(value); return; }
     if (index == CD_INTRO) { segacd_set_intro(value); return; }
     if (index == CD_DEDITHER) { SDL_AtomicSet(&cd_dedither, value); return; }
     if (index == CD_SMOOTH) { SDL_AtomicSet(&cd_smooth, value); return; }
@@ -654,6 +656,7 @@ static void game_page_init(void)
     static const char *const voice[3] = { "off", "on", "over the music" };
     cd_opts[CD_VOICE] = (ob_game_opt){ "cd_voice", "Ron Barr scouting voice", voice, 3, 0, 0, 3 };
     cd_opts[CD_SCREENS] = (ob_game_opt){ "cd_screens", "Opening screens", music, 2, 0, 0, 3 };
+    cd_opts[CD_TITLE] = (ob_game_opt){ "cd_title", "Title page", music, 2, 0, 0, 3 };
     cd_opts[CD_INTRO] = (ob_game_opt){ "cd_intro", "Intro movie", cd_off_on, 2, 0, 0, 3 };
     cd_opts[CD_DEDITHER] = (ob_game_opt){ "cd_dedither", "Movie de-dither", ob_postfx_names, OB_POSTFX_MODES, 0, 0, 3 };
     static const char *const smooth[2] = { "original", "30 fps" }, *const colour[2] = { "original", "enhanced" };
