@@ -23,7 +23,7 @@ disassembly before the cleanup). One C file per asm module (`src/logic.c` for `l
 Upstream is https://github.com/1nputs/ninety-four. Names and file recuts (docs/RULES.md) move this
 repository away from upstream; names that match NHL94Genesis are authorized.
 
-Plan: `alignment-plan/c_ports_plan.md` in the project files. Where the work stands: [docs/C_PORTS_HANDOFF.md](docs/C_PORTS_HANDOFF.md).
+Plan: [c_ports_plan.md](https://github.com/abdulahmad/nhl-disasm-report/blob/main/docs/project/c_ports_plan.md) (nhl-disasm-report, history copy). Where the work stands: [docs/C_PORTS_HANDOFF.md](docs/C_PORTS_HANDOFF.md).
 Alignment rules: [docs/RULES.md](docs/RULES.md). What "vanilla" allows: [docs/VANILLA.md](docs/VANILLA.md).
 
 ## Gates (programs that can fail; "it looks right" never passes a change)
