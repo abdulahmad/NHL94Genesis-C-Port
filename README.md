@@ -19,7 +19,7 @@ And things the cartridge never had:
   effects, opening screens, intro movie and player cards, each off until you turn it on. The
   game itself is the original, exactly.
 - **NHL 95 PC options**: things NHL 95 PC did that the cartridge did not, built from your own copy of that game's files, each
-  off until you turn it on. The first is the rink announcer.
+  off until you turn it on. The first is the rink announcer; **White ice** is another.
 - **Save states**: eight slots with a picture each, the Autosave when you quit, and hold F4 to
   rewind the goal you just gave up.
 - **All of it online.** The host's choices go to every machine. Seasons go online in a save state: anyone saves one, and the host loads it for everyone.
@@ -153,6 +153,9 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   The clips are the rink calls of `XBRUCE2.VIV` (the ones for numbers, teams, penalties and the calls themselves). Put the file beside the
   program (up to three folders below), loose or on a rip of the NHL 95 PC disc (`.cue`, `.ccd` or `.iso` / `.bin`): the game looks in the disc images
   too. Without it the row says "(no XBRUCE2.VIV found)". The clip rate is 11025 Hz.
+- **White ice**: the rink drawn white, as on the PC games, in place of the cartridge's pale cyan (and the glass's sheen in white). It needs no
+  files from anywhere and changes only the picture, in the 4:3 and the wide rink; menus and the opening film keep their colours. Off in every
+  preset (a taste). Headless: `--white-ice`.
 - Headless: `--announcer FILE` plays the announcer from that `XBRUCE2.VIV` into `--wav`; `ANNOUNCER_LOG=1` prints each clip said.
 
 ### Game rules
