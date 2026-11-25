@@ -36,7 +36,7 @@ static struct {
     uint8_t team[2][NTEAMS][448];           /* HOMEPALS, AWAYPALS */
     int have_team[2];
     SDL_SpinLock lock;
-    struct { int16_t pc, x, y, flip, away, sc; } show[16], pub[16];   /* what the game wrote, what the picture draws */
+    struct { int16_t pc, x, y, flip, away, sc, first, count; } show[16], pub[16];   /* what the game wrote, what the picture draws */
     int nshow, npub;
 } P;
 
@@ -211,6 +211,7 @@ static int pc_frame(int fr)
 
 static int in_game(void) { return g.demoflag && (g.disflags & HI(dfok)); }
 
+/* the sprite table entries of the last sprite the hook took */
 static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o)
 {
     if (ev == SPR_BEGIN) { P.nshow = 0; return 0; }
@@ -221,15 +222,22 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
         SDL_AtomicUnlock(&P.lock);
         return 0;
     }
+    if (ev == SPR_MARK) {                                 /* sc = the first entry, x = how many */
+        if (P.nshow > 0) { P.show[P.nshow - 1].first = (int16_t)sc; P.show[P.nshow - 1].count = x; }
+        return 0;
+    }
     if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || sc > 13 || P.nshow >= 16) return 0;
+    if ((int16_t)g.palcount >= 0) return 0;               /* (a fade: the cartridge's sprites fade with the screen) */
     int pf = pc_frame(o->frame & 0x7FF);
-    if (pf < 0 || pf >= NFRAMES || !P.f[pf].px) return 0;
+    if (pf < 0 || pf >= NFRAMES || !P.f[pf].px) return 0;   /* (no such PC frame: the cartridge's sprite stays) */
     P.show[P.nshow].pc = (int16_t)pf;
     P.show[P.nshow].x = x;
     P.show[P.nshow].y = y;
     P.show[P.nshow].flip = (o->attribute & HI(3)) != 0;
     P.show[P.nshow].away = (sc >= 6 && sc != 12) ? 1 : 0;
     P.show[P.nshow].sc = (int16_t)sc;
+    P.show[P.nshow].first = 0;
+    P.show[P.nshow].count = 0;
     P.nshow++;
     return 1;
 }
@@ -250,15 +258,51 @@ int pcspr_searched(void) { return SDL_AtomicGet(&P.searched); }
 int pcspr_found(void) { return SDL_AtomicGet(&P.searched) && SDL_AtomicGet(&P.found); }
 void pcspr_set(int on) { SDL_AtomicSet(&P.on, on ? 1 : 0); }
 
-void pcspr_present(uint32_t *pic, int w, int h, int pitch)
+/* Over the picture the game drew (px: its colours, pic: the same as RGB). The cartridge's own sprites of the objects drawn here are
+ * still in it: the picture is drawn again from a copy of the VDP with those sprite table entries hidden, and where the two differ
+ * the cartridge's sprite was visible (not under a window, the face off box or another sprite). The PC's sprite is drawn only there
+ * and a few pixels around (the two shapes differ a little); everything else of the cartridge's sprites is given back its background. */
+void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
-    if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !in_game()) return;
+    if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !in_game() || (int16_t)g.palcount >= 0) return;
     typeof(P.pub) list;
     int n;
     SDL_AtomicLock(&P.lock);
     memcpy(list, P.pub, sizeof list);
     n = P.npub;
     SDL_AtomicUnlock(&P.lock);
+    if (n <= 0 || w > 320 || h > 240) return;
+    static mdrt_vdp scratch;
+    static uint16_t clean[320 * 240];
+    static uint8_t vis[320 * 240], near[320 * 240];
+    scratch = *vdp;
+    unsigned sat = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
+    for (int i = 0; i < n; i++)
+        for (int k = 0; k < list[i].count; k++) {
+            unsigned e = (unsigned)(list[i].first + k);
+            if (e >= 80) continue;
+            scratch.s.vram[(sat + e * 8) & 0xFFFF] = 0;          /* y = 0: off the top */
+            scratch.s.vram[(sat + e * 8 + 1) & 0xFFFF] = 0;
+            scratch.sat[e * 8] = scratch.sat[e * 8 + 1] = 0;
+        }
+    mdrt_vdp_render(&scratch, clean, 320);
+    memset(vis, 0, sizeof vis);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+            if (px[y * pitch_px + x] != clean[y * 320 + x]) {
+                vis[y * 320 + x] = 1;
+                pic[(long)y * pitch + x] = 0xFF000000u | mdrt_vdp_rgb(clean[y * 320 + x], MDRT_RGB_GPGX);
+            }
+    for (int y = 0; y < h; y++)                                  /* (the pixels within 2 of a visible one) */
+        for (int x = 0; x < w; x++) {
+            int hit = 0;
+            for (int dy = -2; dy <= 2 && !hit; dy++)
+                for (int dx = -2; dx <= 2; dx++) {
+                    int xx = x + dx, yy = y + dy;
+                    if (xx >= 0 && xx < w && yy >= 0 && yy < h && vis[yy * 320 + xx]) { hit = 1; break; }
+                }
+            near[y * 320 + x] = (uint8_t)hit;
+        }
     for (int i = 0; i < n; i++) {
         const spr *s = &P.f[list[i].pc];
         int team = list[i].away ? (int)rosters_art(team_struct(1)->tmteam) : (int)rosters_art(team_struct(0)->tmteam);
@@ -275,9 +319,9 @@ void pcspr_present(uint32_t *pic, int w, int h, int pitch)
                 int v = s->px[y * s->w + (list[i].flip ? s->w - 1 - x : x)];
                 if (v == 255) continue;
                 int r = v < 0x80 ? rec[192 + v] : rec[320 + v - 0x80];
-                int px = x0 + x, py = y0 + y;
-                if (px < 0 || px >= w || py < 0 || py >= h) continue;
-                pic[(long)py * pitch + px] = 0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2];
+                int px_ = x0 + x, py = y0 + y;
+                if (px_ < 0 || px_ >= w || py < 0 || py >= h || !near[py * 320 + px_]) continue;
+                pic[(long)py * pitch + px_] = 0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2];
             }
     }
 }

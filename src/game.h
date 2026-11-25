@@ -257,8 +257,9 @@ extern void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
 enum { HAT_START, HAT_END, HAT_FRAME };
 extern void (*hat_hook)(int ev, int arg);
 /* the host's way to draw a skater's sprite itself (native/pcspr.c; NULL = the cartridge's). SPR_DRAW: object sc's frame is
- * about to be written to the sprite table at screen x, y; a non-zero return says the host draws it and the table gets none. */
-enum { SPR_BEGIN, SPR_DRAW, SPR_END };
+ * about to be written to the sprite table at screen x, y (as the table has it); a non-zero return says the host draws it over
+ * the picture too, and SPR_MARK then says which table entries (sc = the first, x = how many) the frame's sprites took. */
+enum { SPR_BEGIN, SPR_DRAW, SPR_MARK, SPR_END };
 extern int (*spr_hook)(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o);
 /* (the same host) the Sega CD's own pages around the title, which the host draws: CD_TITLE_LICENSE 1: its license page before the
  * title; CD_TITLE_BEGIN 1: its title page in place of the cartridge's (the cartridge's set-up and song stay, its credits do not);
