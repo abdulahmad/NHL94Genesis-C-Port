@@ -8,12 +8,142 @@
 #include <stdio.h>
 #include <string.h>
 
-enum { S_CLOSED, S_OPEN, S_DESK };
+enum { S_CLOSED, S_OPEN, S_DESK, S_PACK };
 static int st, ready;
 static int caseG, cart, tv, tvScreen, tvKnob, con, tap, cspine, ccover, cmanual, cseat, nslot, nsw, nled, nseat;
 static float opn;
 static struct { int cart, tv, sys, out, pads; } G;
-static int tv_tex = -1, tv_mode = -1, led_mat = -1;
+static int tv_tex = -1, tv_mode = -1, led_mat = -1, tvPower = -1, tvRemote = -1;
+
+/* the pack-ins: hidden in the case until "Pack-ins" lays them out in front of it; each opens front and back */
+#define NPK 9
+static int pk[NPK];
+static float pk_home[NPK][3], case_home[3];
+static const char *pk_key[NPK] = { "pk4way", "pkFifa", "pkPoster", "pkHint", "pkReg", "pkWear", "pkOffer", "pkCard", "pkCap" };
+static const char *pk_name[NPK] = { "EA 4 Way Play card", "FIFA International Soccer card", "EA SPORTS poster", "NHL '94 Hint Cards pack",
+    "Registration card", "EA SPORTS-WEAR card", "Hint Cards order card", "Hint card: Brad Shaw", "EA SPORTS milk cap" };
+static const float pk_w[NPK] = { 3.9f, 3.9f, 4.13f, 2.7f, 5.75f, 5.75f, 2.5f, 2.5f, 1.84f };
+
+/* ---- the TV's picture: 1280 x 960 on the glass, the MiSTer JVC D-Series shadow mask (mister/Shadow_Masks) over it,
+ * the tube's turn-on (a bright line that opens to the full picture) and turn-off (the picture folds to a line, then a dot) ---- */
+#define TVW 1280
+#define TVH 960
+static float mask_v[16 * 16][3];
+static int mask_w, mask_h;
+static float tv_on_t = -1, tv_off_t = -1;     /* 0..1 while the tube turns on or off, -1 otherwise */
+static float snow_t;
+
+static void mask_load(void)
+{
+    static const char *name = "mister/Shadow_Masks/JVC D-Series (~2000).txt";
+    char path[1024], line[512];
+    FILE *f = NULL;
+    char *base = SDL_GetBasePath();
+    if (base) { snprintf(path, sizeof path, "%s%s", base, name); SDL_free(base); f = fopen(path, "r"); }
+    if (!f) f = fopen(name, "r");
+    mask_w = mask_h = 0;
+    if (!f) return;
+    int want = 0, y = 0;
+    while (fgets(line, sizeof line, f)) {
+        char *q = line;
+        while (*q == ' ' || *q == '\t') q++;
+        if (*q == '#' || *q == '\n' || *q == '\r' || !*q) continue;
+        if (!strncmp(q, "Resolution=", 11)) { if (want == 3) break; continue; }   /* the first pattern (for the lowest output size) */
+        if (!strncmp(q, "v2", 2)) { want = 1; continue; }
+        if (want == 1) {
+            if (sscanf(q, "%d,%d", &mask_w, &mask_h) != 2 || mask_w < 1 || mask_h < 1 || mask_w > 16 || mask_h > 16) { mask_w = mask_h = 0; break; }
+            want = 2; y = 0; continue;
+        }
+        if (want == 2) {
+            for (int x = 0; x < mask_w; x++) {
+                unsigned c = 0, on = 0, off = 0;
+                if (sscanf(q, "%1x%1x%1x", &c, &on, &off) != 3) break;
+                for (int ch = 0; ch < 3; ch++) mask_v[y * mask_w + x][ch] = (c & (4u >> ch)) ? 1.f + on / 16.f : off / 16.f;
+                q = strchr(q, ',');
+                if (!q) break;
+                q++;
+            }
+            if (++y == mask_h) want = 3;
+        }
+    }
+    fclose(f);
+    if (want != 3) mask_w = mask_h = 0;
+}
+
+/* the picture the console puts out: the licence screen (genTmss in the art folder, 320 x 224), else the same words drawn here */
+static uint32_t tmss[320 * 224];
+static int tmss_ready;
+static void tmss_make(void)
+{
+    if (tmss_ready) return;
+    tmss_ready = 1;
+    r3_tex *t = bx_art("genTmss");
+    if (t && t->nlv && t->w > 0 && t->h > 0) {
+        for (int y = 0; y < 224; y++) for (int x = 0; x < 320; x++) tmss[y * 320 + x] = t->lv[0][(y * t->h / 224) * t->w + x * t->w / 320] | 0xff000000u;
+        return;
+    }
+    for (int i = 0; i < 320 * 224; i++) tmss[i] = 0xff000000u;
+    const char *l[3] = { "PRODUCED BY OR", "UNDER LICENSE FROM", "SEGA ENTERPRISES LTD." };
+    for (int i = 0; i < 3; i++) { float w = ob_vf_width(OB_VF_SEMIBOLD, 13, l[i], 0); ob_vf_draw(tmss, 320, 224, 320, 160 - w / 2, 92 + i * 16, OB_VF_SEMIBOLD, 13, 0xffffff, 255, l[i], 0, 0); }
+    for (int i = 0; i < 320 * 224; i++) tmss[i] |= 0xff000000u;
+}
+
+static void tv_draw(int mode)
+{
+    tv_mode = mode;
+    uint32_t *px = (uint32_t *)malloc((size_t)TVW * TVH * 4);
+    if (!px) return;
+    int lit = mode != 0 || tv_off_t >= 0;
+    if (!lit) {                                          /* off: the dark grey-green of the bare tube */
+        for (int i = 0; i < TVW * TVH; i++) px[i] = 0xff1c201d;
+        r3_tex_set(&BX_S->texs[tv_tex], px, TVW, TVH);
+        return;
+    }
+    if (mode == 2) tmss_make();
+    float band = 1, wide = 1, boost = 1, flash = 0;
+    if (tv_on_t >= 0) {
+        float t = tv_on_t;
+        band = t < .1f ? .004f : .004f + .996f * bx_ease((t - .1f) / .9f);
+        boost = 1 + 1.6f * (1 - t); flash = t < .45f ? 1 - t / .45f : 0;
+    }
+    if (tv_off_t >= 0) {
+        float t = tv_off_t;
+        band = t < .55f ? 1 - .996f * bx_ease(t / .55f) : .004f;
+        wide = t < .55f ? 1 : 1 - (t - .55f) / .45f;
+        boost = 1 + 2 * t; flash = t;
+    }
+    static uint32_t r = 7;
+    for (int y = 0; y < TVH; y++) {
+        float dy = fabsf(y - TVH / 2.f) / (TVH / 2.f);
+        int sy = (int)(((float)y / TVH - .05f) / .9f * 224);   /* the picture fills about 90% of the glass (overscan) */
+        for (int x = 0; x < TVW; x++) {
+            float dx = fabsf(x - TVW / 2.f) / (TVW / 2.f), c[3] = { 8, 9, 8 };
+            if (dy <= band && dx <= wide) {
+                if (mode == 1) {                                 /* no picture on the input: snow */
+                    r = r * 1664525u + 1013904223u;
+                    if ((x & 1) == 0) { float v = 20 + (r >> 24) * .55f; c[0] = c[1] = c[2] = v; }
+                    else { uint32_t q = px[y * TVW + x - 1]; c[0] = c[1] = c[2] = (float)(q & 255); }
+                } else if (mode == 2) {
+                    float u = ((float)x / TVW - .04f) / .92f * 320 - .5f;
+                    if (sy >= 0 && sy < 224 && u >= 0 && u < 319) {
+                        int ix = (int)u; float f = u - ix;
+                        uint32_t a = tmss[sy * 320 + ix], b = tmss[sy * 320 + ix + 1];
+                        for (int ch = 0; ch < 3; ch++) { int sh = 16 - 8 * ch; c[ch] = ((a >> sh) & 255) * (1 - f) + ((b >> sh) & 255) * f; }
+                    }
+                }
+                float e = band < 1 ? 1 - dy / band : 0;          /* the beam's edge glows while it opens */
+                for (int ch = 0; ch < 3; ch++) {
+                    float v = c[ch] * boost + 230 * flash * (band < .05f ? 1 : e * e);
+                    if (mask_w) v *= mask_v[(y % mask_h) * mask_w + x % mask_w][ch];
+                    c[ch] = v > 255 ? 255 : v;
+                }
+            }
+            px[y * TVW + x] = 0xff000000u | (uint32_t)c[0] << 16 | (uint32_t)c[1] << 8 | (uint32_t)c[2];
+        }
+    }
+    r3_tex_set(&BX_S->texs[tv_tex], px, TVW, TVH);
+}
+
 
 static int mesh_mat_of(int node) { for (int i = 0; i < BX_S->nmeshes; i++) if (BX_S->meshes[i].node == node) return BX_S->meshes[i].mat; return -1; }
 static float lin(int c) { float v = c / 255.0f; return v <= .04045f ? v / 12.92f : powf((v + .055f) / 1.055f, 2.4f); }
@@ -26,8 +156,11 @@ static void init(void)
     cspine = bx_node("case.spine"); ccover = bx_node("case.cover"); cmanual = bx_node("case.manual"); cseat = bx_node("case.cartSeat");
     nslot = bx_node("con.slot"); nsw = bx_node("con.sw"); nled = bx_node("con.led"); nseat = bx_node("con.cartSeat");
     /* the TV's picture: a texture of our own on the screen's mesh */
-    uint32_t *px = (uint32_t *)calloc(512 * 384, 4);
-    tv_tex = r3_tex_add(BX_S, px, 512, 384);
+    uint32_t *px = (uint32_t *)calloc((size_t)TVW * TVH, 4);
+    tv_tex = r3_tex_add(BX_S, px, TVW, TVH);
+    tvPower = bx_node("tv.power"); tvRemote = bx_node("tvRemote");
+    for (int i = 0; i < NPK; i++) { char n[8]; snprintf(n, sizeof n, "pk%d", i); pk[i] = bx_node(n); }
+    mask_load();
     for (int i = 0; i < BX_S->nmeshes; i++) if (BX_S->meshes[i].node == tvScreen) {
         r3_mat m = BX_S->mats[BX_S->meshes[i].mat]; m.map = tv_tex; m.type = 'B'; m.col[0] = m.col[1] = m.col[2] = 1;
         BX_S->meshes[i].mat_override = r3_mat_add(BX_S, &m);
@@ -46,34 +179,18 @@ static void init(void)
     ready = 1;
 }
 
-static void tv_draw(int mode)
+static int tv_want(void) { return G.tv ? (G.sys && G.cart ? 2 : 1) : 0; }
+static void tv_on(void) { tv_draw(tv_want()); }
+/* the TV's power: the door drops open, the button goes in, the tube turns on (or off), the door shuts */
+static void door_shut(int a) { (void)a; bx_tw1(&bx_n(tvKnob)->rot[0], 0, 450, 0); }
+static void button_out(int a) { (void)a; if (tvPower >= 0) bx_tw1(&bx_n(tvPower)->pos[2], -.08f, 120, 0); }
+static void tv_switch(void)
 {
-    if (mode == tv_mode && mode != 1) return;
-    tv_mode = mode;
-    r3_tex *t = &BX_S->texs[tv_tex];
-    uint32_t *px = (uint32_t *)malloc(512 * 384 * 4);
-    if (!px) return;
-    uint32_t bg = mode == 0 ? 0xff030303 : mode == 1 ? 0xff0d2f5a : 0xff04163a;
-    for (int i = 0; i < 512 * 384; i++) px[i] = bg;
-    if (mode == 1) {
-        static uint32_t r = 1;
-        for (int i = 0; i < 1400; i++) {
-            r = r * 1664525u + 1013904223u; int x = (r >> 8) % 510; r = r * 1664525u + 1013904223u; int y = (r >> 8) % 384;
-            r = r * 1664525u + 1013904223u; int a = (int)((r >> 24) * .25f);
-            for (int k = 0; k < 3; k++) { uint32_t d = px[y * 512 + x + k]; int c = ((d >> 16) & 255) + (((255 - (int)((d >> 16) & 255)) * a) >> 8); int g = ((d >> 8) & 255) + (((255 - (int)((d >> 8) & 255)) * a) >> 8); int b = (d & 255) + (((255 - (int)(d & 255)) * a) >> 8); px[y * 512 + x + k] = 0xff000000u | c << 16 | g << 8 | b; }
-        }
-    }
-    if (mode == 2) {
-        float w = ob_vf_width(OB_VF_SEMIBOLD, 88, "SEGA", 0);
-        ob_vf_draw(px, 512, 384, 512, 256 - w / 2, 384 / 2 + 20, OB_VF_SEMIBOLD, 88, 0xffffff, 255, "SEGA", 0, 0);
-        const char *l = "Produced by or under license from Sega Enterprises Ltd.";
-        w = ob_vf_width(OB_VF_REGULAR, 17, l, 0);
-        ob_vf_draw(px, 512, 384, 512, 256 - w / 2, 384 - 40, OB_VF_REGULAR, 17, 0xffffff, 255, l, 0, 0);
-        for (int i = 0; i < 512 * 384; i++) px[i] |= 0xff000000u;
-    }
-    r3_tex_set(t, px, 512, 384);
+    bx_tw1(&bx_n(tvKnob)->rot[0], 1.55f, 350, 0);
+    if (tvPower >= 0) { bx_tw1(&bx_n(tvPower)->pos[2], -.16f, 120, 380); bx_after(560, button_out, 0); }
+    if (G.tv) { tv_on_t = 0; tv_off_t = -1; } else { tv_off_t = 0; tv_on_t = -1; }
+    bx_after(1500, door_shut, 0);
 }
-static void tv_on(void) { tv_draw(G.tv ? (G.sys && G.cart ? 2 : 1) : 0); }
 static void set_power(int on)
 {
     r3_node *s = bx_n(nsw);
@@ -90,6 +207,7 @@ static void set_open(float t) { bx_n(cspine)->rot[1] = -PI_F / 2 * t; bx_n(ccove
 
 static void caption(void)
 {
+    if (st == S_PACK) { snprintf(BX.title, sizeof BX.title, "Pack-ins"); bx_say("<b>What else was in the box.</b> Pick one to read it."); return; }
     snprintf(BX.title, sizeof BX.title, "%s", st == S_DESK ? "Set up the system" : "Box");
     if (st == S_CLOSED) bx_say("<b>The box.</b> Drag to spin it, pick it to open.");
     else if (st == S_OPEN) bx_say(G.out ? "<b>Your box.</b> Back returns to the game." : "<b>Manual on the left, cartridge on the right.</b>");
@@ -108,6 +226,58 @@ static void open_case(int instant)
     caption();
 }
 static void open_now(int a) { (void)a; open_case(1); }
+
+/* the pack-ins come out of the lid (from behind the manual) and lie in two rows in front of the camera, a little smaller than life */
+static void pk_hide(int a) { (void)a; for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_n(pk[i])->vis = 0; }
+static void pk_out(int a)
+{
+    (void)a;
+    float m[3]; r3_world_pos(BX_S, cmanual, m);
+    static const int row[2][5] = { { 0, 1, 2, 3, -1 }, { 4, 5, 6, 7, 8 } };
+    const float sc = .6f, gap = .35f, ry[2] = { 2.25f, -2.3f };
+    float *cm = BX_S->cam;
+    r3_node *cg = bx_n(caseG);   /* the case sinks back and down so the spread reads on its own */
+    case_home[0] = cg->pos[0]; case_home[1] = cg->pos[1]; case_home[2] = cg->pos[2];
+    bx_tw3(cg->pos, cg->pos[0], cg->pos[1] - 14, cg->pos[2], 600, 0);
+    for (int r = 0; r < 2; r++) {
+        float tw = 0; int n = 0;
+        for (int k = 0; k < 5 && row[r][k] >= 0; k++) { tw += pk_w[row[r][k]] * sc; n++; }
+        tw += gap * (n - 1);
+        float x = cm[0] - tw / 2;
+        for (int k = 0; k < n; k++) {
+            int i = row[r][k]; r3_node *p = pk[i] >= 0 ? bx_n(pk[i]) : NULL;
+            if (!p) continue;
+            float w = pk_w[i] * sc;
+            pk_home[i][0] = m[0]; pk_home[i][1] = m[1]; pk_home[i][2] = m[2] - .3f;
+            bx_set3(p->pos, m[0], m[1], m[2] - .3f); bx_set3(p->rot, 0, .3f, 0); bx_set3(p->scale, .4f, .4f, .4f); p->vis = 1;
+            bx_tw3(p->pos, x + w / 2, ry[r], 4, 700, i * 70.f);
+            bx_tw3(p->rot, 0, 0, i == 8 ? 0 : (i & 1 ? .025f : -.025f), 700, i * 70.f);
+            bx_tw3(p->scale, sc, sc, sc, 700, i * 70.f);
+            x += w + gap;
+        }
+    }
+}
+static void pk_in(void)
+{
+    r3_node *cg = bx_n(caseG);
+    bx_tw3(cg->pos, case_home[0], case_home[1], case_home[2], 600, 200);
+    for (int i = 0; i < NPK; i++) if (pk[i] >= 0) {
+        r3_node *p = bx_n(pk[i]);
+        bx_tw3(p->pos, pk_home[i][0], pk_home[i][1], pk_home[i][2], 500, (NPK - 1 - i) * 40.f);
+        bx_tw3(p->scale, .4f, .4f, .4f, 500, (NPK - 1 - i) * 40.f);
+    }
+    bx_after(500 + NPK * 40, pk_hide, 0);
+}
+static void caption(void);
+static void pk_btn(int a) { (void)a; if (st != S_OPEN) return; st = S_PACK; bx_sfx(SFX_CLICK, 0); pk_out(0); caption(); }
+static void pk_read(int i)
+{
+    static char kf[24], kb[24]; const char *k[2] = { kf, kb };
+    snprintf(kf, sizeof kf, "%sF", pk_key[i]); snprintf(kb, sizeof kb, "%sB", pk_key[i]);
+    int n = bx_art_exists(kf) + (bx_art_exists(kb) ? 1 : 0);
+    if (!bx_art_exists(kf)) { bx_say("<b>No scan of this pack-in.</b> Put it in the box art folder."); return; }
+    bx_view_open_keys(pk_name[i], k, n, n > 1, NULL);
+}
 
 static void seat_pos(float v[3]) { r3_world_pos(BX_S, nseat, v); }
 static void desk2(int a)
@@ -140,10 +310,10 @@ static void to_case(int a)
 static void check_done(int a) { (void)a; bx_done(); }
 static void check(void)
 {
-    if (G.cart && G.tv && G.sys) { bx_say("<b>Power on.</b>"); tv_draw(2); bx_after(1300, check_done, 0); }
+    if (G.cart && G.tv && G.sys) { bx_say("<b>Power on.</b>"); tv_on(); bx_after(3200, check_done, 0); }
 }
 static void sys_on(int a) { (void)a; G.sys = 1; bx_sfx(SFX_KEY, 0); set_power(1); tv_on(); check(); }
-static void tv_turn_on(int a) { (void)a; G.tv = 1; bx_sfx(SFX_KEY, 0); tv_on(); bx_after(600, sys_on, 0); }
+static void tv_turn_on(int a) { (void)a; G.tv = 1; bx_sfx(SFX_KEY, 0); tv_switch(); tv_on(); bx_after(1500, sys_on, 0); }
 static void insert_cart(void)
 {
     if (G.cart) return;
@@ -154,7 +324,7 @@ static void insert_cart(void)
     bx_say("<b>Cartridge in.</b> Turning on the TV and the system...");
     bx_after(700, tv_turn_on, 0);
 }
-static void tv_power(void) { G.tv = !G.tv; bx_sfx(SFX_KEY, 0); tv_on(); check(); }
+static void tv_power(void) { G.tv = !G.tv; bx_sfx(SFX_KEY, 0); tv_switch(); tv_on(); check(); }
 static void sys_power(void)
 {
     if (!G.cart) { bx_say("Put the cartridge in first."); return; }
@@ -190,6 +360,8 @@ static void enter(int mode)
     opn = 0; set_open(0);
     bx_n(cmanual)->vis = 1;
     bx_parent(cart, cseat); bx_n(cart)->vis = 0; bx_set3(bx_n(cart)->pos, 0, 0, 0); bx_set3(bx_n(cart)->rot, 0, 0, 0); bx_set3(bx_n(cart)->scale, 1, 1, 1);
+    tv_on_t = tv_off_t = -1; bx_n(tvKnob)->rot[0] = 0;
+    for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_n(pk[i])->vis = 0;
     tv_mode = -1; tv_on(); set_power(0);
     G.pads = count_pads();
     bx_cam(0, 0, 19);
@@ -200,17 +372,20 @@ static void enter(int mode)
 
 static void frame(float dt)
 {
-    (void)dt;
     set_open(opn);
+    if (tv_on_t >= 0) { tv_on_t += dt / 750; if (tv_on_t >= 1) tv_on_t = -1; tv_on(); }
+    else if (tv_off_t >= 0) { tv_off_t += dt / 420; if (tv_off_t >= 1) tv_off_t = -1; tv_on(); }
+    else if (tv_mode == 1 && (snow_t += dt) > 70) { snow_t = 0; tv_on(); }
     G.pads = count_pads();
     bx_n(tap)->opacity = G.pads > 2 ? 1 : .28f;
     if (st == S_CLOSED || st == S_OPEN) {
         if (st == S_OPEN) { bx_hot_node(cmanual, "Read the manual"); if (bx_n(cart)->vis && !G.cart) bx_hot_node(cart, "Take the cartridge"); }
         bx_hot_node(caseG, st == S_CLOSED ? "Open the box" : "");
     }
+    if (st == S_PACK) for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_hot_node(pk[i], pk_name[i]);
     if (st == S_DESK) {
         if (!G.cart) { bx_hot_node(cart, "Insert the cartridge"); bx_hot_node(nslot, "Insert the cartridge"); }
-        bx_hot_node(tvKnob, "TV power"); bx_hot_node(nsw, "System power");
+        bx_hot_node(tvKnob, "TV power"); if (tvRemote >= 0) bx_hot_node(tvRemote, "TV power (remote)"); bx_hot_node(nsw, "System power");
         bx_hot_node(tap, G.pads > 2 ? "EA 4 Way Play: multitap enabled" : "Multitap: 2 or fewer input devices detected");
     }
     float *cm = BX_S->cam;
@@ -219,13 +394,15 @@ static void frame(float dt)
 static void back(void)
 {
     if (st == S_DESK) { bx_fade(to_case, 0); return; }
+    if (st == S_PACK) { st = S_OPEN; pk_in(); caption(); return; }
     if ((st == S_OPEN && G.out) || (st == S_CLOSED && !BX.first)) { bx_done(); return; }
 }
 static void back_btn(int a) { (void)a; back(); }
 static void draw2d(void)
 {
     float u = BX_C.u, top = BX_C.sy + 1.4f * u;
-    if (!(st == S_CLOSED && BX.first) && !(st == S_OPEN && BX.first)) bx_button(BX_C.sx + 2 * u, top, (st == S_DESK) ? "< Back" : "< Back to the game", back_btn, 0, -1);
+    if (!(st == S_CLOSED && BX.first) && !(st == S_OPEN && BX.first)) bx_button(BX_C.sx + 2 * u, top, (st == S_DESK || st == S_PACK) ? "< Back" : "< Back to the game", back_btn, 0, -1);
+    if (st == S_OPEN && pk[0] >= 0) bx_button(BX_C.sx + BX_C.sw - 2 * u, top + 4.2f * u, "Pack-ins", pk_btn, 0, 1);
     bx_text(BX_C.sx + BX_C.sw - 2 * u, top + 2.0f * u, 1.5f * u, 0xb5a58f, 255, BX.title, 0, 1);
     if (st == S_DESK) {
         const char *s[3] = { "Put the cartridge in the system", "Turn on the TV", "Turn on the system" };
@@ -248,6 +425,7 @@ static void activate(int node, float sx, float sy)
     (void)sx; (void)sy;
     if (node == caseG) { if (st == S_CLOSED) open_case(0); return; }
     if (node == cmanual) { open_manual(); return; }
+    for (int i = 0; i < NPK; i++) if (st == S_PACK && node == pk[i]) { pk_read(i); return; }
     if (node == cart) {
         if (st == S_OPEN && !G.out) bx_fade(to_desk, 0);
         else if (st == S_DESK) insert_cart();
@@ -255,7 +433,7 @@ static void activate(int node, float sx, float sy)
         return;
     }
     if (node == nslot) { insert_cart(); return; }
-    if (node == tvKnob) { tv_power(); return; }
+    if (node == tvKnob || (tvRemote >= 0 && node == tvRemote)) { tv_power(); return; }
     if (node == nsw) { sys_power(); return; }
     if (node == tap) bx_say(G.pads > 2 ? "<b>Multitap enabled.</b> EA 4 Way Play is plugged into the second controller port." : "<b>Multitap off.</b> Connect more than 2 controllers to enable it.");
 }
@@ -268,7 +446,7 @@ static void spine_mid(float o[3])
 }
 static void drag(int node, float dx, float dy)
 {
-    if (st == S_DESK) return;
+    if (st == S_DESK || st == S_PACK) return;
     int t = caseG;                                          /* the cartridge turns with its case: it is not taken out to be turned */
     r3_node *n = bx_n(t);
     float a[3], b[3];
