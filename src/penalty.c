@@ -31,7 +31,6 @@ void AddPenalty(uint16_t pen, struct SortObj *o)
         if (o->pflags2 & 4) return;
         if (!(g.gmode & (1 << gmoffs)) && pen == 0x10) return;
     }
-    if (pen > 0x10 && !rule_chance(rules[RULE_PENALTIES])) return;   /* (rules: the penalties called) */
     AddPenalty2(pen, o);
 }
 

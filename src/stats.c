@@ -12,16 +12,6 @@
 
 #define SATT g.Satt                                      /* (the sorted player order, in the sprite table) */
 
-/* (rules: more stats) this game's list gets two more columns, plus/minus (5) and body checks
- * (6); the sort can go to them, the five columns shown sliding with it */
-static int more_stats(int playoff) { return rules[RULE_MORE_STATS] && !playoff; }
-static uint16_t first_column(int playoff) { return more_stats(playoff) && (int16_t)g.DispAttribCtr > 4 ? (uint16_t)(g.DispAttribCtr - 4) : 0; }
-#define STRING(s) "\x00" s                                /* (a String: its length, then the text) */
-static const uint8_t more_headers[2][7] = { STRING("\x06 +/-"), STRING("\x06 Chk") };
-static const uint8_t more_titles[3][23] = {                /* for columns 4 to 6 (4: more follow it now) (22 bytes, the literal's 0) */
-    STRING("\x16[ Penalty Minutes  ]"), STRING("\x16[    Plus/Minus    ]"), STRING("\x16[   Body Checks     "),
-};
-
 /* ---- the menu screens: the line editor ---------------------------------------------------------- */
 
 /* the line editor's registers, kept across its routines as the 68k keeps them: d6, the player of
@@ -958,7 +948,7 @@ void PlayerStatsList(struct Team *tm, int playoff)
             else if (d1 & 4) by = -1;
             if (by) {                                     /* the sort column */
                 by = (int16_t)(by + g.DispAttribCtr);
-                if (by >= -1 && by <= (more_stats(playoff) ? 6 : 4)) {
+                if (by >= -1 && by <= 4) {
                     g.DispAttribCtr = (uint16_t)by;
                     DrawStatsList(tm, playoff);
                     DrawStatsListArrows();
@@ -1021,14 +1011,7 @@ void DrawStatsList(struct Team *tm, int playoff)
     printsmallz(str_DrawStatsList_1, sizeof str_DrawStatsList_1);
     uint32_t a1 = SYM_StatColumnHeaders;
     int16_t col = 5;
-    if (more_stats(playoff) && (int16_t)g.DispAttribCtr >= 0) {   /* (rules: the five from the first shown) */
-        for (uint16_t c = first_column(playoff); c < first_column(playoff) + 5; c++) {
-            g.printa = g.DispAttribCtr == c ? 0xC000 : 0x8000;
-            if (c < 5) printsmall(AdvanceStringPtr(SYM_StatColumnHeaders, (uint16_t)(c + 1)));
-            else printsmallz(more_headers[c - 5], 6);
-        }
-        col = 5;
-    } else if ((int16_t)g.DispAttribCtr >= 0) {
+    if ((int16_t)g.DispAttribCtr >= 0) {
         a1 += (uint32_t)(int16_t)rd16(rom_ptr(a1));
         col = 0;
     }
@@ -1040,8 +1023,7 @@ void DrawStatsList(struct Team *tm, int playoff)
     printsmallz(str_DrawStatsList_2, sizeof str_DrawStatsList_2);
     Framer(0x16, 3);
     printz(str_DrawStatsList_3, sizeof str_DrawStatsList_3);
-    if (more_stats(playoff) && (int16_t)g.DispAttribCtr >= 4) printsmallz(more_titles[g.DispAttribCtr - 4], 22);
-    else Fprintsmall(SYM_StatSortTitles, (uint16_t)(1 + g.DispAttribCtr));
+    Fprintsmall(SYM_StatSortTitles, (uint16_t)(1 + g.DispAttribCtr));
     g.printfontset = 0;
     uint8_t *a3 = SATT;
     uint32_t done = 0;                                    /* d6: the players placed (or left out) */
@@ -1055,7 +1037,6 @@ void DrawStatsList(struct Team *tm, int playoff)
             if (done & (1u << (p & 31))) continue;
             uint16_t v = 0;
             if ((int16_t)g.DispAttribCtr >= 0) v = GetStatColumn((uint16_t)p, g.DispAttribCtr, tm, playoff);
-            if (g.DispAttribCtr == 5 && more_stats(playoff)) v = (uint16_t)(v + 0x80);   /* (plus/minus: sorted above zero) */
             int32_t key = (int32_t)((uint32_t)(int32_t)(int16_t)v << 8 & 0xFFFFFF00u) | (uint8_t)(0xFF - T->player[p].number);
             if (key > top) { top = key; best = (uint8_t)p; }
         }
@@ -1091,19 +1072,9 @@ void DrawStatsRow(uint16_t row, struct Team *tm, int playoff)
     print(name);
     g.printx = 0x11;
     if ((int16_t)g.DispAttribCtr >= 0) {
-        for (uint16_t c = first_column(playoff); c < first_column(playoff) + 5; c++) {
+        for (uint16_t c = 0; c < 5; c++) {
             uint16_t v = GetStatColumn(a4[0], c, tm, playoff);
             g.printa = g.DispAttribCtr == c ? 0xC000 : 0x8000;
-            if (c == 5) {                                 /* (rules: plus/minus, signed) */
-                static uint8_t pm[6] = { 0, 6 };
-                int16_t n = (int16_t)v;
-                pm[2] = ' ';
-                pm[3] = n > 9 || n < -9 ? (n < 0 ? '-' : '+') : ' ';
-                pm[4] = n > 9 || n < -9 ? (uint8_t)('0' + (n < 0 ? -n : n) / 10) : n < 0 ? '-' : n > 0 ? '+' : ' ';
-                pm[5] = (uint8_t)('0' + (n < 0 ? -n : n) % 10);
-                printz(pm, sizeof pm);
-                continue;
-            }
             print(PushNumberWidth(v, 4));
         }
         return;
@@ -1139,8 +1110,6 @@ uint16_t GetStatColumn(uint16_t player, uint16_t col, struct Team *tm, int playo
  * tables (GetStatsValue). */
 uint16_t ReadStatColumn(uint16_t player, uint16_t col, struct Team *tm, int playoff)
 {
-    if (!playoff && col == 5) return (uint16_t)(int16_t)rule_plusminus[tm == team_struct(1)][player & 31];          /* (rules) */
-    if (!playoff && col == 6) return tm->pchecks[player];                                                           /* (rules) */
     if (!playoff) {
         const uint8_t *a1 = rom_ptr(SYM_StatColumnOffsets) + (uint16_t)(col << 2);
         uint16_t v = r8(team_place(tm), (int16_t)(uint16_t)(rd16(a1) + player));

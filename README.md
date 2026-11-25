@@ -15,20 +15,12 @@ And things the cartridge never had:
 - **Rollback netplay.** Two to four machines over the internet or a LAN, up to four players with
   EA's 4 Way Play, and rollback so no one waits on anyone's connection. Host from the menu, and
   the others join. Linux, Windows and Mac all play each other.
-- **Your favourite ROM hack's rosters, playable and editable.** Give it a hack made on the 32-team
-  template (NHL 2026 94 Edition, NHL 94 2025, the 30th Anniversary Championship Teams and the like)
-  and it takes the lot: teams, players, ratings, lines, playoff draws, colours and jerseys, logos,
-  banners, centre ice, player photos, title screens and rinks. Out come CSV files a spreadsheet
-  opens and PNGs any paint program edits. Change anything and play it.
-- **Rosters of your own**, up to 32 teams, started from the cartridge's or a hack's, packed into
-  one zip to send to a friend.
-- **Game rules of your own**: the weight bug fixed, plus/minus, more period lengths, skating speed,
-  shot power, how far the puck slides, tiring, penalties, hot and cold streaks, a wide rink view,
-  and presets. **Classic**, the default, is the original exactly.
+- **Sega CD options**: the changes the NHL '94 Sega CD made to the game, the disc's music, sound
+  effects, opening screens, intro movie and player cards, each off until you turn it on. The
+  game itself is the original, exactly.
 - **Save states**: eight slots with a picture each, the Autosave when you quit, and hold F4 to
   rewind the goal you just gave up.
-- **All of it online.** The host's rosters and rules go to every machine, so no one else needs a
-  copy. Seasons go online in a save state: anyone saves one, and the host loads it for everyone.
+- **All of it online.** The host's choices go to every machine. Seasons go online in a save state: anyone saves one, and the host loads it for everyone.
 
 Hold F6 to fast-forward, slow the replay of that one-timer down, step through it a frame at a
 time, and press F12 to keep it. Scored a beauty? **F10 saves the last 20 seconds** as a GIF to
@@ -100,8 +92,7 @@ The picture is Overbar's 4:3 dest of a 240-line canvas with the 224-line source 
 - **Players**: which controller each player has, a controller's buttons (press the new one),
   turbo A / B / C, the stick's dead zone, and EA's **4 Way Play** for four players (as on the
   cartridge: set it, Reset, then choose Players: Three or Four in the game's setup screen).
-- **Rosters**: who plays (below).
-- **Game rules**: how the game plays (below).
+- **Game rules**: the weight bug fix and the wide rink view (below).
 - **Online play**: two to four machines, any players at each (below).
 - **Options** and **Keys**: fast-forward speed, the FPS counter, and every key of the pads and
   the controls (pick one and press the new key, with Shift, Ctrl or Alt if you like).
@@ -144,45 +135,18 @@ The disc's sound needs your own rip of the NHL '94 Sega CD. Put it beside the pr
 
 ### Game rules
 
-Things the cartridge never offered, for every player and the whole game. They are set before a
-game starts (a change made during one shows from the next Reset), and a saved state keeps its
-game's rules. **Classic**, the default, is the original exactly.
+A few things the cartridge never offered, for every player and the whole game. They are set
+before a game starts (a change made during one shows from the next Reset), and a saved state
+keeps its game's rules. Off, the game is the original exactly.
 
-- **Fixes and stats**: the weight bug fixed (the original sums a check's weights in a byte that
-  wraps, so a heavy skater checked by a lighter player falls easily), the second assist kept on a
-  give-and-go, and plus/minus with body checks in Player Stats (the sort scrolls on to two more
-  columns; power play goals count for no one's +/-).
-- **Time**: more period lengths in the setup (2, 3, 7 and 15 minutes besides 5, 10 and 20), and
-  the regular season's overtime length.
-- **How it plays**: skating speed, the speed burst, shot power, how far the puck slides, tiring,
-  bench rest, rest in the penalty box, how many penalties are called, and hot and cold streaks.
-- **Presets** set them all: Classic, Simulation (the fixes and stats, a weaker burst, fewer
-  penalties, milder streaks) and Arcade (faster, harder, livelier).
-- **The rink view**: 320 wide instead of the cartridge's 256, showing the whole width of the ice
-  with the camera moving less, the scoreboard and overlays in the middle (the pause screen stays
-  256 wide, as on the cartridge).
+- **Weight bug fix**: the original sums a check's weights in a byte that wraps, so a heavy
+  skater checked by a lighter player falls easily. On, the weights are summed in full.
+- **Rink view**: 320 wide instead of the cartridge's 256, showing the whole width of the ice with
+  the camera moving less, the scoreboard and overlays in the middle (the pause screen stays 256
+  wide, as on the cartridge).
 
-The rules that are amounts are numbers underneath. The page steps through named choices, each
-showing its number (Skating speed: classic, faster 110%, fastest 125%, slower 90%), and
-`settings.ini` takes a name or any number in the rule's range (`rules.skating = 115`), which the
-page then shows as "custom (115%)"; the preset line follows what the file holds. `--rule` takes the
-same (`--rule skating=115`; a wrong one says what the rule takes).
-
-| Rule | Its number | Named | Range |
-|---|---|---|---|
-| `overtime` | minutes of regular season overtime | classic 10, 5min, 3min | 1 to 20 |
-| `skating` | % of acceleration and top speed | classic 100, faster 110, fastest 125, slower 90 | 50 to 150 |
-| `burst` | % of the speed burst's push | classic 100, weaker 50, weakest 25, stronger 150 | 0 to 200 |
-| `shot_power` | % of a shot's speed | classic 100, harder 115, softer 85 | 50 to 150 |
-| `puck_slide` | % of the puck's slowing on the ice (less slides farther) | classic 100, farther 67, shorter 150 | 25 to 200 |
-| `tiring` | % of the energy skating and bursts use | classic 100, less 50, more 150 | 0 to 200 |
-| `bench_rest` | % of the energy the bench gives back | classic 100, faster 150, slower 67 | 0 to 200 |
-| `penalties` | % of penalties called (icing and offside always) | classic 100, fewer 50, rare 25 | 0 to 100 |
-| `streaks` | % of hot and cold streaks' effect on ratings | classic 100, milder 50, off 0 | 0 to 200 |
-
-The ranges are what the game's motion takes: headless games at both ends of every one, all at
-once, play on with every speed well inside what the game keeps. The on / off rules and period
-lengths are `on` / `off` and `classic` / `more`; the rink view is `classic` / `wide`.
+`settings.ini` takes `rules.weight_fix = on` and `rules.view = wide`; `--rule weight_fix=on` and
+`--rule view=wide` take the same.
 
 ### Online play
 
@@ -202,7 +166,7 @@ If anyone leaves, the game is over for everyone, each told who left. From the co
 `--host [PORT]`, `--join ADDR[:PORT]`, `--peer ADDR[:PORT]` (two machines both connecting,
 `--port` your own), `--delay N`, `--name NAME`, `--here N`, `--players N` (the host's).
 
-The game is the host's: its Rosters and Game rules pages' choices go to every other machine
+The game is the host's: its Game rules page's choices go to every other machine
 before the game starts, rosters as their package (the NHL 2026 edition's, every photo included, is
 about 1.7 MB), so no one else needs a copy of them. Every game online starts from a new
 cartridge (default lines, no records): every machine must play the same save RAM, or the games
@@ -213,7 +177,7 @@ host's **Load state** loads one for everyone, at the same frame on every machine
 save RAM as they were saved (a state of other rosters than the session's is refused, saying so;
 a guest's Load state says only the host can). So a season played alone goes online by saving a
 state, hosting, and loading it; and closing the window in a session saves the Autosave as ever.
-While the session lasts every machine's Rosters and Game rules pages show the host's choices,
+While the session lasts every machine's Game rules page shows the host's choices,
 greyed (their own come back after it), and the host's rosters stay on the others' Rosters pages
 until they quit. The window's pause, slow motion, fast-forward and rewind are not to be had while
 you play together, and only the host can reset: the menu's **Reset** (chosen twice) powers every
@@ -223,41 +187,11 @@ needs the same build of the game and the US/Europe cartridge, or it is refused.
 
 ## Rosters
 
-Play the cartridge's 26 teams (and its two All-Star teams), or rosters of your own of up to 32:
-teams, players, ratings, lines, colours, logos, banners, centre ice, player photos, and even the
-title screens, rinks, sprites and fonts every team shares. Rosters are a folder of text files a
-spreadsheet opens and PNGs any paint program edits, in `rosters/` beside the game, or the same
-packed in one zip.
-
-```
-./build/nhl94 --export-rosters rosters/my-rosters          # the cartridge's rosters, to change as you like
-./build/nhl94 --extract-rom "HACK.bin" rosters/2026      # a hack's rosters (read as data, never run)
-./build/nhl94 --check-rosters rosters/my-rosters           # what holds, or what is wrong and on which line
-./build/nhl94 --pack-rosters rosters/my-rosters my.zip     # one file to keep or send, played as it is
-```
-
-(Each needs the cartridge too: `--rom FILE`, or your dump in the folder as `NHL 94 (UE) [!].gen`.)
-
-Choose one on the menu's **Rosters** page and Reset: those in `rosters/` are listed, and its
-**Files** line finds one anywhere else (a folder, or a package). The page says what the chosen
-rosters hold: where their files are, how many teams they have (and how many play for the cup), and
-sixteen pages of them to step through with left and right: their best skaters, goalies and teams,
-their fastest skaters, hardest shots, sharpest shooters, passers, stickhandlers and hitters (rated
-as the game's cards and roster screen rate them), their heaviest and lightest players, the teams'
-power play, penalty killing, home and road bonuses, and the rosters in numbers. Each set of rosters
-keeps its own records, and a saved state plays on with the rosters it was saved in. The
-cartridge's own rosters, exported and built again, play the original frame for frame.
-
-Community hacks made on the 32-team template (NHL 94 2025, NHL 2026 94 Edition, the 30th
-Anniversary Championship Teams and the like) extract whole: teams, players, ratings, lines,
-playoff draws, colours and jerseys, and all their art. Their code is not taken, so what a hack
-changed there (its own gameplay, extra menu lines, its texts) is not either. A known issue: NHL 94
-2025 rates its players on a wider scale of its own, which plays here as the cartridge's best at most
-([docs/ROSTERS.md](docs/ROSTERS.md#known-issue-nhl-94-2025s-ratings-play-as-the-cartridges-6-at-most)).
-
-**Everything about rosters, file by file and column by column, is in
-[docs/ROSTERS.md](docs/ROSTERS.md):** the folder's layout, every CSV column and its range, the
-art's sizes and colours, what is and is not taken from a hack, packages, records and states.
+The game plays the cartridge's own rosters. The menu has no Rosters page: there are no roster sets
+of your own to choose (the Sega CD's teams are the overlay's **Sega CD rosters** row). The tools
+that make roster sets (`--export-rosters`, `--extract-rom`, `--check-rosters`, `--pack-rosters`,
+and `--rosters` on the command line) are kept for development; [docs/ROSTERS.md](docs/ROSTERS.md)
+describes the files.
 
 ## Build
 
@@ -416,13 +350,11 @@ From the least ambitious to the most.
 - [x] Controller remapping, player slots, turbo, dead zones
 - [x] Capture: the replay (the last 20 seconds) and recordings, as GIFs
 - [x] Save slots with thumbnails; the Autosave on quit (states during play)
-- [x] Game rules, the host's for every player (Classic: the original): period lengths, overtime, the weight bug fix, the second assist fix, plus/minus and checks, skating, burst, shots, puck, energy, penalties, streaks, presets, the rink view
-- [x] The rules as numbers: any value in a rule's range in `settings.ini` or `--rule`, named choices on the page
+- [x] Game rules, the host's for every player (off: the original): the weight bug fix, the rink view
 - [x] Rosters of your own, up to 32 teams: teams, players, lines, colours and pictures in files, name banners drawn for new teams
 - [x] Rosters extracted from hacks on the 32-team template (teams, players, ratings, lines, draws, colours and all their art)
 - [x] Rosters packages: rosters in one zip, to keep or send, played as it is
 - [x] Rosters art as PNGs to draw over: logos, banners, centre ice, photos, and the art every team shares (title screens, rinks, sprites, fonts ...)
-- [x] A Rosters page: choose the rosters, and see its files, teams, best players and teams
 - [x] Vsync: no tearing
 - [x] Downloads for Linux, Windows and macOS (one app for Apple Silicon and Intel)
 - [ ] Skip the EA screen, boot straight into a game

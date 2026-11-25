@@ -45,31 +45,11 @@ The menu (Esc, or a controller's Back button) has the ROM, a reset, save slots, 
 pixel-art upscaler: Scale2x, Scale3x, MMPX or xBR; sharp, integer or fit scaling; square pixels or
 4:3; the colours' levels; dithering blended as a television blended it; a picture tube's scanlines
 and mask; full screen; vsync), captures, the sound (volume, the FM core and chip), the
-players, the rosters, the game rules, online play, options and every key: pick one and press the
+players, the game rules, online play, options and every key: pick one and press the
 new key.
 
-Game rules (the menu's Game rules page, for every player and the whole game; Classic, the default,
-is the original exactly): the weight bug fixed, the second assist kept on a give-and-go, plus/minus
-and body checks in Player Stats, more period lengths, the season's overtime length, skating speed,
-the speed burst, shot power, how far the puck slides, tiring, bench rest, rest in the penalty box,
-how many penalties are called, hot and cold streaks, a wide rink view, and presets (Classic,
-Simulation, Arcade). The amounts are numbers underneath: settings.ini takes any in a rule's range
-(rules.skating = 115), and so does --rule skating=115.
-
-Rosters (the menu's Rosters page): the cartridge's teams, or rosters of your own of up to 32 teams,
-with their players, ratings, lines, colours, logos, banners, centre ice, photos and even the title
-screens and rinks, as CSV files and PNGs in a "rosters" folder in the game's folder (below), or
-anywhere: the page's Files line finds one. To start one, take one from a community hack made on
-the 32-team template, or pack one into a single zip to send, use Terminal, in the folder that
-holds ninety-four.app (the paths are from the folder you run it in):
-
-    ninety-four.app/Contents/MacOS/nhl94 --rom FILE --export-rosters rosters/my-rosters
-    ninety-four.app/Contents/MacOS/nhl94 --rom FILE --extract-rom "HACK.bin" rosters/2026
-    ninety-four.app/Contents/MacOS/nhl94 --rom FILE --check-rosters rosters/my-rosters
-    ninety-four.app/Contents/MacOS/nhl94 --rom FILE --pack-rosters rosters/my-rosters my-rosters.zip
-
-The page says what the chosen rosters hold: their files, their teams and their best players and teams
-by the game's own ratings. Everything about the files is in ROSTERS.md.
+Game rules (the menu's Game rules page, for every player and the whole game; off, the game is the
+original exactly): the weight bug fixed, and a wide rink view.
 
 Four players: in the menu, Players, set Controllers to EA 4 Way Play, Reset, then choose Players:
 Three or Four in the game's setup screen. The Players page also gives each player a controller,
@@ -82,7 +62,7 @@ by default; the host's port must be reachable, forwarded on its router for UDP);
 instead both connect at once, which most home routers let through without a forwarded port. When
 everyone is in, the game powers on everywhere: the host's players on pads 1 onward, then each
 machine's as it joined; with pads 3 or 4 played, EA's 4 Way Play is in the ports (Players: Three
-or Four). The host's rosters and game rules go to everyone, and every game online starts from a
+or Four). The host's game rules go to everyone, and every game online starts from a
 new cartridge (nothing is saved to anyone's save file). Seasons and records go online in a state:
 anyone's Save state saves one everyone played, and the host's Load state loads one for everyone
 (a state of other rosters than the session's is refused). The host's Reset (in the menu) starts

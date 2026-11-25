@@ -304,18 +304,15 @@ void updateplayers(void)
                 if (o->Zpos == 0) {                               /* deceleration on the ice */
                     int d2 = (o->pflags & (1 << pfdoff)) ? 9 : 6;
                     assign_d2 = (uint32_t)d2;
-                    int puck = i == puckscnum && rules[RULE_PUCK_SLIDE] != 100;   /* (rules: the puck's slide) */
                     int16_t d0 = o->Xvel;
                     if (d0 != 0) {
                         d0 = (int16_t)(d0 >> d2);
-                        if (puck) d0 = rule_puck_slowing(d0);
                         if (d0 == 0) d0 = 1;
                         o->Xvel = (int16_t)(o->Xvel - d0);
                     }
                     d0 = o->Yvel;
                     if (d0 != 0) {
                         d0 = (int16_t)(d0 >> d2);
-                        if (puck) d0 = rule_puck_slowing(d0);
                         if (d0 == 0) d0 = 1;
                         o->Yvel = (int16_t)(o->Yvel - d0);
                     }
@@ -914,12 +911,11 @@ void burst(struct SortObj *o)
 {
     int16_t e = getpde(o);
     if (g.OptLine == 0) {
-        e = (int16_t)(e - rule_scale(RULE_TIRING, 0xCC));   /* (rules: tiring) */
+        e = (int16_t)(e - 0xCC);
         setpde(team_struct(PFLAG(o, pfteam)), (int16_t)((int8_t)o->pnum * 2), e);
         if (g.sflags7 & 0x10) e = 0x1000;
     }
     uint16_t d0 = (uint16_t)e >> 7;
-    d0 = (uint16_t)rule_scale(RULE_BURST, d0);            /* (rules: the burst) */
     uint16_t d1 = d0;
     unsigned idx = (unsigned)o->facedir * 2;
     o->Xvel = (int16_t)(o->Xvel + (int16_t)((int32_t)(int16_t)d0 * (int16_t)dirtab[idx]));
@@ -1271,7 +1267,6 @@ void doshot(struct SortObj *o)
     uint32_t prod = (uint32_t)d0 * g.passspeed;
     prod = (uint32_t)(uint16_t)prod * 0x5249u;
     d0 = (uint16_t)(prod >> 16);
-    d0 = (uint16_t)rule_scale(RULE_SHOT_POWER, d0);       /* (rules: shot power) */
     g.passspeed = d0;
     if (o->shotspd & 1) d0 = (uint16_t)(((int16_t)d0 >> 4) + g.passspeed);
     d0 = (uint16_t)(d0 >> 4);
@@ -3696,8 +3691,7 @@ void a2touchpuck(struct SortObj *pl, struct SortObj *puck)
         int was = a0->tmflags & 8;
         a0->tmflags &= (uint8_t)~8;
         if (!was) {
-            if (!rules[RULE_ASSIST_FIX] || d0 != a0->tmtouch2)            /* (rules: a give-and-go keeps the second assist) */
-                a0->tmtouch3 = a0->tmtouch2;
+            a0->tmtouch3 = a0->tmtouch2;
             a0->tmtouch2 = a0->tmtouch1;
         }
         a0->tmtouch1 = d0;
@@ -4155,7 +4149,6 @@ void playeracc(int16_t dir, struct SortObj *o)
         d2 = (int16_t)(d2 + 0x10);
     }
     d2 = (int16_t)(d2 >> 1);
-    d2 = (int16_t)rule_scale(RULE_SKATING, d2);           /* (rules: skating) */
     int32_t ax = ((int32_t)d0 * d2) >> 5;
     int32_t ay = ((int32_t)d1 * d2) >> 5;
     ax = (int32_t)(int16_t)ax * elapsed;
@@ -4188,7 +4181,6 @@ void playeracc(int16_t dir, struct SortObj *o)
         int32_t nxt = (int32_t)MaxSpeed[(g.TempEnergySpd + 4) / 4];
         cap = (uint32_t)((((int32_t)nxt - (int32_t)g.TempMaxSpd) >> 1) + (int32_t)g.TempMaxSpd);
     }
-    if (rules[RULE_SKATING] != 100) cap = (uint32_t)((uint64_t)cap * (uint32_t)(rules[RULE_SKATING] * rules[RULE_SKATING]) / 10000u);   /* (rules: a speed squared) */
     if (o->pflags2 & 0x40) cap >>= 3;                     /* injured in a fight */
     if (o->position == 0 && puckc() == o->SCnum) cap = (uint32_t)((int32_t)cap >> 1);
     if (!(d3 > cap)) {
@@ -4199,7 +4191,7 @@ void playeracc(int16_t dir, struct SortObj *o)
     if (vdp_hv16() & 0x7F) return;
     struct Team *tm = own_team(o);
     int16_t pd1 = (int16_t)((int8_t)o->pnum * 2);
-    e = (int16_t)(getpde(o) - rule_scale(RULE_TIRING, 0x21));   /* (rules: tiring) */
+    e = (int16_t)(getpde(o) - 0x21);
     if (e < 0xC00) { setpde(tm, pd1, e); return; }
     e = (int16_t)(e + ((uint16_t)(int16_t)(int8_t)o->endurance >> 1));
     setpde(tm, pd1, e);

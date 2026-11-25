@@ -1,5 +1,12 @@
 # Rosters
 
+> **Not in the menu now.** The game's menu has no Rosters page (it was taken out with the rule
+> options that came from the PulseMan runtime): it plays the cartridge's rosters, and the Sega CD's
+> teams through the overlay's **Sega CD rosters** row. The tools below (`--export-rosters`,
+> `--extract-rom`, `--check-rosters`, `--pack-rosters`, `--rosters` on the command line) still work for
+> development, and the file formats are as described. Where this page says to choose rosters on the
+> menu's Rosters page, that is no longer possible.
+
 Rosters are who plays: the teams, their players and ratings, lines, colours, logos, banners, centre
 ice, the players' photos, and if you like the art every team shares (title screens, rinks, sprites,
 fonts and the rest). The game plays the cartridge's own rosters unless you choose others on the

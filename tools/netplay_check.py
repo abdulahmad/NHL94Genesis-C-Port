@@ -60,7 +60,7 @@ OUT = os.path.join(ROOT, 'out', 'netplay')
 # %, %), pad 2's seed (None: the four 4 Way Play scripts), the players at each machine (the host's first)
 SCENARIOS = [
     ('h2h', 6000, [], 'peer', 2, '40,10,5,1', 1, [1, 1]),
-    ('rosters', 7000, ['--rosters', 'out/rosters/thirty-two', '--rule', 'preset=arcade'], 'join', 1, '25,25,10,1', 2, [1, 1]),
+    ('rosters', 7000, ['--rosters', 'out/rosters/thirty-two'], 'join', 1, '25,25,10,1', 2, [1, 1]),
     ('delay0', 16000, [], 'join', 0, '15,5,2,0', 3, [1, 1]),
     ('twotwo', 6000, [], 'join', 2, '30,10,5,1', None, [2, 2]),
     ('four', 6000, [], 'join', 2, '30,10,5,1', None, [1, 1, 1, 1]),

@@ -57,7 +57,7 @@ void StartGame(void)
     g.awaydirpresses = 0;
     uint16_t d0, d1, d2, d3;
     ReadJoy1(&d0, &d1, &d2, &d3);
-    if ((uint8_t)d3 == 0xE0) g.Optperlen = rules[RULE_PERIOD_LENGTHS] ? 7 : 3;   /* (the secret 30 seconds) */
+    if ((uint8_t)d3 == 0xE0) g.Optperlen = 3;   /* (the secret 30 seconds) */
     g.gmode = 0;
     if (g.OptPen == 1) g.gmode |= 1 << gmoffs;
     if ((int16_t)g.OptPlayMode > 1) ClearShotData();
@@ -98,7 +98,7 @@ void restoreteams(void)
 void ResetClock(void)
 {
     uint16_t d0 = GetPeriodTime();
-    if ((int16_t)g.gsp >= 3 && g.OptPlayMode == 0) d0 = (uint16_t)(rules[RULE_OVERTIME] * 60);   /* overtime is always 10:00 (rules: its minutes) */
+    if ((int16_t)g.gsp >= 3 && g.OptPlayMode == 0) d0 = 10 * 60;   /* overtime is always 10:00 */
     g.gameclock = d0;
     g.PerTimeTotal = d0;
     g.periodendtime = d0;
@@ -108,13 +108,10 @@ void ResetClock(void)
     g.gmode |= 1 << gmclock;
 }
 
-/* hockey94.asm:GetPeriodTime. The period length in seconds for the option. (Rules: more lengths,
- * in the order the setup menu steps through them from 5 minutes, the secret 30 seconds last.) */
-static const uint16_t more_periodtimes[8] = { 5*60, 7*60, 10*60, 15*60, 20*60, 2*60, 3*60, 30 };
+/* hockey94.asm:GetPeriodTime. The period length in seconds for the option. */
 /* GetPeriodTime. Return d0 = period length in seconds for the period length option */
 uint16_t GetPeriodTime(void)
 {
-    if (rules[RULE_PERIOD_LENGTHS]) return more_periodtimes[g.Optperlen & 7];
     return periodtimes[g.Optperlen];
 }
 
@@ -235,10 +232,8 @@ void RestoreBenchEnergy(void)
     for (int t = 0; t < 2; t++) {
         struct Team *tm = team_struct(t);
         for (int16_t d0 = 0x32; d0 >= 0; d0 -= 2) {
-            uint16_t at = tm->tmpdst[d0 / 2];               /* (rules: the box rests too: penalty time, not injured) */
-            int box = rules[RULE_BOX_REST] && (int16_t)at >= 0 && !(at & 0x1000);
-            if (at != 0xFFFE && !box) continue;
-            uint16_t e = (uint16_t)(tm->tmpde[d0 / 2] + rule_scale(RULE_BENCH_REST, 9));         /* (rules: bench rest) */
+            if (tm->tmpdst[d0 / 2] != 0xFFFE) continue;
+            uint16_t e = (uint16_t)(tm->tmpde[d0 / 2] + 9);
             if ((int16_t)e >= 0x1000) e = 0x1000;
             tm->tmpde[d0 / 2] = e;
         }
