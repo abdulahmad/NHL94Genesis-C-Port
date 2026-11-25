@@ -523,7 +523,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_CROWD (CD_ROWS + 2)
 #define CD_VOICE (CD_ROWS + 3)
 #define CD_SCREENS (CD_ROWS + 4)
-static ob_game_opt cd_opts[CD_ROWS + 5];
+#define CD_INTRO (CD_ROWS + 5)
+static ob_game_opt cd_opts[CD_ROWS + 6];
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
 /* the option of the rules page with this key, or -1 */
@@ -541,6 +542,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_CROWD) { segacd_set_crowd(value); return; }
     if (index == CD_VOICE) { segacd_set_voice(value); return; }
     if (index == CD_SCREENS) { segacd_set_screens(value); return; }
+    if (index == CD_INTRO) { segacd_set_intro(value); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -567,6 +569,22 @@ static void cd_changed(void *ctx, int index, int value)
     rules[cd_rows[index].rule] = (uint8_t)(value ? 1 : 0);          /* (and this game's, from now on) */
 }
 
+/* the disc's intro movie (segacd_intro_hook, the game's thread): the window's loop plays it, this waits */
+static SDL_atomic_t intro_state;                         /* 1 asked for, 2 playing, 0 none */
+static void intro_hook(void)
+{
+    if (F.session || !segacd_disc()) return;           /* (a session's machines keep step: no movie) */
+    SDL_AtomicSet(&intro_state, 1);
+    while (SDL_AtomicGet(&intro_state) && !ending()) SDL_Delay(5);
+}
+
+static void intro_tick(void)
+{
+    int st = SDL_AtomicGet(&intro_state);
+    if (st == 1) SDL_AtomicSet(&intro_state, segacd_movie_start(segacd_disc(), "HOCKEY.SEG", F.dev, F.rate) ? 2 : 0);
+    else if (st == 2 && !segacd_movie_tick()) SDL_AtomicSet(&intro_state, 0);
+}
+
 static void game_page_init(void)
 {
     static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
@@ -585,8 +603,10 @@ static void game_page_init(void)
     static const char *const voice[3] = { "off", "on", "over the music" };
     cd_opts[CD_VOICE] = (ob_game_opt){ "cd_voice", "Ron Barr scouting voice", voice, 3, 0, 0, 3 };
     cd_opts[CD_SCREENS] = (ob_game_opt){ "cd_screens", "Opening screens", music, 2, 0, 0, 3 };
+    cd_opts[CD_INTRO] = (ob_game_opt){ "cd_intro", "Intro movie", cd_off_on, 2, 0, 0, 3 };
     segacd_start();
-    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 5, cd_changed, NULL };
+    segacd_intro_hook = intro_hook;
+    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 6, cd_changed, NULL };
     ob_game_set_ops(&host, &ops);
 }
 
@@ -831,6 +851,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         if (SDL_AtomicGet(&sides_state) == 1) { ob_pads_sides_open(); SDL_AtomicSet(&sides_state, 2); }
         else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
+        intro_tick();
         hold_state = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open || ob_screen_up();
         ob_plat_present();
         ob_plat_frame_done(SDL_AtomicSet(&F.fresh, 0));
