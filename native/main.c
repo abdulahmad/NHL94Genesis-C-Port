@@ -618,7 +618,7 @@ static void segacd_frame(void)
 /* pictures to files (--widescreen: with the sides, wide.c) */
 static int shots_wide;
 static int crop43;                                        /* --crop43: a wide rink cropped to 4:3 as a session's 4:3 machine shows it */
-static int shots_crop(int w) { return !screen_frame && (crop43 || native_net_on()) && wide_rink_frame(w); }
+static int shots_crop(int w) { return !screen_frame && (crop43 || native_net_on()) && (wide_rink_frame(w) || wide_hor_frame(w)); }
 static void write_ppm(const char *path)
 {
     static uint16_t px[320 * 240];
