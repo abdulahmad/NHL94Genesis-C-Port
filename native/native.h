@@ -64,6 +64,7 @@ void native_net_start(mdrt *m);                         /* at power on, the stat
 void native_net_stop_at(long frame);                    /* headless: the session ends at --frames */
 void native_net_wait(void);                             /* at each of the game's waits, before the handshake */
 extern int native_game_teams[2];
+int native_player_on_screen(int p, int *dx, int *dy);   /* the controlled player of pad p: picture pixels from the picture's middle */
 extern volatile unsigned native_play_frames;          /* counts DoGameFrame calls: the window front end tells play from menus by it */                       /* (away, home) as it is called */
 extern void (*native_game_start_hook)(void);           /* a new game begins (the game's thread; frontend.c sets it: the select-sides screen) */
 int native_net_on(void);                                /* in a session (headless: from before power on) */
