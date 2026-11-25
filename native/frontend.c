@@ -740,7 +740,8 @@ static void game_page_init(void)
             "The penalty shot box takes the pad, as on the Sega CD.", "The Sega CD's playoff password rules.",
             "The Sega CD's fix for the shot data.", "The Sega CD's uniform colours for each team.",
             "The Sega CD's sounds: the ding at line changes and breaks.", "Songs play when the Sega CD plays them: in the second half of a period.",
-            "At a period's end the Sega CD goes straight to the song." };
+            "At a period's end the Sega CD goes straight to the song.",
+            "Play waits a moment after a goal or penalty, so the rink announcer can finish." };
         for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];
         game_help[CD_ROSTERS] = "The Sega CD's rosters (the game restarts to change them).";
         game_help[CD_MUSIC] = "Where the songs come from: the cartridge or the Sega CD disc.";
