@@ -726,6 +726,20 @@ static void pcspr_no_file(void)
     cd_opts[CD_PCSPR].label = label;
 }
 
+/* the PC siren and horn rows say so when no PCFF001.DIG was found */
+static void pcsfx_no_file(void)
+{
+    static int done;
+    static char label[2][64];
+    if (done || !pcsfx_searched()) return;
+    done = 1;
+    if (pcsfx_found()) return;
+    snprintf(label[0], sizeof label[0], "%s (no PCFF001.DIG found)", cd_opts[CD_PCSIREN].label);
+    snprintf(label[1], sizeof label[1], "%s (no PCFF001.DIG found)", cd_opts[CD_PCHORN].label);
+    cd_opts[CD_PCSIREN].label = label[0];
+    cd_opts[CD_PCHORN].label = label[1];
+}
+
 /* the colour photos' row says so when neither PC game's portraits were found */
 static void pc_no_files(void)
 {
@@ -1145,6 +1159,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         pa_no_file();
         hats_no_file();
         pcspr_no_file();
+        pcsfx_no_file();
         pc_no_files();
         hold_other = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open;
         hold_state = hold_other || ob_screen_up();
