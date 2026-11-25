@@ -47,11 +47,10 @@ static struct {
 
 /* the centre ice logos of NHL 95 PC (<ABBR>.MAP / .TIL on the disc and RINK.PAL: tiles of 8 x 8 pixels of 256 colours, colour 255 clear) */
 #define NLOGOS 26
+struct lset { int have; uint8_t pal[256][3]; struct { int w, h; uint8_t *idx; } t[NLOGOS]; };
 static struct {
-    SDL_atomic_t on;
-    int have;
-    uint8_t pal[256][3];
-    struct { int w, h; uint8_t *idx; } t[NLOGOS];
+    SDL_atomic_t on;                         /* 0 the cartridge's, 1 NHL 95 PC's, 2 NHL 94 PC's (95's where 94 has none) */
+    struct lset L[2];
     int crest;                               /* the first of the cartridge's 24 crest tiles in the VDP's memory (-1: not found yet) */
     int seen;
 } LGO = { .crest = -1 };
@@ -168,6 +167,182 @@ static int palette(const uint8_t *file, long n)
     return ok;
 }
 
+
+/* NHL 94 PC's EA Huffman + run-length packing (30FB / 31FB / 32FB; QPP94-To-PNG's unhuff): the palette bank is packed this way */
+struct bits { const uint8_t *d; long n, p; uint32_t buf; int cnt; };
+static uint32_t bget(struct bits *b, int n)
+{
+    if (n > 16) { uint32_t hi = bget(b, n - 16); return hi * 0x10000u + bget(b, 16); }
+    uint32_t v = n ? b->buf >> (32 - n) : 0;
+    b->buf = n == 32 ? 0 : b->buf << n;
+    b->cnt -= n;
+    while (b->cnt < 16) {
+        uint32_t c = b->p < b->n ? b->d[b->p] : 0;
+        b->p++;
+        b->buf |= c << (24 - b->cnt);
+        b->cnt += 8;
+    }
+    return v;
+}
+static int bvnum(struct bits *b)
+{
+    int v = 2, n = 1;
+    do { v *= 2; n++; } while (bget(b, 1) == 0 && n < 30);
+    return (int)bget(b, n) + v - 4;
+}
+static uint8_t *unhuff94(const uint8_t *d, long dn, long *out_n)
+{
+    if (dn < 8 || d[1] != 0xFB || d[0] < 0x30 || d[0] > 0x32) return NULL;
+    struct bits b = { d, dn, 2 + (d[0] == 0x31 ? 3 : 0), 0, 0 };
+    bget(&b, 0);
+    long size = (long)bget(&b, 24);
+    unsigned clue = bget(&b, 8);
+    if (size <= 0 || size > 1L << 24) return NULL;
+    int base[40] = { 0 }, maxlen;
+    uint32_t lim[40] = { 0 };
+    int num = 0, len = 1;
+    uint32_t code = 0;
+    for (;;) {
+        if (len >= 17) return NULL;
+        code = (code << 1) & 0xFFFF;
+        base[len] = (int)code - num;
+        int n = bvnum(&b);
+        num += n; code += (uint32_t)n;
+        uint32_t limit = n ? (code << (16 - len)) & 0xFFFF : 0;
+        lim[len] = limit;
+        len++;
+        if (n != 0 && limit == 0) break;
+    }
+    maxlen = len - 1;
+    if (num > 256) return NULL;
+    uint8_t used[256] = { 0 }, sym[256];
+    int cur = -1;
+    for (int i = 0; i < num; i++) {
+        int skip = bvnum(&b) + 1;
+        if (skip > 100000) return NULL;
+        while (skip) { cur = (cur + 1) & 0xFF; if (!used[cur]) skip--; }
+        used[cur] = 1; sym[i] = (uint8_t)cur;
+    }
+    uint8_t *out = calloc(1, (size_t)size);
+    if (!out) return NULL;
+    long o = 0;
+    for (;;) {
+        uint32_t pk = b.buf >> 16;
+        int l = 1;
+        while (lim[l] <= pk && l < maxlen) l++;
+        int si = (int)((bget(&b, l) - (uint32_t)base[l]) & 0xFFFF);
+        if (si >= num) break;
+        unsigned sy = sym[si];
+        if (sy != clue) { if (o < size) out[o] = (uint8_t)sy; o++; continue; }
+        int n = bvnum(&b);
+        if (n) { uint8_t pv = o > 0 && o <= size ? out[o - 1] : 0; for (int i = 0; i < n; i++) { if (o < size) out[o] = pv; o++; } continue; }
+        if (bget(&b, 1) == 0) { uint8_t v = (uint8_t)bget(&b, 8); if (o < size) out[o] = v; o++; continue; }
+        break;
+    }
+    if (d[0] == 0x32) { uint8_t acc = 0; for (long i = 0; i < size; i++) { acc = (uint8_t)(acc + out[i]); out[i] = acc; } }
+    *out_n = size;
+    return out;
+}
+
+#define ICE(c) (kind ? ((c) == 106 || (c) == 107 || (c) == 105 || (c) == 104 || (c) == 23 || (c) == 91 || (c) == 90) : ((c) == 96 || (c) == 23 || (c) == 91 || (c) == 102 || (c) == 103))
+static void load_logo_set(struct lset *S, const char *dir, ob_cd *cd, int kind)
+{
+    long pn = 0;
+        uint8_t *pb = NULL;
+        if (kind == 0) { if (cd) pn = ob_cd_read_file(cd, "RINK.PAL", &pb); else pb = loose(dir, "RINK.PAL", &pn); }
+        else {                                                       /* (NHL 94 PC: RINKPAL.QPP, a SHPI with a !pal of 6 bit colours) */
+            uint8_t *qb = NULL;
+            long qn = 0;
+            if (cd) qn = ob_cd_read_file(cd, "RINKPAL.QPP", &qb); else qb = loose(dir, "RINKPAL.QPP", &qn);
+            long rn = 0;
+            uint8_t *rb = qb && qn > 0 ? unhuff94(qb, qn, &rn) : NULL;
+            if (rb && rn > 6) {                                       /* (the bank: u32 size, u16 count, 4 byte names, u32 offsets from 6 + 8 count) */
+                int cnt = rb[4] | rb[5] << 8;
+                for (int i = 0; i < cnt && 6 + 8 * cnt <= rn; i++)
+                    if (!memcmp(rb + 6 + 4 * i, "!pal", 4)) {
+                        long o = 6 + 8 * cnt + (long)le32(rb + 6 + 4 * cnt + 4 * i);
+                        if (o + 16 + 768 <= rn) {
+                            pb = malloc(512);
+                            if (pb) for (int c = 0; c < 256; c++) {
+                                int r6 = rb[o + 16 + c * 3] & 63, g6 = rb[o + 16 + c * 3 + 1] & 63, b6 = rb[o + 16 + c * 3 + 2] & 63;
+                                int v = (r6 >> 1) | (g6 >> 1) << 5 | (b6 >> 1) << 10;
+                                pb[c * 2] = (uint8_t)v; pb[c * 2 + 1] = (uint8_t)(v >> 8);
+                            }
+                            pn = 512;
+                        }
+                        break;
+                    }
+            }
+            if (getenv("PCSPR_LOG") && cd == NULL) fprintf(stderr, "94 pal: file %ld unpacked %ld magic %.4s\n", qn, rn, rb ? (char *)rb : "-");
+            free(rb); free(qb);
+        }
+        int got = 0;
+        if (pb && pn >= 512) {
+            for (int c = 0; c < 256; c++) {
+                int v = pb[c * 2] | pb[c * 2 + 1] << 8;
+                S->pal[c][0] = (uint8_t)((v & 31) * 255 / 31); S->pal[c][1] = (uint8_t)((v >> 5 & 31) * 255 / 31); S->pal[c][2] = (uint8_t)((v >> 10 & 31) * 255 / 31);
+            }
+            for (int k = 0; k < NLOGOS; k++) {
+                char fm[16], ft[16];
+                snprintf(fm, sizeof fm, "%s.MAP", logo_name[k]);
+                snprintf(ft, sizeof ft, "%s.TIL", logo_name[k]);
+                long mn = 0, tln = 0;
+                uint8_t *mb = NULL, *tb = NULL;
+                if (cd) { mn = ob_cd_read_file(cd, fm, &mb); tln = ob_cd_read_file(cd, ft, &tb); } else { mb = loose(dir, fm, &mn); tb = loose(dir, ft, &tln); }
+                if (mb && tb && mn >= 6) {
+                    int lw = mb[0] | mb[1] << 8, lh = mb[2] | mb[3] << 8;
+                    if (lw > 0 && lh > 0 && lw <= 8 && lh <= 8 && mn >= 6 + 2 * lw * lh) {
+                        uint8_t *ix = malloc((size_t)(lw * 8 * lh * 8));
+                        if (ix) {
+                            for (int ty = 0; ty < lh; ty++)
+                                for (int tx = 0; tx < lw; tx++) {
+                                    int wd = mb[6 + 2 * (ty * lw + tx)] | mb[7 + 2 * (ty * lw + tx)] << 8;
+                                    int ti = kind ? wd & 0x7FF : wd & 0x1FFF, hfl = wd & (kind ? 0x0800 : 0x2000), vfl = wd & (kind ? 0x1000 : 0x4000);
+                                    for (int y = 0; y < 8; y++)
+                                        for (int x = 0; x < 8; x++) {
+                                            int sx = hfl ? 7 - x : x, sy = vfl ? 7 - y : y;
+                                            long at = (long)ti * (kind ? 16 : 64) + (kind ? (sx & 3) * (tln / 4) + sy * 2 + (sx >> 2) : sy * 8 + sx);   /* (94: the whole file is four Mode X planes, a tile 16 bytes of each) */
+                                            ix[(ty * 8 + y) * lw * 8 + tx * 8 + x] = at < tln ? tb[at] : 255;
+                                        }
+                                }
+                            {                                          /* (the ice, its lines and the centre line the tiles bake in round the crest: clear, found from the edge in) */
+                                int fw = lw * 8, fh = lh * 8, *q = malloc(sizeof(int) * (size_t)(fw * fh));
+                                int qn = 0;
+                                if (q) {
+                                    qn = 0;
+                                    for (int y = 0; y < fh; y++)
+                                        for (int x = 0; x < fw; x++)
+                                            if ((x == 0 || y == 0 || x == fw - 1 || y == fh - 1)) { int c = ix[y * fw + x]; if (ICE(c)) { q[qn++] = y * fw + x; ix[y * fw + x] = 254; } }
+                                    for (int i = 0; i < qn; i++) {
+                                        int x = q[i] % fw, y = q[i] / fw;
+                                        static const int d[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+                                        for (int j = 0; j < 4; j++) {
+                                            int nx2 = x + d[j][0], ny2 = y + d[j][1];
+                                            if (nx2 < 0 || ny2 < 0 || nx2 >= fw || ny2 >= fh) continue;
+                                            int c = ix[ny2 * fw + nx2];
+                                            if (ICE(c)) { ix[ny2 * fw + nx2] = 254; q[qn++] = ny2 * fw + nx2; }
+                                        }
+                                    }
+                                    free(q);
+                                    for (int i = 0; i < fw * fh; i++) if (ix[i] == 254) ix[i] = 255;
+                                    if (kind)                                                      /* (94 bakes the centre line in between its two crests: the game draws its own) */
+                                        for (int y = 0; y < fh; y++)
+                                            if (y >= fh / 2 - 4 && y < fh / 2 + 4) memset(ix + y * fw, 255, (size_t)fw);
+                                }
+                            }
+                            S->t[k].w = lw * 8; S->t[k].h = lh * 8; S->t[k].idx = ix;
+                            got++;
+                        }
+                    }
+                }
+                free(mb); free(tb);
+            }
+        }
+        free(pb);
+        S->have = got >= 20;
+        if (getenv("PCSPR_LOG")) fprintf(stderr, "pcspr: %d centre ice logos (%s)\n", got, kind ? "NHL 94 PC" : "NHL 95 PC");
+    }
+
 static int load(const char *dir, ob_cd *cd)
 {
     char nm[16];
@@ -216,72 +391,7 @@ static int load(const char *dir, ob_cd *cd)
         if (o) { fprintf(o, "P6\n%d %d\n255\n", 10 * cw, 10 * ch); fwrite(im, 1, sizeof im, o); fclose(o); }
     }
 
-    {                                                              /* (the centre ice logos: optional) */
-        long pn = 0;
-        uint8_t *pb = NULL;
-        if (cd) pn = ob_cd_read_file(cd, "RINK.PAL", &pb); else pb = loose(dir, "RINK.PAL", &pn);
-        int got = 0;
-        if (pb && pn >= 512) {
-            for (int c = 0; c < 256; c++) {
-                int v = pb[c * 2] | pb[c * 2 + 1] << 8;
-                LGO.pal[c][0] = (uint8_t)((v & 31) * 255 / 31); LGO.pal[c][1] = (uint8_t)((v >> 5 & 31) * 255 / 31); LGO.pal[c][2] = (uint8_t)((v >> 10 & 31) * 255 / 31);
-            }
-            for (int k = 0; k < NLOGOS; k++) {
-                char fm[16], ft[16];
-                snprintf(fm, sizeof fm, "%s.MAP", logo_name[k]);
-                snprintf(ft, sizeof ft, "%s.TIL", logo_name[k]);
-                long mn = 0, tln = 0;
-                uint8_t *mb = NULL, *tb = NULL;
-                if (cd) { mn = ob_cd_read_file(cd, fm, &mb); tln = ob_cd_read_file(cd, ft, &tb); } else { mb = loose(dir, fm, &mn); tb = loose(dir, ft, &tln); }
-                if (mb && tb && mn >= 6) {
-                    int lw = mb[0] | mb[1] << 8, lh = mb[2] | mb[3] << 8;
-                    if (lw > 0 && lh > 0 && lw <= 8 && lh <= 8 && mn >= 6 + 2 * lw * lh) {
-                        uint8_t *ix = malloc((size_t)(lw * 8 * lh * 8));
-                        if (ix) {
-                            for (int ty = 0; ty < lh; ty++)
-                                for (int tx = 0; tx < lw; tx++) {
-                                    int wd = mb[6 + 2 * (ty * lw + tx)] | mb[7 + 2 * (ty * lw + tx)] << 8, ti = wd & 0x1FFF;
-                                    for (int y = 0; y < 8; y++)
-                                        for (int x = 0; x < 8; x++) {
-                                            int sx = wd & 0x2000 ? 7 - x : x, sy = wd & 0x4000 ? 7 - y : y;
-                                            long at = (long)ti * 64 + sy * 8 + sx;
-                                            ix[(ty * 8 + y) * lw * 8 + tx * 8 + x] = at < tln ? tb[at] : 255;
-                                        }
-                                }
-                            {                                          /* (the ice, its lines and the centre line the tiles bake in round the crest: clear, found from the edge in) */
-                                int fw = lw * 8, fh = lh * 8, *q = malloc(sizeof(int) * (size_t)(fw * fh));
-                                int qn = 0;
-                                if (q) {
-                                    qn = 0;
-                                    for (int y = 0; y < fh; y++)
-                                        for (int x = 0; x < fw; x++)
-                                            if ((x == 0 || y == 0 || x == fw - 1 || y == fh - 1)) { int c = ix[y * fw + x]; if (c == 96 || c == 23 || c == 91 || c == 102 || c == 103) { q[qn++] = y * fw + x; ix[y * fw + x] = 254; } }
-                                    for (int i = 0; i < qn; i++) {
-                                        int x = q[i] % fw, y = q[i] / fw;
-                                        static const int d[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
-                                        for (int j = 0; j < 4; j++) {
-                                            int nx2 = x + d[j][0], ny2 = y + d[j][1];
-                                            if (nx2 < 0 || ny2 < 0 || nx2 >= fw || ny2 >= fh) continue;
-                                            int c = ix[ny2 * fw + nx2];
-                                            if (c == 96 || c == 23 || c == 91 || c == 102 || c == 103) { ix[ny2 * fw + nx2] = 254; q[qn++] = ny2 * fw + nx2; }
-                                        }
-                                    }
-                                    free(q);
-                                    for (int i = 0; i < fw * fh; i++) if (ix[i] == 254) ix[i] = 255;
-                                }
-                            }
-                            LGO.t[k].w = lw * 8; LGO.t[k].h = lh * 8; LGO.t[k].idx = ix;
-                            got++;
-                        }
-                    }
-                }
-                free(mb); free(tb);
-            }
-        }
-        free(pb);
-        LGO.have = got >= 20;
-        if (getenv("PCSPR_LOG")) fprintf(stderr, "pcspr: %d centre ice logos\n", got);
-    }
+    if (!LGO.L[0].have) load_logo_set(&LGO.L[0], dir, cd, 0);                           /* (the centre ice logos: optional) */
     if (getenv("PCSPR_LOG")) fprintf(stderr, "pcspr: banks %d pal %d team %d %d\n", banks, pal, P.have_team[0], P.have_team[1]);
     return banks >= 20 && pal && P.have_team[0] && P.have_team[1];
 }
@@ -299,6 +409,16 @@ static int finder(void *arg)
             if (ok) fprintf(stderr, "PC sprites: NHL 95 PC sprites from %s\n", ob_cd_path(cd));
             ob_cd_close(cd);
         }
+    }
+    if (ok) {                                                    /* NHL 94 PC's logos: its folder beside the program, or NHL94PC_DIR */
+        const char *e = getenv("NHL94PC_DIR");
+        char cand[5][600];
+        int nc = 0;
+        if (e) snprintf(cand[nc++], 600, "%s", e);
+        static const char *const sub[4] = { "NHL94PC", "nhl94pc", "NHL94.PC", "." };
+        for (int i = 0; i < 4; i++) snprintf(cand[nc++], 600, "%s/%s", base, sub[i]);
+        for (int i = 0; i < nc && !LGO.L[1].have; i++) load_logo_set(&LGO.L[1], cand[i], NULL, 1);
+        if (LGO.L[1].have) fprintf(stderr, "PC sprites: NHL 94 PC centre logos found\n");
     }
     if (!ok) fprintf(stderr, "PC sprites: no NHL 95 PC sprite files found beside the program\n");
     SDL_MemoryBarrierRelease();
@@ -447,8 +567,8 @@ int pcspr_searched(void) { return SDL_AtomicGet(&P.searched); }
 int pcspr_found(void) { return SDL_AtomicGet(&P.searched) && SDL_AtomicGet(&P.found); }
 void pcspr_set(int on) { SDL_AtomicSet(&P.on, on ? 1 : 0); }
 void pcspr_ref_set(int on) { SDL_AtomicSet(&R.on, on ? 1 : 0); }
-void pcspr_logo_set(int on) { SDL_AtomicSet(&LGO.on, on ? 1 : 0); }
-int pcspr_logos(void) { return LGO.have; }
+void pcspr_logo_set(int on) { SDL_AtomicSet(&LGO.on, on < 0 ? 0 : on > 2 ? 2 : on); }
+int pcspr_logos(void) { return LGO.L[0].have ? 1 + LGO.L[1].have : 0; }
 
 
 /* Masks of where a solid sprite of nx x ny 32 pixel pieces at x0, y0 would show in the picture of vdp: back: put last in the sprite
@@ -557,11 +677,13 @@ static int find_crest(const mdrt_vdp *v, int art)
  * rink: under the windows, the scoreboard and the players as the crest was. Called before the PC's players are drawn. */
 static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
-    if (!SDL_AtomicGet(&LGO.on) || !LGO.have) return;
+    int mode = SDL_AtomicGet(&LGO.on);
+    if (!mode || !LGO.L[0].have) return;
     int art = rosters_art(team_struct(0)->tmteam);
     if (art < 0 || art >= 28 || logo_of_art[art] < 0) return;
     int k = logo_of_art[art];
-    if (!LGO.t[k].idx) return;
+    const struct lset *LS = mode == 2 && LGO.L[1].have && LGO.L[1].t[k].idx ? &LGO.L[1] : &LGO.L[0];   /* (94 falls back to 95 where it has no such logo) */
+    if (!LS->t[k].idx) return;
     if (LGO.crest < 0 || !(g.Vcount & 63) || LGO.seen != art) { LGO.crest = find_crest(vdp, art); LGO.seen = art; }
     if (getenv("PCLOGO_LOG") && !(g.Vcount & 63)) fprintf(stderr, "logo? art %d crest %d\n", art, LGO.crest);
     if (LGO.crest < 0) return;
@@ -583,7 +705,7 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     int16_t cx = 0, cy = 0;
     find3d(&cx, &cy, 0);
     if (getenv("PCLOGO_LOG") && !(g.Vcount & 63)) fprintf(stderr, "logo: art %d crest tile %d bbox %d,%d-%d,%d find3d %d,%d shift %d\n", art, LGO.crest, x0, y0, x1, y1, cx + view_shift(), cy, view_shift());
-    int lw = LGO.t[k].w, lh = LGO.t[k].h;
+    int lw = LS->t[k].w, lh = LS->t[k].h;
     int lx, ly;
     if (cy == 0x4E20) return;
     lx = cx + view_shift() - 128 - lw / 2;
@@ -593,11 +715,11 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     if (nx * ny > 6 || !sprite_masks(&sc, lx, ly, nx, ny, base, back, front, 0)) return;
     for (int y = 0; y < lh; y++)
         for (int x = 0; x < lw; x++) {
-            int c = LGO.t[k].idx[y * lw + x];
+            int c = LS->t[k].idx[y * lw + x];
             if (c == 255) continue;                                                    /* (clear) */
             int ppx = lx + x, ppy = ly + y;
             if (ppx < 0 || ppx >= w || ppy < 0 || ppy >= h || back[ppy * 320 + ppx] == base[ppy * 320 + ppx]) continue;
-            pic[(long)ppy * pitch + ppx] = 0xFF000000u | (uint32_t)LGO.pal[c][0] << 16 | (uint32_t)LGO.pal[c][1] << 8 | LGO.pal[c][2];
+            pic[(long)ppy * pitch + ppx] = 0xFF000000u | (uint32_t)LS->pal[c][0] << 16 | (uint32_t)LS->pal[c][1] << 8 | LS->pal[c][2];
         }
 }
 

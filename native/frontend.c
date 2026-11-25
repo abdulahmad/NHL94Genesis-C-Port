@@ -586,7 +586,7 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_PCANTHEM (CD_ROWS + 24)                         /* (NHL 95 PC's national anthems, its own files: group 4) */
 #define CD_OPTS (CD_ROWS + 25)
 static ob_game_opt cd_opts[CD_OPTS];
-static const char *const cd_cart_pc[2] = { "Cartridge", "NHL 95 PC" };
+static const char *const cd_logo_pc[3] = { "Cartridge", "NHL 95 PC", "NHL 94 PC" };
 /* the Widescreen rows (the Game page's, Overbar's Scaling page's) are one setting: the Scaling page's change shown on the Game page */
 static void wide_rows_sync(void)
 {
@@ -820,7 +820,7 @@ static void game_page_init(void)
     cd_opts[CD_PCHORN] = (ob_game_opt){ "pc_period_horn", "PC end of period horn", cd_off_on, 2, 1, 0, 4 };
     cd_opts[CD_PCSPR] = (ob_game_opt){ "pc_sprites", "PC player sprites", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's skaters and goalies, the cartridge's where the PC has none) */
     cd_opts[CD_PCREF] = (ob_game_opt){ "pc_referee", "Referee on the ice", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's referee skating with the play and dropping the puck) */
-    cd_opts[CD_PCLOGO] = (ob_game_opt){ "pc_centre_logo", "Centre ice logo", cd_cart_pc, 2, 1, 0, 4 };   /* (the cartridge's crest or NHL 95 PC's) */
+    cd_opts[CD_PCLOGO] = (ob_game_opt){ "pc_centre_logo", "Centre ice logo", cd_logo_pc, 3, 1, 0, 4 };   /* (the cartridge's crest or NHL 95 PC's) */
     cd_opts[CD_PCANTHEM] = (ob_game_opt){ "pc_anthems", "National anthems", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's, played before the first face off) */
     cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 1, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
     cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
@@ -832,7 +832,7 @@ static void game_page_init(void)
         game_help[CD_PCHORN] = "NHL 95 PC's horn at the end of a period, from your NHL 95 PC files.";
         game_help[CD_PCSPR] = "NHL 95 PC's skaters and goalies, from your NHL 95 PC files.";
         game_help[CD_PCREF] = "A referee skating on the ice, NHL 95 PC's, from your NHL 95 PC files.";
-        game_help[CD_PCLOGO] = "The logo at centre ice: the cartridge's, or NHL 95 PC's from your NHL 95 PC files.";
+        game_help[CD_PCLOGO] = "The logo at centre ice: the cartridge's, NHL 95 PC's, or NHL 94 PC's (NHL 95's where 94 has none) from your PC game files.";
         game_help[CD_PCANTHEM] = "NHL 95 PC's national anthems before the first face off, from your NHL 95 PC files.";
         game_help[CD_HATS] = "Hats thrown on the ice after a home skater's third goal.";
         game_help[CD_WHITEICE] = "The PC games' white rink instead of the pale cyan one.";
