@@ -517,9 +517,8 @@ void PlayerCards(void)
         ProcessInputWithRepeat(&d1, d2, d3);
         if (d3 & 0x80) break;
         int16_t by;
-        if ((d1 & 0x10) && cd_career_hook                  /* (a host's: B, the player's career from the Sega CD; then as the cartridge) */
-            && m16(RAM_BASE + (g.cardvis ? RAM_OFF_awaycardidx : RAM_OFF_homecardidx)) != 0)
-            cd_career_hook(card_team(), g.cardplayer);
+        if ((d1 & 0x10) && cd_career_hook)                  /* (a host's: B, the player's career, or the team's page, from the Sega CD; then as the cartridge) */
+            cd_career_hook(card_team(), m16(RAM_BASE + (g.cardvis ? RAM_OFF_awaycardidx : RAM_OFF_homecardidx)) ? g.cardplayer : 0xFFFF);
         if (d1 & 0x40) {
             g.cardvis ^= 1;
             by = 0;
