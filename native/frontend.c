@@ -29,6 +29,7 @@
 #include "optionsui.h"
 #include "rules.h"
 #include "overbar/postfx.h"
+#include "overbar/screen.h"
 #include "segacd.h"
 #include "announcer.h"
 #include "whiteice.h"
@@ -405,8 +406,10 @@ static int start_game(void)
 
 /* ---- the window ---- */
 
+static void wide_rows_sync(void);
 static const uint32_t *hook_frame(int *w, int *h)
 {
+    wide_rows_sync();
     SDL_LockMutex(F.lock);
     memcpy(F.shown, F.picture, sizeof F.shown);
     *w = F.width > 0 ? F.width : 320;
@@ -541,8 +544,10 @@ static const struct { int rule; const char *key; } cd_rows[] = {
     { RULE_CD_SKATING, "cd_skating" }, { RULE_CD_CORNERS, "cd_corners" }, { RULE_CD_PSBOX, "cd_penalty_shot_box" },
     { RULE_CD_PASSWORD, "cd_password" }, { RULE_CD_CLEARSHOT, "cd_clear_shots" }, { RULE_CD_COLOURS, "cd_colours" },
     { RULE_CD_SOUNDS, "cd_sounds" }, { RULE_CD_SONGS, "cd_songs" }, { RULE_CD_PERIOD_END, "cd_period_end" },
+    { RULE_HOLD, "hold_play" },                          /* (not the Sega CD's: NHL 95 PC's pause for its announcer; group 4) */
 };
 #define CD_ROWS ((int)(sizeof cd_rows / sizeof cd_rows[0]))
+#define CD_HOLD (CD_ROWS - 1)                              /* (the last rule row: RULE_HOLD) */
 #define CD_ROSTERS CD_ROWS                                /* (the roster set, the built-in "sega-cd", list entry 1) */
 #define CD_MUSIC (CD_ROWS + 1)                            /* (this machine's sound only: the disc's music, its crowd bed) */
 #define CD_CROWD (CD_ROWS + 2)
@@ -554,16 +559,26 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_DEDITHER (CD_ROWS + 8)
 #define CD_SMOOTH (CD_ROWS + 9)
 #define CD_COLOUR (CD_ROWS + 10)
-#define CD_PHOTOS (CD_ROWS + 11)
-#define CD_CAREER (CD_ROWS + 12)
-#define CD_ANNOUNCER (CD_ROWS + 14)                        /* (NHL 95 PC's rink announcer, its own files: group 4) */
-#define CD_PCPHOTOS (CD_ROWS + 13)                        /* (the cartridge's photos in colour, from the player's PC files: cardcolor.c) */
-#define CD_WHITEICE (CD_ROWS + 15)                         /* (white ice: group 4) */
-#define CD_HATS (CD_ROWS + 16)                            /* (NHL 94 SNES's hat trick hats, its own ROM: group 4) */
-#define CD_OPTS (CD_ROWS + 17)
+#define CD_MOVIELOOK (CD_ROWS + 11)                        /* (the movie's own scaling look: Overbar's ob_video_look presets) */
+#define CD_PHOTOS (CD_ROWS + 12)
+#define CD_CAREER (CD_ROWS + 13)
+#define CD_ANNOUNCER (CD_ROWS + 15)                        /* (NHL 95 PC's rink announcer, its own files: group 4) */
+#define CD_PCPHOTOS (CD_ROWS + 14)                        /* (the cartridge's photos in colour, from the player's PC files: cardcolor.c) */
+#define CD_WHITEICE (CD_ROWS + 16)                         /* (white ice: group 4) */
+#define CD_HATS (CD_ROWS + 17)                            /* (NHL 94 SNES's hat trick hats, its own ROM: group 4) */
+#define CD_WIDESCREEN (CD_ROWS + 18)                      /* (the picture 4:3 or 16:9: Overbar's host.widescreen, also on its Scaling page) */
+#define CD_OPTS (CD_ROWS + 19)
 static ob_game_opt cd_opts[CD_OPTS];
+/* the Widescreen rows (the Game page's, Overbar's Scaling page's) are one setting: the Scaling page's change shown on the Game page */
+static void wide_rows_sync(void)
+{
+    static int seen = -1;
+    if (!host.game_ready || host.widescreen == seen) return;
+    if (seen >= 0 && ob_game_get(&host, CD_WIDESCREEN) != host.widescreen) ob_game_set(&host, CD_WIDESCREEN, host.widescreen);
+    seen = host.widescreen;
+}
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
-static SDL_atomic_t cd_smooth, cd_colour;                 /* the movie at 30 fps; each shot's colour */
+static SDL_atomic_t cd_smooth, cd_colour;
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
 /* the option of the rules page with this key, or -1 */
@@ -586,6 +601,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_DEDITHER) { SDL_AtomicSet(&cd_dedither, value); return; }
     if (index == CD_SMOOTH) { SDL_AtomicSet(&cd_smooth, value); return; }
     if (index == CD_COLOUR) { SDL_AtomicSet(&cd_colour, value); return; }
+    if (index == CD_MOVIELOOK) { segacd_movie_set_look(value, &host.lores); return; }
     if (index == CD_PHOTOS) { segacd_set_photos(value); return; }
     if (index == CD_CAREER) { segacd_set_career(value, ending); return; }
     if (index == CD_PCPHOTOS) { cardcolor_set(value); return; }
@@ -593,6 +609,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_ANNOUNCER) { announcer_set(value); return; }
     if (index == CD_WHITEICE) { whiteice_set(value); return; }
     if (index == CD_HATS) { hats_set(value); return; }
+    if (index == CD_WIDESCREEN) { host.widescreen = value != 0; return; }   /* (hook_frame keeps the two rows alike) */
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -691,12 +708,12 @@ static void game_page_init(void)
 {
     static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
                                                   "Sega CD playoff password", "Sega CD shot data fix", "Sega CD uniforms",
-                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end" };
+                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "Pause for the announcer" };
     for (int k = 0; k < CD_ROWS; k++) {
         char key[64];
         snprintf(key, sizeof key, "rules.%s", cd_rows[k].key);
         int i = option_index(key);
-        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], cd_off_on, 2, i >= 0 && F.opt_values ? (F.opt_values[i] ? 1 : 0) : 0, 1, 1 };
+        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], cd_off_on, 2, i >= 0 && F.opt_values ? (F.opt_values[i] ? 1 : 0) : 0, 1, cd_rows[k].rule == RULE_HOLD ? 4 : 1 };
     }
     int r = option_index("rules.rosters");
     cd_opts[CD_ROSTERS] = (ob_game_opt){ "cd_rosters", "Sega CD rosters (restarts)", cd_off_on, 2, r >= 0 && F.opt_values && F.opt_values[r] == 1, 1, 2 };
@@ -712,6 +729,7 @@ static void game_page_init(void)
     static const char *const smooth[2] = { "original", "30 fps" }, *const colour[2] = { "original", "enhanced" };
     cd_opts[CD_SMOOTH] = (ob_game_opt){ "cd_smooth", "Movie frame rate", smooth, 2, 0, 0, 3 };
     cd_opts[CD_COLOUR] = (ob_game_opt){ "cd_colour", "Movie colour", colour, 2, 0, 0, 3 };
+    cd_opts[CD_MOVIELOOK] = (ob_game_opt){ "cd_movie_look", "Movie look", ob_video_look_names, OB_VIDEO_LOOK_COUNT, 0, 0, 3 };   /* (heavier filtering for the low-quality movie only) */
     cd_opts[CD_PHOTOS] = (ob_game_opt){ "cd_photos", "Player photos", music, 2, 0, 0, 3 };
     static const char *const career[2] = { "off", "B on a player card" };
     cd_opts[CD_CAREER] = (ob_game_opt){ "cd_career", "Career stats", career, 2, 0, 0, 3 };
@@ -738,6 +756,8 @@ static void game_page_init(void)
     hats_start();
     cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 0, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
     cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
+    static const char *const shape[2] = { "4:3", "16:9" };
+    cd_opts[CD_WIDESCREEN] = (ob_game_opt){ "widescreen", "Widescreen", shape, 2, host.widescreen ? 1 : 0, 0, 4 };   /* (each machine its own: wide.c) */
     cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 0, 0, 4 };
         game_help[CD_ANNOUNCER] = "NHL 95 PC's rink announcer: goals, penalties, last minute.";
         game_help[CD_HATS] = "Hats thrown on the ice after a home skater's third goal.";
@@ -751,19 +771,24 @@ static void game_page_init(void)
      * the cartridge's game with the disc's presentation. -1 would leave a row alone (a new row starts there). */
     static signed char pv[3][CD_OPTS];
     for (int p = 0; p < 3; p++) for (int k = 0; k < CD_OPTS; k++) pv[p][k] = p == 1 ? 1 : 0;   /* Cartridge 0, Sega CD 1 */
-    pv[1][CD_DEDITHER] = pv[1][CD_SMOOTH] = pv[1][CD_COLOUR] = 0;            /* (the movie as the disc has it) */
+    pv[1][CD_DEDITHER] = pv[1][CD_SMOOTH] = pv[1][CD_COLOUR] = pv[1][CD_MOVIELOOK] = 0;            /* (the movie as the disc has it) */
     pv[1][CD_VOICE] = 1; pv[1][CD_CROWD] = 1;
     pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
     pv[1][CD_ANNOUNCER] = 0;                                                  /* (95 PC's voice: not the Sega CD's) */
+    pv[1][CD_HOLD] = 0;                                                        /* (95 PC's pause: not the Sega CD's) */
+    pv[2][CD_HOLD] = 1;                                                        /* (on in Recommended, with the announcer it is for) */
     pv[1][CD_HATS] = 0;                                                        /* (the SNES's: not the Sega CD's) */
     pv[2][CD_HATS] = 1;                                                        /* (on in Recommended; it does nothing without the SNES ROM) */
     pv[1][CD_WHITEICE] = 0;                                                    /* (the PC games' look: not the Sega CD's; off in Recommended too, it is a taste) */
     pv[2][CD_ANNOUNCER] = 1;                                                  /* (on in Recommended; it does nothing without 95 PC's files) */
-    pv[2][CD_PCPHOTOS] = 1;                                                    /* (Abdul: on in Recommended) */
+    pv[2][CD_PCPHOTOS] = 1;
+    pv[1][CD_WIDESCREEN] = 0;                                                  /* (16:9 in Recommended; the cartridge's and the disc's 4:3) */
+    pv[2][CD_WIDESCREEN] = 1;                                                    /* (Abdul: on in Recommended) */
     static const int disc_look[] = { CD_VOICE, CD_SCREENS, CD_TITLE, CD_INTRO, CD_SFX, CD_PHOTOS, CD_CAREER };
     for (size_t k = 0; k < sizeof disc_look / sizeof *disc_look; k++) pv[2][disc_look[k]] = 1;
     pv[2][CD_CROWD] = 2;                                                       /* (both beds) */
     pv[2][CD_DEDITHER] = OB_POSTFX_LIVE;                                       /* (the movie without the dither) */
+    pv[2][CD_MOVIELOOK] = OB_VIDEO_LOOK_CRT_SOFT;                              /* (the movie filtered harder than the game) */
     for (int k = 0; k < CD_ROWS; k++) if (!strcmp(cd_rows[k].key, "cd_clear_shots")) pv[2][k] = 1;   /* (the one fix) */
     static const ob_game_preset presets[3] = { { "Recommended", pv[2] }, { "Cartridge", pv[0] }, { "Sega CD", pv[1] } };
     ob_game_ops ops = { NULL, cd_opts, CD_OPTS, cd_changed, NULL, presets, 3 };
