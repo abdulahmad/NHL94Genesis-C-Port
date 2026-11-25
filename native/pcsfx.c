@@ -16,6 +16,7 @@
 #include "game.h"
 #include "native.h"
 #include "pcsfx.h"
+#include "announcer.h"
 #include "overbar/cdimage.h"
 
 #define RATE 11025
@@ -24,8 +25,8 @@
 #define PATHMAX 1024
 #define LISTMAX 512
 
-enum { GOAL, HORN, NSND };
-static const uint8_t sample_id[NSND][4] = { { 0x56, 0x49, 0x13, 0xA7 }, { 0x1A, 0xB7, 0xBA, 0x4B } };
+enum { GOAL, HORN, MINUTE, NSND };
+static const uint8_t sample_id[NSND][4] = { { 0x56, 0x49, 0x13, 0xA7 }, { 0x1A, 0xB7, 0xBA, 0x4B }, { 0x31, 0xB5, 0x3F, 0x4F } };
 
 static struct {
     SDL_atomic_t on[NSND], found, searched;
@@ -46,18 +47,18 @@ static int parse(const uint8_t *d, long n)
         int idx = -1;
         for (unsigned i = 0; i < count; i++) if (!memcmp(d + 6 + 4 * i, sample_id[s], 4)) idx = (int)i;
         if (idx < 0) return 0;
-        long off = (long)(d[6 + 4 * count + 4 * idx] | d[7 + 4 * count + 4 * idx] << 8 | d[8 + 4 * count + 4 * idx] << 16 | (long)d[9 + 4 * count + 4 * idx] << 24);
-        long end = n - base;                      /* an item runs to the next offset */
+        uint32_t off = (uint32_t)d[6 + 4 * count + 4 * idx] | (uint32_t)d[7 + 4 * count + 4 * idx] << 8 | (uint32_t)d[8 + 4 * count + 4 * idx] << 16 | (uint32_t)d[9 + 4 * count + 4 * idx] << 24;
+        uint32_t end = (uint32_t)(n - base);                  /* an item runs to the next offset */
         for (unsigned i = 0; i < count; i++) {
-            long o = (long)(d[6 + 4 * count + 4 * i] | d[7 + 4 * count + 4 * i] << 8 | d[8 + 4 * count + 4 * i] << 16 | (long)d[9 + 4 * count + 4 * i] << 24);
-            if (o > off && o != 0xFFFFFFFFL && o < end) end = o;
+            uint32_t o = (uint32_t)d[6 + 4 * count + 4 * i] | (uint32_t)d[7 + 4 * count + 4 * i] << 8 | (uint32_t)d[8 + 4 * count + 4 * i] << 16 | (uint32_t)d[9 + 4 * count + 4 * i] << 24;
+            if (o > off && o != 0xFFFFFFFFu && o < end) end = o;
         }
-        if (off < 0 || off >= end || base + end > n) return 0;
+        if (off >= end || base + (long)end > n) return 0;
         int16_t *p = malloc((size_t)(end - off) * sizeof *p);
         if (!p) return 0;
-        for (long k = 0; k < end - off; k++) p[k] = (int16_t)((int8_t)d[base + off + k] * GAIN);
+        for (long k = 0; k < (long)(end - off); k++) p[k] = (int16_t)((int8_t)d[base + off + k] * GAIN);
         S.pcm[s] = p;
-        S.len[s] = end - off;
+        S.len[s] = (long)(end - off);
     }
     return 1;
 }
@@ -169,7 +170,8 @@ int pcsfx_load_file(const char *path)
 /* the game's siren or horn (src/sound.c sfx_hook): 1 when this plays it and the cartridge's is left out */
 static int hook(int ev)
 {
-    int s = ev == SFX_GOAL ? GOAL : HORN;
+    int s = ev == SFX_GOAL ? GOAL : ev == SFX_HORN ? HORN : MINUTE;
+    if (ev == SFX_ONEMIN && announcer_active()) return 1;           /* (95 PC: the announcer says it instead of the beep or horn) */
     if (!SDL_AtomicGet(&S.on[s]) || !SDL_AtomicGet(&S.found) || !g.demoflag) return 0;
     SDL_MemoryBarrierAcquire();
     SDL_LockMutex(S.lock);
@@ -196,7 +198,7 @@ void pcsfx_wait(void) { while (!SDL_AtomicGet(&S.searched)) SDL_Delay(5); }
 int pcsfx_searched(void) { return SDL_AtomicGet(&S.searched); }
 int pcsfx_found(void) { return SDL_AtomicGet(&S.searched) && SDL_AtomicGet(&S.found); }
 void pcsfx_set_goal(int on) { SDL_AtomicSet(&S.on[GOAL], on ? 1 : 0); }
-void pcsfx_set_horn(int on) { SDL_AtomicSet(&S.on[HORN], on ? 1 : 0); }
+void pcsfx_set_horn(int on) { SDL_AtomicSet(&S.on[HORN], on ? 1 : 0); SDL_AtomicSet(&S.on[MINUTE], on ? 1 : 0); }   /* (and the one minute horn) */
 
 void pcsfx_stop(void)
 {
