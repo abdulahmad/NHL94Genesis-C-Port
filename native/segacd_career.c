@@ -4,15 +4,21 @@
  * (or the disc's stock one), his name, size, birthplace and birthday, his position and number in the disc's big
  * letters at the foot (PlUnpackNibbles), and his career, 7 seasons and 3 columns at a time with "Regular" or
  * "Playoff" over them (PlDrawCareerStats). The team's card: its page with the arena photo, its abbreviation, name and
- * arena, and its six advantage lines (PlShowPicture). Everything at the disc's places on its 40 x 28 screen, in its
+ * arena, and its six advantage lines (PlShowPicture). The video card: the team's frame (TeamVideoFrame<T>, the
+ * third piece) with the team's clips playing in it, PLAYER.BIN's list of them (PlRecordTable: 13 sectors a team, the
+ * disc finds a clip by where it starts) one after another as asked for (PlDecodePicture), their sound on the window's
+ * audio device and the movie de-dither's live pass when it is on. Everything at the disc's places on its 40 x 28 screen, in its
  * 8 x 8 font (GTABLE record 64) and its colours (PlSelectPicture), scaled to the window like the intro movie.
- * Up and down scroll the seasons, left and right the columns (the disc's C + left / right); Enter, Space or A turns
- * to the other card (the disc keeps them side by side); Esc, Backspace, B or a click closes it.
+ * Up and down scroll the seasons, left and right the columns (the disc's C + left / right); on the video card left
+ * and right pick the clip before or after (the disc's B) and up plays it again (its C). Enter, Space or A turns to the
+ * next card (the disc keeps them side by side: player, team, video); Esc, Backspace, B or a click closes it.
  * A team the disc doesn't have (a roster set's) gets a plain page with the same words. The data is
  * native/segacd_photos.c's. */
 #include <SDL.h>
 #include <stdio.h>
 #include <string.h>
+#include "overbar/cdimage.h"
+#include "overbar/postfx.h"
 #include "overbar/screen.h"
 #include "overbar/vfont.h"
 #include "segacd.h"
@@ -25,14 +31,37 @@ static struct {
     ob_cd *cd;
     int disc;                               /* 1 the disc's look (else the plain page) */
     int team;                               /* the disc's team (GTABLE 68 + it) */
-    int side;                               /* 0 the player's card, 1 the team's */
+    int side;                               /* 0 the player's card, 1 the team's, 2 the video card */
     int row, col;                           /* the first season shown, the stat columns' place in the disc's list */
     uint32_t fb[SW * SH];                   /* the disc's screen, made when something changes */
     SDL_atomic_t dirty;
     segacd_career plain;                    /* the plain page's words */
     SDL_atomic_t state;                     /* 1 asked for, 2 up, 0 none */
     SDL_atomic_t close;
+    uint32_t dev;                           /* (the window's audio device, its rate, the movie de-dither: tick's) */
+    unsigned rate;
+    int dedither;
 } C;
+
+/* the video card's clip, played like the intro movie: its pictures kept in time with its sound */
+#define CLIP_W 160
+#define CLIP_H 112
+#define CLIP_AHEAD_MS 120
+static struct {
+    segacd_film *film;
+    int clip;                               /* its place in the team's list */
+    const int16_t *pcm;
+    long pcm_len;
+    double pcm_at;
+    uint64_t out;
+    uint32_t t0;
+    const uint8_t *nidx;
+    const uint32_t *ncol;
+    double ntime;
+    int index;
+    uint32_t pic[CLIP_W * CLIP_H];          /* the picture now (black before the first) */
+    ob_postfx *pp;
+} V;
 
 static unsigned be16(const uint8_t *p) { return (unsigned)p[0] << 8 | p[1]; }
 static uint32_t be32(const uint8_t *p) { return (uint32_t)be16(p) << 16 | be16(p + 2); }
@@ -226,7 +255,9 @@ static void compose(void)
 {
     for (int i = 0; i < SW * SH; i++) C.fb[i] = rgb(0x444);            /* (the backdrop: colour 0 of palette 0) */
     picture p;
-    if (team_picture(C.side ? 0 : 1, &p)) {
+    if (C.side == 2)                                                      /* (the clip under the frame's open middle) */
+        for (int y = 0; y < CLIP_H; y++) memcpy(C.fb + (72 + y) * SW + 80, V.pic + y * CLIP_W, CLIP_W * 4);
+    if (team_picture(C.side == 2 ? 2 : C.side ? 0 : 1, &p)) {
         uint16_t cram[64];
         memcpy(cram, p.cram, sizeof cram);
         cram[32] = cram[35] = 0x444;                                       /* (PlSelectPicture's palette 2) */
@@ -240,8 +271,8 @@ static void compose(void)
                 if (t < p.ntiles) cell((int)x, (int)y, p.tiles + 32 * t, pal[e >> 13 & 3], e >> 11 & 1, e >> 12 & 1);
             }
     }
-    if (C.side || !C.k.player) team_card();
-    else player_card();
+    if (C.side == 1 || (!C.side && !C.k.player)) team_card();
+    else if (!C.side) player_card();
 }
 
 /* ---- the plain page (a team the disc doesn't have) */
@@ -337,6 +368,111 @@ static void plain_words(void)
     pg->nrows = 6;
 }
 
+/* ---- the video card's clips */
+
+#define PL_CLIPS 31988                      /* (PLAYER.BIN's PlRecordTable: 28 teams of 13 longs, -1 past the last) */
+
+static uint32_t clip_lba(int k)
+{
+    long len;
+    const uint8_t *pb = segacd_player_bin(C.cd, &len);
+    if (!pb || k < 0 || k >= 13 || PL_CLIPS + 52L * (C.team + 1) > len) return 0xFFFFFFFFu;
+    return be32(pb + PL_CLIPS + 52 * C.team + 4 * k);
+}
+
+static int clips(void)
+{
+    int n = 0;
+    while (n < 13 && clip_lba(n) != 0xFFFFFFFFu) n++;
+    return n;
+}
+
+static void clip_stop(void)
+{
+    if (V.film) {
+        segacd_film_close(V.film);
+        V.film = NULL;
+        if (C.dev) SDL_ClearQueuedAudio(C.dev);
+    }
+    ob_postfx_free(V.pp);
+    V.pp = NULL;
+}
+
+/* (the window's thread) clip k of the team's list, from its start */
+static void clip_start(int k)
+{
+    clip_stop();
+    int n = clips();
+    if (!n) return;
+    V.clip = (k % n + n) % n;
+    const char *name = ob_cd_file_at(C.cd, (long)clip_lba(V.clip));
+    if (!name || !(V.film = segacd_film_open(C.cd, name))) return;
+    int w, h;
+    segacd_film_size(V.film, &w, &h);
+    if (w != CLIP_W || h != CLIP_H) { segacd_film_close(V.film); V.film = NULL; return; }
+    if (C.dedither != OB_POSTFX_OFF) V.pp = ob_postfx_new(w, h, NULL, segacd_film_id(V.film));
+    V.pcm_len = segacd_film_sound(V.film, &V.pcm);
+    V.pcm_at = 0;
+    V.out = 0;
+    V.index = -1;
+    for (int i = 0; i < CLIP_W * CLIP_H; i++) V.pic[i] = 0xFF000000u;
+    V.ntime = segacd_film_next(V.film, &V.nidx, &V.ncol);
+    if (C.dev) { SDL_ClearQueuedAudio(C.dev); SDL_PauseAudioDevice(C.dev, 0); }
+    V.t0 = SDL_GetTicks();
+    SDL_AtomicSet(&C.dirty, 1);
+}
+
+/* (the window's loop) its sound topped up and its picture brought to its time; at its end the last picture stays */
+static void clip_tick(void)
+{
+    if (!V.film) return;
+    double now;
+    unsigned rate = C.rate ? C.rate : 48000;
+    if (C.dev) {
+        static int16_t buf[2 * 1024];
+        double step = (double)SEGACD_FILM_RATE / rate;
+        while (V.pcm_at < V.pcm_len && SDL_GetQueuedAudioSize(C.dev) < rate * 4 * CLIP_AHEAD_MS / 1000) {
+            int k = 0;
+            for (; k < 1024; k++, V.pcm_at += step) {
+                long i = (long)V.pcm_at;
+                int v = 0;
+                if (i + 1 < V.pcm_len) { double f = V.pcm_at - i; v = (int)(V.pcm[i] * (1 - f) + V.pcm[i + 1] * f); }
+                buf[2 * k] = buf[2 * k + 1] = (int16_t)v;
+            }
+            SDL_QueueAudio(C.dev, buf, (Uint32)k * 4);
+            V.out += (uint64_t)k;
+        }
+        now = (double)(V.out - SDL_GetQueuedAudioSize(C.dev) / 4) / rate;
+    } else now = (SDL_GetTicks() - V.t0) / 1000.0;
+    int fresh = 0;
+    static uint32_t raw[CLIP_W * CLIP_H];
+    while (V.ntime >= 0 && V.ntime <= now) {
+        for (int i = 0; i < CLIP_W * CLIP_H; i++) raw[i] = V.ncol[V.nidx[i]];
+        V.index++;
+        V.ntime = segacd_film_next(V.film, &V.nidx, &V.ncol);
+        fresh = 1;
+    }
+    if (fresh) {
+        int w = CLIP_W, h = CLIP_H;
+        const uint32_t *p = V.pp ? ob_postfx_run(V.pp, OB_POSTFX_LIVE, V.index, raw, &w, &h) : raw;
+        memcpy(V.pic, w == CLIP_W && h == CLIP_H ? p : raw, sizeof V.pic);
+        SDL_AtomicSet(&C.dirty, 1);
+    }
+    if (V.ntime < 0 && V.pcm_at >= V.pcm_len) {                      /* (played out: its picture stays, its sound ends) */
+        segacd_film_close(V.film);
+        V.film = NULL;
+    }
+}
+
+/* the cards in turn: a player's player, team, video; a team's team, video */
+static void turn(void)
+{
+    int next = C.side == 2 ? (C.k.player ? 0 : 1) : C.side + 1;
+    if (C.side == 2) clip_stop();
+    C.side = next;
+    if (C.side == 2) clip_start(V.clip);
+}
+
 /* ---- the screen */
 
 static void draw(void *ud, uint32_t *px, int w, int h, int pitch)
@@ -363,11 +499,11 @@ static void input(void *ud, const ob_screen_ev *e)
     int seasons = C.k.career.nrows - 1;
     switch (e->kind) {
     case OB_SCREEN_BACK: case OB_SCREEN_PRESS: SDL_AtomicSet(&C.close, 1); return;
-    case OB_SCREEN_OK: if (C.k.player && C.disc) C.side ^= 1; else SDL_AtomicSet(&C.close, 1); break;
-    case OB_SCREEN_UP: if (C.row > 0) C.row--; break;
-    case OB_SCREEN_DOWN: if (C.row + 7 < seasons) C.row++; break;
-    case OB_SCREEN_LEFT: if (C.col > 0) C.col--; break;
-    case OB_SCREEN_RIGHT: if (C.col + 1 < ncols()) C.col++; break;
+    case OB_SCREEN_OK: if (C.disc) turn(); else SDL_AtomicSet(&C.close, 1); break;
+    case OB_SCREEN_UP: if (C.side == 2) clip_start(V.clip); else if (C.row > 0) C.row--; break;
+    case OB_SCREEN_DOWN: if (C.side != 2 && C.row + 7 < seasons) C.row++; break;
+    case OB_SCREEN_LEFT: if (C.side == 2) clip_start(V.clip - 1); else if (C.col > 0) C.col--; break;
+    case OB_SCREEN_RIGHT: if (C.side == 2) clip_start(V.clip + 1); else if (C.col + 1 < ncols()) C.col++; break;
     case OB_SCREEN_WHEEL: if (e->y > 0 && C.row > 0) C.row--; else if (e->y < 0 && C.row + 7 < seasons) C.row++; break;
     default: return;
     }
@@ -382,7 +518,9 @@ int segacd_card_show(ob_cd *cd, const segacd_card *card, int (*ending)(void))
     C.cd = cd;
     C.team = segacd_team_index(cd, card->abbr);
     C.disc = C.team >= 0 && segacd_graph2_record(cd, 64, NULL) && segacd_graph2_record(cd, 68 + C.team, NULL);
-    C.side = C.row = C.col = 0;
+    C.side = card->player ? 0 : 1;
+    C.row = C.col = 0;
+    V.clip = 0;
     plain_words();
     SDL_AtomicSet(&C.dirty, 1);
     SDL_AtomicSet(&C.close, 0);
@@ -391,15 +529,20 @@ int segacd_card_show(ob_cd *cd, const segacd_card *card, int (*ending)(void))
     return 1;
 }
 
-/* (the window's loop) puts it up, and takes it down once closed */
-void segacd_career_tick(void)
+/* (the window's loop) puts it up, plays the video card's clip, and takes it down once closed */
+void segacd_career_tick(uint32_t dev, unsigned rate, int dedither)
 {
     int st = SDL_AtomicGet(&C.state);
+    C.dev = dev;
+    C.rate = rate;
+    C.dedither = dedither;
+    if (st == 2 && C.side == 2) clip_tick();
     if (st == 1) {
         ob_screen s = { draw, input, NULL };
         ob_screen_show(&s);
         SDL_AtomicSet(&C.state, 2);
     } else if (st == 2 && SDL_AtomicGet(&C.close)) {
+        clip_stop();
         ob_screen_show(NULL);
         SDL_AtomicSet(&C.state, 0);
     }
@@ -415,6 +558,10 @@ const uint32_t *segacd_card_test(ob_cd *cd, const segacd_card *card, int side, i
     C.side = side;
     C.row = row;
     C.col = col;
+    if (side == 2) {                                                      /* (row: the clip, col: how many pictures in) */
+        clip_start(row);
+        for (int i = 0; V.film && i <= col; i++) { V.ntime = 0; V.pcm_at = V.pcm_len; clip_tick(); }
+    }
     compose();
     return C.fb;
 }
