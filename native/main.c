@@ -732,6 +732,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--segacd-voice") && i + 1 < argc) { segacd_on = 1; segacd_set_voice(atoi(argv[++i])); }
         else if (!strcmp(argv[i], "--widescreen")) shots_wide = 1;
         else if (!strcmp(argv[i], "--segacd-screens")) { segacd_on = segacd_screens = 1; segacd_set_screens(1); }
+        else if (!strcmp(argv[i], "--segacd-title")) { segacd_on = segacd_screens = 1; segacd_set_title(1); }
         else if (!strcmp(argv[i], "--segacd-photos")) { segacd_on = 1; segacd_set_photos(1); }
         else if (!strcmp(argv[i], "--segacd-sfx")) segacd_on = segacd_sfx_flag = 1;
         else if (!strcmp(argv[i], "--headless")) headless = 1;

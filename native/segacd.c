@@ -49,6 +49,9 @@ static struct {
     double clip_at;
     int clip_id, queue[8], nqueue;          /* its paragraph, and the ones waiting */
     SDL_atomic_t screens;                   /* the Opening screens row: 1 the disc's */
+    SDL_atomic_t title;                     /* the Title page row: 1 the disc's (its credits, then the license page) */
+    int title_live;                         /* the disc's title page is up (segacd_title_hook) */
+    int hsp_t;                              /* frames of the High Score Productions page shown (its sparkles' clock) */
     SDL_atomic_t intro;                     /* the Intro movie row: 1 HOCKEY.SEG before the title */
     SDL_atomic_t photos, session, career;   /* the Player photos and Career stats rows; a session's console (none then: the machines keep the same RAM) */
     int intro_done;                         /* it played (once a run) */
@@ -84,6 +87,7 @@ static int finder(void *dir)
 }
 
 static int photo_hook(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32]);
+static int title_hook(int what);
 
 void segacd_start(void)
 {
@@ -93,6 +97,7 @@ void segacd_start(void)
     S.ea_at = -1;
     cd_event_hook = segacd_event;
     cd_picture_hook = photo_hook;
+    cd_title_hook = title_hook;
     char *base = SDL_GetBasePath();
     SDL_Thread *t = SDL_CreateThread(finder, "segacd", base ? base : SDL_strdup("."));
     if (t) SDL_DetachThread(t);
@@ -113,6 +118,7 @@ void segacd_set_music(int on) { SDL_AtomicSet(&S.music, on ? 1 : 0); }
 void segacd_set_crowd(int v) { SDL_AtomicSet(&S.crowd, v); }
 void segacd_set_voice(int v) { SDL_AtomicSet(&S.voice, v); }
 void segacd_set_screens(int v) { SDL_AtomicSet(&S.screens, v); }
+void segacd_set_title(int v) { SDL_AtomicSet(&S.title, v); }
 void segacd_set_intro(int v) { SDL_AtomicSet(&S.intro, v); }
 void segacd_set_photos(int v) { SDL_AtomicSet(&S.photos, v); }
 void segacd_set_session(int on) { SDL_AtomicSet(&S.session, on); }
@@ -319,10 +325,12 @@ void segacd_event(int ev, uint16_t n)
             S.intro_done = 1;                 /* (the disc's movie before its title, as the disc plays it: the game waits) */
             segacd_intro_hook();
         }
-        S.out = !n && S.screen >= 1 && S.screen <= 4 && S.pic_of > 0;   /* (the last picture fades out with the cartridge's screen) */
-        S.dark = (S.screen >= 1 && S.screen <= 4) || S.last < 16 * 255;   /* (after one of the disc's pictures, or black already: at once) */
+        S.out = !n && S.screen >= 1 && S.screen <= 5 && S.pic_of > 0;   /* (the last picture fades out with the cartridge's screen) */
+        S.dark = (S.screen >= 1 && S.screen <= 5) || S.last < 16 * 255;   /* (after one of the disc's pictures, or black already: at once) */
         S.screen = n;
         S.ea_t0 = 0;
+        S.hsp_t = 0;
+        if (n != 2 && n != 3) S.title_live = 0;
         if (!S.out) { S.ramp = 0; S.full = 0; }
         break;
     case CD_EV_CROWD:
@@ -382,6 +390,24 @@ static void mix_voice(int16_t *out, int frames, unsigned rate)
         }
         S.clip_at += step;
     }
+}
+
+/* (cd_title_hook, the game's thread) the disc's pages around the title: CD_TITLE_LICENSE: its license page before the title (the
+ * Opening screens row); CD_TITLE_BEGIN: its own title page in place of the cartridge's (the Title page row); CD_TITLE_STEP: a frame
+ * of its credits, 0 at their end. Not in a session (the machines keep step) */
+static int title_hook(int what)
+{
+    ob_cd *cd = segacd_disc();
+    if (!cd || SDL_AtomicGet(&S.session)) return 0;
+    switch (what) {
+    case CD_TITLE_LICENSE: {
+        static uint32_t check[320 * 224];
+        return SDL_AtomicGet(&S.screens) && segacd_picture(cd, SEGACD_PIC_LICENSE, check);
+    }
+    case CD_TITLE_BEGIN: return S.title_live = SDL_AtomicGet(&S.title) && segacd_title_begin(cd);
+    case CD_TITLE_STEP: return S.title_live && segacd_title_step();
+    }
+    return 0;
 }
 
 void segacd_mix(int16_t *out, int frames, unsigned rate)
@@ -479,10 +505,17 @@ static int ea_pieces(uint32_t ms)
 
 int segacd_present(uint32_t *frame, int w, int h)
 {
-    static const int pic[5] = { 0, SEGACD_PIC_HSP + 1, SEGACD_PIC_TITLE + 1, SEGACD_PIC_LICENSE + 1, 100 };
-    if (!SDL_AtomicGet(&S.screens) || !segacd_disc() || (!S.out && (!S.screen || S.screen > 4))) { S.last = 1e9f; S.out = 0; return 0; }
-    int want = S.out ? S.pic_of : pic[S.screen];
-    if (want == 100) {                                     /* (the EA SPORTS logo: built a piece at a time from the disc's sprites) */
+    enum { EA = 100, HSP, TITLE };
+    int on = SDL_AtomicGet(&S.screens), want = 0;
+    switch (S.screen) {
+    case 1: want = on ? HSP : 0; break;
+    case 2: case 3: want = S.title_live ? TITLE : 0; break;
+    case 4: want = on ? EA : 0; break;
+    case 5: want = SEGACD_PIC_LICENSE + 1; break;      /* (asked for by the game: segacd_title_hook) */
+    }
+    if (S.out) want = S.pic_of;
+    if (!segacd_disc() || !want) { S.last = 1e9f; S.out = 0; return 0; }
+    if (want == EA) {                                      /* (the EA SPORTS logo: built a piece at a time from the disc's sprites) */
         if (!S.dark) S.ea_t0 = 0;
         else if (!S.ea_t0) { S.ea_t0 = SDL_GetTicks() | 1; ea_voice_load(); }
         int n = S.ea_t0 ? ea_pieces(SDL_GetTicks() - S.ea_t0) : 0;
@@ -493,6 +526,34 @@ int segacd_present(uint32_t *frame, int w, int h)
             S.pic_of = segacd_ea_logo(S.cd, n, S.pic) ? want : -want;
             shown = n;
         }
+    } else if (want == HSP) {                              /* (its sparkles: a step a frame once it is up) */
+        if (S.pic_of != want) { S.ramp = 0; S.full = 0; }
+        S.pic_of = segacd_hsp(S.cd, S.dark ? S.hsp_t++ : 0, S.pic) ? want : -want;
+    } else if (want == TITLE) {
+        if (S.pic_of != want) { S.ramp = 0; S.full = 0; }
+        segacd_title_draw(S.pic);
+        S.pic_of = want;
+    } else if (S.screen == 5 && !S.out) {                  /* (the license page: already in pic, its own fade in over whatever the game shows) */
+        if (S.pic_of != want) {
+            if (!segacd_picture(S.cd, SEGACD_PIC_LICENSE, S.pic)) { S.pic_of = -want; return 0; }
+            S.pic_of = want; S.ramp = 0; S.full = 0;
+        }
+        if (S.ramp < 1) S.ramp += 1.0f / 24;
+        float sum = 0;                                     /* (the game's screen under it: the fade out follows it) */
+        for (int y = 0; y < h && y < 224; y += 2)
+            for (int x = 0; x < w && x < 320; x += 3) {
+                uint32_t c = frame[y * 320 + x];
+                sum += (float)(((c >> 16) & 255) + ((c >> 8) & 255) + (c & 255));
+            }
+        if (sum > S.full) S.full = sum;
+        S.last = sum;
+        float k = S.ramp < 1 ? S.ramp : 1;
+        for (int i = 0; i < 320 * 224; i++) {
+            uint32_t c = S.pic[i];
+            frame[i] = 0xFF000000u | (uint32_t)(((c >> 16) & 255) * k) << 16 | (uint32_t)(((c >> 8) & 255) * k) << 8 | (uint32_t)((c & 255) * k);
+        }
+        S.dark = 1;
+        return 1;
     } else if (S.pic_of != want) {
         S.pic_of = segacd_picture(S.cd, want - 1, S.pic) ? want : -want;
         S.ramp = 0;
