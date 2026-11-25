@@ -145,7 +145,11 @@ $(BOXDATA): $(wildcard res/box/gen94/* res/box/gen94/tex/*)
 	@mkdir -p $(dir $(BOXDATA))
 	cp -r res/box/gen94/. $(dir $(BOXDATA))
 	@touch $@
-$(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt | $(MISTER)/README.md $(BOXDATA)
+# the frame generation model (Overbar third_party/rife, MIT) for the movie's 30 fps, beside the program
+RIFE := $(patsubst %/,%,$(dir $(BIN)))/rife-v4.6/flownet.bin
+$(RIFE): $(OVERBAR_DIR)/third_party/rife/rife-v4.6/flownet.bin | overbar
+	$(call overbar_copy_rife,$(patsubst %/,%,$(dir $(BIN))))
+$(BIN): $(NOBJ) $(OVERBARO) $(ICONO) mdrt | $(MISTER)/README.md $(BOXDATA) $(RIFE)
 	@mkdir -p $(dir $@) out
 	$(CC) $(CFLAGS) $(SANITIZE) -O2 $(LDFLAGS) -o $@ $(NOBJ) $(OVERBARO) $(ICONO) $(MDRTLIBS) $(SDLLIBS) -lm $(CXXLIB) $(NETLIB)
 mdrt:

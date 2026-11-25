@@ -49,7 +49,10 @@ uint32_t segacd_film_id(const segacd_film *f);                   /* a hash of th
 #define SEGACD_FILM_RATE 16000
 
 /* the intro movie in the window (native/segacd_movie.c): an Overbar screen, its sound on dev (an SDL audio device, 0 none) */
-int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate, int dedither, const char *cache_path);
+/* dedither: ob_postfx_mode; smooth: 30 fps; colour: each shot's own; base: the made files' path less its
+ * extension (<base>.dedither, .smooth, .colour; "" none made); model: the frame generation model's folder */
+int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate, int dedither, int smooth, int colour, const char *base,
+                       const char *model);
 /* dedither: an Overbar ob_postfx_mode (off, live, cached); cache_path: where the cached pass is kept (made on the first play) */
 int segacd_movie_tick(void);             /* (the window's loop) 0 once it has ended */
 int segacd_movie_playing(void);
