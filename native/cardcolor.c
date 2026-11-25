@@ -9,6 +9,11 @@
  * folder NHL94_PC_PORTRAITS names. Nothing is shipped: cardcolor_table.inc only says which portrait
  * is which card's photo, and where it sits on the card.
  *
+ * Or the finished faces: the folder NHL94-colored-faces (EA-NHL-Tools has it: CardNNN_Name.png, 48 x 48,
+ * all 144 cards, Abdul's approved colours) beside the program, in NHL94_PC_PORTRAITS's folder, or where
+ * NHL94_COLORED_FACES names. A card with its face there shows that face, pixel for pixel; the others
+ * are made from the PC files as above. cardcolor_faces.inc only says which picture is CardNNN.
+ *
  * How it is shown: the game draws a picture as it always does (its tiles, its map, its grey palette).
  * picture_drawn_hook notes which picture went where (its tiles' first char, its 36 map entries); each
  * frame the picture is found on its plane, and the pixels the VDP shows from it are replaced by the
@@ -26,23 +31,30 @@
 #include "cardcolor.h"
 #include "cardcolor_xfer.h"
 #include "overbar/cdimage.h"
+#include "overbar/third_party/stb/stb_image.h"   /* (Overbar links it) */
+#include <dirent.h>
 
 static const cc_card table[] = {
 #include "cardcolor_table.inc"
 };
 #define NCARDS ((int)(sizeof table / sizeof table[0]))
+static const uint32_t faces[] = {                  /* CardNNN's picture: the hash of its tiles */
+#include "cardcolor_faces.inc"
+};
+#define NFACES ((int)(sizeof faces / sizeof faces[0]))
+#define FACES_DIR "NHL94-colored-faces"
 #define SHOWN 4                                    /* pictures on one screen (the scouting report has two) */
 #define QFS_FILES 24
 
 static struct {
     SDL_atomic_t on, found;                        /* the Game page's row; the search ended */
-    int have;                                      /* bit 0 95 PC, bit 1 94 PC */
+    int have;                                      /* bit 0 95 PC, bit 1 94 PC, bit 2 faces */
     uint8_t *qfs[QFS_FILES];                       /* the 95 PC banks as read (RefPack), NULL none */
     long qfs_n[QFS_FILES];
     uint8_t *nsh;
     long nsh_n;
-    uint8_t made[NCARDS];                          /* 0 not yet, 1 made, 2 could not be */
-    uint8_t rgb[NCARDS][CC_N * CC_N * 3];
+    uint8_t made[NFACES];                          /* 0 not yet, 1 made (or a face read), 2 could not be */
+    uint8_t rgb[NFACES][CC_N * CC_N * 3];
     struct shown {
         int used, card;
         uint16_t start, count, attr;               /* its first char, its tiles, the map's attribute bits */
@@ -97,11 +109,49 @@ static int find95_in(const char *dir)
     return got;
 }
 
+/* the faces in dir (CardNNN....png): how many */
+static int faces_in(const char *dir)
+{
+    DIR *d = opendir(dir);
+    if (!d) return 0;
+    int got = 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        const char *n = e->d_name;
+        size_t len = strlen(n);
+        int k;
+        if (len < 11 || SDL_strncasecmp(n, "card", 4) || SDL_strcasecmp(n + len - 4, ".png")) continue;
+        if (n[4] < '0' || n[4] > '9' || n[5] < '0' || n[5] > '9' || n[6] < '0' || n[6] > '9') continue;
+        k = (n[4] - '0') * 100 + (n[5] - '0') * 10 + (n[6] - '0') - 1;
+        if (k < 0 || k >= NFACES || C.made[k] || (n[7] != '_' && n[7] != '.')) continue;
+        char path[1200];
+        long size = 0;
+        snprintf(path, sizeof path, "%s/%s", dir, n);
+        uint8_t *b = slurp(path, &size);
+        int w, h, ch;
+        uint8_t *px = b ? stbi_load_from_memory(b, (int)size, &w, &h, &ch, 3) : NULL;
+        if (px && w == CC_N && h == CC_N) { memcpy(C.rgb[k], px, sizeof C.rgb[k]); C.made[k] = 1; got++; }
+        else fprintf(stderr, "Colour photos: %s is not a 48 x 48 picture\n", path);
+        stbi_image_free(px);
+        free(b);
+    }
+    closedir(d);
+    return got;
+}
+
 static int finder(void *arg)
 {
     char *base = arg;
-    const char *env = getenv("NHL94_PC_PORTRAITS");
+    const char *env = getenv("NHL94_PC_PORTRAITS"), *fenv = getenv("NHL94_COLORED_FACES");
     const char *dirs[3] = { env && env[0] ? env : NULL, base, "." };
+    char fdir[1200];
+    int nf = fenv && fenv[0] ? faces_in(fenv) : 0;
+    for (int d = 0; d < 3 && !nf; d++) {
+        if (!dirs[d]) continue;
+        snprintf(fdir, sizeof fdir, "%s%s" FACES_DIR, dirs[d], dirs[d][0] && dirs[d][strlen(dirs[d]) - 1] != '/' && dirs[d][strlen(dirs[d]) - 1] != '\\' ? "/" : "");
+        nf = faces_in(fdir);
+    }
+    if (nf) { C.have |= 4; fprintf(stderr, "Colour photos: %d colour faces from " FACES_DIR "\n", nf); }
     for (int d = 0; d < 3 && !(C.have & 1); d++) if (dirs[d] && find95_in(dirs[d])) C.have |= 1;
     for (int d = 0; d < 3 && !(C.have & 2); d++) if (dirs[d] && (C.nsh = loose(dirs[d], "PORTRAIT.NSH", &C.nsh_n))) C.have |= 2;
     if (!(C.have & 1)) {                                   /* the 95 PC disc */
@@ -131,7 +181,7 @@ static int finder(void *arg)
             ob_cd_close(cd);
         }
     }
-    if (!C.have) fprintf(stderr, "Colour photos: no NHL 95 PC or NHL 94 PC portraits found\n");
+    if (!C.have) fprintf(stderr, "Colour photos: no " FACES_DIR ", NHL 95 PC or NHL 94 PC portraits found\n");
     SDL_free(base);
     SDL_MemoryBarrierRelease();
     SDL_AtomicSet(&C.found, 1);
@@ -150,23 +200,31 @@ void cardcolor_set(int on) { SDL_AtomicSet(&C.on, on ? 1 : 0); }
 
 /* ---- the game's pictures ------------------------------------------------------------------ */
 
-/* the card table's entry for the picture at tiles, -1 none */
+/* the card (CardNNN - 1) of the picture at tiles, -1 none */
 static int card_of(uint32_t tiles)
 {
     if (tiles >= rom_limit) return -1;
     uint16_t count = rd16(rom_ptr(tiles));
     if (!count || count > 36 || tiles + 2u + count * 24u > rom_limit) return -1;
     uint32_t h = cc_hash(rom_ptr(tiles), 2 + count * 24);
-    for (int k = 0; k < NCARDS; k++) if (table[k].hash == h) return k;
+    for (int k = 0; k < NFACES; k++) if (faces[k] == h) return k;
     return -1;
 }
 
-/* card k's colour picture (made once): 1, 0 when it cannot be */
+/* card k's entry in the PC files' table, NULL none */
+static const cc_card *pc_of(int k)
+{
+    for (int i = 0; i < NCARDS; i++) if (table[i].hash == faces[k]) return &table[i];
+    return NULL;
+}
+
+/* card k's colour picture (a face read, or made once from the PC files): 1, 0 when it cannot be */
 static int make(int k, uint32_t tiles, uint32_t map)
 {
     if (C.made[k]) return C.made[k] == 1;
     C.made[k] = 2;
-    const cc_card *c = &table[k];
+    const cc_card *c = pc_of(k);
+    if (!c) return 0;
     cc_img im;
     int ok = 0;
     if (c->src == CC_PC95 && c->file < QFS_FILES && C.qfs[c->file]) ok = cc_qfs_shape(C.qfs[c->file], C.qfs_n[c->file], c->tag, &im);
@@ -215,7 +273,10 @@ int cardcolor_covers(uint16_t team, uint16_t player)
     for (int i = 0; i < T->pictures; i++) {                /* (DrawPlayerPicture's: the team's featured pictures) */
         if (T->picture[i].slot != player) continue;
         int k = card_of(T->picture[i].pic + 8);
-        return k >= 0 && (have & (table[k].src == CC_PC95 ? 1 : 2)) && C.made[k] != 2;
+        if (k < 0 || C.made[k] == 2) return 0;
+        if (C.made[k] == 1) return 1;
+        const cc_card *c = pc_of(k);
+        return c && (have & (c->src == CC_PC95 ? 1 : 2));
     }
     return 0;
 }
