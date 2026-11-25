@@ -246,20 +246,21 @@ static void show(void)
     }
 }
 
+/* the picture, handed to Overbar: drawn like the game's own, through the player's look (Sharp, CRT, MiSTer) */
+static const uint32_t *picture(void *ud, int *w, int *h, int *lines)
+{
+    (void)ud;
+    *w = M.pw; *h = M.ph; *lines = M.fh;
+    return M.pic;
+}
+
+/* what goes over it: the notes */
 static void draw(void *ud, uint32_t *px, int w, int h, int pitch)
 {
     (void)ud;
     int bw = w, bh = w * 3 / 4;             /* (the Genesis picture is 4:3 whatever its width) */
     if (bh > h) { bh = h; bw = h * 4 / 3; }
     int x0 = (w - bw) / 2, y0 = (h - bh) / 2;
-    for (int y = 0; y < h; y++) {
-        uint32_t *row = px + (long)y * pitch;
-        int sy = (y - y0) * M.ph / (bh ? bh : 1);
-        for (int x = 0; x < w; x++) {
-            int sx = (x - x0) * M.pw / (bw ? bw : 1);
-            row[x] = y < y0 || y >= y0 + bh || x < x0 || x >= x0 + bw ? 0xFF000000u : M.pic[sy * M.pw + sx];
-        }
-    }
     float size = h / 24.0f;
     if (M.smooth && !M.mids && SDL_AtomicGet(&making)) {
         char text[80];
@@ -326,7 +327,7 @@ int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate,
     SDL_AtomicSet(&M.skip, 0);
     if (M.dev) { SDL_ClearQueuedAudio(M.dev); SDL_PauseAudioDevice(M.dev, 0); }
     M.t0 = SDL_GetTicks();
-    ob_screen s = { draw, input, NULL };
+    ob_screen s = { draw, input, NULL, picture };
     ob_screen_show(&s);
     return 1;
 }

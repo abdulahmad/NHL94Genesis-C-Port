@@ -60,6 +60,11 @@ static struct {
     int dark;                               /* its first black frame came (the one before has faded out) */
     float last;                             /* the last frame's brightness */
     int out;                                /* the last picture fading out, the opening over */
+    uint32_t ea_t0;                         /* the EA SPORTS logo: SDL_GetTicks when it came up (0 not yet) */
+    int16_t *ea_pcm;                        /* its voice (STARTER.BIN's PCM bank, 16276 Hz), loaded with it */
+    long ea_len;
+    double ea_at;                           /* (the mixer's) where it is, -1 not playing */
+    SDL_atomic_t ea_go;                     /* 1: start it (the picture's thread to the mixer's) */
 } S;
 
 static const char *const need[2] = { "HOCKEY.BIN", "GRAPH2.BIN" };
@@ -85,6 +90,7 @@ void segacd_start(void)
     static int started;
     if (started) return;
     started = 1;
+    S.ea_at = -1;
     cd_event_hook = segacd_event;
     cd_picture_hook = photo_hook;
     char *base = SDL_GetBasePath();
@@ -313,9 +319,10 @@ void segacd_event(int ev, uint16_t n)
             S.intro_done = 1;                 /* (the disc's movie before its title, as the disc plays it: the game waits) */
             segacd_intro_hook();
         }
-        S.out = !n && S.screen >= 1 && S.screen <= 3 && S.pic_of > 0;   /* (the last picture fades out with the cartridge's screen) */
-        S.dark = (S.screen >= 1 && S.screen <= 3) || S.last < 16 * 255;   /* (after one of the disc's pictures, or black already: at once) */
+        S.out = !n && S.screen >= 1 && S.screen <= 4 && S.pic_of > 0;   /* (the last picture fades out with the cartridge's screen) */
+        S.dark = (S.screen >= 1 && S.screen <= 4) || S.last < 16 * 255;   /* (after one of the disc's pictures, or black already: at once) */
         S.screen = n;
+        S.ea_t0 = 0;
         if (!S.out) { S.ramp = 0; S.full = 0; }
         break;
     case CD_EV_CROWD:
@@ -381,6 +388,19 @@ void segacd_mix(int16_t *out, int frames, unsigned rate)
 {
     segacd_sfx_mix(out, frames, rate);
     if (S.clip && rate) mix_voice(out, frames, rate);
+    if (SDL_AtomicCAS(&S.ea_go, 1, 0)) { SDL_MemoryBarrierAcquire(); S.ea_at = 0; }
+    if (S.ea_pcm && S.ea_at >= 0 && rate) {               /* (the EA SPORTS logo's voice) */
+        double step = (double)VOICE_RATE / rate;
+        for (int i = 0; i < frames; i++, S.ea_at += step) {
+            long j = (long)S.ea_at;
+            if (j + 1 >= S.ea_len) { S.ea_at = -1; break; }
+            float v = (float)(S.ea_pcm[j] + (S.ea_pcm[j + 1] - S.ea_pcm[j]) * (S.ea_at - j)) * VOICE_GAIN;
+            for (int c = 0; c < 2; c++) {
+                float x = v + out[2 * i + c];
+                out[2 * i + c] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
+            }
+        }
+    }
     if (S.clip && !SDL_AtomicGet(&S.voice)) voice_stop();
     if (S.crowd_live > 0 && --S.crowd_live == 0 && S.bed) stop();   /* (the game's crowd stopped: the menus) */
     if (S.bed && !(crowd_bits() & 2)) stop();
@@ -422,12 +442,58 @@ void segacd_mix(int16_t *out, int frames, unsigned rate)
  * disc boots in (title from STARTER.BIN, then the license from GRAPH2.BIN before the menus).
  * The cartridge's own screen goes on underneath (its timing, Start, its song), so the game is
  * the same; the picture fades in by itself and out with the cartridge's frame. */
+/* the EA SPORTS logo's voice: the PCM bank at the end of STARTER.BIN's boot art (RF5C164 bytes up to the first $FF) */
+#define EA_PCM_AT 50540L
+#define EA_PCM_MAX 63284L
+
+static void ea_voice_load(void)
+{
+    uint8_t *b;
+    if (S.ea_pcm || !S.cd) return;
+    long size = ob_cd_read_file(S.cd, "STARTER.BIN", &b);
+    if (size >= EA_PCM_AT + EA_PCM_MAX) {
+        int16_t *c = SDL_malloc((size_t)EA_PCM_MAX * sizeof *c);
+        long len = 0;
+        if (c)
+            for (; len < EA_PCM_MAX && b[EA_PCM_AT + len] != 0xFF; len++) {
+                int v = (b[EA_PCM_AT + len] & 0x7F) << 8;
+                c[len] = (int16_t)(b[EA_PCM_AT + len] & 0x80 ? v : -v);
+            }
+        S.ea_len = len;
+        SDL_MemoryBarrierRelease();
+        S.ea_pcm = c;
+    }
+    free(b);
+}
+
+/* the disc's EA SPORTS logo now: ScreenSetupA's script (starterscreen94cd.asm) at 60 frames a second puts the first
+ * piece up at frame 11 with the voice, then one each 31 frames twice, then 5 frames, then one each 7 frames; 17 in all */
+static int ea_pieces(uint32_t ms)
+{
+    int t = (int)(ms * 60 / 1000), n = 0;
+    static const int first[4] = { 11, 42, 73, 104 };
+    for (int i = 0; i < 4; i++) if (t >= first[i]) n = i + 1;
+    if (t >= 109) n = 5 + (t - 109) / 7;
+    return n > 17 ? 17 : n;
+}
+
 int segacd_present(uint32_t *frame, int w, int h)
 {
-    static const int pic[4] = { 0, SEGACD_PIC_HSP + 1, SEGACD_PIC_TITLE + 1, SEGACD_PIC_LICENSE + 1 };
-    if (!SDL_AtomicGet(&S.screens) || !segacd_disc() || (!S.out && (!S.screen || S.screen > 3))) { S.last = 1e9f; S.out = 0; return 0; }
+    static const int pic[5] = { 0, SEGACD_PIC_HSP + 1, SEGACD_PIC_TITLE + 1, SEGACD_PIC_LICENSE + 1, 100 };
+    if (!SDL_AtomicGet(&S.screens) || !segacd_disc() || (!S.out && (!S.screen || S.screen > 4))) { S.last = 1e9f; S.out = 0; return 0; }
     int want = S.out ? S.pic_of : pic[S.screen];
-    if (S.pic_of != want) {
+    if (want == 100) {                                     /* (the EA SPORTS logo: built a piece at a time from the disc's sprites) */
+        if (!S.dark) S.ea_t0 = 0;
+        else if (!S.ea_t0) { S.ea_t0 = SDL_GetTicks() | 1; ea_voice_load(); }
+        int n = S.ea_t0 ? ea_pieces(SDL_GetTicks() - S.ea_t0) : 0;
+        static int shown = -1;
+        if (S.pic_of != want || n != shown) {
+            if (S.pic_of != want) { S.ramp = 0; S.full = 0; }
+            if (n >= 1 && shown < 1 && S.ea_pcm) SDL_AtomicSet(&S.ea_go, 1);
+            S.pic_of = segacd_ea_logo(S.cd, n, S.pic) ? want : -want;
+            shown = n;
+        }
+    } else if (S.pic_of != want) {
         S.pic_of = segacd_picture(S.cd, want - 1, S.pic) ? want : -want;
         S.ramp = 0;
         S.full = 0;

@@ -148,3 +148,69 @@ int segacd_picture(ob_cd *cd, int which, uint32_t *out)
     free(b);
     return ok;
 }
+
+/* ---- the disc's EA SPORTS logo (STARTER.BIN EaLogoSheetA, $BC62, 1952 bytes): a sprite sheet (palette offset, frame
+ * table offset, tile word with bit 15 = packed, tiles), the frame table words (frame n's sprites from entry n - 1 to
+ * entry n), 8 bytes a sprite (x, y, tile, flags in the top 5 bits, size in the low byte), x and y on the VDP's sprite
+ * plane (128 is the screen's edge). ScreenSetupA (starterscreen94cd.asm) builds the logo a piece at a time: with n
+ * pieces up it draws frames n down to 1 (frame n on top), at (128, 128), from the third on 8 lower; tile 0 of the
+ * sheet is the first it loads. The backdrop is colour 0 of line 0. */
+#define EA_SHEET_AT 0xBC62L
+#define EA_SHEET_LEN 1952L
+
+int segacd_ea_logo(ob_cd *cd, int pieces, uint32_t *out)
+{
+    static uint8_t *tiles;
+    static unsigned ntiles;
+    static uint8_t sheet[EA_SHEET_LEN];
+    static uint32_t col[64];
+    static int loaded;                                     /* 1 ready, -1 not on this disc */
+    if (!loaded && cd) {
+        uint8_t *b;
+        long size = ob_cd_read_file(cd, "STARTER.BIN", &b);
+        loaded = -1;
+        if (size >= EA_SHEET_AT + EA_SHEET_LEN) {
+            memcpy(sheet, b + EA_SHEET_AT, EA_SHEET_LEN);
+            uint32_t pal = be32(sheet);
+            unsigned tw = be16(sheet + 8), n = tw & 0x7FFF;
+            if (n && pal + 128 <= EA_SHEET_LEN && be32(sheet + 4) + 4 <= EA_SHEET_LEN && (tiles = malloc((size_t)n * 32))) {
+                if (tw & 0x8000 ? unpack(sheet + 10, EA_SHEET_LEN - 10, tiles, (long)n * 32) >= (long)n * 32
+                                : 10 + (long)n * 32 <= EA_SHEET_LEN && (memcpy(tiles, sheet + 10, (size_t)n * 32), 1)) {
+                    cram(sheet + pal, col);
+                    ntiles = n;
+                    loaded = 1;
+                } else { free(tiles); tiles = NULL; }
+            }
+        }
+        free(b);
+    }
+    if (loaded != 1) return 0;
+    for (int i = 0; i < 320 * 224; i++) out[i] = col[0];
+    uint32_t tab = be32(sheet + 4);
+    unsigned frames = be16(sheet + tab) / 2 - 1;
+    if (pieces > (int)frames) pieces = (int)frames;
+    for (int f = 1; f <= pieces; f++) {                    /* (frame 1 first: each later one over it) */
+        unsigned a = tab + be16(sheet + tab + 2 * (f - 1)), e = tab + be16(sheet + tab + 2 * f);
+        if (e > EA_SHEET_LEN || a > e) return 0;
+        int oy = f >= 3 ? 8 : 0;
+        for (unsigned s = e; s >= a + 8; s -= 8) {         /* (a frame's first sprite on top: drawn last) */
+            const uint8_t *p = sheet + s - 8;
+            int x0 = (int16_t)be16(p) - 128 + 128, y0 = (int16_t)be16(p + 2) - 128 + 128 + oy;
+            unsigned t0 = be16(p + 4), fl = be16(p + 6), size = fl & 0xFF, cw = (size >> 2 & 3) + 1, ch = (size & 3) + 1;
+            unsigned pal = (fl >> 13) & 3, hf = fl & 0x800, vf = fl & 0x1000;
+            for (unsigned cx = 0; cx < cw; cx++) for (unsigned cy = 0; cy < ch; cy++) {
+                unsigned t = (t0 + cx * ch + cy) & 0x7FF;
+                if (t >= ntiles) continue;
+                int dx = x0 + 8 * (int)(hf ? cw - 1 - cx : cx), dy = y0 + 8 * (int)(vf ? ch - 1 - cy : cy);
+                for (unsigned y = 0; y < 8; y++) for (unsigned x = 0; x < 8; x++) {
+                    unsigned sx = hf ? 7 - x : x, sy = vf ? 7 - y : y;
+                    uint8_t b = tiles[t * 32 + sy * 4 + sx / 2];
+                    unsigned c = sx & 1 ? b & 15 : b >> 4;
+                    int px = dx + (int)x, py = dy + (int)y;
+                    if (c && px >= 0 && px < 320 && py >= 0 && py < 224) out[py * 320 + px] = col[pal * 16 + c];
+                }
+            }
+        }
+    }
+    return 1;
+}

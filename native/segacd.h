@@ -34,6 +34,7 @@ void segacd_sfx_wait(void);             /* (headless) until they are rendered */
 /* the disc's opening pictures (native/segacd_pics.c): 320 x 224 ARGB into out; 0 when it cannot */
 enum { SEGACD_PIC_HSP, SEGACD_PIC_TITLE, SEGACD_PIC_LICENSE };
 int segacd_picture(ob_cd *cd, int which, uint32_t *out);
+int segacd_ea_logo(ob_cd *cd, int pieces, uint32_t *out);   /* the disc's EA SPORTS logo with that many pieces up (320 x 224) */
 
 /* the disc's movies (native/segacd_film.c): an SM picture over the tiles the frame before left; 0 when it is not one */
 int segacd_sm_decode(const uint8_t *c, long n, uint8_t *tiles, int *w, int *h, uint16_t cram[64], uint8_t *line, int max_tiles);

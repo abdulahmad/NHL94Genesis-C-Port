@@ -538,7 +538,7 @@ void segacd_career_tick(uint32_t dev, unsigned rate, int dedither)
     C.dedither = dedither;
     if (st == 2 && C.side == 2) clip_tick();
     if (st == 1) {
-        ob_screen s = { draw, input, NULL };
+        ob_screen s = { draw, input, NULL, NULL };
         ob_screen_show(&s);
         SDL_AtomicSet(&C.state, 2);
     } else if (st == 2 && SDL_AtomicGet(&C.close)) {
