@@ -473,11 +473,13 @@ void PeriodOver(void)
 void PeriodOver_sp(void)
 {
     ResetClock();
-    uint16_t v = g.Vcount;
-    while (g.Vcount == v) hal_wait_vblank();
-    p_turnoff();
-    v = g.Vcount;
-    while (g.Vcount == v) hal_wait_vblank();
+    if (!rules[RULE_CD_PERIOD_END]) {                    /* (rules: the Sega CD goes straight to the song) */
+        uint16_t v = g.Vcount;
+        while (g.Vcount == v) hal_wait_vblank();
+        p_turnoff();
+        v = g.Vcount;
+        while (g.Vcount == v) hal_wait_vblank();
+    }
     song(SYM_SngEOG);
     UpdateScores();
     if (g.gsp == 4) AddPlayoffTeamStats();

@@ -518,6 +518,7 @@ static const char *const cd_off_on[2] = { "off", "on" };
 static const struct { int rule; const char *key; } cd_rows[] = {
     { RULE_CD_SKATING, "cd_skating" }, { RULE_CD_CORNERS, "cd_corners" }, { RULE_CD_PSBOX, "cd_penalty_shot_box" },
     { RULE_CD_PASSWORD, "cd_password" }, { RULE_CD_CLEARSHOT, "cd_clear_shots" }, { RULE_CD_COLOURS, "cd_colours" },
+    { RULE_CD_SOUNDS, "cd_sounds" }, { RULE_CD_SONGS, "cd_songs" }, { RULE_CD_PERIOD_END, "cd_period_end" },
 };
 #define CD_ROWS ((int)(sizeof cd_rows / sizeof cd_rows[0]))
 #define CD_ROSTERS CD_ROWS                                /* (the roster set, the built-in "sega-cd", list entry 1) */
@@ -600,7 +601,8 @@ static void intro_tick(void)
 static void game_page_init(void)
 {
     static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
-                                                  "Sega CD playoff password", "Sega CD shot data fix", "Sega CD uniforms" };
+                                                  "Sega CD playoff password", "Sega CD shot data fix", "Sega CD uniforms",
+                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end" };
     for (int k = 0; k < CD_ROWS; k++) {
         char key[64];
         snprintf(key, sizeof key, "rules.%s", cd_rows[k].key);

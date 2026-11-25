@@ -36,6 +36,11 @@ enum {
     RULE_CD_PASSWORD,           /* a playoff password's pad layout read as the disc reads it */
     RULE_CD_CLEARSHOT,          /* ClearShotData clears its $72 words, not $E4 (past the buffer) */
     RULE_CD_COLOURS,            /* HFD's home and OTW's away uniforms in the disc's colours */
+    RULE_CD_SOUNDS,             /* the disc's sound ids: the breakaway "ding" 2 (not 1) in breakaway, asspuckc and
+                                 * assnearest; dopass's sound always $10 (not $10-$13 by the puck's height) */
+    RULE_CD_SONGS,              /* the disc starts songs at once: the home goal song (not 120 frames later), the
+                                 * faceoff song in puckfaceoff (not queued for the drop) */
+    RULE_CD_PERIOD_END,         /* PeriodOver_sp without the two vblank waits and the p_turnoff between them */
     RULE_COUNT
 };
 /* the original's values; a percentage is at most 255 */

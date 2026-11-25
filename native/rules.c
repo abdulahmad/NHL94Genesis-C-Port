@@ -68,6 +68,9 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_CD_PASSWORD] = { "rules.cd_password", "Sega CD playoff password", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_CD_CLEARSHOT] = { "rules.cd_clear_shots", "Sega CD shot data fix", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_CD_COLOURS] = { "rules.cd_colours", "Sega CD uniforms", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_CD_SOUNDS] = { "rules.cd_sounds", "Sega CD sound choices", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_CD_SONGS] = { "rules.cd_songs", "Sega CD song timing", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_CD_PERIOD_END] = { "rules.cd_period_end", "Sega CD period end", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
 
 /* a rule the presets set: not the view (a matter of taste) or the Sega CD's (the Game page's) */

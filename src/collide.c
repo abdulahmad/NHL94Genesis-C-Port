@@ -722,8 +722,11 @@ goal:
         g.HmTeam = g.HomeTeam;
         g.SongIndex = 3;
         ChooseSong();
-        g.songdelay = 0x78;
-        g.delayedsong = g.SongNum;
+        if (rules[RULE_CD_SONGS]) song((int16_t)g.SongNum);   /* (rules: the Sega CD plays it now) */
+        else {
+            g.songdelay = 0x78;
+            g.delayedsong = g.SongNum;
+        }
     }
     if (g.ScoreSumbytes == 0x168)
         g.ScoreSumbytes -= 6;                            /* summary full: overwrite the last entry */
