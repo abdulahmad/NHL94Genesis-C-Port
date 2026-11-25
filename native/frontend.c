@@ -698,7 +698,7 @@ static void pa_no_file(void)
     if (done || !announcer_searched()) return;
     done = 1;
     if (announcer_found()) return;
-    snprintf(label, sizeof label, "%s (no XBRUCE2.VIV found)", cd_opts[CD_ANNOUNCER].label);
+    snprintf(label, sizeof label, "%s (no NHL 95 PC disc image found)", cd_opts[CD_ANNOUNCER].label);
     cd_opts[CD_ANNOUNCER].label = label;
 }
 
@@ -722,7 +722,7 @@ static void pcspr_no_file(void)
     if (done || !pcspr_searched()) return;
     done = 1;
     if (pcspr_found()) return;
-    snprintf(label, sizeof label, "%s (no NHL 95 PC files found)", cd_opts[CD_PCSPR].label);
+    snprintf(label, sizeof label, "%s (no NHL 95 PC disc image found)", cd_opts[CD_PCSPR].label);
     cd_opts[CD_PCSPR].label = label;
 }
 
@@ -734,8 +734,8 @@ static void pcsfx_no_file(void)
     if (done || !pcsfx_searched()) return;
     done = 1;
     if (pcsfx_found()) return;
-    snprintf(label[0], sizeof label[0], "%s (no PCFF001.DIG found)", cd_opts[CD_PCSIREN].label);
-    snprintf(label[1], sizeof label[1], "%s (no PCFF001.DIG found)", cd_opts[CD_PCHORN].label);
+    snprintf(label[0], sizeof label[0], "%s (no NHL 95 PC disc image found)", cd_opts[CD_PCSIREN].label);
+    snprintf(label[1], sizeof label[1], "%s (no NHL 95 PC disc image found)", cd_opts[CD_PCHORN].label);
     cd_opts[CD_PCSIREN].label = label[0];
     cd_opts[CD_PCHORN].label = label[1];
 }

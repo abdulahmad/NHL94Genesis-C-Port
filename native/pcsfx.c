@@ -152,7 +152,7 @@ static int finder(void *dir)
 {
     if (SDL_AtomicGet(&S.searched)) { SDL_free(dir); return 0; }
     int ok = find_in((const char *)dir) || find_in(".");
-    if (!ok) fprintf(stderr, "PC siren and horn: no PCFF001.DIG found beside the program\n");
+    if (!ok) fprintf(stderr, "PC siren and horn: no NHL 95 PC disc image found beside the program\n");
     SDL_MemoryBarrierRelease();
     SDL_AtomicSet(&S.found, ok);
     SDL_AtomicSet(&S.searched, 1);
