@@ -46,6 +46,15 @@ static struct {
     long clip_len;
     double clip_at;
     int clip_id, queue[8], nqueue;          /* its paragraph, and the ones waiting */
+    SDL_atomic_t screens;                   /* the Opening screens row: 1 the disc's */
+    int screen;                             /* the cartridge's opening screen now (CD_EV_SCREEN), 0 none */
+    int pic_of;                             /* the picture in pic (SEGACD_PIC_* + 1), 0 none */
+    uint32_t pic[320 * 224];
+    float ramp;                             /* the picture's fade in (0-1), its own: the cartridge's frame gives the fade out */
+    float full;                             /* the cartridge screen's brightest frame so far */
+    int dark;                               /* its first black frame came (the one before has faded out) */
+    float last;                             /* the last frame's brightness */
+    int out;                                /* the last picture fading out, the opening over */
 } S;
 
 static const char *const need[2] = { "HOCKEY.BIN", "GRAPH2.BIN" };
@@ -69,7 +78,7 @@ void segacd_start(void)
     static int started;
     if (started) return;
     started = 1;
-    cd_sound_hook = segacd_event;
+    cd_event_hook = segacd_event;
     char *base = SDL_GetBasePath();
     SDL_Thread *t = SDL_CreateThread(finder, "segacd", base ? base : SDL_strdup("."));
     if (t) SDL_DetachThread(t);
@@ -88,6 +97,7 @@ ob_cd *segacd_disc(void)
 void segacd_set_music(int on) { SDL_AtomicSet(&S.music, on ? 1 : 0); }
 void segacd_set_crowd(int v) { SDL_AtomicSet(&S.crowd, v); }
 void segacd_set_voice(int v) { SDL_AtomicSet(&S.voice, v); }
+void segacd_set_screens(int v) { SDL_AtomicSet(&S.screens, v); }
 
 static int music_on(void) { return SDL_AtomicGet(&S.music) && segacd_disc(); }
 /* the crowd: bit 0 the cartridge's PSG noise, bit 1 the disc's track 2 */
@@ -193,7 +203,7 @@ void segacd_event(int ev, uint16_t n)
     if (log < 0) log = SDL_getenv("SEGACD_LOG") != NULL;
     if (log && ev != CD_EV_CROWD)
         fprintf(stderr, "segacd: frame %ld %s %02X (track %d)\n", native_frames(),
-                ev == CD_EV_SONG ? "song" : ev == CD_EV_STOP ? "stop" : ev == CD_EV_PARAGRAPH ? "paragraph" : "turnoff", n, S.track);
+                ev == CD_EV_SONG ? "song" : ev == CD_EV_STOP ? "stop" : ev == CD_EV_PARAGRAPH ? "paragraph" : ev == CD_EV_SCREEN ? "screen" : "turnoff", n, S.track);
     switch (ev) {
     case CD_EV_SONG: {
         S.song_on_cd = 0;
@@ -220,6 +230,12 @@ void segacd_event(int ev, uint16_t n)
         break;
     case CD_EV_PARAGRAPH:
         paragraph(n);
+        break;
+    case CD_EV_SCREEN:
+        S.out = !n && S.screen >= 1 && S.screen <= 3 && S.pic_of > 0;   /* (the last picture fades out with the cartridge's screen) */
+        S.dark = (S.screen >= 1 && S.screen <= 3) || S.last < 16 * 255;   /* (after one of the disc's pictures, or black already: at once) */
+        S.screen = n;
+        if (!S.out) { S.ramp = 0; S.full = 0; }
         break;
     case CD_EV_CROWD:
         S.crowd_live = CROWD_LIVE;
@@ -315,4 +331,49 @@ void segacd_mix(int16_t *out, int frames, unsigned rate)
             S.at += step;
         }
     }
+}
+
+/* ---- the opening screens: the disc's picture in place of the cartridge's ----
+ * The cartridge's High Score Productions page shows the disc's (its static picture: the disc
+ * animates the logo on it); the cartridge's title shows the disc's title page, and when the
+ * cartridge's credits start rolling, the disc's license page over the goalie, the order the
+ * disc boots in (title from STARTER.BIN, then the license from GRAPH2.BIN before the menus).
+ * The cartridge's own screen goes on underneath (its timing, Start, its song), so the game is
+ * the same; the picture fades in by itself and out with the cartridge's frame. */
+int segacd_present(uint32_t *frame, int w, int h)
+{
+    static const int pic[4] = { 0, SEGACD_PIC_HSP + 1, SEGACD_PIC_TITLE + 1, SEGACD_PIC_LICENSE + 1 };
+    if (!SDL_AtomicGet(&S.screens) || !segacd_disc() || (!S.out && (!S.screen || S.screen > 3))) { S.last = 1e9f; S.out = 0; return 0; }
+    int want = S.out ? S.pic_of : pic[S.screen];
+    if (S.pic_of != want) {
+        S.pic_of = segacd_picture(S.cd, want - 1, S.pic) ? want : -want;
+        S.ramp = 0;
+        S.full = 0;
+    }
+    if (S.pic_of != want) return 0;                        /* (not on this disc) */
+    float sum = 0;
+    for (int y = 0; y < h && y < 224; y += 2)
+        for (int x = 0; x < w && x < 320; x += 3) {
+            uint32_t c = frame[y * 320 + x];
+            sum += (float)(((c >> 16) & 255) + ((c >> 8) & 255) + (c & 255));
+        }
+    S.last = sum;
+    if (S.out) {                                           /* (fading out: until the cartridge's frame is black) */
+        if (sum < 16 * 255 || S.full <= 0) { S.out = 0; return 0; }
+        S.ramp = 1;
+    } else if (sum < 16 * 255) {                                  /* (black, or nearly: the cartridge's screen between fades) */
+        S.dark = 1;
+        S.ramp = 0;
+        S.full = 0;
+    }
+    if (!S.dark) return 0;                                 /* (the screen before it, still fading out) */
+    if (sum > S.full) S.full = sum;
+    float k = S.full > 0 ? sum / S.full : 0;
+    if (S.ramp < 1 && sum >= 16 * 255) S.ramp += 1.0f / 24;   /* (the cartridge's cramfade: about 24 frames) */
+    if (k > S.ramp) k = S.ramp;
+    for (int i = 0; i < 320 * 224; i++) {
+        uint32_t c = S.pic[i];
+        frame[i] = 0xFF000000u | (uint32_t)(((c >> 16) & 255) * k) << 16 | (uint32_t)(((c >> 8) & 255) * k) << 8 | (uint32_t)((c & 255) * k);
+    }
+    return 1;
 }

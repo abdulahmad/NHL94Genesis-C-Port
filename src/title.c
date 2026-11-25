@@ -34,6 +34,7 @@ static void screen_layout(void)
 void TitleScreen(void)
 {
     static const uint8_t font[8] = { 0x0D, 0x10, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
+    if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 2);
     cpu_set_sr(0x2700);
     uint16_t hi = vdp_hv16();                             /* the seed from the HV counter: its high word first */
     g.seed = (uint32_t)hi << 16 | vdp_hv16();
@@ -85,6 +86,7 @@ void TitleScreen(void)
     cpu_set_sr(0x2500);
     do if (CreditsWait()) return; while (g.clampcounter != 0);
     for (int i = 0; i <= 0x3C; i++) if (CreditsWait()) return;
+    if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 3);
     printz(str_TitleScreen_9, sizeof str_TitleScreen_9);
     uint32_t a1 = SYM_CreditsList;
     do {
