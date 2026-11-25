@@ -908,6 +908,12 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_pads_tick();
         if (SDL_AtomicGet(&sides_state) == 1) { ob_pads_sides_open(); SDL_AtomicSet(&sides_state, 2); }
         else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);
+        {   /* the mouse steers in play (the game's frames are running) and steps through the menus otherwise */
+            static unsigned seen_frames;
+            static Uint32 play_ms;
+            if (native_play_frames != seen_frames) { seen_frames = native_play_frames; play_ms = SDL_GetTicks(); }
+            ob_pads_mouse_mode(play_ms && SDL_GetTicks() - play_ms < 250u);
+        }
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
         intro_tick();
         segacd_career_tick(F.dev, F.rate, SDL_AtomicGet(&cd_dedither));
