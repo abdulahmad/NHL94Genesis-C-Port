@@ -85,6 +85,7 @@
 #include "native.h"
 #include "segacd.h"
 #include "announcer.h"
+#include "cardcolor.h"
 #include "wide.h"
 #include "rules.h"
 #include "view.h"
@@ -569,6 +570,7 @@ static uint16_t script_pad(int pad, int k)
 
 /* --segacd-screens: each frame, the picture with the disc's opening screens in it (segacd_present) */
 static int segacd_screens;
+static int pc_photos;                                     /* --pc-photos: the players' photos in colour (cardcolor.c) */
 static uint32_t screen_px[320 * 224];
 static int screen_frame;                                  /* (screen_px is this frame's) */
 static void segacd_frame(void)
@@ -597,6 +599,7 @@ static void write_ppm(const char *path)
     if (screen_frame) { w = 320; h = 224; }
     for (int i = 0; i < h; i++)
         for (int x = 0; x < w; x++) pic[i * 320 + x] = screen_frame ? screen_px[i * 320 + x] : 0xFF000000u | mdrt_vdp_rgb(px[i * 320 + x], 1);
+    if (!screen_frame) cardcolor_present(v, pic, w, h, 320);   /* (--pc-photos) */
     int pitch = 320;
     const uint32_t *src = pic;
     if (shots_wide) { w = wide_frame(v, pic, w, h, 320, wide, WIDE_MAX_W, screen_frame); src = wide; pitch = WIDE_MAX_W; }
@@ -743,6 +746,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--segacd-screens")) { segacd_on = segacd_screens = 1; segacd_set_screens(1); }
         else if (!strcmp(argv[i], "--segacd-title")) { segacd_on = segacd_screens = 1; segacd_set_title(1); }
         else if (!strcmp(argv[i], "--segacd-photos")) { segacd_on = 1; segacd_set_photos(1); }
+        else if (!strcmp(argv[i], "--pc-photos")) { pc_photos = 1; cardcolor_set(1); }
         else if (!strcmp(argv[i], "--segacd-sfx")) segacd_on = segacd_sfx_flag = 1;
         else if (!strcmp(argv[i], "--headless")) headless = 1;
         else if (!strcmp(argv[i], "--lockstep") && i + 1 < argc) { lockstep_path = argv[++i]; headless = 1; }
@@ -880,6 +884,7 @@ int main(int argc, char **argv)
         announcer_start();
         announcer_set(1);
     }
+    if (pc_photos) { cardcolor_start(); cardcolor_wait(); }
     if (segacd_sfx_flag) { segacd_set_sfx(1); segacd_sfx_wait(); }
     if (golden_path && !(golden = fopen(golden_path, "w"))) { fprintf(stderr, "cannot write %s\n", golden_path); return 1; }
     if (hashes_path && !(hashes = fopen(hashes_path, "w"))) { fprintf(stderr, "cannot write %s\n", hashes_path); return 1; }

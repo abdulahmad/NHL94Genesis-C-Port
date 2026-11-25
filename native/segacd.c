@@ -24,6 +24,7 @@
 #include "rosters.h"
 #include "native.h"
 #include "segacd.h"
+#include "cardcolor.h"
 #include "overbar/cdimage.h"
 
 #define SONG_GAIN 0.70f                     /* the disc's tracks against the FM chip's mix */
@@ -172,6 +173,7 @@ static int photo_hook(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colo
     if (!SDL_AtomicGet(&S.photos) || SDL_AtomicGet(&S.session) || !segacd_disc()) return 0;
     const struct RosterTeam *T = rosters_team(team);
     if (player >= T->players) return 0;
+    if (cardcolor_covers(team, player)) return 0;      /* (the cartridge's photo in colour comes first) */
     char abbr[16], name[40];
     plain(&T->abbr, abbr, sizeof abbr);
     plain(&T->player[player].name, name, sizeof name);

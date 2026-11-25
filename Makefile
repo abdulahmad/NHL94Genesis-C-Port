@@ -211,6 +211,11 @@ build/relaytest: test/relaytest.c src/z80.c src/z80.h src/rom.c src/rom.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -Isrc -o $@ test/relaytest.c src/z80.c src/rom.c
 
+# the colour player photos' maths against the prototype's pictures (needs the player's files: tools/cardcolor_check.c)
+build/cardcolor_check: tools/cardcolor_check.c native/cardcolor_xfer.c native/cardcolor_xfer.h native/cardcolor_table.inc
+	@mkdir -p build
+	$(CC) $(CFLAGS) -o $@ tools/cardcolor_check.c native/cardcolor_xfer.c -lm
+
 # the release's downloads, named by the version, built from clean at the commit checked out
 release:
 	tools/release.sh $(VERSION)
