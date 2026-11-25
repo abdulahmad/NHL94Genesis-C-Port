@@ -240,7 +240,7 @@ void play_sfx_or_music_track(uint16_t n);  /* d0 */
 void stop_current_song(uint16_t d0);       /* d0 = the caller's d0 (its high byte leaks into an index) */
 /* the sound events a host can follow (the Sega CD's music: native/segacd.c); NULL: none. It changes
  * nothing in the game. */
-enum { CD_EV_SONG, CD_EV_STOP, CD_EV_TURNOFF, CD_EV_CROWD };
+enum { CD_EV_SONG, CD_EV_STOP, CD_EV_TURNOFF, CD_EV_CROWD, CD_EV_PARAGRAPH /* the scouting report's, its number */ };
 extern void (*cd_sound_hook)(int ev, uint16_t n);
 void ReadJoyData(void);
 uint8_t ReadPad4Way1(void);                /* -> d0 */
