@@ -405,6 +405,15 @@ static int anthem_hook(int home_art, int away_art)
     return (int)(total * 60 / RATE) + 30;
 }
 
+/* the flag of the anthem playing at a frame of the game since it began (0 USA, 1 Canada; -1 none) */
+int pcsong_flag_at(int frame)
+{
+    if (!SDL_AtomicGet(&S.on) || !SDL_AtomicGet(&S.found) || !S.playing) return -1;
+    int first = S.which & 1, second = (S.which >> 1) - 1;
+    if (second >= 0 && (long)frame * RATE / 60 >= S.len[first]) return second;
+    return first;
+}
+
 void pcsong_start(void)
 {
     static int started;

@@ -23,6 +23,8 @@
 #include "rosters.h"
 #include "native.h"
 #include "pcspr.h"
+#include "pcsong.h"
+#include "rules.h"
 #include "cardcolor_xfer.h"
 #include "overbar/cdimage.h"
 
@@ -138,6 +140,29 @@ static int bank(const uint8_t *b, long n)
         if (shape(b, n, off, &P.f[num])) got++;
     }
     return got;
+}
+
+/* NHL 95 PC's flags of the anthems (UFLAG.PPV, CFLAG.PPV: four pictures each, waving) */
+static spr FLG[2][4];
+static int have_flag, nflag[2];
+static void load_flags(const char *dir, ob_cd *cd)
+{
+    static const char *const nm[2] = { "UFLAG.PPV", "CFLAG.PPV" };
+    int got = 0;
+    nflag[0] = nflag[1] = 0;
+    for (int k = 0; k < 2; k++) {
+        long n = 0;
+        uint8_t *b = NULL;
+        if (cd) n = ob_cd_read_file(cd, nm[k], &b); else b = loose(dir, nm[k], &n);
+        if (b && n > 16 && !memcmp(b, "SHPI", 4)) {
+            int count = (int)le32(b + 8);
+            for (int i = 0; i < count && i < 4 && 16 + 8 * i + 8 <= n; i++)
+                if (shape(b, n, le32(b + 20 + 8 * i), &FLG[k][nflag[k]])) { nflag[k]++; got++; }
+        }
+        free(b);
+    }
+    have_flag = nflag[0] > 0 && nflag[1] > 0;
+    if (getenv("PCSPR_LOG")) fprintf(stderr, "pcspr: flags %d of 8\n", got);
 }
 
 static const char *bank_name(int k, char *buf)
@@ -391,6 +416,7 @@ static int load(const char *dir, ob_cd *cd)
         if (o) { fprintf(o, "P6\n%d %d\n255\n", 10 * cw, 10 * ch); fwrite(im, 1, sizeof im, o); fclose(o); }
     }
 
+    if (!have_flag) load_flags(dir, cd);
     if (!LGO.L[0].have) load_logo_set(&LGO.L[0], dir, cd, 0);                           /* (the centre ice logos: optional) */
     if (getenv("PCSPR_LOG")) fprintf(stderr, "pcspr: banks %d pal %d team %d %d\n", banks, pal, P.have_team[0], P.have_team[1]);
     return banks >= 20 && pal && P.have_team[0] && P.have_team[1];
@@ -459,7 +485,11 @@ static void ref_tick(void)
     int fo = asn == pfaceoff || asn == pfaceoff2;
     int fx = (int16_t)g.fox, fy = (int16_t)g.foy;
     int px = pk->Xpos, py = pk->Ypos, cy = (int16_t)g.Vpos;
-    if (fo) {
+    int ax_, ay_, ad_, am_;
+    if (hold_anthem_ref(&ax_, &ay_, &ad_, &am_)) {                           /* (the anthem: at the side with the players in their lines) */
+        R.x = ax_ * 256; R.y = ay_ * 256; R.vx = R.vy = 0;
+        R.dir = ad_; R.t = am_ ? R.t + 1 : 0; R.wasfo = 1; R.drop = 0; R.init = 1;
+    } else if (fo) {
         R.x = (fx > 0 ? fx + 15 : fx - 15) * 256;
         R.y = fy * 256;
         R.vx = R.vy = 0;
@@ -740,9 +770,29 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
  * still in it: the picture is drawn again from a copy of the VDP with those sprite table entries hidden, and where the two differ
  * the cartridge's sprite was visible (not under a window, the face off box or another sprite). The PC's sprite is drawn only there
  * and a few pixels around (the two shapes differ a little); everything else of the cartridge's sprites is given back its background. */
+/* the anthem's flag over the middle of the ice, between the two lines of players, waving (the PC's four pictures, each shown for two steps of 12/100 s) */
+static void flag_draw(uint32_t *pic, int w, int h, int pitch)
+{
+    int t = hold_anthem_time();
+    if (getenv("PCFLAG_LOG")) fprintf(stderr, "flag: t %d have %d flag %d\n", t, have_flag, t < 0 ? -9 : pcsong_flag_at(t));
+    if (t < 0 || !have_flag) return;
+    int k = pcsong_flag_at(t);
+    if (k < 0) return;
+    const spr *f = &FLG[k][(t * 100 / 60 / 12 / 2) % nflag[k]];
+    if (!f->px) return;
+    int x0 = (w - f->w) / 2, y0 = 40;
+    for (int y = 0; y < f->h; y++)
+        for (int x = 0; x < f->w; x++) {
+            int v = f->px[y * f->w + x];
+            int px_ = x0 + x, py = y0 + y;
+            if (v == 255 || px_ < 0 || px_ >= w || py < 0 || py >= h) continue;
+            pic[(long)py * pitch + px_] = 0xFF000000u | (uint32_t)P.pal[v][0] << 16 | (uint32_t)P.pal[v][1] << 8 | P.pal[v][2];
+        }
+}
+
 void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
-    if ((!SDL_AtomicGet(&P.on) && !SDL_AtomicGet(&R.on) && !SDL_AtomicGet(&LGO.on)) || !SDL_AtomicGet(&P.found) || !in_game() || (int16_t)g.palcount >= 0) return;
+    if ((!SDL_AtomicGet(&P.on) && !SDL_AtomicGet(&R.on) && !SDL_AtomicGet(&LGO.on) && hold_anthem_time() < 0) || !SDL_AtomicGet(&P.found) || !in_game() || (int16_t)g.palcount >= 0) return;
     shown list[16];
     int n = 0;
     unsigned sat0 = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
@@ -765,7 +815,7 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
     logo_draw(vdp, px, pitch_px, pic, w, h, pitch);
     static mdrt_vdp scratch;
     if (!SDL_AtomicGet(&P.on)) n = 0;
-    if (n <= 0) { ref_draw(vdp, pic, w, h, pitch, list, 0); return; }
+    if (n <= 0) { ref_draw(vdp, pic, w, h, pitch, list, 0); flag_draw(pic, w, h, pitch); return; }
     static uint16_t clean[320 * 240];
     static uint8_t vis[320 * 240];
     scratch = *vdp;
@@ -829,4 +879,5 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
             }
     }
     ref_draw(vdp, pic, w, h, pitch, list, n);
+    flag_draw(pic, w, h, pitch);
 }
