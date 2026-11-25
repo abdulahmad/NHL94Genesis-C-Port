@@ -63,9 +63,6 @@ int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate,
 void segacd_movie_pause(int on);            /* the overlay is up: the intro waits */
 int segacd_movie_tick(void);             /* (the window's loop) 0 once it has ended */
 int segacd_movie_playing(void);
-struct ob_look;
-/* the movie's own look: an Overbar ob_video_look preset over the player's look game (kept, so changes to it show) */
-void segacd_movie_set_look(int preset, const struct ob_look *game);
 
 /* the disc's player photos (native/segacd_photos.c): team abbr's player name's, as UnpackPicture leaves a picture
  * (the tile count word, 36 tiles) into buf and its 16 colours (big-endian words) into colours; 0 when the disc has none */

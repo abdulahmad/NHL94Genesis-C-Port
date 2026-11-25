@@ -278,6 +278,7 @@ static int find_rom(char *why, size_t why_size)
 
 static int ending(void) { return SDL_AtomicGet(&F.quit) || SDL_AtomicGet(&F.stop); }
 
+static int hold_other;                                /* the same, less a full-window screen (the intro movie is one) */
 static int hold_state;                                /* the overlay, the setup screen or a full-window screen (the box) is open */
 
 static void sram_save(void)
@@ -559,7 +560,7 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_DEDITHER (CD_ROWS + 8)
 #define CD_SMOOTH (CD_ROWS + 9)
 #define CD_COLOUR (CD_ROWS + 10)
-#define CD_MOVIELOOK (CD_ROWS + 11)                        /* (the movie's own scaling look: Overbar's ob_video_look presets) */
+#define CD_MOVIELOOK (CD_ROWS + 11)                        /* (the movie's scaling: the game's or its own, Overbar's host.movie_own, also on Scaling (Movie)) */
 #define CD_PHOTOS (CD_ROWS + 12)
 #define CD_CAREER (CD_ROWS + 13)
 #define CD_ANNOUNCER (CD_ROWS + 15)                        /* (NHL 95 PC's rink announcer, its own files: group 4) */
@@ -576,6 +577,10 @@ static void wide_rows_sync(void)
     if (!host.game_ready || host.widescreen == seen) return;
     if (seen >= 0 && ob_game_get(&host, CD_WIDESCREEN) != host.widescreen) ob_game_set(&host, CD_WIDESCREEN, host.widescreen);
     seen = host.widescreen;
+    static int movie_seen = -1;                           /* (Movie scaling: the Game page's row and Scaling (Movie)'s are one setting too) */
+    if (host.movie_own == movie_seen) return;
+    if (movie_seen >= 0 && ob_game_get(&host, CD_MOVIELOOK) != host.movie_own) ob_game_set(&host, CD_MOVIELOOK, host.movie_own);
+    movie_seen = host.movie_own;
 }
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
 static SDL_atomic_t cd_smooth, cd_colour;
@@ -601,7 +606,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_DEDITHER) { SDL_AtomicSet(&cd_dedither, value); return; }
     if (index == CD_SMOOTH) { SDL_AtomicSet(&cd_smooth, value); return; }
     if (index == CD_COLOUR) { SDL_AtomicSet(&cd_colour, value); return; }
-    if (index == CD_MOVIELOOK) { segacd_movie_set_look(value, &host.lores); return; }
+    if (index == CD_MOVIELOOK) { host.movie_own = value != 0; return; }   /* (hook_frame keeps the two rows alike) */
     if (index == CD_PHOTOS) { segacd_set_photos(value); return; }
     if (index == CD_CAREER) { segacd_set_career(value, ending); return; }
     if (index == CD_PCPHOTOS) { cardcolor_set(value); return; }
@@ -729,7 +734,9 @@ static void game_page_init(void)
     static const char *const smooth[2] = { "original", "30 fps" }, *const colour[2] = { "original", "enhanced" };
     cd_opts[CD_SMOOTH] = (ob_game_opt){ "cd_smooth", "Movie frame rate", smooth, 2, 0, 0, 3 };
     cd_opts[CD_COLOUR] = (ob_game_opt){ "cd_colour", "Movie colour", colour, 2, 0, 0, 3 };
-    cd_opts[CD_MOVIELOOK] = (ob_game_opt){ "cd_movie_look", "Movie look", ob_video_look_names, OB_VIDEO_LOOK_COUNT, 0, 0, 3 };   /* (heavier filtering for the low-quality movie only) */
+    static const char *const movie_scaling[2] = { "same as the game", "its own" };
+    host.has_movie = 1;                                   /* (the overlay lists Scaling (Movie): the intro movie's own look) */
+    cd_opts[CD_MOVIELOOK] = (ob_game_opt){ "movie_scaling", "Movie scaling", movie_scaling, 2, host.movie_own ? 1 : 0, 0, 3 };   /* (its own: the overlay's Scaling (Movie) page) */
     cd_opts[CD_PHOTOS] = (ob_game_opt){ "cd_photos", "Player photos", music, 2, 0, 0, 3 };
     static const char *const career[2] = { "off", "B on a player card" };
     cd_opts[CD_CAREER] = (ob_game_opt){ "cd_career", "Career stats", career, 2, 0, 0, 3 };
@@ -789,7 +796,7 @@ static void game_page_init(void)
     for (size_t k = 0; k < sizeof disc_look / sizeof *disc_look; k++) pv[2][disc_look[k]] = 1;
     pv[2][CD_CROWD] = 2;                                                       /* (both beds) */
     pv[2][CD_DEDITHER] = OB_POSTFX_LIVE;                                       /* (the movie without the dither) */
-    pv[2][CD_MOVIELOOK] = OB_VIDEO_LOOK_CRT_SOFT;                              /* (the movie filtered harder than the game) */
+    pv[2][CD_MOVIELOOK] = 1;                                                   /* (its own look: soft CRT unless changed on Scaling (Movie)) */
     for (int k = 0; k < CD_ROWS; k++) if (!strcmp(cd_rows[k].key, "cd_clear_shots")) pv[2][k] = 1;   /* (the one fix) */
     static const ob_game_preset presets[3] = { { "Recommended", pv[2] }, { "Cartridge", pv[0] }, { "Sega CD", pv[1] } };
     ob_game_ops ops = { NULL, cd_opts, CD_OPTS, cd_changed, NULL, presets, 3 };
@@ -1060,14 +1067,15 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
             }
         }
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
-        segacd_movie_pause(hold_state);
+        segacd_movie_pause(hold_state && !(segacd_movie_playing() && !hold_other));   /* (the movie is a full-window screen itself: only something over it pauses it) */
         intro_tick();
         segacd_career_tick(F.dev, F.rate, SDL_AtomicGet(&cd_dedither));
         cd_no_disc();
         pa_no_file();
         hats_no_file();
         pc_no_files();
-        hold_state = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open || ob_screen_up();
+        hold_other = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open;
+        hold_state = hold_other || ob_screen_up();
         ob_plat_present();
         ob_plat_frame_done(SDL_AtomicSet(&F.fresh, 0));
         if (SDL_AtomicGet(&F.done)) break;
