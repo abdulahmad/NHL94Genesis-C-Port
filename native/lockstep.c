@@ -438,6 +438,17 @@ int native_menu_rows(int rect[][4], int max, int *n, int *sel, int *lr)
     return 0;
 }
 
+/* the humans after the select-sides screen: pad j (n of them) plays team[j] (1 home, 2 visitor), as the game's own cont1team ... cont4team. Not in a demo. */
+int native_apply_seats(const int team[4], int n)
+{
+    if (g.OptNOP == 0 || n <= 0) return 0;
+    g.cont1team = (uint16_t)(n > 0 ? team[0] : 0);
+    g.cont2team = (uint16_t)(n > 1 ? team[1] : 0);
+    g.cont3team = (uint16_t)(g.FourWayPlay && n > 2 ? team[2] : 0);
+    g.cont4team = (uint16_t)(g.FourWayPlay && n > 3 ? team[3] : 0);
+    return 1;
+}
+
 /* where pad p's controlled player is on the screen, in picture pixels from the middle of the picture (the same arithmetic as the
  * game's off-screen arrows, sso_arrow: the player's place less the scroll). 0 when it is not on the ice or the rink is sideways */
 int native_player_on_screen(int p, int *dx, int *dy)
