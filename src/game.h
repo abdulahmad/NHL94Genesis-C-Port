@@ -252,7 +252,7 @@ extern void (*cd_event_hook)(int ev, uint16_t n);
 enum { PA_GOAL, PA_PENALTY, PA_PENSHOT, PA_ONEMIN, PA_STAR };
 extern void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
 /* the goal siren and the horn at a period's end (native/pcsfx.c): the hook returns 1 when the host plays its own and the cartridge's is left out */
-enum { SFX_GOAL, SFX_HORN };
+enum { SFX_GOAL, SFX_HORN, SFX_ONEMIN };
 extern int (*sfx_hook)(int ev);
 
 /* The hat trick hats (native/hats.c): a home skater's third goal starts them (HAT_START), the next face off

@@ -237,6 +237,8 @@ int announcer_searched(void) { return SDL_AtomicGet(&A.searched); }
 int announcer_found(void) { return SDL_AtomicGet(&A.searched) && SDL_AtomicGet(&A.found); }
 void announcer_set(int on) { SDL_AtomicSet(&A.on, on ? 1 : 0); if (!on) announcer_stop(); }
 
+int announcer_active(void) { return SDL_AtomicGet(&A.on) && SDL_AtomicGet(&A.found) && g.demoflag; }
+
 void announcer_stop(void)
 {
     if (!A.lock) return;

@@ -174,7 +174,8 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   for both; away goals and penalties have no song, so the speech is at once. Headless: `--rule announce_timing="with the goal"`.
 - **PC goal siren and PC end of period horn** (host rows, on in Recommended): NHL 95 PC's goal siren (its sound $9C, 7 s) and period end horn
   ($91, 2.6 s) play in place of the cartridge's, from the player's own `PCFF001.DIG` (beside the program or on the NHL 95 PC disc image). The game is
-  untouched, only the sound; without the file the cartridge's sounds stay. Headless: `--pc-sfx PCFF001.DIG --wav out.wav`.
+  untouched, only the sound; without the file the cartridge's sounds stay. At one minute left the PC says "one minute left" with the rink announcer on
+  (the cartridge's beep is left out), else sounds its one minute horn ($97) with the horn row on. Headless: `--pc-sfx PCFF001.DIG --wav out.wav`.
 - **PC between-play pause** (a game rule, off in every preset): the same waits after a goal, a penalty or a penalty shot even without the announcer,
   as the PC game stops play. Headless: `--rule hold_play=1`.
 - **Fighting**: fights in the style of NHL '93, ported from its code. The row has four choices. *NHL 93*: a hard check between two players with
