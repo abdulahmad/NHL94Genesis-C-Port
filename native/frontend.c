@@ -530,11 +530,11 @@ static void font_measure(struct gfont *f, int cell_w, int cell_h, int first_row)
     }
     for (int c = 0; c < 96; c++) {
         int cx = c % 32 * 8, cy = (first_row + c / 32) * 8, lo = cell_w, hi = -1;
-        f->x[c] = cx; f->ink[c] = 0; f->adv[c] = 4;
+        f->x[c] = cx; f->ink[c] = 0; f->adv[c] = 8;
         for (int x = 0; x < cell_w; x++)
             for (int y = 0; y < cell_h; y++)
                 if (f->pic[(size_t)(cy + y) * f->w + cx + x] >> 24) { if (x < lo) lo = x; if (x > hi) hi = x; }
-        if (hi >= lo) { f->x[c] = cx + lo; f->ink[c] = hi - lo + 1; f->adv[c] = hi - lo + 2; }
+        if (hi >= lo) { f->x[c] = cx; f->ink[c] = 8; f->adv[c] = 8; }     /* (the small font is eight wide each, as on the game's screens) */
         f->x[c] |= cy << 16;                                  /* (the row in the high bits) */
     }
 }
@@ -564,8 +564,8 @@ static int sides_text_width(void *ud, const char *s, int big)
     (void)ud;
     sides_art();
     if (!f->pic) return (int)strlen(s) * 6;
-    for (; *s; s++) { int i = glyph_index(f, big, (unsigned char)*s); w += i < 0 ? (big ? 10 : 4) : f->adv[i]; }
-    return w > 0 ? w - 1 : 0;
+    for (; *s; s++) { int i = glyph_index(f, big, (unsigned char)*s); w += i < 0 ? (big ? 15 : 8) : f->adv[i]; }
+    return big && w > 0 ? w - 1 : w;
 }
 
 static void sides_text(void *ud, uint32_t *px, int w, int h, int pitch, int x, int y, const char *s, uint32_t argb, int big, int scale)
@@ -575,19 +575,19 @@ static void sides_text(void *ud, uint32_t *px, int w, int h, int pitch, int x, i
     (void)ud;
     sides_art();
     if (!f->pic) return;
-    for (pass = big ? 1 : 0; pass < 2; pass++) {            /* (the small font: a black shadow first, then the letters) */
+    for (pass = 1; pass < 2; pass++) {            /* (the small font: a black shadow first, then the letters) */
         int pen = 0;
         for (const char *p = s; *p; p++) {
             int i = glyph_index(f, big, (unsigned char)*p);
-            if (i < 0) { pen += big ? 10 : 4; continue; }
+            if (i < 0) { pen += big ? 15 : 8; continue; }
             int gx = f->x[i] & 0xFFFF, gy = f->x[i] >> 16;
             for (int j = 0; j < gh; j++)
                 for (int k = 0; k < f->ink[i]; k++) {
                     uint32_t c = f->pic[(size_t)(gy + j) * f->w + gx + k];
                     if (!(c >> 24)) continue;
                     if (!big) {
-                        int shade = (c & 0xFF) < 250;
-                        c = pass == 0 ? 0xFF000000u : shade ? ((argb >> 1 & 0x7F7F7F) + (argb >> 2 & 0x3F3F3F)) | 0xFF000000u : argb;
+                        int shade = (c >> 16 & 0xFF) < 250;
+                        c = pass == 0 || shade ? 0xFF000000u : argb;     /* (the font's second tone is its dark edge) */
                     }
                     int dx = (x + pen + k + (pass == 0 && !big)) * scale, dy = (y + j + (pass == 0 && !big)) * scale;
                     for (int v = 0; v < scale; v++)
@@ -620,10 +620,20 @@ static void sides_team_plate(void *ud, uint32_t *px, int w, int h, int pitch, in
     static int have[2] = { -2, -2 }, ok[2];
     (void)ud;
     if (have[team] != sides_team[team]) { have[team] = sides_team[team]; ok[team] = rosters_banner(have[team], banner[team]) == 0; }
+    /* the art under the game's own bevel: a light edge top and left, grey, dark at the bottom and right (as on the game's screen) */
     for (int j = 0; j < 16 * scale; j++)
-        for (int i = 0; i < 88 * scale; i++)
-            if (x + i >= 0 && x + i < w && y + j >= 0 && y + j < h)
-                px[(size_t)(y + j) * pitch + x + i] = ok[team] ? banner[team][j / scale * 88 + i / scale] : 0xFF000000u;
+        for (int i = 0; i < 88 * scale; i++) {
+            int gx = i / scale, gy = j / scale;
+            uint32_t v = ok[team] ? banner[team][gy * 88 + gx] : 0xFF000000u;
+            if (x + i < 0 || x + i >= w || y + j < 0 || y + j >= h) continue;
+            if (gy == 0) v = 0xFFDBDBDBu;
+            else if (gx == 0) { if (gy == 15) continue; v = 0xFFDBDBDBu; }
+            else if (gy == 15) v = 0xFF242424u;
+            else if (gx == 87) v = 0xFF242424u;
+            else if (gx == 1 || gy == 1) v = 0xFF929292u;
+            else if (gx == 86 || gy == 14) v = 0xFF494949u;
+            px[(size_t)(y + j) * pitch + x + i] = v;
+        }
 }
 
 static void sides_background(void *ud, uint32_t *px, int w, int h, int pitch)
