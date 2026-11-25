@@ -30,6 +30,7 @@ int wide_frame(const mdrt_vdp *v, const uint32_t *pic, int w, int h, int pitch, 
 
 /* a w-wide frame is the wide-view rink (rules.view) */
 int wide_rink_frame(int w);
+int wide_hor_frame(int w);       /* the wide view's horizontal rink (the penalty screen): 256 in the middle of 320 */
 /* the wide rink's picture (320 x h) for a 4:3 screen: its middle 256, panning with the puck, plane A's
  * overlays and boxes where the cartridge has them -> 256 */
 void wide_crop_follow(void);   /* (each frame the rink is up: the crop's camera) */
