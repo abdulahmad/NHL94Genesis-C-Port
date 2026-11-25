@@ -1,0 +1,11 @@
+#ifndef PCSPR_H
+#define PCSPR_H
+#include <stdint.h>
+
+void pcspr_start(void);                    /* look for NHL 95 PC's sprite banks (000_049.PPV ...) beside the program or on its disc (a thread) and hook the game */
+void pcspr_wait(void);                     /* (headless) until the search ends */
+int pcspr_searched(void);
+int pcspr_found(void);                     /* 1 when the sprites were read (after the search) */
+void pcspr_set(int on);                    /* the Game page: 0 off (the cartridge's sprites), 1 on (the PC's, the cartridge's where the PC has none) */
+void pcspr_present(uint32_t *pic, int w, int h, int pitch);   /* draw the PC's sprites over a finished picture */
+#endif

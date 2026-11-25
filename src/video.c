@@ -439,10 +439,18 @@ void checksso(struct Vid *v)
 }
 
 /* video94.asm:setsortcords. addframe for the 16 objects in OOlist order. */
+int (*spr_hook)(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o);
+static int spr_sc = -1;                                   /* the object addframe is drawing (for spr_hook) */
+
 void setsortcords(struct Vid *v)
 {
-    for (int i = 0; i < 16; i++)
-        addframe(&sortobj(g.OOlist[i] / 2)->rink, v);
+    if (spr_hook) spr_hook(SPR_BEGIN, 0, 0, 0, NULL);
+    for (int i = 0; i < 16; i++) {
+        spr_sc = g.OOlist[i] / 2;
+        addframe(&sortobj(spr_sc)->rink, v);
+    }
+    spr_sc = -1;
+    if (spr_hook) spr_hook(SPR_END, 0, 0, 0, NULL);
 }
 
 /* video94.asm:setffo. The 7 objects tied to the rink scrolling (the gloves and the pads),
@@ -546,6 +554,7 @@ void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
     uint16_t attr_saved = o->attribute;
     int16_t d4 = (int16_t)o->frame;
     if (d4 <= 0) return;
+    if (spr_hook && spr_sc >= 0 && spr_hook(SPR_DRAW, spr_sc, x, y, o)) return;   /* (the host draws this one: the PC's sprites) */
     o->attribute ^= (uint16_t)(d4 & 0xF800);
     uint16_t fr = (uint16_t)(o->frame & 0x7FF);
     const uint8_t *a2 = rom_ptr(ART(Sprites) + rd32(rom_ptr(ART(Sprites)) + 4));
