@@ -696,7 +696,7 @@ goal:
     ChkShotStat();
     stop_current_song(0);                                /* checkgoal's d0 is not followed (a register leak) */
     hal_wait_vblank();
-    sfx(0);                                              /* SFXsiren */
+    if (!(sfx_hook && sfx_hook(SFX_GOAL))) sfx(0);       /* SFXsiren (the PC's: pcsfx.c) */
     freezewindow();
     g.Crowdlevel += 0x1F4;
     struct Team *a2 = team_struct(0), *a1 = team_struct(1);

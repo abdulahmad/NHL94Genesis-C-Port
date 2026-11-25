@@ -303,7 +303,7 @@ void clockcont(void)
     if (g.gameclock != 0) return;
     g.disflags |= HI(dfclock);
     stop_current_song(0);                                /* periodicevents' d0 is not followed (a register leak) */
-    sfx(SYM_SFXhorn);
+    if (!(sfx_hook && sfx_hook(SFX_HORN))) sfx(SYM_SFXhorn);   /* (the PC's horn: pcsfx.c) */
     freezewindow();
     clockcont_0();
 }
