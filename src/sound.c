@@ -116,6 +116,7 @@ void play_sfx_or_music_track(uint16_t n)
     uint16_t track = 7;
     for (int i = 1; i < 8; i++)
         if (low > (int32_t)g.fm_slots[i].stream) { slot = &g.fm_slots[i]; low = (int32_t)slot->stream; track = (uint16_t)(7 - i); }
+    if ((int16_t)n < 0x30 && cd_event_hook) cd_event_hook(CD_EV_SFX, (uint16_t)(n | ((int32_t)slot->stream >= 0 ? 8 : track) << 8));
     if ((int32_t)slot->stream >= 0) return;              /* no free slot */
     uint32_t stream = rd32(rom_ptr(SYM_SoundStreamTable + (uint16_t)(n << 2)));
     slot->stream = stream;
