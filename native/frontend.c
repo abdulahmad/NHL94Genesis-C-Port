@@ -405,8 +405,10 @@ static int start_game(void)
 
 /* ---- the window ---- */
 
+static void wide_rows_sync(void);
 static const uint32_t *hook_frame(int *w, int *h)
 {
+    wide_rows_sync();
     SDL_LockMutex(F.lock);
     memcpy(F.shown, F.picture, sizeof F.shown);
     *w = F.width > 0 ? F.width : 320;
@@ -559,8 +561,17 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_PCPHOTOS (CD_ROWS + 13)                        /* (the cartridge's photos in colour, from the player's PC files: cardcolor.c) */
 #define CD_WHITEICE (CD_ROWS + 15)                         /* (white ice: group 4) */
 #define CD_HATS (CD_ROWS + 16)                            /* (NHL 94 SNES's hat trick hats, its own ROM: group 4) */
-#define CD_OPTS (CD_ROWS + 17)
+#define CD_WIDESCREEN (CD_ROWS + 17)                      /* (the picture 4:3 or 16:9: Overbar's host.widescreen, also on its Scaling page) */
+#define CD_OPTS (CD_ROWS + 18)
 static ob_game_opt cd_opts[CD_OPTS];
+/* the Widescreen rows (the Game page's, Overbar's Scaling page's) are one setting: the Scaling page's change shown on the Game page */
+static void wide_rows_sync(void)
+{
+    static int seen = -1;
+    if (!host.game_ready || host.widescreen == seen) return;
+    if (seen >= 0 && ob_game_get(&host, CD_WIDESCREEN) != host.widescreen) ob_game_set(&host, CD_WIDESCREEN, host.widescreen);
+    seen = host.widescreen;
+}
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
 static SDL_atomic_t cd_smooth, cd_colour;                 /* the movie at 30 fps; each shot's colour */
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
@@ -592,6 +603,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_ANNOUNCER) { announcer_set(value); return; }
     if (index == CD_WHITEICE) { whiteice_set(value); return; }
     if (index == CD_HATS) { hats_set(value); return; }
+    if (index == CD_WIDESCREEN) { host.widescreen = value != 0; return; }   /* (hook_frame keeps the two rows alike) */
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -720,6 +732,8 @@ static void game_page_init(void)
     hats_start();
     cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 0, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
     cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
+    static const char *const shape[2] = { "4:3", "16:9" };
+    cd_opts[CD_WIDESCREEN] = (ob_game_opt){ "widescreen", "Widescreen", shape, 2, host.widescreen ? 1 : 0, 0, 4 };   /* (each machine its own: wide.c) */
     cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 0, 0, 4 };
     segacd_start();
     cardcolor_start();
@@ -737,7 +751,9 @@ static void game_page_init(void)
     pv[2][CD_HATS] = 1;                                                        /* (on in Recommended; it does nothing without the SNES ROM) */
     pv[1][CD_WHITEICE] = 0;                                                    /* (the PC games' look: not the Sega CD's; off in Recommended too, it is a taste) */
     pv[2][CD_ANNOUNCER] = 1;                                                  /* (on in Recommended; it does nothing without 95 PC's files) */
-    pv[2][CD_PCPHOTOS] = 1;                                                    /* (Abdul: on in Recommended) */
+    pv[2][CD_PCPHOTOS] = 1;
+    pv[1][CD_WIDESCREEN] = 0;                                                  /* (16:9 in Recommended; the cartridge's and the disc's 4:3) */
+    pv[2][CD_WIDESCREEN] = 1;                                                    /* (Abdul: on in Recommended) */
     static const int disc_look[] = { CD_VOICE, CD_SCREENS, CD_TITLE, CD_INTRO, CD_SFX, CD_PHOTOS, CD_CAREER };
     for (size_t k = 0; k < sizeof disc_look / sizeof *disc_look; k++) pv[2][disc_look[k]] = 1;
     pv[2][CD_CROWD] = 2;                                                       /* (both beds) */
