@@ -47,6 +47,8 @@ static struct {
     double clip_at;
     int clip_id, queue[8], nqueue;          /* its paragraph, and the ones waiting */
     SDL_atomic_t screens;                   /* the Opening screens row: 1 the disc's */
+    SDL_atomic_t intro;                     /* the Intro movie row: 1 HOCKEY.SEG before the title */
+    int intro_done;                         /* it played (once a run) */
     int screen;                             /* the cartridge's opening screen now (CD_EV_SCREEN), 0 none */
     int pic_of;                             /* the picture in pic (SEGACD_PIC_* + 1), 0 none */
     uint32_t pic[320 * 224];
@@ -98,6 +100,8 @@ void segacd_set_music(int on) { SDL_AtomicSet(&S.music, on ? 1 : 0); }
 void segacd_set_crowd(int v) { SDL_AtomicSet(&S.crowd, v); }
 void segacd_set_voice(int v) { SDL_AtomicSet(&S.voice, v); }
 void segacd_set_screens(int v) { SDL_AtomicSet(&S.screens, v); }
+void segacd_set_intro(int v) { SDL_AtomicSet(&S.intro, v); }
+void (*segacd_intro_hook)(void);
 
 static int music_on(void) { return SDL_AtomicGet(&S.music) && segacd_disc(); }
 /* the crowd: bit 0 the cartridge's PSG noise, bit 1 the disc's track 2 */
@@ -232,6 +236,10 @@ void segacd_event(int ev, uint16_t n)
         paragraph(n);
         break;
     case CD_EV_SCREEN:
+        if (n == 2 && !S.intro_done && SDL_AtomicGet(&S.intro) && segacd_intro_hook && segacd_disc()) {
+            S.intro_done = 1;                 /* (the disc's movie before its title, as the disc plays it: the game waits) */
+            segacd_intro_hook();
+        }
         S.out = !n && S.screen >= 1 && S.screen <= 3 && S.pic_of > 0;   /* (the last picture fades out with the cartridge's screen) */
         S.dark = (S.screen >= 1 && S.screen <= 3) || S.last < 16 * 255;   /* (after one of the disc's pictures, or black already: at once) */
         S.screen = n;
