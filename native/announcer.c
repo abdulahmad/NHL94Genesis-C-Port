@@ -1,0 +1,421 @@
+/* The rink announcer of NHL 95 PC beside the cartridge game (the Game page's "Rink announcer").
+ *
+ * NHL 95 PC says a goal, a penalty, a penalty shot, the last minute and the three stars over the
+ * crowd, from the clips in its XBRUCE2.VIV (one voice, one clip a word: "BOS.tea", "goalnum.cor",
+ * "7.num"). The cartridge shows the same events in boxes; this says them. The clips are the player's
+ * own: the file is found beside the program (loose, or on the NHL 95 PC disc image, any ripping, by
+ * Overbar's cdimage reader), never shipped. 95 PC has the expansion teams (Anaheim, Florida), so its
+ * voice knows every team of this game.
+ *
+ * What is said (the wording is 95 PC's: SayGoal, SayPenalty, SayPenaltyShot, SayPlayerNumber and
+ * SayOneMinuteLeft in NHL95PC src/front/announcer):
+ *   goal          "<team> goal number <n>" and "assisted by number <n>", "and number <n>"
+ *   penalty       "<team> penalty on number <n>, 2 minutes, <name>" ("and number <n>" for another of the
+ *                 same team's stoppage), then "at <minutes> <seconds>" after the last
+ *   penalty shot  "<team> penalty shot number <n>, at <minutes> <seconds>"
+ *   last minute   "one minute left"
+ *   three stars   "first star: <team> number <n>" ...
+ * The clips are 95 PC's rink clips: the ones its mixer plays through the 4-bit Fibonacci table (the
+ * speech clips, .INT .BAR .HOM .AWA .RNK, are 47 FB packed and are not used). None of this is in the
+ * game: it only adds sound, so states, replays and online play are the same with it on or off. */
+#include <SDL.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+#include <ctype.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include "game.h"
+#include "rom.h"
+#include "rosters.h"
+#include "native.h"
+#include "announcer.h"
+#include "overbar/cdimage.h"
+
+#define RATE 11025                          /* the clips' rate (the mixer plays 95 PC's speech at 0x2B11) */
+#define GAIN 0.9f
+#define QUEUE 48                            /* clips waiting */
+#define WALK_DEPTH 3
+
+struct clip { char name[16]; int16_t *pcm; long len; };
+
+static struct {
+    SDL_atomic_t on, found, searched;       /* the row; the clips are read; the search ended */
+    SDL_mutex *lock;
+    struct clip *clips;                     /* sorted by name (upper case) */
+    int nclips;
+    const struct clip *cur;                 /* the clip playing, NULL none */
+    double at;
+    const struct clip *queue[QUEUE];
+    int nq;
+    int log;                                /* ANNOUNCER_LOG: the clips said, to stderr */
+    int last_pen_team;                      /* the team of the last penalty said in this stoppage, -1 none */
+} A;
+
+/* ---- the archive: C0 FB, a big-endian count at +4, then per clip a 24-bit offset, a 24-bit size and the name ---- */
+static uint32_t be24(const uint8_t *p) { return (uint32_t)p[0] << 16 | (uint32_t)p[1] << 8 | p[2]; }
+static uint16_t be16(const uint8_t *p) { return (uint16_t)(p[0] << 8 | p[1]); }
+
+static int clip_cmp(const void *a, const void *b) { return strcmp(((const struct clip *)a)->name, ((const struct clip *)b)->name); }
+
+/* word_D7414: the 4-bit deltas the mixer expands a rink clip with (low nibble, then high; the sum starts at 0) */
+static const int8_t fib[16] = { -34, -21, -13, -8, -5, -3, -2, -1, 1, 2, 3, 5, 8, 13, 21, 34 };
+
+/* the archive's rink clips into A.clips; the number of them */
+static int parse(const uint8_t *d, long n)
+{
+    if (n < 12) return 0;
+    int count = d[0] == 0xC0 && d[1] == 0xFB ? be16(d + 4) : be16(d + 2);
+    if (count < 1 || count > 1000) return 0;
+    struct clip *cl = calloc((size_t)count, sizeof *cl);
+    if (!cl) return 0;
+    int k = 0;
+    long o = 6;
+    for (int i = 0; i < count && o + 7 <= n; i++) {
+        uint32_t off = be24(d + o), size = be24(d + o + 3);
+        o += 6;
+        char name[16];
+        int len = 0;
+        while (o < n && d[o] && len < 15) name[len++] = (char)toupper(d[o++]);
+        if (o >= n || d[o]) break;                       /* (a name too long, or cut) */
+        name[len] = 0;
+        o++;
+        if (!size || off >= (uint32_t)n || size > (uint32_t)n - off || d[off] == 0x47) continue;   /* 'G' (47 FB): a speech clip, packed */
+        int16_t *pcm = malloc((size_t)size * 2 * sizeof *pcm);
+        if (!pcm) continue;
+        int acc = 0;
+        for (uint32_t j = 0; j < size; j++) {
+            uint8_t b = d[off + j];
+            acc = (int8_t)(acc + fib[b & 15]);
+            pcm[2 * j] = (int16_t)(acc * 256);
+            acc = (int8_t)(acc + fib[b >> 4]);
+            pcm[2 * j + 1] = (int16_t)(acc * 256);
+        }
+        memcpy(cl[k].name, name, (size_t)len + 1);
+        cl[k].pcm = pcm;
+        cl[k].len = (long)size * 2;
+        k++;
+    }
+    if (!k) { free(cl); return 0; }
+    qsort(cl, (size_t)k, sizeof *cl, clip_cmp);
+    A.clips = cl;
+    A.nclips = k;
+    return 1;
+}
+
+/* ---- finding the file: loose beside the program, else on a disc image ---- */
+static int ieq(const char *a, const char *b)
+{
+    for (; *a && *b; a++, b++) if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) return 0;
+    return !*a && !*b;
+}
+static const char *base_name(const char *p)
+{
+    const char *q = p;
+    for (; *p; p++) if (*p == '/' || *p == '\\') q = p + 1;
+    return q;
+}
+static int is_dir(const char *p) { struct stat st; return stat(p, &st) == 0 && S_ISDIR(st.st_mode); }
+static long file_len(const char *p) { struct stat st; return stat(p, &st) == 0 ? (long)st.st_size : -1; }
+
+#define PATHMAX 1024
+#define LISTMAX 512
+static int ends(const char *s, const char *e)
+{
+    size_t a = strlen(s), b = strlen(e);
+    return a >= b && ieq(s + a - b, e);
+}
+
+/* the files below dir (depth folders down) into list: how many */
+static int walk(const char *dir, int depth, char (*list)[PATHMAX], int n)
+{
+    DIR *d = opendir(dir);
+    struct dirent *e;
+    if (!d) return n;
+    while ((e = readdir(d)) && n < LISTMAX) {
+        char p[PATHMAX];
+        if (e->d_name[0] == '.') continue;
+        snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
+        if (is_dir(p)) { if (depth > 0) n = walk(p, depth - 1, list, n); }
+        else snprintf(list[n++], PATHMAX, "%s", p);
+    }
+    closedir(d);
+    return n;
+}
+
+static uint8_t *slurp(const char *path, long *size)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    long n = file_len(path);
+    uint8_t *b = n > 0 && n < 64L << 20 ? malloc((size_t)n) : NULL;
+    if (b && fread(b, 1, (size_t)n, f) != (size_t)n) { free(b); b = NULL; }
+    fclose(f);
+    *size = b ? n : 0;
+    return b;
+}
+
+/* the VIV under dir: loose, else in a disc image's data track (the disc's file may sit in a folder) */
+static int find_in(const char *dir)
+{
+    static char list[LISTMAX][PATHMAX];
+    int n = walk(dir, WALK_DEPTH, list, 0);
+    for (int i = 0; i < n; i++)
+        if (ieq(base_name(list[i]), "XBRUCE2.VIV")) {
+            long size;
+            uint8_t *b = slurp(list[i], &size);
+            int ok = b && parse(b, size);
+            free(b);
+            if (ok) { fprintf(stderr, "Rink announcer: %s (%d clips)\n", list[i], A.nclips); return 1; }
+        }
+    static const char *const kinds[3][5] = { { ".cue" }, { ".ccd" }, { ".iso", ".bin", ".img", ".mdf", ".raw" } };
+    for (int k = 0; k < 3; k++)
+        for (int i = 0; i < n; i++) {
+            int match = 0;
+            for (int e = 0; e < 5 && kinds[k][e]; e++) match |= ends(list[i], kinds[k][e]);
+            if (!match || (k == 2 && file_len(list[i]) < 16L * 2048)) continue;
+            ob_cd *cd = ob_cd_open(list[i], NULL, 0);
+            if (!cd) continue;
+            for (int f = 0; ob_cd_file_name(cd, f); f++)
+                if (ieq(base_name(ob_cd_file_name(cd, f)), "XBRUCE2.VIV")) {
+                    uint8_t *b;
+                    long size = ob_cd_read_file(cd, ob_cd_file_name(cd, f), &b);
+                    int ok = size > 0 && parse(b, size);
+                    free(b);
+                    ob_cd_close(cd);
+                    if (ok) { fprintf(stderr, "Rink announcer: %s (%d clips)\n", list[i], A.nclips); return 1; }
+                    cd = NULL;
+                    break;
+                }
+            if (cd) ob_cd_close(cd);
+        }
+    return 0;
+}
+
+static int finder(void *dir)
+{
+    if (SDL_AtomicGet(&A.searched)) { SDL_free(dir); return 0; }   /* (a file given on the command line) */
+    if (!find_in((const char *)dir) && !find_in(".")) fprintf(stderr, "Rink announcer: no XBRUCE2.VIV found beside the program\n");
+    SDL_MemoryBarrierRelease();
+    SDL_AtomicSet(&A.found, A.nclips > 0);
+    SDL_AtomicSet(&A.searched, 1);
+    SDL_free(dir);
+    return 0;
+}
+
+int announcer_load_file(const char *path)
+{
+    long size;
+    uint8_t *b = slurp(path, &size);
+    int ok = b && parse(b, size);
+    free(b);
+    SDL_AtomicSet(&A.found, ok);
+    SDL_AtomicSet(&A.searched, 1);
+    return ok;
+}
+
+static void hook(int ev, struct Team *tm, int player, int a, int b);
+
+void announcer_start(void)
+{
+    static int started;
+    if (started) return;
+    started = 1;
+    A.lock = SDL_CreateMutex();
+    A.log = SDL_getenv("ANNOUNCER_LOG") != NULL;
+    A.last_pen_team = -1;
+    pa_hook = hook;
+    char *base = SDL_GetBasePath();
+    SDL_Thread *t = SDL_CreateThread(finder, "announcer", base ? SDL_strdup(base) : SDL_strdup("."));
+    if (base) SDL_free(base);
+    if (t) SDL_DetachThread(t);
+}
+
+void announcer_wait(void) { while (!SDL_AtomicGet(&A.searched)) SDL_Delay(5); }
+int announcer_searched(void) { return SDL_AtomicGet(&A.searched); }
+int announcer_found(void) { return SDL_AtomicGet(&A.searched) && SDL_AtomicGet(&A.found); }
+void announcer_set(int on) { SDL_AtomicSet(&A.on, on ? 1 : 0); if (!on) announcer_stop(); }
+
+void announcer_stop(void)
+{
+    if (!A.lock) return;
+    SDL_LockMutex(A.lock);
+    A.cur = NULL;
+    A.nq = 0;
+    SDL_UnlockMutex(A.lock);
+}
+
+/* ---- what is said ---- */
+static const struct clip *find(const char *name)
+{
+    char up[16];
+    int i = 0;
+    for (; name[i] && i < 15; i++) up[i] = (char)toupper((unsigned char)name[i]);
+    up[i] = 0;
+    struct clip key;
+    memcpy(key.name, up, (size_t)i + 1);
+    return bsearch(&key, A.clips, (size_t)A.nclips, sizeof *A.clips, clip_cmp);
+}
+
+/* add the clip to the queue (a clip the bank lacks is skipped) */
+static void add(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+static void add(const char *fmt, ...)
+{
+    char name[24];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(name, sizeof name, fmt, ap);
+    va_end(ap);
+    const struct clip *c = find(name);
+    if (A.log) fprintf(stderr, "announcer: %s%s\n", name, c ? "" : " (not in the bank)");
+    if (c && A.nq < QUEUE) A.queue[A.nq++] = c;
+}
+
+/* the 95 PC abbreviation of each of the cartridge's teams, in its order (the art's: a roster set's team plays as one of them) */
+static const char *const abbr95[28] = {
+    "ANA", "BOS", "BUF", "CGY", "CHI", "DAL", "DET", "EDM", "FLA", "HFD", "LA", "MTL", "NJ", "NYI",
+    "NYR", "OTT", "PHI", "PIT", "QUE", "SJ", "STL", "TB", "TOR", "VAN", "WSH", "WPG", "ASE", "ASW",
+};
+
+static const char *team_abbr(struct Team *tm)
+{
+    uint16_t t = rosters_art(tm->tmteam);
+    return t < 28 ? abbr95[t] : NULL;
+}
+
+/* the player's number (the roster keeps it as BCD) */
+static int jersey(int player, struct Team *tm)
+{
+    const struct RosterPlayer *p = (const struct RosterPlayer *)(const void *)GetPlayerNamePointer((uint16_t)player, tm);
+    return (p->number >> 4) * 10 + (p->number & 15);
+}
+
+/* "at <minutes> <seconds>" (QueueTimeClips: 1 minute and 1 second have clips of their own; seconds after minutes are two digits) */
+static void say_time(int min, int sec)
+{
+    add("at.cor");
+    add("pause.cor");
+    if (min) {
+        if (!sec) { if (min == 1) add("1minute.cor"); else { add("%d.num", min); add("minutes.cor"); } }
+        else add("%d.num", min);
+    }
+    if (sec == 1) { if (!min) add("1second.cor"); else add("%02d.num", sec); }
+    else if (sec > 1) {
+        if (!min) { add("%d.num", sec); add("seconds.cor"); }
+        else add("%02d.num", sec);
+    }
+}
+
+static const char *pen_clip(int pen)
+{
+    switch (pen) {
+    case 0x12: case 0x1A: return "roughing";
+    case 0x16: return "charging";
+    case 0x18: return "slashing";
+    case 0x1C: return "xcheck";
+    case 0x1E: return "hooking";
+    case 0x20: return "tripping";
+    case 0x22: return "interfer";
+    case 0x24: return "holding";
+    }
+    return NULL;                                        /* (fighting, the instigator: 95 PC has no clip) */
+}
+
+/* a new announcement: a goal and a penalty shot take over from what is being said; the rest wait their turn (or are dropped when
+ * the voice is busy, as 95 PC's SpeechIdle) */
+static int begin(int interrupt, int drop_if_busy)
+{
+    if (A.cur || A.nq) {
+        if (interrupt) { A.cur = NULL; A.nq = 0; }
+        else if (drop_if_busy) return 0;
+    }
+    return 1;
+}
+
+static void hook(int ev, struct Team *tm, int player, int a, int b)
+{
+    if (A.log) fprintf(stderr, "announcer: event %d (on %d, found %d, demo %d)\n", ev, SDL_AtomicGet(&A.on), SDL_AtomicGet(&A.found), g.demoflag);
+    if (!SDL_AtomicGet(&A.on) || !SDL_AtomicGet(&A.found) || !g.demoflag) return;                 /* (a demo game is silent: demoflag is clear then) */
+    SDL_MemoryBarrierAcquire();
+    SDL_LockMutex(A.lock);
+    const char *abbr = tm ? team_abbr(tm) : NULL;
+    int away = tm == team_struct(1);
+    switch (ev) {
+    case PA_GOAL:                                       /* tm the scorer's team, player him, a and b the assists (-1 none) */
+        if (!abbr || !begin(1, 0)) break;
+        A.last_pen_team = -1;
+        add("%s.tea", abbr);
+        add("goalnum.cor");
+        add("%d.num", jersey(player, tm));
+        if (a >= 0) { add("pause.cor"); add("asstnum.cor"); add("%d.num", jersey(a, tm)); }
+        if (b >= 0) { add("pause.cor"); add("andnum.cor"); add("%d.num", jersey(b, tm)); }
+        break;
+    case PA_PENALTY: {                                  /* a the penalty, b its minutes | remaining penalties << 8 | the next one is this team's << 16 */
+        int mins = b & 0xFF, remaining = b >> 8 & 0xFF, next_same = b >> 16 & 1;
+        if (!abbr || !begin(0, 0)) break;
+        int idx = A.last_pen_team == away ? 2 : 1;
+        A.last_pen_team = away;
+        if (idx == 1) {
+            add("%s.tea", abbr);
+            add(next_same ? "pensnum.cor" : "pennum.cor");
+        } else add("andnum.cor");
+        add("%d.num", jersey(player, tm));
+        add("pause.cor");
+        add(mins == 5 ? "5min.cor" : "2min.cor");
+        const char *pc = pen_clip(a);
+        if (pc) add("%s.pen", pc);
+        add("pause.cor");
+        if (!remaining) { say_time(g.gameclock / 60, g.gameclock % 60); A.last_pen_team = -1; }
+        break;
+    }
+    case PA_PENSHOT:                                    /* tm the shooter's team, player him */
+        if (!abbr || !begin(1, 0)) break;
+        A.last_pen_team = -1;
+        add("%s.tea", abbr);
+        add("penshot.cor");
+        add("%d.num", jersey(player, tm));
+        add("pause.cor");
+        say_time(g.gameclock / 60, g.gameclock % 60);
+        break;
+    case PA_ONEMIN:
+        if (!begin(0, 1)) break;
+        add("oneleft.cor");
+        break;
+    case PA_STAR:                                       /* a the star, 0-2: "first star", "<team> number <n>" */
+        if (!abbr) break;
+        add("%s", a == 0 ? "1ststar.cor" : a == 1 ? "2ndstar.cor" : "3rdstar.cor");
+        add("%s.frm", abbr);
+        add("pause.cor");
+        add("number.cor");
+        add("%d.num", jersey(player, tm));
+        break;
+    }
+    SDL_UnlockMutex(A.lock);
+}
+
+/* ---- the voice into the mix ---- */
+void announcer_mix(int16_t *out, int frames, unsigned rate)
+{
+    if (!A.lock || !rate || !SDL_AtomicGet(&A.found)) return;
+    SDL_LockMutex(A.lock);
+    double step = (double)RATE / rate;
+    for (int i = 0; i < frames; i++) {
+        while (!A.cur && A.nq) {                        /* the next waiting clip */
+            A.cur = A.queue[0];
+            memmove(A.queue, A.queue + 1, (size_t)--A.nq * sizeof A.queue[0]);
+            A.at = 0;
+        }
+        if (!A.cur) break;
+        long j = (long)A.at;
+        if (j + 1 >= A.cur->len) { A.cur = NULL; i--; continue; }
+        double frac = A.at - j;
+        float v = (float)(A.cur->pcm[j] + (A.cur->pcm[j + 1] - A.cur->pcm[j]) * frac) * GAIN;
+        for (int c = 0; c < 2; c++) {
+            float x = v + out[2 * i + c];
+            out[2 * i + c] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
+        }
+        A.at += step;
+    }
+    SDL_UnlockMutex(A.lock);
+}

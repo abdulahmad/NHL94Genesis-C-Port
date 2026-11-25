@@ -232,6 +232,15 @@ void InProgress(void)
         box[-1] = (uint8_t)p;
         *box = 0xFF;
         assreplace(apenalty, pl);
+        if (pa_hook) {                                    /* (the rink announcer: this penalty, and whether more follow) */
+            int remaining = 0, next_same = 0;
+            for (const uint8_t *r = penbuf(); r < a0; r += 2) {
+                if (rd16(r) == 0) continue;
+                remaining++;
+                next_same = (PFLAG(sortobj(r[1] & 0x7F), pfteam) != 0) == (PFLAG(pl, pfteam) != 0);
+            }
+            pa_hook(PA_PENALTY, a2, pl->pnum, pen, penalty_entry(pen)[penmins] | remaining << 8 | next_same << 16);
+        }
         SetPA(pen);
         USBoard();
         return;
