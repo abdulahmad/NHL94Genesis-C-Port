@@ -301,6 +301,7 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     SDL_LockMutex(F.lock);
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++) F.picture[y * 320 + x] = 0xFF000000u | mdrt_vdp_rgb(px[y * pitch + x], MDRT_RGB_GPGX);
+    if (w <= 320 && h <= 224 && segacd_present(F.picture, w, h)) { w = 320; h = 224; }   /* (the Sega CD's opening screens, when they are on) */
     F.width = w;
     F.height = h;
     SDL_AtomicSet(&F.fresh, 1);
@@ -521,7 +522,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_MUSIC (CD_ROWS + 1)                            /* (this machine's sound only: the disc's music, its crowd bed) */
 #define CD_CROWD (CD_ROWS + 2)
 #define CD_VOICE (CD_ROWS + 3)
-static ob_game_opt cd_opts[CD_ROWS + 4];
+#define CD_SCREENS (CD_ROWS + 4)
+static ob_game_opt cd_opts[CD_ROWS + 5];
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
 /* the option of the rules page with this key, or -1 */
@@ -538,6 +540,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_MUSIC) { segacd_set_music(value); return; }
     if (index == CD_CROWD) { segacd_set_crowd(value); return; }
     if (index == CD_VOICE) { segacd_set_voice(value); return; }
+    if (index == CD_SCREENS) { segacd_set_screens(value); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -581,8 +584,9 @@ static void game_page_init(void)
     cd_opts[CD_CROWD] = (ob_game_opt){ "cd_crowd", "Crowd", crowd, 3, 0, 0, 3 };
     static const char *const voice[3] = { "off", "on", "over the music" };
     cd_opts[CD_VOICE] = (ob_game_opt){ "cd_voice", "Ron Barr scouting voice", voice, 3, 0, 0, 3 };
+    cd_opts[CD_SCREENS] = (ob_game_opt){ "cd_screens", "Opening screens", music, 2, 0, 0, 3 };
     segacd_start();
-    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 4, cd_changed, NULL };
+    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 5, cd_changed, NULL };
     ob_game_set_ops(&host, &ops);
 }
 

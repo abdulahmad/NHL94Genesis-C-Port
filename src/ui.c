@@ -167,6 +167,7 @@ void DrawPlayoffSprite(void)
  * the fades-only vblank, for $50 x 4 frames or until a button. */
 void HiScoreScreen(void)
 {
+    if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 1);
     g.VBint = SYM_vb2;
     g.disflags &= (uint16_t)~HI(df32c);
     screen_layout();
