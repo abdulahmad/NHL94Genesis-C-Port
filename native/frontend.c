@@ -501,13 +501,137 @@ static ob_host host;
 static void shell_controllers(void) { ob_pads_setup_open(-1); }
 static void shell_sides(void) { ob_pads_sides_open(); }
 
-/* the select-sides screen's field: the game's own EA SPORTS scouting-screen pattern, tiled over the whole picture */
+/* ---- the select-sides screen in the cartridge's own art: its EA SPORTS pattern (ScoutMap) for the field, the title in the big font
+ * (BigFontMap), the black box from the frame (FramerMap), each team's setup-screen banner, and the small font (SmallFontMap, the credits' look)
+ * for the rest ---- */
+struct gfont { uint32_t *pic; int w, h; int x[96], adv[96], ink[96]; int row_h; };   /* x: the glyph's left in the picture, ink: its width */
+static struct gfont big_f, small_f;
+static uint32_t *frame_pic;
+static int fw_, fh_, sides_art_tried;
+static int sides_team[2];
+
+static void font_measure(struct gfont *f, int cell_w, int cell_h, int first_row)
+{
+    if (cell_w == 16) {                                       /* the big font: glyphs are cut where a column is empty (the cells are not all alike) */
+        int seg[48][2], n = 0, start = -1;
+        for (int x = 0; x <= f->w && n < 40; x++) {
+            int ink = 0;
+            for (int y = 0; x < f->w && y < f->h && !ink; y++) ink = f->pic[(size_t)y * f->w + x] >> 24;
+            if (ink && start < 0) start = x;
+            if (!ink && start >= 0) {
+                if (x - start >= 28) { seg[n][0] = start; seg[n++][1] = 15; seg[n][0] = start + 15; seg[n++][1] = x - start - 15; }   /* two joined glyphs */
+                else { seg[n][0] = start; seg[n++][1] = x - start; }
+                start = -1;
+            }
+        }
+        for (int c = 0; c < 96; c++) { f->x[c] = 0; f->ink[c] = 0; f->adv[c] = 8; }
+        for (int c = 0; c < 36 && c < n; c++) { f->x[c] = seg[c][0]; f->ink[c] = seg[c][1]; f->adv[c] = seg[c][1] + 1; }
+        return;
+    }
+    for (int c = 0; c < 96; c++) {
+        int cx = c % 32 * 8, cy = (first_row + c / 32) * 8, lo = cell_w, hi = -1;
+        f->x[c] = cx; f->ink[c] = 0; f->adv[c] = 4;
+        for (int x = 0; x < cell_w; x++)
+            for (int y = 0; y < cell_h; y++)
+                if (f->pic[(size_t)(cy + y) * f->w + cx + x] >> 24) { if (x < lo) lo = x; if (x > hi) hi = x; }
+        if (hi >= lo) { f->x[c] = cx + lo; f->ink[c] = hi - lo + 1; f->adv[c] = hi - lo + 2; }
+        f->x[c] |= cy << 16;                                  /* (the row in the high bits) */
+    }
+}
+
+static void sides_art(void)
+{
+    if (sides_art_tried) return;
+    sides_art_tried = 1;
+    big_f.pic = rosters_picture("BigFontMap", &big_f.w, &big_f.h, 1);
+    small_f.pic = rosters_picture("SmallFontMap", &small_f.w, &small_f.h, 1);
+    frame_pic = rosters_picture("FramerMap", &fw_, &fh_, 1);
+    if (big_f.pic) font_measure(&big_f, 16, 16, 0);
+    if (small_f.pic) font_measure(&small_f, 8, 8, 1);
+}
+
+static int glyph_index(const struct gfont *f, int big, unsigned char ch)
+{
+    if (big) { if (ch >= 'a' && ch <= 'z') ch = (unsigned char)(ch - 32); return ch >= 'A' && ch <= 'Z' ? ch - 'A' : ch >= '0' && ch <= '9' ? 26 + ch - '0' : -1; }
+    (void)f;
+    return ch >= 32 && ch < 128 ? ch - 32 : -1;
+}
+
+static int sides_text_width(void *ud, const char *s, int big)
+{
+    const struct gfont *f = big ? &big_f : &small_f;
+    int w = 0;
+    (void)ud;
+    sides_art();
+    if (!f->pic) return (int)strlen(s) * 6;
+    for (; *s; s++) { int i = glyph_index(f, big, (unsigned char)*s); w += i < 0 ? (big ? 10 : 4) : f->adv[i]; }
+    return w > 0 ? w - 1 : 0;
+}
+
+static void sides_text(void *ud, uint32_t *px, int w, int h, int pitch, int x, int y, const char *s, uint32_t argb, int big, int scale)
+{
+    const struct gfont *f = big ? &big_f : &small_f;
+    int gh = big ? 16 : 8, pass;
+    (void)ud;
+    sides_art();
+    if (!f->pic) return;
+    for (pass = big ? 1 : 0; pass < 2; pass++) {            /* (the small font: a black shadow first, then the letters) */
+        int pen = 0;
+        for (const char *p = s; *p; p++) {
+            int i = glyph_index(f, big, (unsigned char)*p);
+            if (i < 0) { pen += big ? 10 : 4; continue; }
+            int gx = f->x[i] & 0xFFFF, gy = f->x[i] >> 16;
+            for (int j = 0; j < gh; j++)
+                for (int k = 0; k < f->ink[i]; k++) {
+                    uint32_t c = f->pic[(size_t)(gy + j) * f->w + gx + k];
+                    if (!(c >> 24)) continue;
+                    if (!big) {
+                        int shade = (c & 0xFF) < 250;
+                        c = pass == 0 ? 0xFF000000u : shade ? ((argb >> 1 & 0x7F7F7F) + (argb >> 2 & 0x3F3F3F)) | 0xFF000000u : argb;
+                    }
+                    int dx = (x + pen + k + (pass == 0 && !big)) * scale, dy = (y + j + (pass == 0 && !big)) * scale;
+                    for (int v = 0; v < scale; v++)
+                        for (int u = 0; u < scale; u++)
+                            if (dx + u < w && dy + v < h) px[(size_t)(dy + v) * pitch + dx + u] = c;
+                }
+            pen += f->adv[i];
+        }
+    }
+}
+
+static void sides_frame(void *ud, uint32_t *px, int w, int h, int pitch, int x, int y, int bw, int bh, int scale)
+{
+    (void)ud;
+    sides_art();
+    for (int j = 0; j < bh; j++)
+        for (int i = 0; i < bw; i++) {
+            int gx = i / scale, gy = j / scale, gw = bw / scale, gh = bh / scale, sx, sy;
+            if (x + i < 0 || x + i >= w || y + j < 0 || y + j >= h) continue;
+            sx = gx < 8 ? gx : gx >= gw - 8 ? 24 - (gw - gx) : 8 + (gx - 8) % 8;
+            sy = gy < 8 ? gy : gy >= gh - 8 ? 24 - (gh - gy) : 8 + (gy - 8) % 8;
+            if (!frame_pic) px[(size_t)(y + j) * pitch + x + i] = 0xFF000000u;
+            else if (sx >= 0 && sx < fw_ && sy >= 0 && sy < fh_ && frame_pic[sy * fw_ + sx] >> 24) px[(size_t)(y + j) * pitch + x + i] = frame_pic[sy * fw_ + sx];
+        }
+}
+
+static void sides_team_plate(void *ud, uint32_t *px, int w, int h, int pitch, int x, int y, int team, int scale)
+{
+    static uint32_t banner[2][88 * 16];
+    static int have[2] = { -2, -2 }, ok[2];
+    (void)ud;
+    if (have[team] != sides_team[team]) { have[team] = sides_team[team]; ok[team] = rosters_banner(have[team], banner[team]) == 0; }
+    for (int j = 0; j < 16 * scale; j++)
+        for (int i = 0; i < 88 * scale; i++)
+            if (x + i >= 0 && x + i < w && y + j >= 0 && y + j < h)
+                px[(size_t)(y + j) * pitch + x + i] = ok[team] ? banner[team][j / scale * 88 + i / scale] : 0xFF000000u;
+}
+
 static void sides_background(void *ud, uint32_t *px, int w, int h, int pitch)
 {
     static uint32_t *pic;
     static int pw, ph, tried;
     (void)ud;
-    if (!tried) { tried = 1; pic = rosters_picture("ScoutMap", &pw, &ph); }
+    if (!tried) { tried = 1; pic = rosters_picture("ScoutMap", &pw, &ph, 0); }
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++) px[(size_t)y * pitch + x] = pic ? pic[(y % ph) * pw + x % pw] : 0xFF0000B2u;
 }
@@ -518,10 +642,13 @@ static SDL_atomic_t sides_state;                   /* 0 none, 1 asked for by the
 static void game_starting(void)
 {
     if (native_net_on() || !F.o || SDL_AtomicGet(&F.quit) || !atoi(pads_get("sides.at_start", "1"))) return;
+    sides_team[0] = native_game_teams[0];
+    sides_team[1] = native_game_teams[1];
     SDL_AtomicSet(&sides_state, 1);
     while (SDL_AtomicGet(&sides_state) && !SDL_AtomicGet(&F.quit)) SDL_Delay(5);
 }
-static const ob_sides_skin sides_skin = { .background = sides_background };
+static const ob_sides_skin sides_skin = { .background = sides_background, .text = sides_text, .text_width = sides_text_width, .frame = sides_frame,
+                                        .team = sides_team_plate, .team_w = 88, .team_h = 16 };
 
 int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game, void *user)
 {

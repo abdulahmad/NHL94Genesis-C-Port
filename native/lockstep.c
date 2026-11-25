@@ -371,6 +371,7 @@ static void try_place(void);
 static void place_next(const char *how);
 static int in_game_logic(void);
 
+int native_game_teams[2];                                 /* the away and home teams as the game begins */
 void (*native_game_start_hook)(void);                     /* set by the window front end: a new game begins (the select-sides screen) */
 void __cyg_profile_func_enter(void *fn, void *site);       /* (the compiler's hooks: -finstrument-functions) */
 void __cyg_profile_func_exit(void *fn, void *site);
@@ -378,7 +379,7 @@ void NI __cyg_profile_func_enter(void *fn, void *site)
 {
     (void)site;
     if (native_in_vblank()) return;
-    if (fn == (void *)StartGame && native_game_start_hook) native_game_start_hook();
+    if (fn == (void *)StartGame && native_game_start_hook) { native_game_teams[0] = g.VisTeam; native_game_teams[1] = g.HomeTeam; native_game_start_hook(); }
     if (clock_original() || tracking) {
         uint32_t r = routine_of(fn);
         if (clock_original()) clock_on_enter(r);
