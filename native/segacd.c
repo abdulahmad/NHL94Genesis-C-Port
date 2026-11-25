@@ -118,46 +118,32 @@ static void plain(const struct RosterText *t, char *s, int cap)
     s[k] = 0;
 }
 
-/* (cd_career_hook, set by the window: B on a card; player $FFFF the team's card) */
+/* (cd_career_hook, set by the window: B on a card; player $FFFF the team's card) the disc's card: the team's words
+ * and its six advantage numbers (the team data's bytes 1 to 3, from the roster set, as the disc reads them: each
+ * byte's high nibble first, so its "Power play" is the nibble the cartridge's code uses for killing penalties, and
+ * the other way round), and the player's name, number and career */
 static int (*career_ending)(void);
-/* the disc's team page (PLAYER.BIN's PlShowPicture, $54 0): the team's bonuses, a nibble each times 100 / 2 with a %
- * (BinToBcdCarry), and its forwards and defensemen (the team data's bytes 1 to 3, from the roster set). The disc's $24 / $28 blocks (the Players and Goalies season
- * stats) hold no records on this disc. */
-static void team_page(const struct RosterTeam *T)
-{
-    static segacd_career pg;
-    static const char *const line[6] = { "Power play advantage", "Penalty killing disadvantage", "Home team advantage",
-                                         "Road team disadvantage", "Number of forwards", "Number of defensemen" };
-    /* (as the disc prints them: each byte's high nibble first, so its "Power play" is the nibble the cartridge's code
-     * uses for killing penalties, and the other way round) */
-    const int v[6] = { T->pk, T->pp, T->home, T->away, T->forwards, T->defensemen };
-    char city[40], nick[40];
-    memset(&pg, 0, sizeof pg);
-    plain(&T->city, city, sizeof city);
-    plain(&T->nickname, nick, sizeof nick);
-    snprintf(pg.bio[0], sizeof pg.bio[0], "%.32s %.32s", city, nick);
-    pg.nbio = 1;
-    pg.noheader = 1;
-    for (int i = 0; i < 6; i++) {
-        snprintf(pg.cell[i][0], SEGACD_CELL, "%s", line[i]);
-        if (i < 4) snprintf(pg.cell[i][1], SEGACD_CELL, "%d%%", v[i] * 100 / 2);
-        else snprintf(pg.cell[i][1], SEGACD_CELL, "%d", v[i]);
-        pg.ncells[i] = 2;
-    }
-    pg.nrows = 6;
-    segacd_page_show(&pg, career_ending);
-}
-
 static void career_hook(uint16_t team, uint16_t player)
 {
     if (!SDL_AtomicGet(&S.career) || SDL_AtomicGet(&S.session) || !segacd_disc()) return;
     const struct RosterTeam *T = rosters_team(team);
-    if (player == 0xFFFF) { team_page(T); return; }
-    if (player >= T->players) return;
-    char abbr[16], name[40];
-    plain(&T->abbr, abbr, sizeof abbr);
-    plain(&T->player[player].name, name, sizeof name);
-    segacd_career_show(S.cd, abbr, name, player < T->goalies, career_ending);
+    if (player != 0xFFFF && player >= T->players) return;
+    static segacd_card k;
+    memset(&k, 0, sizeof k);
+    plain(&T->abbr, k.abbr, sizeof k.abbr);
+    plain(&T->city, k.city, sizeof k.city);
+    plain(&T->nickname, k.nick, sizeof k.nick);
+    plain(&T->arena, k.arena, sizeof k.arena);
+    const int adv[6] = { T->pk, T->pp, T->home, T->away, T->forwards, T->defensemen };
+    memcpy(k.adv, adv, sizeof adv);
+    if (player != 0xFFFF) {
+        k.player = 1;
+        plain(&T->player[player].name, k.name, sizeof k.name);
+        k.number = T->player[player].number;
+        k.goalie = player < T->goalies;
+        if (!segacd_career_get(S.cd, k.abbr, k.name, k.goalie, &k.career)) return;
+    }
+    segacd_card_show(S.cd, &k, career_ending);
 }
 
 void segacd_set_career(int v, int (*ending)(void))

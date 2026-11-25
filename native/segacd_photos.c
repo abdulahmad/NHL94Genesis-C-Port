@@ -27,8 +27,8 @@ static uint32_t be32(const uint8_t *p) { return (uint32_t)be16(p) << 16 | be16(p
 
 static struct {
     int loaded;                          /* 1 looked (photos read, or none) */
-    uint8_t *graph2;
-    long size;
+    uint8_t *graph2, *gtable, *player;   /* (PLAYER.BIN read when first asked for) */
+    long size, gsize, psize;
     int n;
     struct { char abbr[8], name[32]; long at; } photo[MAX_PHOTOS];
     struct { char abbr[8]; long careers[2], end[2]; } team[28];   /* its skaters' and goalies' careers (offsets in graph2, 0 none) */
@@ -68,6 +68,8 @@ static void load(ob_cd *cd)
     long gn = ob_cd_read_file(cd, "GTABLE.BIN", &gt);
     P.size = ob_cd_read_file(cd, "GRAPH2.BIN", &P.graph2);
     if (gn < 6 * (FIRST_TEAM_RECORD + 28) || P.size <= 0) { free(gt); free(P.graph2); P.graph2 = NULL; return; }
+    P.gtable = gt;
+    P.gsize = gn;
     for (int t = 0; t < 28; t++) {
         const uint8_t *r = gt + 6 * (FIRST_TEAM_RECORD + t);
         long at = (long)be16(r) * 2048, len = (long)be32(r + 2), k = 0;
@@ -96,7 +98,35 @@ static void load(ob_cd *cd)
             P.photo[P.n++].at = at + off;
         }
     }
-    free(gt);
+}
+
+const uint8_t *segacd_graph2_record(ob_cd *cd, int rec, long *len)
+{
+    if (!cd) return NULL;
+    if (!P.loaded) load(cd);
+    if (!P.graph2 || rec < 0 || 6L * (rec + 1) > P.gsize) return NULL;
+    long at = (long)be16(P.gtable + 6 * rec) * 2048, n = (long)be32(P.gtable + 6 * rec + 2);
+    if (n <= 0 || at + n > P.size) return NULL;
+    if (len) *len = n;
+    return P.graph2 + at;
+}
+
+const uint8_t *segacd_player_bin(ob_cd *cd, long *len)
+{
+    if (!cd) return NULL;
+    if (!P.player) P.psize = ob_cd_read_file(cd, "PLAYER.BIN", &P.player);
+    if (!P.player || P.psize <= 0) return NULL;
+    if (len) *len = P.psize;
+    return P.player;
+}
+
+int segacd_team_index(ob_cd *cd, const char *abbr)
+{
+    if (!cd) return -1;
+    if (!P.loaded) load(cd);
+    if (!P.graph2) return -1;
+    for (int t = 0; t < 28; t++) if (!strcmp(P.team[t].abbr, abbr)) return t;
+    return -1;
 }
 
 int segacd_photo(ob_cd *cd, const char *abbr, const char *name, uint8_t *buf, uint8_t colours[32])

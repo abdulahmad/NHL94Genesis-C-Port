@@ -52,7 +52,7 @@ const char *segacd_photo_name(int i, const char **abbr);
 
 /* a player's career from the disc (native/segacd_photos.c): his name, position and size, birthplace, birthday, draft;
  * the table's two headings (the regular season's, the playoffs'), its column names (row 0) and a row a season.
- * The team page (B on a team's card) is one too: its name, and a row a line with no column names (noheader) */
+ * (The plain team page is one too: its name, and a row a line with no column names, noheader.) */
 #define SEGACD_BIO 8
 #define SEGACD_ROWS 40
 #define SEGACD_COLS 20
@@ -65,6 +65,22 @@ typedef struct {
     char cell[SEGACD_ROWS][SEGACD_COLS][SEGACD_CELL];
 } segacd_career;
 int segacd_career_get(ob_cd *cd, const char *abbr, const char *name, int goalie, segacd_career *out);
-int segacd_career_show(ob_cd *cd, const char *abbr, const char *name, int goalie, int (*ending)(void));   /* (native/segacd_career.c) */
-int segacd_page_show(const segacd_career *page, int (*ending)(void));   /* (the same, a page made already) */
+/* the disc's other pieces (native/segacd_photos.c): a GTABLE.BIN record of GRAPH2.BIN, PLAYER.BIN, and a team's
+ * number on the disc (its order in the cartridge, 0-27; -1 a team the disc doesn't have) */
+const uint8_t *segacd_graph2_record(ob_cd *cd, int rec, long *len);
+const uint8_t *segacd_player_bin(ob_cd *cd, long *len);
+int segacd_team_index(ob_cd *cd, const char *abbr);
+
+/* the disc's player and team cards (native/segacd_career.c, PLAYER.BIN's screen): B on a card. A team the disc
+ * has gets the disc's own screen; another (a roster set's) a plain page with the same words */
+typedef struct {
+    char abbr[8], city[24], nick[24], arena[32];
+    int adv[6];                             /* the team card's six numbers, as the disc reads its nibbles */
+    int player;                             /* 1: a player's card (else the team's) */
+    char name[40];
+    uint8_t number;                         /* BCD */
+    int goalie;
+    segacd_career career;
+} segacd_card;
+int segacd_card_show(ob_cd *cd, const segacd_card *card, int (*ending)(void));
 void segacd_career_tick(void);           /* (the window's loop) */
