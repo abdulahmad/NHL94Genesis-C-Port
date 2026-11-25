@@ -94,6 +94,7 @@ void segacd_start(void)
 }
 
 void segacd_wait(void) { while (!SDL_AtomicGet(&S.found)) SDL_Delay(5); }
+int segacd_searched(void) { return SDL_AtomicGet(&S.found); }
 
 ob_cd *segacd_disc(void)
 {

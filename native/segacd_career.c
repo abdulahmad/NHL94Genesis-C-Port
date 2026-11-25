@@ -105,7 +105,7 @@ static int picture_at(const uint8_t *b, long len, picture *p)
     p->w = be16(b + at + 128);
     p->h = be16(b + at + 130);
     p->map = b + at + 132;
-    return at + 132 + 2L * p->w * p->h <= len;
+    return at + 132 + 2L * (long)p->w * (long)p->h <= len;
 }
 
 /* the team's page k (0 the arena photo, 1 the empty photo frame) */
@@ -129,7 +129,7 @@ static void text(int cx, int cy, const char *s)
     for (int i = 0; i < 16; i++) pal[i] = rgb(0xEEE);
     for (; *s && cx < SW / 8; s++, cx++) {
         unsigned c = (unsigned char)*s;
-        if (c < 0x20 || c - 0x20 >= n || 4 + 32L * (c - 0x20 + 1) > len) continue;
+        if (c < 0x20 || c - 0x20 >= n || 4 + 32L * (long)(c - 0x20 + 1) > len) continue;
         cell(cx, cy, f + 4 + 32 * (c - 0x20), pal, 0, 0);
     }
 }

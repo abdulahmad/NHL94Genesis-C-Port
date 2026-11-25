@@ -453,8 +453,11 @@ static void pk_read(int i)
     bx_view_open_keys(pk_name[i], k, n, n > 1, NULL);
 }
 
-static void seat_pos(float v[3]) { r3_world_pos(BX_S, nseat, v); }
-#define CART_UP .75f                               /* how far the cartridge stands out of the slot before it is pushed in */
+/* where the cartridge sits when it is pushed home: the commercial's seated cartridge shows about 2.2 in above the console
+   (of its 3.53), so it goes this much further down than the slot's rim */
+#define SEAT_DEEP .45f
+static void seat_pos(float v[3]) { r3_world_pos(BX_S, nseat, v); v[1] -= SEAT_DEEP; }
+#define CART_UP 1.0f                               /* how far the cartridge stands out of the slot before it is pushed in */
 /* the desk opens on the commercial's shot: low, in front of the console, the cartridge standing in the slot not yet pushed home */
 static void to_desk(int a)
 {
@@ -464,8 +467,8 @@ static void to_desk(int a)
     float v[3]; seat_pos(v);
     r3_node *c = bx_n(cart);
     bx_set3(c->pos, v[0], v[1] + CART_UP, v[2]); bx_set3(c->rot, 0, 0, 0); bx_set3(c->scale, 1, 1, 1);
-    bx_cam(v[0] - 1.0f, v[1] + 1.5f, v[2] + 12.5f);
-    bx_set3(lk, v[0], v[1] + .9f, v[2]);
+    bx_cam(v[0] - 1.0f, v[1] + 1.95f, v[2] + 12.5f);
+    bx_set3(lk, v[0], v[1] + 1.35f, v[2]);
 }
 static void to_case(int a)
 {
