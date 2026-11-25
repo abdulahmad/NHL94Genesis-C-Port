@@ -371,7 +371,21 @@ static void try_place(void);
 static void place_next(const char *how);
 static int in_game_logic(void);
 
-volatile unsigned native_play_frames;                      /* counts the game's play frames (DoGameFrame): not counting in menus, the pause menu or between periods */
+volatile unsigned native_play_frames;
+
+/* where pad p's controlled player is on the screen, in picture pixels from the middle of the picture (the same arithmetic as the
+ * game's off-screen arrows, sso_arrow: the player's place less the scroll). 0 when it is not on the ice or the rink is sideways */
+int native_player_on_screen(int p, int *dx, int *dy)
+{
+    static const unsigned char pad[4] = { 1, 2, 4, 5 };
+    const struct RinkObj *o;
+    if (p < 0 || p > 3 || (g.sflags & HI(sfhor))) return 0;
+    o = &g.pads[pad[p]];
+    if (o->Zpos < 0) return 0;
+    *dx = (int16_t)(o->Xpos - (int16_t)g.Hpos);
+    *dy = -(int16_t)(o->Ypos - (int16_t)g.Vpos);
+    return 1;
+}                      /* counts the game's play frames (DoGameFrame): not counting in menus, the pause menu or between periods */
 int native_game_teams[2];                                 /* the away and home teams as the game begins */
 void (*native_game_start_hook)(void);                     /* set by the window front end: a new game begins (the select-sides screen) */
 void __cyg_profile_func_enter(void *fn, void *site);       /* (the compiler's hooks: -finstrument-functions) */

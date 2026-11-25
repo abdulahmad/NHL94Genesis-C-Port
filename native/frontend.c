@@ -915,6 +915,10 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
             static Uint32 play_ms;
             if (native_play_frames != seen_frames) { seen_frames = native_play_frames; play_ms = SDL_GetTicks(); }
             ob_pads_mouse_mode(play_ms && SDL_GetTicks() - play_ms < 250u);
+            {   int ax, ay, mp = ob_pads_mouse_player();
+                if (mp >= 0 && native_player_on_screen(mp, &ax, &ay)) ob_pads_mouse_anchor(ax, ay);
+                else ob_pads_mouse_anchor(0, 0);
+            }
         }
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
         intro_tick();
