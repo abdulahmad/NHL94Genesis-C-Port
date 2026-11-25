@@ -501,6 +501,28 @@ static ob_host host;
 static void shell_controllers(void) { ob_pads_setup_open(-1); }
 static void shell_sides(void) { ob_pads_sides_open(); }
 
+/* the select-sides screen's field: the game's own EA SPORTS scouting-screen pattern, tiled over the whole picture */
+static void sides_background(void *ud, uint32_t *px, int w, int h, int pitch)
+{
+    static uint32_t *pic;
+    static int pw, ph, tried;
+    (void)ud;
+    if (!tried) { tried = 1; pic = rosters_picture("ScoutMap", &pw, &ph); }
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) px[(size_t)y * pitch + x] = pic ? pic[(y % ph) * pw + x % pw] : 0xFF0000B2u;
+}
+static SDL_atomic_t sides_state;                   /* 0 none, 1 asked for by the game, 2 open */
+
+/* (the game's thread, as a new game begins: lockstep.c) the select-sides screen first; the game waits for it. Not in a session, where the room
+ * decides, and not with sides.at_start=0 in settings.ini. */
+static void game_starting(void)
+{
+    if (native_net_on() || !F.o || SDL_AtomicGet(&F.quit) || !atoi(pads_get("sides.at_start", "1"))) return;
+    SDL_AtomicSet(&sides_state, 1);
+    while (SDL_AtomicGet(&sides_state) && !SDL_AtomicGet(&F.quit)) SDL_Delay(5);
+}
+static const ob_sides_skin sides_skin = { .background = sides_background };
+
 int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game, void *user)
 {
     ob_profile profile = OB_PROFILE_DESKTOP;
@@ -520,7 +542,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     }
     ob_pads_init(&(ob_pads_cfg){ .players = MDRT_PADS, .n = BUTTONS, .b = buttons, .start = 7, .src_w = 320, .src_h = 224,
                                  .get = pads_get, .set = pads_set, .save = settings_write,
-                                 .team_name = { "Away", "Home" }, .mouse_btn = { 6, 7, 5 } });   /* the mouse: left B, right C, middle A */
+                                 .team_name = { "Away", "Home" }, .skin = &sides_skin, .mouse_btn = { 6, 7, 5 } });   /* the mouse: left B, right C, middle A */
     F.adaptor = ob_pads_extra() ? MDRT_ADAPTOR_EA4WAY : MDRT_ADAPTOR_NONE;
     options_from_settings();
     settings_write();
@@ -568,12 +590,15 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     }
     cfg->platform = (mdrt_platform){ .user = NULL, .present = present, .audio = audio, .wait = frame_wait, .input = input, .idle = idle };
     if (!start_game()) { fprintf(stderr, "the game could not start\n"); return 1; }
+    native_game_start_hook = game_starting;
     test_aid_arm();
     while (!SDL_AtomicGet(&F.quit)) {
         test_aid_tick();
         if (native_net_window_poll()) restart_for_session();
         ob_plat_pump();
         ob_pads_tick();
+        if (SDL_AtomicGet(&sides_state) == 1) { ob_pads_sides_open(); SDL_AtomicSet(&sides_state, 2); }
+        else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
         hold_state = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open || ob_screen_up();
         ob_plat_present();

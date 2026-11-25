@@ -63,6 +63,7 @@ int native_net_four_way(void);                          /* the session plays pad
 void native_net_start(mdrt *m);                         /* at power on, the states' parts added */
 void native_net_stop_at(long frame);                    /* headless: the session ends at --frames */
 void native_net_wait(void);                             /* at each of the game's waits, before the handshake */
+extern void (*native_game_start_hook)(void);           /* a new game begins (the game's thread; frontend.c sets it: the select-sides screen) */
 int native_net_on(void);                                /* in a session (headless: from before power on) */
 /* the session's settings (the host's, sent to the guests before power on): the next game's rules
  * and its roster set as a package (the save RAM is a new cartridge's on every machine). Made by the
@@ -124,6 +125,7 @@ const char *rosters_dir(void);           /* its folder ("" the cartridge's) */
 const char *rosters_name(void);
 int rosters_use(const char *dir, uint64_t hash);   /* a state's roster set (dir's, when its checksum is hash): 0, -1 */
 int rosters_check(const char *dir, int describe);   /* it builds (described on stdout): 0, -1 */
+uint32_t *rosters_picture(const char *name, int *w, int *h);   /* a shared picture of the cartridge as ARGB, malloc'd; NULL: none */
 int rosters_export(const char *dir);     /* the cartridge's roster set as a folder: 0, -1 */
 /* dir's roster set as a package (zip_path: a zip of its files, to send or keep): 0, -1 */
 int rosters_pack(const char *dir, const char *zip_path);
