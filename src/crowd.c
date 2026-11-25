@@ -94,7 +94,7 @@ void checkcornercoll(int16_t x, int16_t y, struct SortObj *o)
         int16_t dx = (int16_t)(x - cx), dy = (int16_t)(y - cy);
         int16_t c = dy, s = (int16_t)-dx;
         int32_t dist = (int32_t)dy * dy + (int32_t)dx * dx;
-        if ((uint32_t)dist > 0x1000) {
+        if ((uint32_t)dist > (rules[RULE_CD_CORNERS] ? 0x42u : 0x1000u)) {   /* (rules: the Sega CD's radius, about 8) */
             int16_t r = (int16_t)Sroot((uint32_t)dist);
             c = (int16_t)m68k_divs((int32_t)c * 256, r);     /* (asl.l #8; a negative's shift undefined in C) */
             s = (int16_t)m68k_divs((int32_t)s * 256, r);

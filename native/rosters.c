@@ -1591,14 +1591,87 @@ static void use_built(struct built *B, const char *dir, const char *name)
     art_map_make();
 }
 
+static atomic_flag reading = ATOMIC_FLAG_INIT;   /* (one roster set read at a time: below) */
+
+/* ---- the built-in roster sets: the cartridge's teams as the Sega CD has them --------------------------- */
+
+#include "segacd_rosters.inc"
+static int src_draws(const struct romsrc *s, const struct team *T, uint8_t seats[ROWS_MAX][16]);
+#define SEGACD_DIR "@sega-cd"                            /* (its "folder": the name states and settings keep) */
+#define SEGACD_LIST "sega-cd"                            /* (its name on the Rosters page's list) */
+#define SEGACD_NAME "NHL '94 (Sega CD)"
+
+static int is_builtin(const char *dir) { return dir && !strcmp(dir, SEGACD_DIR); }
+
+/* the cartridge's teams as a folder has them (rosters_export's, read back), the Sega CD's changes
+ * made when segacd: its 31 players fewer, its goalie weights and forward counts, its lines */
+static int builtin_folder(struct folder *L, int segacd)
+{
+    struct romsrc s;
+    romsrc_cartridge(&s, rom_cart);
+    memset(L, 0, sizeof *L);
+    snprintf(L->name, sizeof L->name, "%s", segacd ? SEGACD_NAME : "NHL '94 (built in)");
+    snprintf(L->dir, sizeof L->dir, "%s", SEGACD_DIR);
+    memcpy(L->hiscore_at, s.hiscore_at, sizeof L->hiscore_at);
+    L->teams = s.teams;
+    L->playoff_teams = s.playoff_teams;
+    for (int t = 0; t < s.teams; t++) {
+        src_team(&s, t, &L->t[t]);
+        L->t[t].banner[0] = 0;
+    }
+    if (src_draws(&s, L->t, L->seats) < 0) return fail("the cartridge's playoff draws");
+    L->rows = s.rows;
+    if (!segacd) return 0;
+    if (s.teams != 28) return fail("not the cartridge's 28 teams");
+    for (int t = 0; t < 28; t++) {
+        struct team *T = &L->t[t];
+        int map[ROSTER], n = 0;                           /* (each cartridge slot's on the disc, -1 left out) */
+        for (int i = 0; i < T->players; i++) {
+            int out = 0;
+            for (int k = 0; k < 3; k++) out |= segacd_teams[t].removed[k] == i + 1;
+            map[i] = out ? -1 : n;
+            if (!out) T->pl[n++] = T->pl[i];
+        }
+        T->players = n;
+        T->goalies = 0;
+        uint16_t w = segacd_teams[t].godds;                /* (as the game counts them: GetGoalieCount) */
+        do T->pl[T->goalies++].start = (uint8_t)(w >> 12); while ((w = (uint16_t)(w << 4)) != 0);
+        T->forwards = segacd_teams[t].forwards;
+        for (int i = 0; i < T->players; i++) T->pl[i].pos = i < T->goalies ? 'G' : i < T->goalies + T->forwards ? 'F' : 'D';
+        memcpy(T->line, segacd_teams[t].lines, sizeof T->line);
+        int k = 0;
+        for (int i = 0; i < T->pics; i++)                 /* (the pictures of those left, at their new slots) */
+            if (T->pic[i].slot < ROSTER && map[T->pic[i].slot] >= 0) {
+                T->pic[k] = T->pic[i];
+                T->pic[k++].slot = (uint8_t)map[T->pic[i].slot];
+            }
+        T->pics = k;
+    }
+    return 0;
+}
+
+static int build_builtin(const char *dir, struct built *B, char *name, size_t name_size)
+{
+    static struct folder L;                               /* (one at a time: reading) */
+    if (!rom_cart) return fail("no cartridge");
+    while (atomic_flag_test_and_set(&reading)) {}
+    int r = builtin_folder(&L, strcmp(dir, "@built-in") != 0);
+    err_file = NULL;
+    err_line = 0;
+    if (r == 0) r = build(&L, rom_cart, B);
+    if (name) snprintf(name, name_size, "%s", L.name);
+    atomic_flag_clear(&reading);
+    return r;
+}
+
 /* dir's roster set built on the cartridge: 0, or -1 with rosters_error() */
 /* one roster set read at a time (src): the game's thread builds one at power on, and the window's may
  * read one the player found meanwhile (rosters_add) */
-static atomic_flag reading = ATOMIC_FLAG_INIT;
 
 static int build_dir(const char *dir, struct built *B, char *name, size_t name_size)
 {
     struct folder *L;
+    if (is_builtin(dir) || !strcmp(dir, "@built-in")) return build_builtin(dir, B, name, name_size);   /* (@built-in: the cartridge's so made, for a check) */
     if (!rom_cart) return fail("no cartridge");
     while (atomic_flag_test_and_set(&reading)) {}        /* (the window's read takes a moment) */
     if (read_rosters(dir, &L, 1) < 0) { src_close(); atomic_flag_clear(&reading); return -1; }
@@ -1614,10 +1687,18 @@ static int build_dir(const char *dir, struct built *B, char *name, size_t name_s
 
 void rosters_next(const char *dir) { clean_dir(next_dir, sizeof next_dir, dir ? dir : ""); }
 
+static int sent_builtin;                                 /* (the host's roster set is the built-in Sega CD one) */
+
 int rosters_next_bytes(const uint8_t *b, size_t n)
 {
     rosters_next(NULL);
+    sent_builtin = 0;
     if (!n) return 0;
+    if (n == strlen(SEGACD_DIR) && !memcmp(b, SEGACD_DIR, n)) {   /* (built in: every machine makes it from its cartridge) */
+        sent_builtin = 1;
+        rosters_next(SEGACD_DIR);
+        return 0;
+    }
     while (atomic_flag_test_and_set(&reading)) {}        /* (the window may be reading it: rosters_session) */
     if (!sent.b || sent.n != n || memcmp(sent.b, b, n)) { /* (kept for the run: another session's another) */
         uint8_t *c = malloc(n);
@@ -1640,6 +1721,12 @@ long rosters_next_package(uint8_t **out)
     err_file = NULL;
     err_line = 0;
     if (!next_dir[0]) return 0;
+    if (is_builtin(next_dir)) {                           /* (built in: its name, each peer builds it) */
+        size_t n = strlen(SEGACD_DIR);
+        if (!(*out = malloc(n))) return fail("out of memory");
+        memcpy(*out, SEGACD_DIR, n);
+        return (long)n;
+    }
     if (sent.b && !strcmp(next_dir, sent.label)) {        /* (the roster set a host sent: as it came) */
         if (!(*out = malloc(sent.n))) return fail("out of memory");
         memcpy(*out, sent.b, sent.n);
@@ -1789,6 +1876,7 @@ const char *rosters_list_dir(int i, char *out, size_t size)
 {
     if (i <= 0 || i >= list_n) return NULL;
     const char *n = list_name[i];
+    if (i == 1) { snprintf(out, size, "%s", SEGACD_DIR); return out; }   /* (built in) */
     if (sent.b && !strcmp(n, sent.label)) snprintf(out, size, "%s", n);   /* (the roster set a host sent: by its name) */
     else if (strpbrk(n, "/\\") || (n[0] && n[1] == ':')) snprintf(out, size, "%s", n);   /* (found by the player: its path) */
     else snprintf(out, size, "rosters/%s", n);
@@ -1820,6 +1908,7 @@ static void real_place(const char *path, char *out, size_t size)
 int rosters_session_entry(void)
 {
     static int at = -1, version;
+    if (sent_builtin) return 1;                           /* (the list's built-in Sega CD roster set) */
     if (!sent.b) return -1;
     if (at > 0 && version == sent.version) return at;
     if (atomic_flag_test_and_set(&reading)) return -1;   /* (the game is reading one: asked again later) */
@@ -2092,6 +2181,11 @@ int rosters_list(const char *const **names, const char *const **labels)
     list_unread = 0;
     snprintf(list_name[0], sizeof list_name[0], "cartridge");
     snprintf(list_label[0], sizeof list_label[0], "NHL '94 (the cartridge)");
+    snprintf(list_name[1], sizeof list_name[1], "%s", SEGACD_LIST);   /* (built in: the cartridge's teams as the Sega CD has them) */
+    snprintf(list_label[1], sizeof list_label[1], "%s", SEGACD_NAME);
+    free(about[1]);
+    about[1] = NULL;
+    n = 2;
     DIR *d = opendir("rosters");
     struct dirent *e;
     while (d && (e = readdir(d)) && nf < LIST_MAX * 2) {
@@ -2106,6 +2200,7 @@ int rosters_list(const char *const **names, const char *const **labels)
     for (int i = 0; i < nf && n < LIST_MAX; i++) {
         char dir[600];
         struct folder *L;
+        if (!strcmp(found[i], SEGACD_LIST)) { fprintf(stderr, "rosters/%s: the name is the built-in Sega CD roster set's: give the folder another\n", SEGACD_LIST); list_unread++; continue; }
         if (!strcmp(found[i], "cartridge")) { fprintf(stderr, "rosters/cartridge: the name is the cartridge's own: give the folder another\n"); list_unread++; continue; }
         snprintf(dir, sizeof dir, "rosters/%.63s", found[i]);
         if (read_rosters(dir, &L, 0) < 0) { fprintf(stderr, "%s: %s (not in the menu)\n", dir, err); src_close(); list_unread++; continue; }   /* (no cartridge yet: its art is read when it is played) */
@@ -2127,6 +2222,7 @@ const char *rosters_sram(const char *base)
     static char path[1200];
     if (!next_dir[0] || !base) return base;
     const char *slash = strrchr(next_dir, '/'), *name = slash && slash[1] ? slash + 1 : next_dir;
+    if (*name == '@') name++;                             /* (built in: base-sega-cd.srm) */
     const char *dot = strrchr(base, '.'), *bs = strrchr(base, '/');
     int stem = dot && (!bs || dot > bs) ? (int)(dot - base) : (int)strlen(base), len = (int)strlen(name);
     if (is_package(name)) len -= 4;                       /* (a package's: its name's) */

@@ -536,7 +536,17 @@ void doinput(uint16_t d0, uint16_t d1, uint16_t d2, uint16_t d3, int16_t d4, str
             }
         }
     }
-    if ((g.gmode2 & HI(7)) && (uint8_t)d0 != 8) ShortenMsgTimer(o);
+    if ((g.gmode2 & HI(7)) && rules[RULE_CD_PSBOX]) {     /* (rules: the Sega CD's penalty-shot box takes the pad) */
+        d0 &= (uint16_t)~0x40;                            /* (bclr #6 on d0-d3: the A button) */
+        d1 &= (uint16_t)~BUT_A;
+        d2 &= (uint16_t)~BUT_A;
+        d3 &= (uint16_t)~BUT_A;
+        if ((uint8_t)d0 != 8) {                           /* a direction: the box shorter, and nothing else */
+            ShortenMsgTimer(o);
+            d0 = 8;
+            d1 = d2 = d3 = 0;
+        }
+    } else if ((g.gmode2 & HI(7)) && (uint8_t)d0 != 8) ShortenMsgTimer(o);
     g.TempWord1 = d0 & 0xF;
     setpads(d4, o);
     if (d1 & BUT_START) {
@@ -4131,8 +4141,10 @@ void playeracc(int16_t dir, struct SortObj *o)
     int16_t d2 = (int16_t)(o->weight >> 2);
     d2 = (int16_t)(0x40 - d2);
     d2 = (int16_t)((d2 & 0xFF00) | ((d2 + o->legstr) & 0xFF));
-    if ((g.sflags8 & 2) || (g.sflags7 & 0x40))
+    if ((g.sflags8 & 2) || (g.sflags7 & 0x40)) {
         d2 = (int16_t)((d2 & 0xFF00) | ((d2 + 2) & 0xFF));   /* crowd meter boost */
+        if (rules[RULE_CD_SKATING]) d2 = (int16_t)((d2 & 0xFF00) | ((d2 + 2) & 0xFF));   /* (rules: the Sega CD adds it twice) */
+    }
     if (o->position == 0) {
         d2 = (int16_t)((d2 & 0xFF00) | ((d2 + o->legstr) & 0xFF));   /* goalie gets double agility */
         d2 = (int16_t)(d2 + 0x10);

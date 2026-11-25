@@ -110,6 +110,22 @@ All of it is kept in `settings.ini`, in the folder you run the game from, beside
 can edit it while the game is closed. The macOS app opened from the Finder keeps them in
 `~/Library/Application Support/ninety-four`. On a Mac, hold Fn for the function keys.
 
+### Sega CD options
+
+The overlay's **Game** page has the changes the NHL '94 Sega CD made to the game, each one off
+(the cartridge's way) until you turn it on. They were found in the disc's disassembly
+([NHL94Genesis `docs/segacd_differences.md`](https://github.com/abdulahmad/NHL94Genesis/blob/main/docs/segacd_differences.md)).
+Online, every machine plays by the host's.
+
+- **Sega CD skating**: the crowd meter boost is added twice, so every player gets going about 2 to 5% quicker.
+- **Sega CD corner bounce**: a checked player bounces off the corner boards almost anywhere in a corner (the disc's radius is about 8, the cartridge's 64).
+- **Sega CD penalty shot box**: the pad does nothing while the PENALTY SHOT box is up (a direction only shortens it).
+- **Sega CD playoff password**: a password's pad layout read as the disc reads it (which pads play which team in a continued playoff).
+- **Sega CD shot data fix**: a new game clears only the shot buffer (the cartridge runs past it into the sound driver's tables).
+- **Sega CD uniforms**: Hartford's home and Ottawa's away colours as the disc has them.
+- **Sega CD rosters (restarts)**: the disc's teams: 31 players fewer, with its goalie counts, forward counts and lines. It is a
+  built-in roster set (`--rosters sega-cd`, `rules.rosters = sega-cd`), made from your cartridge, with records of its own; turning it on or off starts the console again.
+
 ### Game rules
 
 Things the cartridge never offered, for every player and the whole game. They are set before a

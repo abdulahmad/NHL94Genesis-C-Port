@@ -28,6 +28,14 @@ enum {
     RULE_STREAKS,               /* hot and cold streaks' effect on ratings (0: none) */
     RULE_VIEW,                  /* 1: the rink 320 wide (src/view.h): the camera moves less, players
                                  * count as off screen further out (a pad takes its goalie later) */
+    /* the Sega CD's changes to the game (NHL94Genesis docs/segacd_differences.md), each 0 the
+     * cartridge's, 1 the disc's: the overlay's Game page sets them */
+    RULE_CD_SKATING,            /* playeracc adds the crowd meter boost twice (+4, not +2) */
+    RULE_CD_CORNERS,            /* checkcornercoll's corner radius squared $42, not $1000 */
+    RULE_CD_PSBOX,              /* doinput: the pad does nothing while the penalty-shot box is up */
+    RULE_CD_PASSWORD,           /* a playoff password's pad layout read as the disc reads it */
+    RULE_CD_CLEARSHOT,          /* ClearShotData clears its $72 words, not $E4 (past the buffer) */
+    RULE_CD_COLOURS,            /* HFD's home and OTW's away uniforms in the disc's colours */
     RULE_COUNT
 };
 /* the original's values; a percentage is at most 255 */
@@ -55,3 +63,6 @@ void rules_clear_stats(void);
 /* a goal by team scorer (0 / 1; strength: its goal entry's 2 + skaters more than the other's):
  * plus one for its skaters on the ice, minus one for the other's, unless a power play goal */
 void rules_count_goal(int scorer, int strength);
+/* RULE_CD_COLOURS: a uniform's 16 colours (c) as the Sega CD has them, for the cartridge team art
+ * (rosters_art) on the side away (0 home, 1 away); a colour changed only where it is the cartridge's */
+void cd_colours(uint16_t art, int away, uint16_t c[16]);

@@ -441,7 +441,11 @@ void InitTeamLines(struct Team *tm)
 void setplayercolors(void)
 {
     for (int away = 0; away < 2; away++) {
-        pal_load_w(0x20 + 0x10 * away, rosters_team(team_struct(away)->tmteam)->colours[away], 0x10);
+        uint16_t c[16];
+        uint16_t team = team_struct(away)->tmteam;
+        memcpy(c, rosters_team(team)->colours[away], sizeof c);
+        if (rules[RULE_CD_COLOURS]) cd_colours(rosters_art(team), away, c);   /* (rules: the Sega CD's HFD and OTW) */
+        pal_load_w(0x20 + 0x10 * away, c, 0x10);
     }
 }
 
@@ -953,7 +957,7 @@ void ContinuePlayoffs(void)
     MakeTree();
     uint16_t d0 = g.FourWayPlay ? 0xB : 7;
     if (!g.FourWayPlay) {
-        if ((int16_t)g.pojoy >= 2) g.pojoy -= 2;
+        if ((int16_t)g.pojoy >= (rules[RULE_CD_PASSWORD] ? 3 : 2)) g.pojoy -= 2;   /* (rules: the Sega CD's ble, above 2) */
     } else if (g.pojoy == 1) {
         g.pojoy = 3;
     } else if (g.pojoy == 2) {
@@ -1131,7 +1135,10 @@ void ReadPassBits(uint8_t *bits)
     }
     g.WinBits = SuperDiv(bits, 0x4000);
     g.pojoy = SuperDiv(bits, 8);
-    if (!g.FourWayPlay && (g.pojoy == 1 || g.pojoy == 2)) g.pojoy = 4;
+    if (rules[RULE_CD_PASSWORD]) {                        /* (rules: the Sega CD's, only with the adaptor: 1 becomes 3, 2 becomes 4) */
+        if (g.FourWayPlay && g.pojoy == 1) g.pojoy = 3;
+        else if (g.FourWayPlay && g.pojoy == 2) g.pojoy = 4;
+    } else if (!g.FourWayPlay && (g.pojoy == 1 || g.pojoy == 2)) g.pojoy = 4;
     g.potreeteam = SuperDiv(bits, 0x10);
     g.gamelevel = SuperDiv(bits, 4);
     g.bosgames = SuperDiv(bits, 8);
