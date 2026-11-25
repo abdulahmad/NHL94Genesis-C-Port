@@ -232,14 +232,15 @@ void InProgress(void)
         box[-1] = (uint8_t)p;
         *box = 0xFF;
         assreplace(apenalty, pl);
-        if (pa_hook) {                                    /* (the rink announcer: this penalty, and whether more follow) */
-            int remaining = 0, next_same = 0;
+        {
+            int remaining = 0, next_same = 0;                 /* (the rink announcer and the pause for it: this penalty, and whether more follow) */
             for (const uint8_t *r = penbuf(); r < a0; r += 2) {
                 if (rd16(r) == 0) continue;
                 remaining++;
                 next_same = (PFLAG(sortobj(r[1] & 0x7F), pfteam) != 0) == (PFLAG(pl, pfteam) != 0);
             }
-            pa_hook(PA_PENALTY, a2, pl->pnum, pen, penalty_entry(pen)[penmins] | remaining << 8 | next_same << 16);
+            if (pa_hook) pa_hook(PA_PENALTY, a2, pl->pnum, pen, penalty_entry(pen)[penmins] | remaining << 8 | next_same << 16);
+            hold_for((hold_wait() ? 276 : 372) + (remaining ? 0 : 210));   /* 4.6 s for "and number n, 2 minutes, name", else 6.2 s; 3.5 s more for "at 12 minutes 30 seconds" */
         }
         SetPA(pen);
         USBoard();

@@ -664,6 +664,7 @@ void native_frame_done(long frame, int wait)
 
 static FILE *wav;
 static int segacd_on;                                     /* --segacd-music / --segacd-crowd */
+static int announcer_find;
 static const char *hats_rom;                              /* --hats FILE: the hat trick hats, from this NHL 94 SNES ROM */
 static const char *announcer_file;                        /* --announcer FILE: the rink announcer, from this XBRUCE2.VIV (its voice joins the --wav) */
 static int segacd_sfx_flag;                               /* --segacd-sfx: the disc's sound effects (rendered before the run starts) */
@@ -742,6 +743,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--shots") && i + 1 < argc) shots_dir = argv[++i];
         else if (!strcmp(argv[i], "--every") && i + 1 < argc) shots_every = atol(argv[++i]);
         else if (!strcmp(argv[i], "--wav") && i + 1 < argc) wav_path = argv[++i];
+        else if (!strcmp(argv[i], "--announcer-find")) announcer_find = 1;   /* (looks beside the program as the window does, then says what it found) */
         else if (!strcmp(argv[i], "--hats") && i + 1 < argc) hats_rom = argv[++i];
         else if (!strcmp(argv[i], "--white-ice")) whiteice_set(1);
         else if (!strcmp(argv[i], "--announcer") && i + 1 < argc) announcer_file = argv[++i];
@@ -890,6 +892,7 @@ int main(int argc, char **argv)
         hats_set(1);
         hats_start();
     }
+    if (announcer_find) { announcer_start(); announcer_wait(); fprintf(stderr, "announcer found: %d\n", announcer_found()); return !announcer_found(); }
     if (announcer_file) {
         wav_rate = c.audio_rate ? c.audio_rate : 48000;
         if (!announcer_load_file(announcer_file)) { fprintf(stderr, "--announcer: %s is not a bank of clips\n", announcer_file); return 2; }

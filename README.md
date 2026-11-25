@@ -161,6 +161,10 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   `NHL '94 (USA).sfc` (or `.smc`) put beside the program (up to three folders below); without it the row says "(no NHL 94 SNES ROM found)". Nothing
   of the game changes (the hats have a random generator of their own), so states, replays and online play are the same with it on or off. Headless:
   `--hats ROM`; `HATS_DEMO=1` starts the hats at once, for looking at them.
+- **Pause for the announcer**: with the rink announcer, play waits after a goal, a penalty or a penalty shot until the announcer has had time to
+  say it (the same fixed lengths on every machine, 95 PC's clips' about 6 s for a goal with an assist, 6 s a penalty, 7.5 s a penalty shot, with
+  the time the replay and the face off set up already take counted), then the puck drops. Unlike the other rows here it is a game rule: the host's
+  choice holds for everyone online, and it is on in the Recommended preset. Headless: `--rule hold_play=1`.
 - Headless: `--announcer FILE` plays the announcer from that `XBRUCE2.VIV` into `--wav`; `ANNOUNCER_LOG=1` prints each clip said.
 
 ### Game rules

@@ -25,6 +25,7 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_CD_SOUNDS] = { "rules.cd_sounds", "Sega CD sound choices", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_CD_SONGS] = { "rules.cd_songs", "Sega CD song timing", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_CD_PERIOD_END] = { "rules.cd_period_end", "Sega CD period end", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_HOLD] = { "rules.hold_play", "Pause for the announcer", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
 
 /* a choice's value: its number, or (a list's) its index */
@@ -270,5 +271,6 @@ int rules_state_load(void *user, const uint8_t *in, size_t size)
     }
     if (rosters_use(dir, h) < 0) { fprintf(stderr, "the state: %s\n", rosters_error()); return -1; }
     memcpy(rules, v, sizeof rules);
+    hold_reset();                                          /* (a state keeps no pause: every machine that loads it starts without) */
     return 0;
 }

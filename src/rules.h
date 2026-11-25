@@ -26,12 +26,22 @@ enum {
     RULE_CD_SONGS,              /* the disc starts songs at once: the home goal song (not 120 frames later), the
                                  * faceoff song in puckfaceoff (not queued for the drop) */
     RULE_CD_PERIOD_END,         /* PeriodOver_sp without the two vblank waits and the p_turnoff between them */
+    RULE_HOLD,                  /* play waits between a goal, a penalty or a penalty shot and the next face off for
+                                 * about as long as NHL 95 PC's announcer takes to say it (src/hold.c) */
     RULE_COUNT
 };
 /* the original's values */
 #define RULES_CLASSIC { 0 }
 extern const uint8_t rule_classic[RULE_COUNT];
 extern uint8_t rules[RULE_COUNT];   /* each rule's value now (Classic until the platform sets them) */
+
+/* RULE_HOLD (src/hold.c): the stoppage's pause for the announcer. hold_for makes the next face off wait
+ * until frames vblanks have passed since now (a later call adds to what is left); hold_wait is 1 while it
+ * must; hold_reset forgets it (a state loaded). The wait is in the game's own vblank count, not in audio:
+ * every machine of a session waits the same, with the announcer or without. */
+void hold_for(int frames);
+int hold_wait(void);
+void hold_reset(void);
 
 /* RULE_CD_COLOURS: a uniform's 16 colours (c) as the Sega CD has them, for the cartridge team art
  * (rosters_art) on the side away (0 home, 1 away); a colour changed only where it is the cartridge's */

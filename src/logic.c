@@ -3309,6 +3309,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
 {
     if (!PFLAG(o, pfna)) {
         o->temp1 = (int16_t)(o->temp1 - 1);
+        if (o->temp1 < 0 && hold_wait()) o->temp1 = 0;       /* (RULE_HOLD: the announcer is still on) */
         if (o->temp1 >= 0) { updatefaceoff(o); return; }
         EndArenaAnim();
         Endfaceoff(o);
