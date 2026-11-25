@@ -68,6 +68,7 @@ int native_player_on_screen(int p, int *dx, int *dy);   /* the controlled player
 int native_menu_rows(int rect[][4], int max, int *n, int *sel, int *lr);   /* the game menu being read: rows on the 320x224 picture, the selected one; 0 none */
 extern volatile unsigned native_menu_calls;
 int native_menu_waiting(void);                       /* the setup screen is inside its wait for a pad */
+int native_menu_kind(void);                          /* which menu the game is reading: 1 pause, 2 setup, 3 line editor grid, 4 line editor player list */
 extern volatile unsigned native_play_frames;          /* counts DoGameFrame calls: the window front end tells play from menus by it */                       /* (away, home) as it is called */
 extern void (*native_game_start_hook)(void);           /* a new game begins (the game's thread; frontend.c sets it: the select-sides screen) */
 int native_net_on(void);                                /* in a session (headless: from before power on) */

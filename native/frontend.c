@@ -971,11 +971,11 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
             ob_pads_mouse_mode(play_ms && SDL_GetTicks() - play_ms < 250u);
             {   static unsigned seen_menu; static Uint32 menu_ms;       /* a game menu is being read: the mouse points at its rows */
                 static ob_menu_rect mr[OB_MENU_ROWS]; int rect[OB_MENU_ROWS][4], n, sel, lr;
-                ob_pad_menu pm = { mr, 0, 0, 0, MDRT_PAD_C, MDRT_PAD_B, 320, 0 };
+                ob_pad_menu pm = { mr, 0, 0, 0, MDRT_PAD_C, MDRT_PAD_B, 320, 0, 0 };
                 if (native_menu_calls != seen_menu) { seen_menu = native_menu_calls; menu_ms = SDL_GetTicks(); }
                 if (((menu_ms && SDL_GetTicks() - menu_ms < 250u) || native_menu_waiting()) && !(play_ms && SDL_GetTicks() - play_ms < 250u) && native_menu_rows(rect, OB_MENU_ROWS, &n, &sel, &lr)) {
                     for (int i = 0; i < n; i++) { mr[i].x = rect[i][0] + (F.width > 320 ? (F.width - 320) / 2 : 0); mr[i].y = rect[i][1]; mr[i].w = rect[i][2]; mr[i].h = rect[i][3]; }
-                    pm.n = n; pm.sel = sel; pm.lr = lr; pm.w = F.width > 0 ? F.width : 320;
+                    pm.n = n; pm.sel = sel; pm.lr = lr; pm.grid = native_menu_kind() == 3; if (native_menu_kind() >= 3) pm.back = MDRT_PAD_START;     /* the line editor and the playoff tree: right click is Start */ pm.w = F.width > 0 ? F.width : 320;
                     ob_pads_menu(&pm);
                 } else ob_pads_menu(NULL);
             }
