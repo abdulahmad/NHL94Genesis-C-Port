@@ -7,8 +7,10 @@
  * RULE_ANNOUNCE 2: a home goal's speech starts after the goal song, and the wait covers the song and then the speech. */
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "game.h"
 #include "rules.h"
+#include "anim_gen.h"
 
 #define PFLAG(o, b) ((o)->pflags & (1 << (b)))
 
@@ -125,8 +127,84 @@ static void anthem_pose(void)
     }
 }
 
+/* NHL 95 PC's between-play: the skaters do not appear at the face off spots; each skates there from where he was when
+ * the whistle blew (the referee too: native/pcspr.c asks hold_skate_ref). The game's own setup has already placed them, so
+ * every copy of the game agrees; this only walks them there over the wait. Only with RULE_HOLD. */
+#define SKATE_SPEED 4                                   /* pixels a frame */
+static int sk_cap, sk_on, sk_dur;
+static uint16_t sk_t0;
+static struct { int16_t x, y; } sk_from[12], sk_to[12];
+
+void hold_skate_begin(void)
+{
+    sk_cap = 0;
+    if (!rules[RULE_HOLD]) return;
+    struct SortObj *pl = sortobj(0);
+    for (int i = 0; i < 12; i++, pl++) { sk_from[i].x = pl->Xpos; sk_from[i].y = pl->Ypos; }
+    sk_cap = 1;
+}
+
+void hold_skate_arm(void)
+{
+    if (!sk_cap) return;
+    sk_cap = 0;
+    if (anth) return;                                   /* (the anthem's own walk to the spots) */
+    int far = 0;
+    struct SortObj *pl = sortobj(0);
+    for (int i = 0; i < 12; i++, pl++) {
+        sk_to[i].x = pl->Xpos; sk_to[i].y = pl->Ypos;
+        int fx = sk_from[i].x, fy = sk_from[i].y;
+        if (pl->position <= 0 || fx < -300 || fx > 300 || fy < -300 || fy > 300) { sk_from[i] = sk_to[i]; continue; }
+        int dx = sk_to[i].x - fx, dy = sk_to[i].y - fy;
+        int d = (int)(sqrt((double)dx * dx + (double)dy * dy));
+        if (d > far) far = d;
+    }
+    sk_dur = far / SKATE_SPEED + 1;
+    if (sk_dur < 24) return;
+    if (sk_dur > 200) sk_dur = 200;
+    sk_t0 = g.Vcount;
+    sk_on = 1;
+    if (getenv("HOLDLOG")) fprintf(stderr, "hold: skate to the spots, %d frames, at %d\n", sk_dur, g.Vcount);
+}
+
+/* the referee's progress along his way to the dot, 0 to 256 (-1: no walk to the spots) */
+int hold_skate_ref(void)
+{
+    if (!sk_on) return -1;
+    int t = (int16_t)(g.Vcount - sk_t0);
+    return t >= sk_dur ? 256 : t * 256 / sk_dur;
+}
+
+static void skate_pose(void)
+{
+    int t = (int16_t)(g.Vcount - sk_t0);
+    struct SortObj *pl = sortobj(0);
+    for (int i = 0; i < 12; i++, pl++) {
+        int dx = sk_to[i].x - sk_from[i].x, dy = sk_to[i].y - sk_from[i].y;
+        int d = (int)sqrt((double)dx * dx + (double)dy * dy);
+        if (d < 2) continue;
+        int run = t * SKATE_SPEED;
+        if (run >= d || t >= sk_dur) {                  /* (there: face the puck, glide) */
+            if (pl->Xpos != sk_to[i].x || pl->Ypos != sk_to[i].y) {
+                pl->Xpos = sk_to[i].x; pl->Ypos = sk_to[i].y;
+                pl->facedir = (int16_t)vtoa((int16_t)((int16_t)g.puckx[0] - pl->Xpos), (int16_t)((int16_t)g.pucky - pl->Ypos));
+                SetSPA(pl, SPAglide);
+            }
+        } else {
+            if (t == 0) SetSPA(pl, SPAskate);
+            pl->Xpos = (int16_t)(sk_from[i].x + dx * run / d);
+            pl->Ypos = (int16_t)(sk_from[i].y + dy * run / d);
+            pl->facedir = (int16_t)vtoa((int16_t)dx, (int16_t)dy);
+        }
+        pl->Xvel = 0;
+        pl->Yvel = 0;
+    }
+    if (t >= sk_dur) sk_on = 0;
+}
+
 void hold_tick(void)
 {
+    if (sk_on) skate_pose();
     if (anth && pending) anthem_pose();
     if (!sg.on) return;
     int playing = song_playing() || (int16_t)g.songdelay > 0;
@@ -141,6 +219,7 @@ void hold_tick(void)
 
 int hold_wait(void)
 {
+    if (sk_on) return 1;                                /* (the players are still skating to the spots) */
     if (!pending) return 0;
     if (sg.on) return 1;
     if ((wanted() || anth) && (int16_t)(until - g.Vcount) > 0) return 1;
@@ -149,4 +228,4 @@ int hold_wait(void)
     return 0;
 }
 
-void hold_reset(void) { pending = 0; anth = 0; anth_pose = 0; sg.on = 0; }
+void hold_reset(void) { sk_on = 0; sk_cap = 0; pending = 0; anth = 0; anth_pose = 0; sg.on = 0; }

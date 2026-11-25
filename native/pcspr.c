@@ -490,10 +490,26 @@ static void ref_tick(void)
         R.x = ax_ * 256; R.y = ay_ * 256; R.vx = R.vy = 0;
         R.dir = ad_; R.t = am_ ? R.t + 1 : 0; R.wasfo = 1; R.drop = 0; R.init = 1;
     } else if (fo) {
-        R.x = (fx > 0 ? fx + 15 : fx - 15) * 256;
-        R.y = fy * 256;
+        int tx = (fx > 0 ? fx + 15 : fx - 15) * 256, ty = fy * 256;
+        int pr = hold_skate_ref();                                           /* (the between-play pause: he skates to the dot with the players) */
+        if (pr >= 0 && pr < 256 && R.init) {
+            static int fx0, fy0, started;
+            if (!started || !R.wasfo) { fx0 = R.x; fy0 = R.y; started = 1; }
+            double ddx = tx - fx0, ddy = ty - fy0;
+            R.x = (int)(fx0 + ddx * pr / 256);
+            R.y = (int)(fy0 + ddy * pr / 256);
+            if (ddx * ddx + ddy * ddy > 256.0 * 256.0 * 16) {
+                int d = (int)floor(atan2(ddx, ddy) / (M_PI / 4) + 0.5);
+                R.dir = ((d % 8) + 8) % 8;
+                R.t++;
+            }
+        } else {
+            R.x = tx;
+            R.y = ty;
+            R.t = 0;
+            R.dir = fx > 0 ? 6 : 2;
+        }
         R.vx = R.vy = 0;
-        R.dir = fx > 0 ? 6 : 2;
         R.wasfo = 1; R.drop = 0; R.init = 1;
     } else {
         if (!R.init) { R.x = (px > 0 ? 0x7C : -0x7C) * 256; R.y = cy * 256; R.init = 1; R.vx = R.vy = 0; }
@@ -534,7 +550,7 @@ static int ref_frame(void)
     const struct SortObj *pk = sortobj(puckscnum);
     int asn = pk->asslist[pk->assnum & 7];
     int d = R.dir & 7;
-    if (asn == pfaceoff || asn == pfaceoff2) return (d >= 3 && d <= 6) ? 711 : 703;       /* (SPAreffowait) */
+    if ((asn == pfaceoff || asn == pfaceoff2) && R.t == 0) return (d >= 3 && d <= 6) ? 711 : 703;       /* (still: skating to the dot, he is not) */       /* (SPAreffowait) */
     if (R.drop > 0) {                                                                    /* (SPArefdrop: 8 ticks each) */
         int k = (24 - R.drop) / 8;
         if (d >= 3 && d <= 6) return k == 0 ? 845 : k == 1 ? 846 : 711;

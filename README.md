@@ -180,7 +180,9 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   untouched, only the sound; without the file the cartridge's sounds stay. At one minute left the PC says "one minute left" with the rink announcer on
   (the cartridge's beep is left out), else sounds its one minute horn ($97) with the horn row on. Headless: `--pc-sfx PCFF001.DIG --wav out.wav`.
 - **PC between-play pause** (a game rule, off in every preset): the same waits after a goal, a penalty or a penalty shot even without the announcer,
-  as the PC game stops play. Headless: `--rule hold_play=1`.
+  as the PC game stops play. At every whistle the skaters and the referee also skate from where they were to the face off spot (the game's own
+  setup has already placed them, so it is the same for every copy of the game) instead of appearing there, and the drop waits until they have arrived.
+  Headless: `--rule hold_play=1`.
 - **Fighting**: fights in the style of NHL '93, ported from its code. The row has four choices. *NHL 93*: a hard check between two players with
   fighting ratings starts a fight (the 93 odds: fighting ratings, checks taken, how long since the last fight). *NHL 92*: the 92 roll, the two
   players' aggression plus how hard the hit was, so any hard hit between aggressive players can start one. *Hybrid*: 92's aggression roll, but only
