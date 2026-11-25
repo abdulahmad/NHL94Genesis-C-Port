@@ -623,7 +623,7 @@ void updatesound(void)
     psg_write(0xC8);
     psg_write(1);
     psg_write((uint8_t)(((g.asv >> 8) ^ 0xF) | 0xF0));
-    if (cd_sound_hook) cd_sound_hook(CD_EV_CROWD, g.asv);
+    if (cd_event_hook) cd_event_hook(CD_EV_CROWD, g.asv);
 }
 
 /* video94.asm:KillCrowd. Silence the crowd noise (psg). */

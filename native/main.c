@@ -565,6 +565,22 @@ static uint16_t script_pad(int pad, int k)
     return script_buttons(pad, (long)mdrt_frame_count(native_m));   /* (the console's frames: on through a reset) */
 }
 
+/* --segacd-screens: each frame, the picture with the disc's opening screens in it (segacd_present) */
+static int segacd_screens;
+static uint32_t screen_px[320 * 224];
+static int screen_frame;                                  /* (screen_px is this frame's) */
+static void segacd_frame(void)
+{
+    static uint16_t px[320 * 240];
+    mdrt_vdp *v = mdrt_get_vdp(native_m);
+    screen_frame = 0;
+    int w = mdrt_vdp_width(v), h = mdrt_vdp_height(v);
+    if (w > 320 || h > 224) return;
+    mdrt_vdp_render(v, px, 320);
+    for (int i = 0; i < 320 * 224; i++) screen_px[i] = 0xFF000000u | mdrt_vdp_rgb(px[i], 1);
+    screen_frame = segacd_present(screen_px, w, h);
+}
+
 /* pictures to files */
 static void write_ppm(const char *path)
 {
@@ -572,12 +588,13 @@ static void write_ppm(const char *path)
     mdrt_vdp *v = mdrt_get_vdp(native_m);
     int w = mdrt_vdp_width(v), h = mdrt_vdp_height(v);
     mdrt_vdp_render(v, px, 320);
+    if (screen_frame) { w = 320; h = 224; }
     FILE *f = fopen(path, "wb");
     if (!f) return;
     fprintf(f, "P6\n%d %d\n255\n", w, h);
     for (int i = 0; i < h; i++)
         for (int x = 0; x < w; x++) {
-            uint32_t c = mdrt_vdp_rgb(px[i * 320 + x], 1);
+            uint32_t c = screen_frame ? screen_px[i * 320 + x] : mdrt_vdp_rgb(px[i * 320 + x], 1);
             uint8_t rgb[3] = { (uint8_t)(c >> 16), (uint8_t)(c >> 8), (uint8_t)c };
             fwrite(rgb, 1, 3, f);
         }
@@ -589,6 +606,7 @@ void native_frame_done(long frame, int wait)
     if (!run_known) { run_offset = frame - (long)mdrt_frame_count(native_m); run_known = 1; }
     long run = (long)mdrt_frame_count(native_m) + run_offset;   /* (the game's frames, on through a reset in place: the console's go on, and a rollback puts them back) */
     if (wait) lockstep_check(frame);
+    if (segacd_screens) segacd_frame();
     if (golden) golden_wait();
     if (hashes) {
         static uint8_t ram[RAM_SIZE];
@@ -703,6 +721,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--segacd-music")) { segacd_on = 1; segacd_set_music(1); }
         else if (!strcmp(argv[i], "--segacd-crowd") && i + 1 < argc) { segacd_on = 1; segacd_set_crowd(atoi(argv[++i])); }
         else if (!strcmp(argv[i], "--segacd-voice") && i + 1 < argc) { segacd_on = 1; segacd_set_voice(atoi(argv[++i])); }
+        else if (!strcmp(argv[i], "--segacd-screens")) { segacd_on = segacd_screens = 1; segacd_set_screens(1); }
         else if (!strcmp(argv[i], "--headless")) headless = 1;
         else if (!strcmp(argv[i], "--lockstep") && i + 1 < argc) { lockstep_path = argv[++i]; headless = 1; }
         else if (!strcmp(argv[i], "--golden") && i + 1 < argc) { golden_path = argv[++i]; headless = 1; }

@@ -519,6 +519,7 @@ void Opening(void)
  * options (GameSetUp), the name entry, then Opening3. Does not return. */
 void Opening2(void)
 {
+    if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 0);
     KillCrowd();
     cpu_set_sr(0x2700);
     ram_fill(RAM(VSCRLPM), 0, 0xD03E - RAM_OFF_VSCRLPM);
@@ -748,7 +749,7 @@ void UpdateScoutingDisplay(void)
             return;
         }
         ScrollDisplayUp();
-        if (cd_sound_hook) cd_sound_hook(CD_EV_PARAGRAPH, (uint16_t)d0);
+        if (cd_event_hook) cd_event_hook(CD_EV_PARAGRAPH, (uint16_t)d0);
         const uint8_t *p = rom_ptr(a1);
         for (uint16_t n = (uint16_t)d0; n-- != 0;) while (*p++ != 0xD) {}
         d0 = (int16_t)(uint16_t)(p - rom_ptr(a1));
@@ -841,6 +842,7 @@ void ScrollDisplayUp(void)
  * until a button or $50 x 4 frames (about 5 s). */
 void EASportsScreen(void)
 {
+    if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 0);
     g.VBint = SYM_vb2;
     g.disflags &= (uint16_t)~HI(df32c);
     g.maps[2].colshift = 5;

@@ -20,7 +20,7 @@
 #define IO_CT1_PORT 0xA10003u
 #define IO_CT2_PORT 0xA10005u
 
-void (*cd_sound_hook)(int ev, uint16_t n);
+void (*cd_event_hook)(int ev, uint16_t n);
 
 static void bset(uint8_t *p, unsigned bit) { *p |= (uint8_t)(1u << (bit & 7)); }
 static void needs_update(void) { g.music_needs_z80_update = 0xFF; }
@@ -90,7 +90,7 @@ void ClearAllTrackAndSFXSlots(void)
  * channel, send the buffer and stop the PCM channel. */
 void p_turnoff(void)
 {
-    if (cd_sound_hook) cd_sound_hook(CD_EV_TURNOFF, 0);
+    if (cd_event_hook) cd_event_hook(CD_EV_TURNOFF, 0);
     ClearAllTrackAndSFXSlots();
     CMD[0] = 0x77;                                            /* key off channels 0-2, 4-6 */
     CMD[2] = 0x77;                                            /* volume change on them */
@@ -107,7 +107,7 @@ void play_sfx_or_music_track(uint16_t n)
     if (n > 0x7A) { rtsfx(); return; }
     if ((int16_t)n >= 0x30) {
         stop_current_song(n);
-        if (cd_sound_hook) cd_sound_hook(CD_EV_SONG, n);
+        if (cd_event_hook) cd_event_hook(CD_EV_SONG, n);
     }
     struct TrackSlot *slot = &g.fm_slots[0];
     int32_t low = (int32_t)slot->stream;
@@ -134,7 +134,7 @@ void play_sfx_or_music_track(uint16_t n)
  * passbits) and leaves the channel's volume alone. */
 void stop_current_song(uint16_t d0)
 {
-    if (cd_sound_hook) cd_sound_hook(CD_EV_STOP, 0);
+    if (cd_event_hook) cd_event_hook(CD_EV_STOP, 0);
     uint16_t sr = cpu_get_sr();
     cpu_set_sr(0x2700);                                   /* no interrupts while the slots change */
     int32_t first = (int32_t)rd32(rom_ptr(SYM_SongPointerTable));
