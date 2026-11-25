@@ -262,6 +262,7 @@ extern int (*song_block_hook)(void);                         /* 1: the cartridge
  * the game; only the host sets it. They read the game and never write it. */
 enum { HAT_START, HAT_END, HAT_FRAME };
 extern void (*hat_hook)(int ev, int arg);
+extern void (*test_frame_hook)(void);
 /* the host's way to draw a skater's sprite itself (native/pcspr.c; NULL = the cartridge's). SPR_DRAW: object sc's frame is
  * about to be written to the sprite table at screen x, y (as the table has it); a non-zero return says the host draws it over
  * the picture too, and SPR_MARK then says which table entries (sc = the first, x = how many) the frame's sprites took. */

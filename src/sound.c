@@ -26,6 +26,7 @@ int (*sfx_hook)(int ev);
 int (*anthem_hook_fn)(int home_art, int away_art);
 int (*song_block_hook)(void);
 void (*hat_hook)(int ev, int arg);
+void (*test_frame_hook)(void);                        /* (native/main.c, HOLDTEST: forces a goal or a penalty in a headless run) */
 int (*cd_title_hook)(int what);
 int (*cd_scout_hook)(int what);
 const uint8_t *(*cd_scout_text)(int n);

@@ -518,6 +518,31 @@ static uint16_t script_buttons(int pad, long frame)
     return scripts[pad].e[i].frame == frame ? b : (uint16_t)(b & ~MDRT_NET_RESET_BIT);
 }
 static long script_reset = -1;          /* alone: the frame a script's RESET was given for (the console powers on again at its wait) */
+
+/* HOLDTEST=goal:FRAME,pen:FRAME (a headless run): at that vblank in a game in play the puck is put into a net, or a penalty queued on
+ * a home skater, and every change of the stoppage wait is logged with its frame: tests the announcer and the face off wait
+ * (src/hold.c) at the game's own call sites. */
+static int holdtest_goal = -1, holdtest_pen = -1, holdtest_last = -1;
+static void holdtest_frame(void)
+{
+    int now = (int)g.Vcount;
+    int hw = hold_wait();
+    if (hw != holdtest_last) { fprintf(stderr, "holdtest: frame %d wait %d (score %d-%d, clock %d)\n", now, hw, team_struct(0)->tmscore, team_struct(1)->tmscore, g.gameclock); holdtest_last = hw; }
+    { static int calls; if (++calls % 500 == 0) fprintf(stderr, "holdtest: call %d frame %d demo %d gmode %x clock %d\n", calls, now, g.demoflag, g.gmode, g.gameclock); }
+    if (!g.demoflag) return;
+    if (holdtest_goal >= 0 && now >= holdtest_goal && !(g.gmode & (1 << gmclock))) {
+        struct SortObj *o = sortobj(puckscnum);
+        holdtest_goal = -1;
+        fprintf(stderr, "holdtest: frame %d goal forced (puck at %d,%d)\n", now, o->Xpos, o->Ypos);
+        o->Xpos = 0; o->OldXpos = 0; o->Ypos = 0x108; o->OldYpos = 0x100; o->Zpos = 2; o->OldZpos = 2; o->Yvel = 0x300; o->Xvel = 0; o->Zvel = 0;
+    }
+    if (holdtest_pen >= 0 && now >= holdtest_pen && g.gmode == 0) {
+        holdtest_pen = -1;
+        fprintf(stderr, "holdtest: frame %d penalty forced\n", now);
+        AddPenalty2((uint16_t)(getenv("HOLDPEN") ? atoi(getenv("HOLDPEN")) : 4), sortobj_at(team_struct(0)->tmsort) + 2);
+    }
+}
+
 static void script_source(void *user, uint16_t b[MDRT_PADS])
 {
     long frame = (long)mdrt_frame_count(user);
@@ -921,6 +946,12 @@ int main(int argc, char **argv)
     }
     if (pclogo_cli) { if (!pcspr_cli && !pcref_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-logos: no NHL 95 PC files found\n"); return 2; } } pcspr_logo_set(pclogo_cli); }
     if (pcref_cli) { if (!pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-ref: no NHL 95 PC sprite files found\n"); return 2; } } pcspr_ref_set(1); }
+    if (getenv("HOLDTEST")) {
+        const char *h = getenv("HOLDTEST"), *q;
+        if ((q = strstr(h, "goal:"))) holdtest_goal = atoi(q + 5);
+        if ((q = strstr(h, "pen:"))) holdtest_pen = atoi(q + 4);
+        test_frame_hook = holdtest_frame;
+    }
     if (announcer_find) { announcer_start(); announcer_wait(); fprintf(stderr, "announcer found: %d\n", announcer_found()); return !announcer_found(); }
     if (announcer_file) {
         wav_rate = c.audio_rate ? c.audio_rate : 48000;
