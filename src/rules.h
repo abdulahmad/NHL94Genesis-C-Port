@@ -44,6 +44,7 @@ extern uint8_t rules[RULE_COUNT];   /* each rule's value now (Classic until the 
  * must; hold_reset forgets it (a state loaded). The wait is in the game's own vblank count, not in audio:
  * every machine of a session waits the same, with the announcer or without. */
 void hold_for(int frames);
+void hold_anthem(int frames);
 /* RULE_ANNOUNCE 2: a goal's speech (pa_hook PA_GOAL with these arguments) starts when the goal song has ended; the face off waits for
  * both. frames is the speech's length. hold_tick is called every game frame. */
 void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a2);

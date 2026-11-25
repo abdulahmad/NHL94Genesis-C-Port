@@ -89,6 +89,7 @@
 #include "whiteice.h"
 #include "hats.h"
 #include "pcspr.h"
+#include "pcsong.h"
 #include "cardcolor.h"
 #include "wide.h"
 #include "rules.h"
@@ -668,6 +669,8 @@ void native_frame_done(long frame, int wait)
 static FILE *wav;
 static int segacd_on;                                     /* --segacd-music / --segacd-crowd */
 static int announcer_find;
+static int pcsong_cli;                                   /* --pc-anthems: NHL 95 PC's anthems before the first face off (their sound joins the --wav) */
+static const char *pcsong_wav;                           /* --pc-anthem-wav FILE: both anthems written as a wav, then exit */
 static int pclogo_cli;                                   /* --pc-logos: NHL 95 PC's centre ice logos */
 static int pcref_cli;                                    /* --pc-ref: the referee on the ice (needs the PC files as --pc-sprites does) */
 static int pcspr_cli;                                    /* --pc-sprites: NHL 95 PC's skater sprites, found beside the program
@@ -689,11 +692,12 @@ static void wav_audio(void *user, const int16_t *s, int n)
                         (unsigned long long)fnv(FNV0, s, (size_t)n * 4), n);
     if (!wav) return;
     static int16_t mixed[2 * 4096];
-    if ((segacd_on || announcer_file || pcsfx_file) && n > 0 && n <= 4096) {   /* (the Sega CD disc's music and crowd, the rink announcer: after the golden line, which is the game's) */
+    if ((segacd_on || announcer_file || pcsfx_file || pcsong_cli) && n > 0 && n <= 4096) {   /* (the Sega CD disc's music and crowd, the rink announcer: after the golden line, which is the game's) */
         memcpy(mixed, s, (size_t)n * 4);
         if (segacd_on) segacd_mix(mixed, n, wav_rate);
         if (announcer_file) announcer_mix(mixed, n, wav_rate);
         if (pcsfx_file) pcsfx_mix(mixed, n, wav_rate);
+        if (pcsong_cli) pcsong_mix(mixed, n, wav_rate);
         s = mixed;
     }
     fwrite(s, 4, (size_t)n, wav);                         /* (a little-endian host) */
@@ -758,6 +762,8 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--pc-sprites")) pcspr_cli = 1;
         else if (!strcmp(argv[i], "--pc-ref")) pcref_cli = 1;
         else if (!strcmp(argv[i], "--pc-logos")) pclogo_cli = 1;
+        else if (!strcmp(argv[i], "--pc-anthems")) pcsong_cli = 1;
+        else if (!strcmp(argv[i], "--pc-anthem-wav") && i + 1 < argc) pcsong_wav = argv[++i];
         else if (!strcmp(argv[i], "--announcer") && i + 1 < argc) announcer_file = argv[++i];
         else if (!strcmp(argv[i], "--pc-sfx") && i + 1 < argc) pcsfx_file = argv[++i];
         else if (!strcmp(argv[i], "--segacd-music")) { segacd_on = 1; segacd_set_music(1); }
@@ -906,6 +912,12 @@ int main(int argc, char **argv)
         hats_start();
     }
     if (pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-sprites: no NHL 95 PC sprite files found\n"); return 2; } pcspr_set(1); }
+    if (pcsong_cli || pcsong_wav) {
+        pcsong_start(); pcsong_wait();
+        if (!pcsong_found()) { fprintf(stderr, "--pc-anthems: no NHL 95 PC files found\n"); return 2; }
+        if (pcsong_wav) { int ok = pcsong_write_wav(pcsong_wav); return ok ? 0 : 2; }
+        pcsong_set(1);
+    }
     if (pclogo_cli) { if (!pcspr_cli && !pcref_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-logos: no NHL 95 PC files found\n"); return 2; } } pcspr_logo_set(1); }
     if (pcref_cli) { if (!pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-ref: no NHL 95 PC sprite files found\n"); return 2; } } pcspr_ref_set(1); }
     if (announcer_find) { announcer_start(); announcer_wait(); fprintf(stderr, "announcer found: %d\n", announcer_found()); return !announcer_found(); }

@@ -250,6 +250,7 @@ void sfx(int16_t n)
 void song(int16_t n)
 {
     if (n < 0) return;
+    if (song_block_hook && song_block_hook()) return;
     play_sfx_or_music_track((uint16_t)n);
 }
 

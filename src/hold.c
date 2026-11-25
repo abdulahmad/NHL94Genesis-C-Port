@@ -10,6 +10,7 @@
 
 static uint16_t until;                                /* the vblank (g.Vcount) the wait ends at */
 static int pending;
+static int anth;                                      /* the wait is the anthems' */
 
 /* a goal's speech held back until its song has ended */
 static struct { int on, started; uint16_t limit; int frames; struct Team *tm; int player, a1, a2; } sg;
@@ -23,6 +24,15 @@ void hold_for(int frames)
     if (pending && (int16_t)(until - g.Vcount) > 0) until = (uint16_t)(until + frames);
     else until = (uint16_t)(g.Vcount + frames);
     pending = 1;
+}
+
+/* the anthems before the first face off: the drop waits for them whatever the rules say */
+void hold_anthem(int frames)
+{
+    if (frames > 60 * 120) frames = 60 * 120;
+    until = (uint16_t)(g.Vcount + frames);
+    pending = 1;
+    anth = 1;
 }
 
 void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a2)
@@ -56,9 +66,10 @@ int hold_wait(void)
 {
     if (!pending) return 0;
     if (sg.on) return 1;
-    if (wanted() && (int16_t)(until - g.Vcount) > 0) return 1;
+    if ((wanted() || anth) && (int16_t)(until - g.Vcount) > 0) return 1;
     pending = 0;
+    anth = 0;
     return 0;
 }
 
-void hold_reset(void) { pending = 0; sg.on = 0; }
+void hold_reset(void) { pending = 0; anth = 0; sg.on = 0; }
