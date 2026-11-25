@@ -22,6 +22,7 @@
 
 void (*cd_event_hook)(int ev, uint16_t n);
 void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
+int (*sfx_hook)(int ev);
 void (*hat_hook)(int ev, int arg);
 int (*cd_title_hook)(int what);
 int (*cd_scout_hook)(int what);
@@ -135,6 +136,14 @@ void play_sfx_or_music_track(uint16_t n)
         v->patch = 0;
         v->volume = 0x7F;
     }
+}
+
+/* 1 while a song plays (a track slot holds a song's stream) */
+int song_playing(void)
+{
+    int32_t first = (int32_t)rd32(rom_ptr(SYM_SongPointerTable));
+    for (int i = 0; i < 8; i++) if (first <= (int32_t)g.fm_slots[i].stream) return 1;
+    return 0;
 }
 
 /* sound94.asm:stop_current_song. Free the slot playing a song (pointer at or past the first song

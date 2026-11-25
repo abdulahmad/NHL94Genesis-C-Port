@@ -154,7 +154,7 @@ void VBlank(void)
                     g.disflags |= HI(dfclock);
                     g.gameclock--;
                     if ((int16_t)g.gameclock <= 0x3D && (int16_t)g.gameclock >= 0x3C)
-                        sfx(SYM_SFXbeep2);                /* one minute left */
+                        { if (!(sfx_hook && sfx_hook(SFX_ONEMIN))) sfx(SYM_SFXbeep2); }   /* one minute left (the PC says it or sounds its horn: pcsfx.c) */
                     if (g.gameclock == 0x3C && pa_hook) pa_hook(PA_ONEMIN, NULL, 0, 0, 0);
                 }
             }
@@ -599,7 +599,7 @@ void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
         t += o->VRchar;
         sat_entry(v, (uint16_t)(y + yy), a2[7], t, (uint16_t)(x + xx));
     }
-    if (rep) spr_hook(SPR_MARK, first, (int)v->link - 1 - first, 0, NULL);   /* (its sprite table entries: the host takes them out of its own picture) */
+    if (rep) spr_hook(SPR_MARK, first, (int)v->link - 1 - first, 0, (const struct SpriteHead *)(const void *)(v->sat - 8 * ((int)v->link - 1 - first)));   /* (its sprite table entries: the host takes them out of its own picture) */
     o->attribute = attr_saved;
 }
 

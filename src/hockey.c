@@ -182,6 +182,7 @@ void DoGameFrame(void)
     g.OldVcount = g.Vcount;
     elapsed = d7;
     if (hat_hook) hat_hook(HAT_FRAME, d7);
+    hold_tick();
     periodicevents();
     updateplayers();
     if ((int16_t)g.songdelay > 0 && --g.songdelay == 0) {
@@ -302,7 +303,7 @@ void clockcont(void)
     if (g.gameclock != 0) return;
     g.disflags |= HI(dfclock);
     stop_current_song(0);                                /* periodicevents' d0 is not followed (a register leak) */
-    sfx(SYM_SFXhorn);
+    if (!(sfx_hook && sfx_hook(SFX_HORN))) sfx(SYM_SFXhorn);   /* (the PC's horn: pcsfx.c) */
     freezewindow();
     clockcont_0();
 }

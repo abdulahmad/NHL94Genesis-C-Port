@@ -32,6 +32,7 @@
 #include "overbar/screen.h"
 #include "segacd.h"
 #include "announcer.h"
+#include "pcsfx.h"
 #include "whiteice.h"
 #include "hats.h"
 #include "pcspr.h"
@@ -340,6 +341,7 @@ static void audio(void *user, const int16_t *samples, int frames)
         memcpy(mixed, samples, (size_t)frames * 4);
         segacd_mix(mixed, frames, F.rate);
         announcer_mix(mixed, frames, F.rate);
+        pcsfx_mix(mixed, frames, F.rate);
         samples = mixed;
     }
     SDL_QueueAudio(F.dev, samples, (Uint32)frames * 4);
@@ -548,11 +550,13 @@ static const struct { int rule; const char *key; } cd_rows[] = {
     { RULE_CD_PASSWORD, "cd_password" }, { RULE_CD_CLEARSHOT, "cd_clear_shots" }, { RULE_CD_COLOURS, "cd_colours" },
     { RULE_CD_SOUNDS, "cd_sounds" }, { RULE_CD_SONGS, "cd_songs" }, { RULE_CD_PERIOD_END, "cd_period_end" },
     { RULE_HOLD, "hold_play" },
-    { RULE_FIGHT, "fighting" },                          /* (NHL 93's fighting: group 4) */                          /* (not the Sega CD's: NHL 95 PC's pause for its announcer; group 4) */
+    { RULE_FIGHT, "fighting" },                          /* (NHL 93's fighting: group 4) */
+    { RULE_ANNOUNCE, "announce_timing" },                /* (when the rink announcer speaks, and play waits for it: group 4) */
 };
 #define CD_ROWS ((int)(sizeof cd_rows / sizeof cd_rows[0]))
-#define CD_HOLD (CD_ROWS - 2)                              /* (RULE_HOLD) */
-#define CD_FIGHT (CD_ROWS - 1)                             /* (the last rule row: RULE_FIGHT) */
+#define CD_HOLD (CD_ROWS - 3)                              /* (RULE_HOLD) */
+#define CD_FIGHT (CD_ROWS - 2)                             /* (RULE_FIGHT) */
+#define CD_ANNOUNCE (CD_ROWS - 1)                          /* (the last rule row: RULE_ANNOUNCE) */
 #define CD_ROSTERS CD_ROWS                                /* (the roster set, the built-in "sega-cd", list entry 1) */
 #define CD_MUSIC (CD_ROWS + 1)                            /* (this machine's sound only: the disc's music, its crowd bed) */
 #define CD_CROWD (CD_ROWS + 2)
@@ -573,7 +577,9 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_HATS (CD_ROWS + 17)                            /* (NHL 94 SNES's hat trick hats, its own ROM: group 4) */
 #define CD_WIDESCREEN (CD_ROWS + 18)                      /* (the picture 4:3 or 16:9: Overbar's host.widescreen, also on its Scaling page) */
 #define CD_PCSPR (CD_ROWS + 19)                            /* (NHL 95 PC's skater sprites, its own files: group 4) */
-#define CD_OPTS (CD_ROWS + 20)
+#define CD_PCSIREN (CD_ROWS + 20)                          /* (NHL 95 PC's goal siren, its own file: group 4) */
+#define CD_PCHORN (CD_ROWS + 21)                           /* (and its end of period horn) */
+#define CD_OPTS (CD_ROWS + 22)
 static ob_game_opt cd_opts[CD_OPTS];
 /* the Widescreen rows (the Game page's, Overbar's Scaling page's) are one setting: the Scaling page's change shown on the Game page */
 static void wide_rows_sync(void)
@@ -617,6 +623,8 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_PCPHOTOS) { cardcolor_set(value); return; }
     if (index == CD_SFX) { segacd_set_sfx(value); return; }
     if (index == CD_ANNOUNCER) { announcer_set(value); return; }
+    if (index == CD_PCSIREN) { pcsfx_set_goal(value); return; }
+    if (index == CD_PCHORN) { pcsfx_set_horn(value); return; }
     if (index == CD_WHITEICE) { whiteice_set(value); return; }
     if (index == CD_HATS) { hats_set(value); return; }
     if (index == CD_PCSPR) { pcspr_set(value); return; }
@@ -690,7 +698,7 @@ static void pa_no_file(void)
     if (done || !announcer_searched()) return;
     done = 1;
     if (announcer_found()) return;
-    snprintf(label, sizeof label, "%s (no XBRUCE2.VIV found)", cd_opts[CD_ANNOUNCER].label);
+    snprintf(label, sizeof label, "%s (no NHL 95 PC disc image found)", cd_opts[CD_ANNOUNCER].label);
     cd_opts[CD_ANNOUNCER].label = label;
 }
 
@@ -714,8 +722,22 @@ static void pcspr_no_file(void)
     if (done || !pcspr_searched()) return;
     done = 1;
     if (pcspr_found()) return;
-    snprintf(label, sizeof label, "%s (no NHL 95 PC files found)", cd_opts[CD_PCSPR].label);
+    snprintf(label, sizeof label, "%s (no NHL 95 PC disc image found)", cd_opts[CD_PCSPR].label);
     cd_opts[CD_PCSPR].label = label;
+}
+
+/* the PC siren and horn rows say so when no PCFF001.DIG was found */
+static void pcsfx_no_file(void)
+{
+    static int done;
+    static char label[2][64];
+    if (done || !pcsfx_searched()) return;
+    done = 1;
+    if (pcsfx_found()) return;
+    snprintf(label[0], sizeof label[0], "%s (no NHL 95 PC disc image found)", cd_opts[CD_PCSIREN].label);
+    snprintf(label[1], sizeof label[1], "%s (no NHL 95 PC disc image found)", cd_opts[CD_PCHORN].label);
+    cd_opts[CD_PCSIREN].label = label[0];
+    cd_opts[CD_PCHORN].label = label[1];
 }
 
 /* the colour photos' row says so when neither PC game's portraits were found */
@@ -731,12 +753,12 @@ static void game_page_init(void)
 {
     static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
                                                   "Sega CD playoff password", "Sega CD shot data fix", "Sega CD uniforms",
-                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "Pause for the announcer", "Fighting" };
+                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "PC between-play pause", "Fighting", "Rink announcer timing" };
     for (int k = 0; k < CD_ROWS; k++) {
         char key[64];
         snprintf(key, sizeof key, "rules.%s", cd_rows[k].key);
         int i = option_index(key);
-        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], i >= 0 ? F.o->options[i].names : cd_off_on, i >= 0 ? F.o->options[i].count : 2, i >= 0 && F.opt_values ? F.opt_values[i] : 0, 1, (cd_rows[k].rule == RULE_HOLD || cd_rows[k].rule == RULE_FIGHT) ? 4 : 1 };
+        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], i >= 0 ? F.o->options[i].names : cd_off_on, i >= 0 ? F.o->options[i].count : 2, i >= 0 && F.opt_values ? F.opt_values[i] : 0, 1, (cd_rows[k].rule == RULE_HOLD || cd_rows[k].rule == RULE_FIGHT || cd_rows[k].rule == RULE_ANNOUNCE) ? 4 : 1 };
     }
     int r = option_index("rules.rosters");
     cd_opts[CD_ROSTERS] = (ob_game_opt){ "cd_rosters", "Sega CD rosters (restarts)", cd_off_on, 2, r >= 0 && F.opt_values && F.opt_values[r] == 1, 1, 2 };
@@ -759,15 +781,16 @@ static void game_page_init(void)
     static const char *const career[2] = { "off", "B on a player card" };
     cd_opts[CD_CAREER] = (ob_game_opt){ "cd_career", "Career stats", career, 2, 0, 0, 3 };
     cd_opts[CD_SFX] = (ob_game_opt){ "cd_sfx", "Sound effects", music, 2, 0, 0, 3 };
-    cd_opts[CD_ANNOUNCER] = (ob_game_opt){ "pc_announcer", "Rink announcer", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's voice: goals, penalties, the last minute, the three stars) */
+    cd_opts[CD_ANNOUNCER] = (ob_game_opt){ "pc_announcer", "Rink announcer", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's voice: goals, penalties, the last minute, the three stars) */
     {   static const char *const hp[] = {
             "The Sega CD's skating speed, a touch different from the cartridge.", "The puck's bounce off the corners, as on the Sega CD.",
             "The penalty shot box takes the pad, as on the Sega CD.", "The Sega CD's playoff password rules.",
             "The Sega CD's fix for the shot data.", "The Sega CD's uniform colours for each team.",
             "The Sega CD's sounds: the ding at line changes and breaks.", "Songs play when the Sega CD plays them: in the second half of a period.",
             "At a period's end the Sega CD goes straight to the song.",
-            "Play waits a moment after a goal or penalty, so the rink announcer can finish.",
-            "NHL 93's fights: a hard check between two fighters can start one (B low punch, C high punch, A grab)." };
+            "NHL 95 PC's between-play time: play waits a moment after a goal, penalty or penalty shot before the face off.",
+            "NHL 93's fights: a hard check between two fighters can start one (B low punch, C high punch, A grab).",
+            "When the rink announcer speaks: with the goal or penalty as on NHL 95 PC (play waits until he is done), or after the goal song." };
         for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];
         game_help[CD_ROSTERS] = "The Sega CD's rosters (the game restarts to change them).";
         game_help[CD_MUSIC] = "Where the songs come from: the cartridge or the Sega CD disc.";
@@ -782,13 +805,18 @@ static void game_page_init(void)
     announcer_start();
     hats_start();
     pcspr_start();
+    pcsfx_start();
+    cd_opts[CD_PCSIREN] = (ob_game_opt){ "pc_goal_siren", "PC goal siren", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's siren in place of the cartridge's) */
+    cd_opts[CD_PCHORN] = (ob_game_opt){ "pc_period_horn", "PC end of period horn", cd_off_on, 2, 1, 0, 4 };
     cd_opts[CD_PCSPR] = (ob_game_opt){ "pc_sprites", "PC player sprites", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's skaters and goalies, the cartridge's where the PC has none) */
-    cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 0, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
+    cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 1, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
     cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
     static const char *const shape[2] = { "4:3", "16:9" };
     cd_opts[CD_WIDESCREEN] = (ob_game_opt){ "widescreen", "Widescreen", shape, 2, host.widescreen ? 1 : 0, 0, 4 };   /* (each machine its own: wide.c) */
-    cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 0, 0, 4 };
+    cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 1, 0, 4 };
         game_help[CD_ANNOUNCER] = "NHL 95 PC's rink announcer: goals, penalties, last minute.";
+        game_help[CD_PCSIREN] = "NHL 95 PC's goal siren, from your NHL 95 PC files, in place of the cartridge's.";
+        game_help[CD_PCHORN] = "NHL 95 PC's horn at the end of a period, from your NHL 95 PC files.";
         game_help[CD_PCSPR] = "NHL 95 PC's skaters and goalies, from your NHL 95 PC files.";
         game_help[CD_HATS] = "Hats thrown on the ice after a home skater's third goal.";
         game_help[CD_WHITEICE] = "The PC games' white rink instead of the pale cyan one.";
@@ -806,9 +834,13 @@ static void game_page_init(void)
     pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
     pv[1][CD_ANNOUNCER] = 0;                                                  /* (95 PC's voice: not the Sega CD's) */
     pv[1][CD_HOLD] = 0;                                                        /* (95 PC's pause: not the Sega CD's) */
-    pv[2][CD_HOLD] = 1;                                                        /* (on in Recommended, with the announcer it is for) */
+    pv[2][CD_HOLD] = 0;                                                        /* (the PC between-play pause: a taste, off in Recommended) */
+    pv[1][CD_ANNOUNCE] = 0;                                                    /* (95 PC's timing: not the Sega CD's) */
+    pv[2][CD_ANNOUNCE] = 1;                                                    /* (with the goal, as on the PC, in Recommended) */
     pv[1][CD_FIGHT] = 0;                                                       /* (NHL 93's fights: not the Sega CD's; off in Recommended too until tried) */
     pv[1][CD_HATS] = 0;                                                        /* (the SNES's: not the Sega CD's) */
+    pv[1][CD_PCSIREN] = pv[1][CD_PCHORN] = 0;                                  /* (the PC games' sounds: not the Sega CD's) */
+    pv[2][CD_PCSIREN] = pv[2][CD_PCHORN] = 1;                                  /* (on in Recommended; they do nothing without 95 PC's files) */
     pv[1][CD_PCSPR] = 0;                                                       /* (the PC games' look: not the Sega CD's; off in Recommended until tried) */
     pv[2][CD_HATS] = 1;                                                        /* (on in Recommended; it does nothing without the SNES ROM) */
     pv[1][CD_WHITEICE] = 0;                                                    /* (the PC games' look: not the Sega CD's; off in Recommended too, it is a taste) */
@@ -1077,10 +1109,12 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_pads_tick();
         if (SDL_AtomicGet(&sides_state) == 1) { ob_pads_sides_open(); SDL_AtomicSet(&sides_state, 2); }
         else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);
+        int in_play = 0;
         {   /* the mouse steers in play (the game's frames are running) and steps through the menus otherwise */
             static unsigned seen_frames;
             static Uint32 play_ms;
             if (native_play_frames != seen_frames) { seen_frames = native_play_frames; play_ms = SDL_GetTicks(); }
+            in_play = play_ms && SDL_GetTicks() - play_ms < 250u;
             ob_pads_mouse_mode(play_ms && SDL_GetTicks() - play_ms < 250u);
             {   static unsigned seen_menu; static Uint32 menu_ms;       /* a game menu is being read: the mouse points at its rows */
                 static ob_menu_rect mr[OB_MENU_ROWS]; int rect[OB_MENU_ROWS][4], n, sel, lr;
@@ -1104,6 +1138,11 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
             int src = seat_n ? (p < seat_n ? seat_pad[p] : -1) : p;       /* (after the select-sides screen the pads are the seated players') */
             SDL_AtomicSet(&F.buttons[p], src >= 0 ? (int)ob_pads_read(src) : 0);
         }
+        if (!in_play) {      /* in the menus any seated device (the keyboard too) drives the game's first pad, wherever the seating put it */
+            int any = 0;
+            for (int p = 0; p < 4 && p < MDRT_PADS; p++) if (ob_pads_seated(p) && p != ob_pads_mouse_player()) any |= (int)ob_pads_read(p);
+            SDL_AtomicSet(&F.buttons[0], SDL_AtomicGet(&F.buttons[0]) | any);
+        }
         {   /* a left click on the logos, the title and the license page leaves them, as a press of Start does (the movie takes its own) */
             static int was_down;
             static Uint32 click_until;
@@ -1120,6 +1159,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         pa_no_file();
         hats_no_file();
         pcspr_no_file();
+        pcsfx_no_file();
         pc_no_files();
         hold_other = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open;
         hold_state = hold_other || ob_screen_up();

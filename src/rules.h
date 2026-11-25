@@ -7,6 +7,7 @@
  * settings file. */
 #pragma once
 #include <stdint.h>
+struct Team;
 
 enum {
     RULE_WEIGHT_FIX,            /* 1: a check's weights summed in full (the original's 8-bit sum wraps,
@@ -29,6 +30,8 @@ enum {
     RULE_HOLD,                  /* play waits between a goal, a penalty or a penalty shot and the next face off for
                                  * about as long as NHL 95 PC's announcer takes to say it (src/hold.c) */
     RULE_FIGHT,                 /* NHL 93's fighting (src/fight.c): hard checks between opposing skaters can start a fight */
+    RULE_ANNOUNCE,              /* the rink announcer's timing (src/hold.c): 1 the speech starts with the goal or penalty and play waits
+                                 * until it is done, 2 a home goal's speech waits for the goal song to end */
     RULE_COUNT
 };
 /* the original's values */
@@ -36,11 +39,15 @@ enum {
 extern const uint8_t rule_classic[RULE_COUNT];
 extern uint8_t rules[RULE_COUNT];   /* each rule's value now (Classic until the platform sets them) */
 
-/* RULE_HOLD (src/hold.c): the stoppage's pause for the announcer. hold_for makes the next face off wait
+/* RULE_HOLD (src/hold.c): the stoppage's pause (NHL 95 PC's between-play time; RULE_ANNOUNCE also uses it, for the speech). hold_for makes the next face off wait
  * until frames vblanks have passed since now (a later call adds to what is left); hold_wait is 1 while it
  * must; hold_reset forgets it (a state loaded). The wait is in the game's own vblank count, not in audio:
  * every machine of a session waits the same, with the announcer or without. */
 void hold_for(int frames);
+/* RULE_ANNOUNCE 2: a goal's speech (pa_hook PA_GOAL with these arguments) starts when the goal song has ended; the face off waits for
+ * both. frames is the speech's length. hold_tick is called every game frame. */
+void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a2);
+void hold_tick(void);
 int hold_wait(void);
 void hold_reset(void);
 

@@ -481,7 +481,11 @@ void NI __cyg_profile_func_enter(void *fn, void *site)
     else if (fn == (void *)PrintMenuItem) { if (pause_n < 4) { pause_x[pause_n] = (int16_t)g.printx; pause_y[pause_n] = (int16_t)g.printy; pause_n++; } }
     else if (fn == (void *)MoveMenuFrame) in_moveframe = 1;
     else if (fn == (void *)Framer && in_moveframe) { in_moveframe = 0; setup_d7 = (int16_t)g.printy - 0xE + 2 * (int16_t)g.setupfirstline; }
-    if (fn == (void *)StartGame && native_game_start_hook) { native_game_teams[0] = g.VisTeam; native_game_teams[1] = g.HomeTeam; native_game_start_hook(); }
+    {   /* the select-sides screen comes first: before the scouting report (or the game itself when there is none) */
+        static int sides_done;
+        if ((fn == (void *)ScoutingReport || fn == (void *)StartGame) && native_game_start_hook && !sides_done) { sides_done = 1; native_game_teams[0] = g.VisTeam; native_game_teams[1] = g.HomeTeam; native_game_start_hook(); }
+        if (fn == (void *)StartGame) sides_done = 0;
+    }
     if (clock_original() || tracking) {
         uint32_t r = routine_of(fn);
         if (clock_original()) clock_on_enter(r);

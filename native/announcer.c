@@ -120,7 +120,7 @@ static int is_dir(const char *p) { struct stat st; return stat(p, &st) == 0 && S
 static long file_len(const char *p) { struct stat st; return stat(p, &st) == 0 ? (long)st.st_size : -1; }
 
 #define PATHMAX 1024
-#define LISTMAX 512
+#define LISTMAX 2048
 static int ends(const char *s, const char *e)
 {
     size_t a = strlen(s), b = strlen(e);
@@ -130,17 +130,21 @@ static int ends(const char *s, const char *e)
 /* the files below dir (depth folders down) into list: how many */
 static int walk(const char *dir, int depth, char (*list)[PATHMAX], int n)
 {
-    DIR *d = opendir(dir);
-    struct dirent *e;
-    if (!d) return n;
-    while ((e = readdir(d)) && n < LISTMAX) {
-        char p[PATHMAX];
-        if (e->d_name[0] == '.') continue;
-        snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
-        if (is_dir(p)) { if (depth > 0) n = walk(p, depth - 1, list, n); }
-        else snprintf(list[n++], PATHMAX, "%s", p);
+    /* a folder's own files first, then its folders (never the build's obj): a big folder must not use up the list before the disc image */
+    for (int pass = 0; pass < 2; pass++) {
+        DIR *d = opendir(dir);
+        struct dirent *e;
+        if (!d) return n;
+        while ((e = readdir(d)) && n < LISTMAX) {
+            char p[PATHMAX];
+            if (e->d_name[0] == '.') continue;
+            snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
+            if (is_dir(p)) {
+                if (pass == 1 && depth > 0 && strcmp(e->d_name, "obj")) n = walk(p, depth - 1, list, n);
+            } else if (pass == 0) snprintf(list[n++], PATHMAX, "%s", p);
+        }
+        closedir(d);
     }
-    closedir(d);
     return n;
 }
 
@@ -196,7 +200,7 @@ static int find_in(const char *dir)
 static int finder(void *dir)
 {
     if (SDL_AtomicGet(&A.searched)) { SDL_free(dir); return 0; }   /* (a file given on the command line) */
-    if (!find_in((const char *)dir) && !find_in(".")) fprintf(stderr, "Rink announcer: no XBRUCE2.VIV found beside the program\n");
+    if (!find_in((const char *)dir) && !find_in(".")) fprintf(stderr, "Rink announcer: no NHL 95 PC disc image found beside the program\n");
     SDL_MemoryBarrierRelease();
     SDL_AtomicSet(&A.found, A.nclips > 0);
     SDL_AtomicSet(&A.searched, 1);
@@ -236,6 +240,8 @@ void announcer_wait(void) { while (!SDL_AtomicGet(&A.searched)) SDL_Delay(5); }
 int announcer_searched(void) { return SDL_AtomicGet(&A.searched); }
 int announcer_found(void) { return SDL_AtomicGet(&A.searched) && SDL_AtomicGet(&A.found); }
 void announcer_set(int on) { SDL_AtomicSet(&A.on, on ? 1 : 0); if (!on) announcer_stop(); }
+
+int announcer_active(void) { return SDL_AtomicGet(&A.on) && SDL_AtomicGet(&A.found) && g.demoflag; }
 
 void announcer_stop(void)
 {

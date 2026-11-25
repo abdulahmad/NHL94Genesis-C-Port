@@ -167,10 +167,17 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   PC frame numbers are the cartridge's less one (less nine from the siren frames on), so where the PC has no matching frame (the cartridge's extra goalie
   frames) the cartridge's sprite stays. The game is untouched, only the sprite table: states, replays and online play are the same on or off.
   Headless: `--pc-sprites`.
-- **Pause for the announcer**: with the rink announcer, play waits after a goal, a penalty or a penalty shot until the announcer has had time to
-  say it (the same fixed lengths on every machine, 95 PC's clips' about 6 s for a goal with an assist, 6 s a penalty, 7.5 s a penalty shot, with
-  the time the replay and the face off set up already take counted), then the puck drops. Unlike the other rows here it is a game rule: the host's
-  choice holds for everyone online, and it is on in the Recommended preset. Headless: `--rule hold_play=1`.
+- **Rink announcer timing** (a game rule: the host's choice holds for everyone online; on, "with the goal", in Recommended): *with the goal* the
+  speech starts at the goal, penalty or penalty shot as on NHL 95 PC, and play waits until the announcer has had time to say it (fixed lengths, the
+  same on every machine: about 6 s for a goal with an assist, 6 s a penalty, 7.5 s a penalty shot, with the time the replay and the face off set
+  up already take counted), then the puck drops. *After the goal song*: a home goal's speech waits for the goal song to end, and the face off waits
+  for both; away goals and penalties have no song, so the speech is at once. Headless: `--rule announce_timing="with the goal"`.
+- **PC goal siren and PC end of period horn** (host rows, on in Recommended): NHL 95 PC's goal siren (its sound $9C, 7 s) and period end horn
+  ($91, 2.6 s) play in place of the cartridge's, from the player's own `PCFF001.DIG` (beside the program or on the NHL 95 PC disc image). The game is
+  untouched, only the sound; without the file the cartridge's sounds stay. At one minute left the PC says "one minute left" with the rink announcer on
+  (the cartridge's beep is left out), else sounds its one minute horn ($97) with the horn row on. Headless: `--pc-sfx PCFF001.DIG --wav out.wav`.
+- **PC between-play pause** (a game rule, off in every preset): the same waits after a goal, a penalty or a penalty shot even without the announcer,
+  as the PC game stops play. Headless: `--rule hold_play=1`.
 - **Fighting**: fights in the style of NHL '93, ported from its code. The row has four choices. *NHL 93*: a hard check between two players with
   fighting ratings starts a fight (the 93 odds: fighting ratings, checks taken, how long since the last fight). *NHL 92*: the 92 roll, the two
   players' aggression plus how hard the hit was, so any hard hit between aggressive players can start one. *Hybrid*: 92's aggression roll, but only
