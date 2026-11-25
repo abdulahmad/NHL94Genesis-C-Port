@@ -1,5 +1,5 @@
 /* The Sega CD's career pages (the Game page's "Career stats"): B on a player's card opens his career from the
- * disc, the bio and a row a season, regular season and playoffs, on an Overbar full-window screen while the game
+ * disc, the bio and a row a season, regular season and playoffs (on a team's card, its team page), on an Overbar full-window screen while the game
  * waits. Any key, button or click closes it. The data is native/segacd_photos.c's. */
 #include <SDL.h>
 #include <stdio.h>
@@ -43,12 +43,13 @@ static void draw(void *ud, uint32_t *px, int w, int h, int pitch)
     float colw[SEGACD_COLS] = { 0 }, gap = 0.9f, total = 0;
     for (int r = 0; r < c->nrows; r++)
         for (int i = 0; i < c->ncells[r]; i++) {
-            float cw = ob_vf_width(r ? OB_VF_REGULAR : OB_VF_SEMIBOLD, 100, c->cell[r][i], 0) / 100;
+            float cw = ob_vf_width(r || c->noheader ? OB_VF_REGULAR : OB_VF_SEMIBOLD, 100, c->cell[r][i], 0) / 100;
             if (cw > colw[i]) colw[i] = cw;
         }
     for (int i = 0; i < cols; i++) total += colw[i] + gap;
     int lines = c->nbio + 3 + c->nrows;
     float size = h / (lines * 1.45f + 2.5f);
+    if (size > h / 26.0f) size = h / 26.0f;                              /* (a short page, the team's, not huge) */
     if (total * size > w * 0.92f) size = w * 0.92f / total;
     float bio_size = size * 1.1f, line = size * 1.45f, x0 = (w - total * size) / 2, y = size * 2.2f;
     if (x0 < size) x0 = size;
@@ -59,7 +60,7 @@ static void draw(void *ud, uint32_t *px, int w, int h, int pitch)
     xs[0] = x0;
     for (int i = 0; i < cols; i++) xs[i + 1] = xs[i] + (colw[i] + gap) * size;
     int split = playoffs_from(c);
-    if (c->heading[0][0] && split > 3) {                                   /* REGULAR SEASON over its columns, PLAYOFFS over theirs */
+    if (c->heading[0][0] && split > 3 && !c->noheader) {                                   /* REGULAR SEASON over its columns, PLAYOFFS over theirs */
         float a = xs[3], b = xs[split] - gap * size;
         float tw = ob_vf_width(OB_VF_SEMIBOLD, size, c->heading[0], 0);
         ob_vf_draw(px, w, h, pitch, a + (b - a - tw) / 2, y, OB_VF_SEMIBOLD, size, GOLD, 255, c->heading[0], 0, 0);
@@ -72,11 +73,12 @@ static void draw(void *ud, uint32_t *px, int w, int h, int pitch)
     }
     for (int r = 0; r < c->nrows; r++, y += line) {
         for (int i = 0; i < c->ncells[r]; i++) {
-            float tw = ob_vf_width(r ? OB_VF_REGULAR : OB_VF_SEMIBOLD, size, c->cell[r][i], 0);
-            float x = i < 3 ? xs[i] : xs[i] + colw[i] * size - tw;            /* (season, club and league to the left; numbers to the right) */
-            ob_vf_draw(px, w, h, pitch, x, y, r ? OB_VF_REGULAR : OB_VF_SEMIBOLD, size, r ? INK : GOLD, 255, c->cell[r][i], 0, 0);
+            int body = r || c->noheader, left = c->noheader ? i == 0 : i < 3;
+            float tw = ob_vf_width(body ? OB_VF_REGULAR : OB_VF_SEMIBOLD, size, c->cell[r][i], 0);
+            float x = left ? xs[i] : xs[i] + colw[i] * size - tw;             /* (season, club and league to the left; numbers to the right) */
+            ob_vf_draw(px, w, h, pitch, x, y, body ? OB_VF_REGULAR : OB_VF_SEMIBOLD, size, body ? INK : GOLD, 255, c->cell[r][i], 0, 0);
         }
-        if (!r) {                                                       /* a rule under the column names */
+        if (!r && !c->noheader) {                                                       /* a rule under the column names */
             int ry = (int)(y + size * 0.45f);
             for (int x = (int)x0; x < (int)xs[cols] && x < w; x++) if (ry >= 0 && ry < h) px[(long)ry * pitch + x] = 0xFF3A5AA0u;
             y += size * 0.3f;
@@ -94,6 +96,13 @@ static void input(void *ud, const ob_screen_ev *e)
 int segacd_career_show(ob_cd *cd, const char *abbr, const char *name, int goalie, int (*ending)(void))
 {
     if (SDL_AtomicGet(&C.state) || !segacd_career_get(cd, abbr, name, goalie, &C.c)) return 0;
+    return segacd_page_show(&C.c, ending);
+}
+
+int segacd_page_show(const segacd_career *page, int (*ending)(void))
+{
+    if (SDL_AtomicGet(&C.state)) return 0;
+    if (page != &C.c) C.c = *page;
     SDL_AtomicSet(&C.close, 0);
     SDL_AtomicSet(&C.state, 1);
     while (SDL_AtomicGet(&C.state) && !(ending && ending())) SDL_Delay(5);

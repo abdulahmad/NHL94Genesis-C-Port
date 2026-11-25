@@ -12,7 +12,7 @@ void segacd_set_voice(int v);            /* Ron Barr's scouting report: 0 off, 1
 void segacd_set_screens(int v);          /* the opening screens: 0 the cartridge's, 1 the disc's */
 void segacd_set_photos(int v);           /* the player cards' photos: 0 the cartridge's, 1 the disc's where it has one */
 void segacd_set_session(int on);
-void segacd_set_career(int v, int (*ending)(void));   /* (the window's) B on a player's card: his career from the disc; ending: give up waiting */         /* (a session's console: the photos stay the cartridge's) */
+void segacd_set_career(int v, int (*ending)(void));   /* (the window's) B on a player's card: his career from the disc; on a team's card its team page; ending: give up waiting */         /* (a session's console: the photos stay the cartridge's) */
 void segacd_set_intro(int v);            /* the intro movie (HOCKEY.SEG) before the title: 0 off, 1 on */
 extern void (*segacd_intro_hook)(void);  /* (the window's) plays it, the game's thread waiting; NULL: no movie */
 int segacd_present(uint32_t *frame, int w, int h);   /* a w x h ARGB frame in a 320 x 224 buffer: the disc's opening picture over it, 320 x 224 (1), or left alone (0) */
@@ -51,7 +51,8 @@ int segacd_photo_count(ob_cd *cd);
 const char *segacd_photo_name(int i, const char **abbr);
 
 /* a player's career from the disc (native/segacd_photos.c): his name, position and size, birthplace, birthday, draft;
- * the table's two headings (the regular season's, the playoffs'), its column names (row 0) and a row a season */
+ * the table's two headings (the regular season's, the playoffs'), its column names (row 0) and a row a season.
+ * The team page (B on a team's card) is one too: its name, and a row a line with no column names (noheader) */
 #define SEGACD_BIO 8
 #define SEGACD_ROWS 40
 #define SEGACD_COLS 20
@@ -60,9 +61,10 @@ typedef struct {
     int nbio;
     char bio[SEGACD_BIO][SEGACD_CELL];
     char heading[2][32];
-    int nrows, ncells[SEGACD_ROWS];
+    int nrows, ncells[SEGACD_ROWS], noheader;
     char cell[SEGACD_ROWS][SEGACD_COLS][SEGACD_CELL];
 } segacd_career;
 int segacd_career_get(ob_cd *cd, const char *abbr, const char *name, int goalie, segacd_career *out);
 int segacd_career_show(ob_cd *cd, const char *abbr, const char *name, int goalie, int (*ending)(void));   /* (native/segacd_career.c) */
+int segacd_page_show(const segacd_career *page, int (*ending)(void));   /* (the same, a page made already) */
 void segacd_career_tick(void);           /* (the window's loop) */
