@@ -90,7 +90,9 @@ int native_net_window_status(char *line, size_t size);
  * options_use, or the command line's --rule NAME=VALUE), set at power on, and the state part */
 extern const mdrt_sdl_option rule_options[];
 void rules_next(const int *values, void *user);
-void rules_next_get(uint8_t *v);                         /* the next game's rules' values (RULE_COUNT of them) */
+void rules_next_get(uint8_t *v);
+void rules_next_send(uint8_t *v);                        /* the same with the Widescreen setting's wide rink: what a host sends */
+void rules_widescreen(int on);                           /* the Widescreen setting (16:9: the wide-view rink from the next power on) */                         /* the next game's rules' values (RULE_COUNT of them) */
 int rules_next_set(const uint8_t *v, int count);         /* count of them (the rest Classic): 0, or -1 when one is out of range */
 /* the menu's page: the rules (its options_use and options_changed) */
 const mdrt_sdl_option *rules_page(int *count);

@@ -310,6 +310,7 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     if (cd) { w = 320; h = 224; }
     SDL_LockMutex(F.lock);
     F.wide = host.widescreen;
+    rules_widescreen(host.widescreen);           /* (the wide rink from the next power on: rules.c) */
     if (F.wide) w = wide_frame(mdrt_get_vdp(F.m), pic, w, h, 320, F.picture, WIDE_MAX_W, cd);   /* (the sides: wide.c) */
     else for (int y = 0; y < h; y++) memcpy(F.picture + y * WIDE_MAX_W, pic + y * 320, (size_t)w * 4);
     F.width = w;
@@ -854,6 +855,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     settings_write();
     ob_host_init(&host, OB_PORT_GENESIS, profile);
     ob_host_load_ini_beside(&host, "overbar.ini");   /* the Overbar settings stay set between runs */
+    rules_widescreen(host.widescreen);
     options_ui_init(o, F.opt_values, F.set, user, settings_write);
     game_page_init();                                 /* (after overbar.ini: its game_ lines are kept until the rows are known) */
     {
