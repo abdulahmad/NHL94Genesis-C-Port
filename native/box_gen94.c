@@ -19,6 +19,13 @@ static int tv_tex = -1, tv_mode = -1, led_mat = -1, tvPower = -1, tvRemote = -1;
 #define NPK 9
 static int pk[NPK];
 static float pk_home[NPK][3], case_home[3];
+/* the stage: dark ground with a pool of light, and the closed box's blurry reflection in it (after the game's TV commercial) */
+static int nfloorA = -1, nfloorB = -1, nrefl = -1;
+static float lk[3];                              /* where the camera looks on the desk (tweened) */
+#define CASE_W 5.03f
+#define CASE_H 7.02f
+#define CASE_D 1.30f
+#define DESK_Y (-8.2f)
 static const char *pk_key[NPK] = { "pk4way", "pkFifa", "pkPoster", "pkHint", "pkReg", "pkWear", "pkOffer", "pkCard", "pkCap" };
 static const char *pk_name[NPK] = { "EA 4 Way Play card", "FIFA International Soccer card", "EA SPORTS poster", "NHL '94 Hint Cards pack",
     "Registration card", "EA SPORTS-WEAR card", "Hint Cards order card", "Hint card: Brad Shaw", "EA SPORTS milk cap" };
@@ -148,6 +155,163 @@ static void tv_draw(int mode)
 static int mesh_mat_of(int node) { for (int i = 0; i < BX_S->nmeshes; i++) if (BX_S->meshes[i].node == node) return BX_S->meshes[i].mat; return -1; }
 static float lin(int c) { float v = c / 255.0f; return v <= .04045f ? v / 12.92f : powf((v + .055f) / 1.055f, 2.4f); }
 
+/* the backdrop: near black, a touch of cold blue low down, darker corners */
+static void stage_bg(uint32_t *px, int w, int h)
+{
+    for (int y = 0; y < h; y++) {
+        float v = (float)y / (float)(h - 1);
+        for (int x = 0; x < w; x++) {
+            float u = (float)x / (float)(w - 1) - .5f, d = u * u * 1.6f + (v - .62f) * (v - .62f) * 1.2f;
+            float k = 1 - d * 1.5f; if (k < 0) k = 0;
+            int r = (int)(4 + 9 * k), g = (int)(5 + 10 * k), b = (int)(8 + 15 * k);
+            px[(size_t)y * w + x] = 0xff000000u | (uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b;
+        }
+    }
+}
+/* the ground's picture: a soft pool of cold light that fades out to nothing; shadow puts the box's contact shadow in the middle
+   (size: the ground's side in inches) */
+static int pool_tex(float bright, float spread, int shadow, float size)
+{
+    const int N = 512;
+    uint32_t *px = (uint32_t *)malloc((size_t)N * N * 4);
+    if (!px) return -1;
+    for (int y = 0; y < N; y++)
+        for (int x = 0; x < N; x++) {
+            float u = (x + .5f) / N * 2 - 1, v = (y + .5f) / N * 2 - 1, r = sqrtf(u * u + v * v);
+            float g = expf(-(r / spread) * (r / spread)) * bright;
+            if (shadow) {
+                float sx = u * size * .5f / (CASE_W * .62f), sy = v * size * .5f / (CASE_D * 1.5f);
+                g *= 1 - .7f * expf(-(sx * sx + sy * sy));
+            }
+            float a = r < .7f ? 1 : r > 1 ? 0 : 1 - (r - .7f) / .3f;
+            int R = (int)(6 + 190 * g), G2 = (int)(8 + 200 * g), B2 = (int)(12 + 236 * g);
+            if (R > 255) R = 255;
+            if (G2 > 255) G2 = 255;
+            if (B2 > 255) B2 = 255;
+            px[(size_t)y * N + x] = (uint32_t)(a * 255) << 24 | (uint32_t)R << 16 | (uint32_t)G2 << 8 | (uint32_t)B2;
+        }
+    return r3_tex_add(BX_S, px, N, N);
+}
+static int flat_mat(int tex, int side)
+{
+    r3_mat m; memset(&m, 0, sizeof m);
+    m.type = 'B'; m.col[0] = m.col[1] = m.col[2] = 1; m.map = tex; m.opacity = 1; m.transparent = 1; m.side = side; m.depth_write = 0; m.visible = 1; m.bright = 1;
+    return r3_mat_add(BX_S, &m);
+}
+static int ground(const char *name, float size, int tex, int ro)
+{
+    int n = r3_node_add(BX_S, -1, name);
+    if (n < 0) return -1;
+    int me = r3_mesh_quad(BX_S, n, flat_mat(tex, 2), -size / 2, size / 2, -size / 2, size / 2, 0, 1, 0);
+    if (me >= 0) BX_S->meshes[me].ro = ro;
+    BX_S->nodes[n].rot[0] = -PI_F / 2;
+    return n;
+}
+/* a face of the box as the ground shows it: the scan, small and blurred, fading out away from the ground */
+static int refl_tex(const char *key, float inset)
+{
+    const int W = 64, H = 96;
+    r3_tex *t = key ? bx_art(key) : NULL;
+    float *f = (float *)calloc((size_t)W * H * 3, sizeof(float)), *g = (float *)calloc((size_t)W * H * 3, sizeof(float));
+    uint32_t *px = (uint32_t *)malloc((size_t)W * H * 4);
+    if (!f || !g || !px) { free(f); free(g); free(px); return -1; }
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            float u = ((x + .5f) / W - inset) / (1 - 2 * inset), v = ((y + .5f) / H - inset * .7f) / (1 - 1.4f * inset);
+            float c[3] = { 10, 10, 12 };
+            if (t && t->w > 0 && u >= 0 && u < 1 && v >= 0 && v < 1) {
+                /* the mean of a block of the scan */
+                int x0 = (int)(u * t->w), y0 = (int)(v * t->h), bw = t->w / W + 1, bh = t->h / H + 1, n = 0; float a[3] = { 0, 0, 0 };
+                for (int yy = y0; yy < y0 + bh && yy < t->h; yy += 2)
+                    for (int xx = x0; xx < x0 + bw && xx < t->w; xx += 2) { uint32_t p = t->lv[0][(size_t)yy * t->w + xx]; a[0] += (p >> 16) & 255; a[1] += (p >> 8) & 255; a[2] += p & 255; n++; }
+                if (n) for (int k = 0; k < 3; k++) c[k] = a[k] / n;
+            }
+            for (int k = 0; k < 3; k++) f[((size_t)y * W + x) * 3 + k] = c[k];
+        }
+    for (int pass = 0; pass < 3; pass++) {           /* blur */
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+                for (int k = 0; k < 3; k++) {
+                    float a = 0; int n = 0;
+                    for (int dy = -2; dy <= 2; dy++)
+                        for (int dx = -2; dx <= 2; dx++) { int xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue; a += f[((size_t)yy * W + xx) * 3 + k]; n++; }
+                    g[((size_t)y * W + x) * 3 + k] = a / n;
+                }
+        float *sw = f; f = g; g = sw;
+    }
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            float up = 1 - (y + .5f) / H;             /* 0 at the box's foot (the picture's last row), 1 at its top */
+            float a = .6f * powf(1 - up, 2.6f);
+            const float *c = f + ((size_t)y * W + x) * 3;
+            px[(size_t)y * W + x] = (uint32_t)(a * 255) << 24 | (uint32_t)c[0] << 16 | (uint32_t)c[1] << 8 | (uint32_t)c[2];
+        }
+    free(f); free(g);
+    return r3_tex_add(BX_S, px, W, H);
+}
+static float cb[6] = { -CASE_W / 2, CASE_W / 2, -CASE_H / 2, CASE_H / 2, -CASE_D / 2, CASE_D / 2 };   /* the closed case in its own frame: x0 x1 y0 y1 z0 z1 */
+static void case_bounds(void)
+{
+    r3_update(BX_S);
+    float inv[16], m[16], lo[3] = { 1e9f, 1e9f, 1e9f }, hi[3] = { -1e9f, -1e9f, -1e9f };
+    r3_m4_inv(inv, r3_world(BX_S, caseG));
+    for (int i = 0; i < BX_S->nmeshes; i++) {
+        const r3_mesh *me = &BX_S->meshes[i];
+        if (!r3_is_under(BX_S, me->node, caseG) || r3_is_under(BX_S, me->node, cart) || !r3_visible(BX_S, me->node)) continue;
+        r3_m4_mul(m, inv, r3_world(BX_S, me->node));
+        for (int v = 0; v < me->nv; v++) {
+            const float *p = me->v + v * 8;
+            for (int k = 0; k < 3; k++) {
+                float q = m[k * 4] * p[0] + m[k * 4 + 1] * p[1] + m[k * 4 + 2] * p[2] + m[k * 4 + 3];
+                if (q < lo[k]) lo[k] = q;
+                if (q > hi[k]) hi[k] = q;
+            }
+        }
+    }
+    if (hi[0] > lo[0]) for (int k = 0; k < 3; k++) { cb[k * 2] = lo[k]; cb[k * 2 + 1] = hi[k]; }
+}
+static void refl_face(int parent, const char *name, const char *key, float inset, float w, float ry, float px_, float pz)
+{
+    int n = r3_node_add(BX_S, parent, name);
+    if (n < 0) return;
+    int tx = refl_tex(key, inset);
+    int me = r3_mesh_quad(BX_S, n, flat_mat(tx, 0), -w / 2, w / 2, cb[2], cb[3], 0, 1, 0);
+    if (me >= 0) BX_S->meshes[me].ro = -1;
+    r3_node *nd = &BX_S->nodes[n];
+    nd->rot[1] = ry; nd->pos[0] = px_; nd->pos[2] = pz;
+}
+static void stage_make(void)
+{
+    case_bounds();
+    nfloorA = ground("stageBox", 46, pool_tex(1.0f, .46f, 1, 46), -3);
+    nfloorB = ground("stageDesk", 150, pool_tex(.5f, .5f, 0, 150), -3);
+    nrefl = r3_node_add(BX_S, -1, "caseRefl");
+    if (nrefl < 0) return;
+    float w = cb[1] - cb[0], d = cb[5] - cb[4], mx = (cb[0] + cb[1]) / 2, mz = (cb[4] + cb[5]) / 2;
+    refl_face(nrefl, "caseReflF", "genFront", .035f, w, 0, mx, cb[5]);
+    refl_face(nrefl, "caseReflB", "genBack", .035f, w, PI_F, mx, cb[4]);
+    refl_face(nrefl, "caseReflS", "genSpine", .03f, d, -PI_F / 2, cb[0], mz);
+    refl_face(nrefl, "caseReflR", NULL, 0, d, PI_F / 2, cb[1], mz);
+}
+/* each frame: the ground under whatever stands on it, and the box's reflection opposite the box */
+static void stage_frame(void)
+{
+    if (nfloorA < 0 || nfloorB < 0 || nrefl < 0) return;
+    r3_node *fa = bx_n(nfloorA), *fb = bx_n(nfloorB), *rf = bx_n(nrefl), *c = bx_n(caseG);
+    int desk = st == S_DESK;
+    fa->vis = !desk; fb->vis = desk;
+    fb->pos[0] = 62; fb->pos[1] = DESK_Y; fb->pos[2] = 2;
+    float rx = c->rot[0], fy = c->pos[1] - (-cb[2] * fabsf(cosf(rx)) + (cb[5] - cb[4]) / 2 * fabsf(sinf(rx)));
+    fa->pos[0] = c->pos[0]; fa->pos[1] = fy; fa->pos[2] = c->pos[2];
+    float k = (1 - opn * 3) * (1 - fabsf(rx) * 3);
+    if (k < 0) k = 0;
+    rf->vis = !desk && k > .01f && st != S_PACK;
+    rf->opacity = k;
+    rf->pos[0] = c->pos[0]; rf->pos[1] = 2 * fy - c->pos[1]; rf->pos[2] = c->pos[2];
+    rf->rot[0] = -c->rot[0]; rf->rot[1] = c->rot[1]; rf->rot[2] = -c->rot[2];
+    rf->scale[0] = 1; rf->scale[1] = -1; rf->scale[2] = 1;
+}
+
 static void init(void)
 {
     if (ready) return;
@@ -161,6 +325,8 @@ static void init(void)
     tvPower = bx_node("tv.power"); tvRemote = bx_node("tvRemote");
     for (int i = 0; i < NPK; i++) { char n[8]; snprintf(n, sizeof n, "pk%d", i); pk[i] = bx_node(n); }
     mask_load();
+    stage_make();
+    bx_bg_paint = stage_bg;
     for (int i = 0; i < BX_S->nmeshes; i++) if (BX_S->meshes[i].node == tvScreen) {
         r3_mat m = BX_S->mats[BX_S->meshes[i].mat]; m.map = tv_tex; m.type = 'B'; m.col[0] = m.col[1] = m.col[2] = 1;
         BX_S->meshes[i].mat_override = r3_mat_add(BX_S, &m);
@@ -218,10 +384,10 @@ static void open_case(int instant)
     st = S_OPEN;
     bx_n(cart)->vis = !G.out;
     float ms = instant ? 1 : 900;
-    bx_tw3(bx_n(caseG)->rot, .12f, -.05f, 0, ms, 0);
+    bx_tw3(bx_n(caseG)->rot, 0, -.05f, 0, ms, 0);
     bx_tw3(bx_n(caseG)->pos, 3.4f, 0, 0, ms, 0);
     bx_tw1(&opn, 1, instant ? 1 : 1400, 0);
-    bx_cam_to(0, 0, 21, ms);
+    bx_cam_to(0, 1.2f, 23, ms);
     if (!instant) bx_sfx(SFX_CLICK, 0);
     caption();
 }
@@ -280,29 +446,24 @@ static void pk_read(int i)
 }
 
 static void seat_pos(float v[3]) { r3_world_pos(BX_S, nseat, v); }
-static void desk2(int a)
-{
-    (void)a;
-    bx_attach(cart, -1);
-    float v[3]; seat_pos(v);
-    bx_tw3(bx_n(cart)->pos, v[0], v[1] + 4.2f, v[2], 1000, 0);
-    bx_tw3(bx_n(cart)->rot, 0, 0, 0, 1000, 0);
-    bx_tw3(bx_n(cart)->scale, 1, 1, 1, 1000, 0);
-    bx_cam_to(62, -1, 54, 1100);
-}
+#define CART_UP .75f                               /* how far the cartridge stands out of the slot before it is pushed in */
+/* the desk opens on the commercial's shot: low, in front of the console, the cartridge standing in the slot not yet pushed home */
 static void to_desk(int a)
 {
     (void)a;
     st = S_DESK; G.cart = 0; caption();
+    bx_attach(cart, -1);
+    float v[3]; seat_pos(v);
     r3_node *c = bx_n(cart);
-    bx_tw1(&c->pos[2], c->pos[2] + 4, 500, 0);
-    bx_after(520, desk2, 0);
+    bx_set3(c->pos, v[0], v[1] + CART_UP, v[2]); bx_set3(c->rot, 0, 0, 0); bx_set3(c->scale, 1, 1, 1);
+    bx_cam(v[0] - 1.0f, v[1] + 1.5f, v[2] + 12.5f);
+    bx_set3(lk, v[0], v[1] + .9f, v[2]);
 }
 static void to_case(int a)
 {
     (void)a;
     st = S_OPEN;
-    bx_cam_to(0, 0, 21, 900);
+    bx_cam_to(0, 1.2f, 23, 900);
     G.cart = 0;
     if (bx_n(cart)->parent != cseat) { bx_parent(cart, cseat); bx_set3(bx_n(cart)->pos, 0, 0, 0); bx_set3(bx_n(cart)->rot, 0, 0, 0); bx_set3(bx_n(cart)->scale, 1, 1, 1); }
     caption();
@@ -314,15 +475,18 @@ static void check(void)
 }
 static void sys_on(int a) { (void)a; G.sys = 1; bx_sfx(SFX_KEY, 0); set_power(1); tv_on(); check(); }
 static void tv_turn_on(int a) { (void)a; G.tv = 1; bx_sfx(SFX_KEY, 0); tv_switch(); tv_on(); bx_after(1500, sys_on, 0); }
+static void cam_wide(int a) { (void)a; bx_cam_to(62, -1, 54, 1700); bx_tw3(lk, 62, -3, 0, 1700, 0); }
 static void insert_cart(void)
 {
     if (G.cart) return;
     G.cart = 1;
     bx_sfx(SFX_DISK_IN, 0);
     float v[3]; seat_pos(v);
-    bx_tw3(bx_n(cart)->pos, v[0], v[1], v[2], 650, 0);
+    bx_tw3(bx_n(cart)->pos, v[0], v[1], v[2], 130, 0);                 /* pushed home: a short, hard click */
+    bx_sfx(SFX_CLICK, 0);
     bx_say("<b>Cartridge in.</b> Turning on the TV and the system...");
-    bx_after(700, tv_turn_on, 0);
+    bx_after(650, cam_wide, 0);                                        /* then back to the whole desk */
+    bx_after(2500, tv_turn_on, 0);
 }
 static void tv_power(void) { G.tv = !G.tv; bx_sfx(SFX_KEY, 0); tv_switch(); tv_on(); check(); }
 static void sys_power(void)
@@ -356,7 +520,7 @@ static void enter(int mode)
     bx_time_clear();
     G.out = mode != BOX_SHOW_FIRST; G.cart = G.tv = G.sys = 0;
     r3_node *c = bx_n(caseG);
-    c->vis = 1; bx_set3(c->pos, 0, 0, 0); bx_set3(c->rot, .18f, -.35f, 0);
+    c->vis = 1; bx_set3(c->pos, 0, 0, 0); bx_set3(c->rot, 0, -.2f, 0);
     opn = 0; set_open(0);
     bx_n(cmanual)->vis = 1;
     bx_parent(cart, cseat); bx_n(cart)->vis = 0; bx_set3(bx_n(cart)->pos, 0, 0, 0); bx_set3(bx_n(cart)->rot, 0, 0, 0); bx_set3(bx_n(cart)->scale, 1, 1, 1);
@@ -364,7 +528,7 @@ static void enter(int mode)
     for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_n(pk[i])->vis = 0;
     tv_mode = -1; tv_on(); set_power(0);
     G.pads = count_pads();
-    bx_cam(0, 0, 19);
+    bx_cam(0, 2.4f, 21);
     st = S_CLOSED;
     caption();
     if (mode != BOX_SHOW_FIRST) bx_after(30, open_now, 0);
@@ -389,7 +553,9 @@ static void frame(float dt)
         bx_hot_node(tap, G.pads > 2 ? "EA 4 Way Play: multitap enabled" : "Multitap: 2 or fewer input devices detected");
     }
     float *cm = BX_S->cam;
-    bx_look[0] = cm[0]; bx_look[1] = st == S_DESK ? -3 : cm[1] * .3f; bx_look[2] = 0;
+    if (st == S_DESK) { bx_look[0] = lk[0]; bx_look[1] = lk[1]; bx_look[2] = lk[2]; }
+    else { bx_look[0] = cm[0]; bx_look[1] = cm[1] * .3f - 1.5f; bx_look[2] = 0; }
+    stage_frame();
 }
 static void back(void)
 {
