@@ -29,6 +29,8 @@
 
 typedef struct { int w, h, xo, yo; uint8_t *px; } spr;
 
+typedef struct { int16_t pc, x, y, flip, away, sc, first, count; uint8_t sig[8]; } shown;   /* a sprite the PC draws: its sprite table entries and what they held */
+
 static struct {
     SDL_atomic_t on, found, searched;
     spr f[NFRAMES];
@@ -36,8 +38,9 @@ static struct {
     uint8_t team[2][NTEAMS][448];           /* HOMEPALS, AWAYPALS */
     int have_team[2];
     SDL_SpinLock lock;
-    struct { int16_t pc, x, y, flip, away, sc, first, count; } show[16], pub[16];   /* what the game wrote, what the picture draws */
-    int nshow, npub;
+    shown show[16];                          /* what the game wrote */
+    struct { int n; shown l[16]; } ring[4];     /* the last frames the game wrote (newest first): the picture draws the one its sprite table is */
+    int nshow;
 } P;
 
 static long file_len(const char *p) { struct stat st; return stat(p, &st) == 0 ? (long)st.st_size : -1; }
@@ -217,13 +220,17 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
     if (ev == SPR_BEGIN) { P.nshow = 0; return 0; }
     if (ev == SPR_END) {
         SDL_AtomicLock(&P.lock);
-        memcpy(P.pub, P.show, sizeof P.show);
-        P.npub = P.nshow;
+        memmove(&P.ring[1], &P.ring[0], sizeof P.ring - sizeof P.ring[0]);
+        memcpy(P.ring[0].l, P.show, sizeof P.show);
+        P.ring[0].n = P.nshow;
         SDL_AtomicUnlock(&P.lock);
         return 0;
     }
     if (ev == SPR_MARK) {                                 /* sc = the first entry, x = how many */
-        if (P.nshow > 0) { P.show[P.nshow - 1].first = (int16_t)sc; P.show[P.nshow - 1].count = x; }
+        if (P.nshow > 0) {
+            P.show[P.nshow - 1].first = (int16_t)sc; P.show[P.nshow - 1].count = x;
+            if (o) memcpy(P.show[P.nshow - 1].sig, o, 8);
+        }
         return 0;
     }
     if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || sc > 13 || P.nshow >= 16) return 0;
@@ -265,12 +272,24 @@ void pcspr_set(int on) { SDL_AtomicSet(&P.on, on ? 1 : 0); }
 void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
     if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !in_game() || (int16_t)g.palcount >= 0) return;
-    typeof(P.pub) list;
-    int n;
+    shown list[16];
+    int n = 0;
+    unsigned sat0 = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
     SDL_AtomicLock(&P.lock);
-    memcpy(list, P.pub, sizeof list);
-    n = P.npub;
+    for (int r = 0; r < 4; r++) {                                /* the newest frame whose sprites are the ones in the sprite table now */
+        int ok = P.ring[r].n > 0;
+        for (int i = 0; ok && i < P.ring[r].n; i++) {
+            unsigned e = (unsigned)P.ring[r].l[i].first;
+            if (e >= 80 || memcmp(vdp->s.vram + ((sat0 + e * 8) & 0xFFFF), P.ring[r].l[i].sig, 8)) ok = 0;
+        }
+        if (ok) { memcpy(list, P.ring[r].l, sizeof list); n = P.ring[r].n; if (getenv("PCSPR_LOG") && r) fprintf(stderr, "pcspr: frame %d old\n", r); break; }
+    }
     SDL_AtomicUnlock(&P.lock);
+    if (!n && getenv("PCSPR_LOG") && P.ring[0].n > 0) {
+        fprintf(stderr, "pcspr: no match (%d, sat %04X, first %d)", P.ring[0].n, sat0, P.ring[0].l[0].first);
+        for (int k = 0; k < 8; k++) fprintf(stderr, " %02X/%02X", P.ring[0].l[0].sig[k], vdp->s.vram[(sat0 + (unsigned)P.ring[0].l[0].first * 8 + (unsigned)k) & 0xFFFF]);
+        fprintf(stderr, "\n");
+    }
     if (n <= 0 || w > 320 || h > 240) return;
     static mdrt_vdp scratch;
     static uint16_t clean[320 * 240];
@@ -286,6 +305,13 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
             scratch.sat[e * 8] = scratch.sat[e * 8 + 1] = 0;
         }
     mdrt_vdp_render(&scratch, clean, 320);
+    static uint16_t bare[320 * 240];                              /* (and with no sprite at all: where `clean` differs, another sprite is drawn, a shadow or a box) */
+    for (unsigned e = 0; e < 80; e++) {
+        scratch.s.vram[(sat + e * 8) & 0xFFFF] = 0;
+        scratch.s.vram[(sat + e * 8 + 1) & 0xFFFF] = 0;
+        scratch.sat[e * 8] = scratch.sat[e * 8 + 1] = 0;
+    }
+    mdrt_vdp_render(&scratch, bare, 320);
     memset(vis, 0, sizeof vis);
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++)
@@ -301,9 +327,9 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
                     int xx = x + dx, yy = y + dy;
                     if (xx >= 0 && xx < w && yy >= 0 && yy < h && vis[yy * 320 + xx]) { hit = 1; break; }
                 }
-            near[y * 320 + x] = (uint8_t)hit;
+            near[y * 320 + x] = (uint8_t)(hit && (vis[y * 320 + x] || clean[y * 320 + x] == bare[y * 320 + x]));   /* (not over another sprite: its dither shows the cartridge's) */
         }
-    for (int i = 0; i < n; i++) {
+    for (int i = n - 1; i >= 0; i--) {                           /* (the sprite table's first is on top: drawn last) */
         const spr *s = &P.f[list[i].pc];
         int team = list[i].away ? (int)rosters_art(team_struct(1)->tmteam) : (int)rosters_art(team_struct(0)->tmteam);
         if (team < 0 || team >= NTEAMS) team = 0;
