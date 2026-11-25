@@ -598,6 +598,21 @@ static void intro_tick(void)
     else if (st == 2 && !segacd_movie_tick()) SDL_AtomicSet(&intro_state, 0);
 }
 
+/* the disc's rows say so when no disc was found beside the program (they do nothing then) */
+static void cd_no_disc(void)
+{
+    static int done;
+    if (done || !segacd_searched()) return;
+    done = 1;
+    if (segacd_disc()) return;
+    static char labels[CD_ROWS + 10][64];
+    for (int k = CD_MUSIC; k <= CD_CAREER; k++) {
+        if (!cd_opts[k].label) continue;
+        snprintf(labels[k], sizeof labels[k], "%s (no disc found)", cd_opts[k].label);
+        cd_opts[k].label = labels[k];
+    }
+}
+
 static void game_page_init(void)
 {
     static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
@@ -872,6 +887,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
         intro_tick();
         segacd_career_tick(F.dev, F.rate, SDL_AtomicGet(&cd_dedither));
+        cd_no_disc();
         hold_state = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open || ob_screen_up();
         ob_plat_present();
         ob_plat_frame_done(SDL_AtomicSet(&F.fresh, 0));
