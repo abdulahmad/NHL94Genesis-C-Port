@@ -3313,6 +3313,10 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
         return;
     }
     o->pflags &= (uint8_t)~(1 << pfna);
+    if (anthem_hook_fn && g.gsp == 0 && g.gameclock == g.PerTimeTotal && !(g.gmode2 & 1)) {   /* (the first face off of the game: the anthems) */
+        int fr = anthem_hook_fn(rosters_art(team_struct(0)->tmteam), rosters_art(team_struct(1)->tmteam));
+        if (fr > 0) hold_anthem(fr);
+    }
     if (hat_hook) hat_hook(HAT_END, 0);                      /* (the SNES clears its hats here) */
     g.BA_PS_flags &= (uint16_t)~(HI(2) | HI(5));
     g.sflags4 &= (uint16_t)~(HI(0) | HI(1));
