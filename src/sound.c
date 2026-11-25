@@ -22,6 +22,7 @@
 
 void (*cd_event_hook)(int ev, uint16_t n);
 void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
+int (*sfx_hook)(int ev);
 void (*hat_hook)(int ev, int arg);
 int (*cd_title_hook)(int what);
 int (*cd_scout_hook)(int what);

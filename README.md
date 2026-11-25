@@ -172,6 +172,9 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   same on every machine: about 6 s for a goal with an assist, 6 s a penalty, 7.5 s a penalty shot, with the time the replay and the face off set
   up already take counted), then the puck drops. *After the goal song*: a home goal's speech waits for the goal song to end, and the face off waits
   for both; away goals and penalties have no song, so the speech is at once. Headless: `--rule announce_timing="with the goal"`.
+- **PC goal siren and PC end of period horn** (host rows, on in Recommended): NHL 95 PC's goal siren (its sound $9C, 7 s) and period end horn
+  ($91, 2.6 s) play in place of the cartridge's, from the player's own `PCFF001.DIG` (beside the program or on the NHL 95 PC disc image). The game is
+  untouched, only the sound; without the file the cartridge's sounds stay. Headless: `--pc-sfx PCFF001.DIG --wav out.wav`.
 - **PC between-play pause** (a game rule, off in every preset): the same waits after a goal, a penalty or a penalty shot even without the announcer,
   as the PC game stops play. Headless: `--rule hold_play=1`.
 - **Fighting**: fights in the style of NHL '93, ported from its code. The row has four choices. *NHL 93*: a hard check between two players with
