@@ -2,6 +2,8 @@
  * shooting, checking, line changes) and runs the computer players, with an assignment
  * per position and for the goalie, bench and penalty box. Also the puck at faceoffs,
  * offsides and icing, plus the per-frame player update and scroll window. */
+#include <stdio.h>
+#include <stdlib.h>
 #include "game.h"
 #include "hal.h"
 #include "rom.h"
@@ -3298,6 +3300,38 @@ void CompLine(struct Team *a2, struct Team *a1)
     a2->tmline = *--tab;
 }
 
+static int fo_deferred;
+
+/* the face off window (the two men, the line lists) and the tiles it needs: drawn at the setup, or after the anthem */
+static void fo_window(void)
+{
+    printz(str_puckfaceoff2_1, sizeof str_puckfaceoff2_1);
+    int16_t d0 = 0x36;                                    /* x of the faceoff window */
+    if ((int16_t)g.fox < 0) d0 = 0xBE;
+    g.fodropx = (uint16_t)d0;
+    g.printx = (uint16_t)((int16_t)(d0 - 0x2E) >> 3);
+    d0 = 0x5C;
+    g.fodropy = (uint16_t)d0;
+    g.printy = (uint16_t)((int16_t)(d0 - 0x44) >> 3);
+    {
+        const uint8_t *map = rom_ptr(ART(FaceOffMap));
+        uint32_t pal = ART(FaceOffMap) + rd32(map), mp = ART(FaceOffMap) + rd32(map + 4);
+        g.sflags6 |= HI(0);
+        dobitmap(pal, mp, ART(FaceOffMap) + 8, 0, 0, 0xC, 0xA, g.ExtraChars, 0);
+        g.sflags6 &= (uint16_t)~HI(0);
+    }
+    if (g.OptLine == 0) {                                 /* the two lines on the ice */
+        printsmallz(str_puckfaceoff2_2, sizeof str_puckfaceoff2_2);
+        Framer(0xC, 3);
+        uint16_t l0 = team_struct(0)->tmline, l1 = team_struct(1)->tmline;
+        if (!(g.gmode & (1 << gmdir))) { uint16_t t = l0; l0 = l1; l1 = t; }
+        printsmallz(str_puckfaceoff2_3, sizeof str_puckfaceoff2_3);
+        Fprintsmall(SYM_linelist, l0);
+        g.printx += 4;
+        Fprintsmall(SYM_linelist, l1);
+    }
+}
+
 /* logic94.asm:puckfaceoff2. Face off control logic and general setup for action: on a new
  * assignment black out, reset the rink and every object around the faceoff spot, draw the
  * faceoff window and pick the drop time; then count the drop time down (updatefaceoff) and
@@ -3307,6 +3341,12 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     if (!PFLAG(o, pfna)) {
         o->temp1 = (int16_t)(o->temp1 - 1);
         if (o->temp1 < 0 && hold_wait()) o->temp1 = 0;       /* (RULE_HOLD: the announcer is still on) */
+        if (fo_deferred && o->temp1 < 0) {                   /* (the anthem is over: the window, and the usual time to the drop) */
+            fo_deferred = 0;
+            fo_window();
+            g.disflags |= HI(4);
+            o->temp1 = (int16_t)(randomd0(0x78) + 0xB4);
+        }
         if (o->temp1 >= 0) { updatefaceoff(o); return; }
         EndArenaAnim();
         Endfaceoff(o);
@@ -3412,32 +3452,9 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     g.arenaanim = 0xFFFF;
     if ((g.sflags7 & 1) && (int16_t)g.faceoffanim[0] >= 0)
         StartArenaAnim(g.faceoffanim[0]);
-    printz(str_puckfaceoff2_1, sizeof str_puckfaceoff2_1);
-    int16_t d0 = 0x36;                                    /* x of the faceoff window */
-    if ((int16_t)g.fox < 0) d0 = 0xBE;
-    g.fodropx = (uint16_t)d0;
-    g.printx = (uint16_t)((int16_t)(d0 - 0x2E) >> 3);
-    d0 = 0x5C;
-    g.fodropy = (uint16_t)d0;
-    g.printy = (uint16_t)((int16_t)(d0 - 0x44) >> 3);
-    {
-        const uint8_t *map = rom_ptr(ART(FaceOffMap));
-        uint32_t pal = ART(FaceOffMap) + rd32(map), mp = ART(FaceOffMap) + rd32(map + 4);
-        g.sflags6 |= HI(0);
-        dobitmap(pal, mp, ART(FaceOffMap) + 8, 0, 0, 0xC, 0xA, g.ExtraChars, 0);
-        g.sflags6 &= (uint16_t)~HI(0);
-    }
-    if (g.OptLine == 0) {                                 /* the two lines on the ice */
-        printsmallz(str_puckfaceoff2_2, sizeof str_puckfaceoff2_2);
-        Framer(0xC, 3);
-        uint16_t l0 = team_struct(0)->tmline, l1 = team_struct(1)->tmline;
-        if (!(g.gmode & (1 << gmdir))) { uint16_t t = l0; l0 = l1; l1 = t; }
-        printsmallz(str_puckfaceoff2_3, sizeof str_puckfaceoff2_3);
-        Fprintsmall(SYM_linelist, l0);
-        g.printx += 4;
-        Fprintsmall(SYM_linelist, l1);
-    }
-    d0 = (int16_t)(randomd0(0x78) + 0xB4);                /* time to the drop */
+    if (hold_anthem_pending()) { fo_deferred = 1; g.disflags &= (uint16_t)~HI(4); }   /* (the anthem first: the face off window comes after it) */
+    else fo_window();
+    int16_t d0 = (int16_t)(randomd0(0x78) + 0xB4);        /* time to the drop */
     {
         uint16_t a = g.arenaanim;
         if ((a == 0 || a == 1 || a == 5 || a == 4 || a == 2) && !(d0 > 0x10E))
