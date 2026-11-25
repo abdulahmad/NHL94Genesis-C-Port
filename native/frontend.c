@@ -528,7 +528,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_INTRO (CD_ROWS + 5)
 #define CD_DEDITHER (CD_ROWS + 6)
 #define CD_PHOTOS (CD_ROWS + 7)
-static ob_game_opt cd_opts[CD_ROWS + 8];
+#define CD_CAREER (CD_ROWS + 8)
+static ob_game_opt cd_opts[CD_ROWS + 9];
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
@@ -550,6 +551,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_INTRO) { segacd_set_intro(value); return; }
     if (index == CD_DEDITHER) { SDL_AtomicSet(&cd_dedither, value); return; }
     if (index == CD_PHOTOS) { segacd_set_photos(value); return; }
+    if (index == CD_CAREER) { segacd_set_career(value, ending); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -614,9 +616,11 @@ static void game_page_init(void)
     cd_opts[CD_INTRO] = (ob_game_opt){ "cd_intro", "Intro movie", cd_off_on, 2, 0, 0, 3 };
     cd_opts[CD_DEDITHER] = (ob_game_opt){ "cd_dedither", "Movie de-dither", ob_postfx_names, OB_POSTFX_MODES, 0, 0, 3 };
     cd_opts[CD_PHOTOS] = (ob_game_opt){ "cd_photos", "Player photos", music, 2, 0, 0, 3 };
+    static const char *const career[2] = { "off", "B on a player card" };
+    cd_opts[CD_CAREER] = (ob_game_opt){ "cd_career", "Career stats", career, 2, 0, 0, 3 };
     segacd_start();
     segacd_intro_hook = intro_hook;
-    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 8, cd_changed, NULL };
+    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 9, cd_changed, NULL };
     ob_game_set_ops(&host, &ops);
 }
 
@@ -862,6 +866,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
         intro_tick();
+        segacd_career_tick();
         hold_state = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open || ob_screen_up();
         ob_plat_present();
         ob_plat_frame_done(SDL_AtomicSet(&F.fresh, 0));
