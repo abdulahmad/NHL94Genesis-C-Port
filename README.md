@@ -170,11 +170,11 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   PC frame numbers are the cartridge's less one (less nine from the siren frames on), so where the PC has no matching frame (the cartridge's extra goalie
   frames) the cartridge's sprite stays. The game is untouched, only the sprite table: states, replays and online play are the same on or off.
   Headless: `--pc-sprites`.
-- **Rink announcer timing** (a game rule: the host's choice holds for everyone online; on, "with the goal", in Recommended): *with the goal* the
+- **Rink announcer: when he speaks** (a game rule: the host's choice holds for everyone online; on by default and in Recommended; turning the announcer on moves "talks over the face off" to "right after the goal"): *right after the goal* the
   speech starts at the goal, penalty or penalty shot as on NHL 95 PC, and play waits until the announcer has had time to say it (fixed lengths, the
   same on every machine: about 6 s for a goal with an assist, 6 s a penalty, 7.5 s a penalty shot, with the time the replay and the face off set
   up already take counted), then the puck drops. *After the goal song*: a home goal's speech waits for the goal song to end, and the face off waits
-  for both; away goals and penalties have no song, so the speech is at once. Headless: `--rule announce_timing="with the goal"`.
+  for both; away goals and penalties have no song, so the speech is at once. Headless: `--rule announce_timing="right after the goal"`. "talks over the face off" is the cartridge pace; the celebration then does not wait for the speech.
 - **PC goal siren and PC end of period horn** (host rows, on in Recommended): NHL 95 PC's goal siren (its sound $9C, 7 s) and period end horn
   ($91, 2.6 s) play in place of the cartridge's, from the player's own `PCFF001.DIG` (beside the program or on the NHL 95 PC disc image). The game is
   untouched, only the sound; without the file the cartridge's sounds stay. At one minute left the PC says "one minute left" with the rink announcer on

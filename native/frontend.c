@@ -628,7 +628,11 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_CAREER) { segacd_set_career(value, ending); return; }
     if (index == CD_PCPHOTOS) { cardcolor_set(value); return; }
     if (index == CD_SFX) { segacd_set_sfx(value); return; }
-    if (index == CD_ANNOUNCER) { announcer_set(value); return; }
+    if (index == CD_ANNOUNCER) {                          /* (turned on while the timing says "talks over the face off": the PC's, right after the goal) */
+        announcer_set(value);
+        if (value && ob_game_get(&host, CD_ANNOUNCE) == 0) ob_game_set(&host, CD_ANNOUNCE, 1);
+        return;
+    }
     if (index == CD_PCSIREN) { pcsfx_set_goal(value); return; }
     if (index == CD_PCHORN) { pcsfx_set_horn(value); return; }
     if (index == CD_WHITEICE) { whiteice_set(value); return; }
@@ -762,7 +766,7 @@ static void game_page_init(void)
 {
     static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
                                                   "Sega CD playoff password", "Sega CD shot data fix", "Sega CD uniforms",
-                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "PC between-play pause", "Fighting", "Rink announcer timing" };
+                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "PC between-play pause", "Fighting", "Rink announcer: when he speaks" };
     for (int k = 0; k < CD_ROWS; k++) {
         char key[64];
         snprintf(key, sizeof key, "rules.%s", cd_rows[k].key);
@@ -799,7 +803,7 @@ static void game_page_init(void)
             "At a period's end the Sega CD goes straight to the song.",
             "NHL 95 PC's between-play time: play waits a moment after a goal, penalty or penalty shot before the face off.",
             "NHL 93's fights: a hard check between two fighters can start one (B low punch, C high punch, A grab).",
-            "When the rink announcer speaks: with the goal or penalty as on NHL 95 PC (play waits until he is done), or after the goal song." };
+            "When the rink announcer speaks. Right after the goal or penalty, as on NHL 95 PC: play waits until he is done (the goal celebration lasts as long as the speech, with or without the between-play pause). After the goal song: a home goal's speech starts when the song ends. Talks over the face off: the cartridge's pace." };
         for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];
         game_help[CD_ROSTERS] = "The Sega CD's rosters (the game restarts to change them).";
         game_help[CD_MUSIC] = "Where the songs come from: the cartridge or the Sega CD disc.";
