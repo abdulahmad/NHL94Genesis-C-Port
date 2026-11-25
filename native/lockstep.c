@@ -373,6 +373,42 @@ static int in_game_logic(void);
 
 volatile unsigned native_play_frames;
 
+/* Where the game's menus put their rows, for the mouse (the window front end points at them). Seen from the compiler's hooks: the pause menu prints
+ * each row with PrintMenuItem at printx / printy; the setup screen draws its frame (Framer, after MoveMenuFrame) on the selected line, a line is
+ * two tiles, six lines show from setupfirstline. */
+volatile unsigned native_menu_calls;                      /* HandleMenuInput / ReadSetupPads calls: the menu is being read */
+static volatile int menu_kind;                            /* 1 the pause menu, 2 the setup screen */
+static volatile int in_readsetup;                       /* inside ReadSetupPads (it waits for a pad press inside) */
+int native_menu_waiting(void) { return in_readsetup; }
+static int pause_x[4], pause_y[4], pause_n, setup_d7 = -1, in_moveframe;
+
+/* the current menu's rows as rectangles on the 320x224 picture: -> kind (0 none) */
+int native_menu_rows(int rect[][4], int max, int *n, int *sel, int *lr)
+{
+    int k = menu_kind;
+    *lr = 0;
+    if (k == 1) {
+        int top = (int16_t)g.menu.top, item = (int16_t)g.menu.item;
+        *n = pause_n < max ? pause_n : max;
+        *sel = item - top;
+        if (*n <= 0 || *sel < 0 || *sel >= *n) return 0;
+        for (int i = 0; i < *n; i++) { rect[i][0] = (pause_x[i] - 2) * 8; rect[i][1] = pause_y[i] * 8; rect[i][2] = 19 * 8; rect[i][3] = 8; }
+        return 1;
+    }
+    if (k == 2) {
+        int first = (int16_t)g.setupfirstline, lines = 9 - first;
+        if (setup_d7 < 0) return 0;
+        if (lines > 6) lines = 6;
+        *n = lines < max ? lines : max;
+        *sel = setup_d7 / 2 - first;
+        if (*n <= 0 || *sel < 0 || *sel >= *n) return 0;
+        for (int i = 0; i < *n; i++) { rect[i][0] = 0x10 * 8; rect[i][1] = (0xE + 2 * i) * 8 + 4; rect[i][2] = 0x17 * 8; rect[i][3] = 16; }
+        *lr = 1;
+        return 2;
+    }
+    return 0;
+}
+
 /* where pad p's controlled player is on the screen, in picture pixels from the middle of the picture (the same arithmetic as the
  * game's off-screen arrows, sso_arrow: the player's place less the scroll). 0 when it is not on the ice or the rink is sideways */
 int native_player_on_screen(int p, int *dx, int *dy)
@@ -395,6 +431,12 @@ void NI __cyg_profile_func_enter(void *fn, void *site)
     (void)site;
     if (native_in_vblank()) return;
     if (fn == (void *)DoGameFrame) native_play_frames++;
+    else if (fn == (void *)HandleMenuInput) { menu_kind = 1; native_menu_calls++; }
+    else if (fn == (void *)ReadSetupPads) { menu_kind = 2; in_readsetup = 1; native_menu_calls++; }
+    else if (fn == (void *)Pausemode_Pmenu) pause_n = 0;
+    else if (fn == (void *)PrintMenuItem) { if (pause_n < 4) { pause_x[pause_n] = (int16_t)g.printx; pause_y[pause_n] = (int16_t)g.printy; pause_n++; } }
+    else if (fn == (void *)MoveMenuFrame) in_moveframe = 1;
+    else if (fn == (void *)Framer && in_moveframe) { in_moveframe = 0; setup_d7 = (int16_t)g.printy - 0xE + 2 * (int16_t)g.setupfirstline; }
     if (fn == (void *)StartGame && native_game_start_hook) { native_game_teams[0] = g.VisTeam; native_game_teams[1] = g.HomeTeam; native_game_start_hook(); }
     if (clock_original() || tracking) {
         uint32_t r = routine_of(fn);
@@ -414,6 +456,7 @@ void NI __cyg_profile_func_exit(void *fn, void *site)
 {
     (void)site;
     if (native_in_vblank()) return;
+    if (fn == (void *)ReadSetupPads) in_readsetup = 0;
     if (clock_original()) clock_on_exit(routine_of(fn));
     if (!tracking) return;
     (void)fn;
