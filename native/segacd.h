@@ -15,6 +15,7 @@ void segacd_set_title(int v);            /* the title page: 0 the cartridge's, 1
 void segacd_set_photos(int v);           /* the player cards' photos: 0 the cartridge's, 1 the disc's where it has one */
 void segacd_set_session(int on);
 void segacd_set_career(int v, int (*ending)(void));   /* (the window's) B on a player's card: his career from the disc; on a team's card its team page; ending: give up waiting */         /* (a session's console: the photos stay the cartridge's) */
+int segacd_opening(void);                /* the game is on a screen any press leaves: the logos, the title, the license page */
 void segacd_set_intro(int v);            /* the intro movie (HOCKEY.SEG) before the title: 0 off, 1 on */
 extern void (*segacd_intro_hook)(void);  /* (the window's) plays it, the game's thread waiting; NULL: no movie */
 int segacd_present(uint32_t *frame, int w, int h);   /* a w x h ARGB frame in a 320 x 224 buffer: the disc's opening picture over it, 320 x 224 (1), or left alone (0) */

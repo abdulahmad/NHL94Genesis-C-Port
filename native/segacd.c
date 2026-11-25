@@ -130,6 +130,7 @@ void segacd_set_title(int v) { SDL_AtomicSet(&S.title, v); }
 void segacd_set_intro(int v) { SDL_AtomicSet(&S.intro, v); }
 void segacd_set_photos(int v) { SDL_AtomicSet(&S.photos, v); }
 void segacd_set_session(int on) { SDL_AtomicSet(&S.session, on); }
+int segacd_opening(void) { return S.screen >= 1 && S.screen <= 5; }
 
 /* (cd_picture_hook) the disc's photo of the card's player, by his team's abbreviation and his name */
 static void plain(const struct RosterText *t, char *s, int cap)
@@ -379,6 +380,10 @@ void segacd_event(int ev, uint16_t n)
     case CD_EV_SCREEN:
         if (n == 2 && !S.intro_done && SDL_AtomicGet(&S.intro) && segacd_intro_hook && segacd_disc()) {
             S.intro_done = 1;                 /* (the disc's movie before its title, as the disc plays it: the game waits) */
+            S.screen = 0;                     /* (the last disc picture is gone: not shown again between the movie and the title) */
+            S.pic_of = 0;
+            S.out = 0;
+            S.hold = 1;
             segacd_intro_hook();
         }
         {

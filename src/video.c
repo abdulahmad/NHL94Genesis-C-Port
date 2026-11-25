@@ -554,7 +554,8 @@ void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
     uint16_t attr_saved = o->attribute;
     int16_t d4 = (int16_t)o->frame;
     if (d4 <= 0) return;
-    if (spr_hook && spr_sc >= 0 && spr_hook(SPR_DRAW, spr_sc, x, y, o)) return;   /* (the host draws this one: the PC's sprites) */
+    int rep = spr_hook && spr_sc >= 0 && spr_hook(SPR_DRAW, spr_sc, (int16_t)(x + view_shift()), y, o);   /* (the host draws this one over: the PC's sprites) */
+    int first = (int)v->link - 1;
     o->attribute ^= (uint16_t)(d4 & 0xF800);
     uint16_t fr = (uint16_t)(o->frame & 0x7FF);
     const uint8_t *a2 = rom_ptr(ART(Sprites) + rd32(rom_ptr(ART(Sprites)) + 4));
@@ -598,6 +599,7 @@ void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
         t += o->VRchar;
         sat_entry(v, (uint16_t)(y + yy), a2[7], t, (uint16_t)(x + xx));
     }
+    if (rep) spr_hook(SPR_MARK, first, (int)v->link - 1 - first, 0, NULL);   /* (its sprite table entries: the host takes them out of its own picture) */
     o->attribute = attr_saved;
 }
 

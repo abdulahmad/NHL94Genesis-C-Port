@@ -602,9 +602,9 @@ static void write_ppm(const char *path)
     if (screen_frame) { w = 320; h = 224; }
     for (int i = 0; i < h; i++)
         for (int x = 0; x < w; x++) pic[i * 320 + x] = screen_frame ? screen_px[i * 320 + x] : 0xFF000000u | mdrt_vdp_rgb(px[i * 320 + x], 1);
+    if (!screen_frame) pcspr_present(v, px, 320, pic, w, h, 320);
     if (!screen_frame) whiteice_present(pic, w, h, 320);
     if (!screen_frame) hats_present(pic, w, h, 320);
-    if (!screen_frame) pcspr_present(pic, w, h, 320);
     if (!screen_frame) cardcolor_present(v, pic, w, h, 320);   /* (--pc-photos) */
     int pitch = 320;
     const uint32_t *src = pic;

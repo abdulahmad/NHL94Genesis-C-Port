@@ -1556,15 +1556,18 @@ void ShowGoalBox(void)
     }
     printbig(text);
     uint16_t scorer = e[3];
-    if (pa_hook) {                                        /* (the rink announcer) */
-        int a1 = -1, a2 = -1;
-        if (!(e[4] & 0x80) && !(g.sflags4 & HI(5))) { a1 = e[4]; if (!(e[5] & 0x80)) a2 = e[5]; }
-        pa_hook(PA_GOAL, tm, scorer, a1, a2);
-    }
-    {                                                    /* (RULE_HOLD: 3.7 s for the goal, 2.6 s and 2 s for the assists) */
-        int assists = 0;
-        if (!(e[4] & 0x80) && !(g.sflags4 & HI(5))) assists = (e[5] & 0x80) ? 1 : 2;
-        hold_for(222 + (assists ? 156 : 0) + (assists > 1 ? 120 : 0));
+    {                                                    /* (RULE_HOLD, RULE_ANNOUNCE: 3.7 s for the goal, 2.6 s and 2 s for the assists) */
+        int a1 = -1, a2 = -1, assists = 0;
+        if (!(e[4] & 0x80) && !(g.sflags4 & HI(5))) {
+            a1 = e[4]; assists = 1;
+            if (!(e[5] & 0x80)) { a2 = e[5]; assists = 2; }
+        }
+        int frames = 222 + (assists ? 156 : 0) + (assists > 1 ? 120 : 0);
+        if (rules[RULE_ANNOUNCE] == 2 && tm == team_struct(0)) hold_goal_after_song(frames, tm, scorer, a1, a2);   /* (the home goal's song first) */
+        else {
+            if (pa_hook) pa_hook(PA_GOAL, tm, scorer, a1, a2);           /* (the rink announcer) */
+            hold_for(frames);
+        }
     }
     g.printx = 0xC;
     print(FormatPlayerName(scorer, tm));
