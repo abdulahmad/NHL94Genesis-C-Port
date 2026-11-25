@@ -330,10 +330,27 @@ static void start_fight(struct SortObj *a2, struct SortObj *a3)   /* .sf: a3 aga
 /* hockey93.asm:checkfight. Two opposing players collided (a3 moving, a2 the other): when both are hit hard
  * enough (impact 10 and up), free to move, no penalty on them, no goalie, the clock running and the puck not on a
  * face off, SetInst decides whether they fight. */
+/* NHL 92's SetInst (hockey.asm): a player in a shoulder check who starts a fight is the instigator: the first
+ * available skater on his team (not him) gets the instigator's penalty */
+static void inst92(struct SortObj *a3)
+{
+    if (a3->SPA != SPAshoulderchkl && a3->SPA != SPAshoulderchkr) return;
+    struct SortObj *p = sortobj((a3->pflags & (1 << pfteam)) ? 6 : 0);
+    for (int i = 0; i < 6; i++, p++) {
+        if (p == a3) continue;
+        if (p->position <= 0) continue;
+        if (p->pflags2 & (1 << pf2pen)) continue;
+        if (p->pflags2 & (1 << pf2unav)) continue;
+        AddPenalty2(PenInstigator, p);
+        return;
+    }
+}
+
 void checkfight(struct SortObj *a2, struct SortObj *a3)
 {
     if (!rules[RULE_FIGHT]) return;
-    if (a3->impact < 10 || a2->impact < 10) return;
+    int mode = rules[RULE_FIGHT];                          /* 1 NHL 93's, 2 NHL 92's, 3 the two together */
+    if (mode != 2 && (a3->impact < 10 || a2->impact < 10)) return;
     if (PFLAG(a3, pfalock) || PFLAG(a2, pfalock)) return;
     if ((a3->pflags2 & (1 << pf2pen)) || (a2->pflags2 & (1 << pf2pen))) return;
     if (a3->position == 0 || a2->position == 0) return;
@@ -342,12 +359,22 @@ void checkfight(struct SortObj *a2, struct SortObj *a3)
     struct SortObj *puck = sortobj(puckscnum);
     if (puck->pflags2 & (1 << pf2fight)) return;
     if (puck->asslist[puck->assnum >> 0] == pfaceoff) return;
-    int16_t need = (int16_t)(0x28 - g.ChkCnt);
-    if (need < 0) need = 0;
-    need = (int16_t)((need >> 2) + 0xA);
-    SetInst((uint16_t)need, a2, a3);
-    SetInst((uint16_t)need, a3, a2);
-    if (!(a3->pflags2 & (1 << pf2fight))) return;
+    if (mode == 1) {
+        int16_t need = (int16_t)(0x28 - g.ChkCnt);
+        if (need < 0) need = 0;
+        need = (int16_t)((need >> 2) + 0xA);
+        SetInst((uint16_t)need, a2, a3);
+        SetInst((uint16_t)need, a3, a2);
+        if (!(a3->pflags2 & (1 << pf2fight))) return;
+    } else {                                              /* 92's roll: the more aggressive the two and the harder the hit, the likelier */
+        if (mode == 3 && ((int8_t)a3->fighting < 2 || (int8_t)a2->fighting < 2)) return;   /* (hybrid: only between players who can fight) */
+        uint16_t range = (uint16_t)((0x28 - (int8_t)a3->aggress - (int8_t)a2->aggress) << 7);
+        uint16_t roll = (uint16_t)(randomd0(range) + 64);
+        if (roll > (uint16_t)(a3->impact + a2->impact)) return;
+        a3->pflags2 |= 1 << pf2fight;
+        a2->pflags2 |= 1 << pf2fight;
+        if (g.OptPen) { inst92(a3); inst92(a2); }
+    }
     g.ChkCnt = 0;
     for (int i = 0; i < 26; i++) { team_struct(0)->pchecks[i] = 0; team_struct(1)->pchecks[i] = 0; }
     g.Crowdlevel = (uint16_t)(g.Crowdlevel + 0x3E8);
