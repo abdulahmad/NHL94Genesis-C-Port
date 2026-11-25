@@ -16,6 +16,7 @@
  * what reaches the chips and the speakers. */
 #include <SDL.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "game.h"
 #include "rom.h"
@@ -48,6 +49,7 @@ static struct {
     int clip_id, queue[8], nqueue;          /* its paragraph, and the ones waiting */
     SDL_atomic_t screens;                   /* the Opening screens row: 1 the disc's */
     SDL_atomic_t intro;                     /* the Intro movie row: 1 HOCKEY.SEG before the title */
+    SDL_atomic_t photos, session;           /* the Player photos row; a session's console (none then: the machines keep the same RAM) */
     int intro_done;                         /* it played (once a run) */
     int screen;                             /* the cartridge's opening screen now (CD_EV_SCREEN), 0 none */
     int pic_of;                             /* the picture in pic (SEGACD_PIC_* + 1), 0 none */
@@ -75,12 +77,15 @@ static int finder(void *dir)
     return 0;
 }
 
+static int photo_hook(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32]);
+
 void segacd_start(void)
 {
     static int started;
     if (started) return;
     started = 1;
     cd_event_hook = segacd_event;
+    cd_picture_hook = photo_hook;
     char *base = SDL_GetBasePath();
     SDL_Thread *t = SDL_CreateThread(finder, "segacd", base ? base : SDL_strdup("."));
     if (t) SDL_DetachThread(t);
@@ -101,6 +106,30 @@ void segacd_set_crowd(int v) { SDL_AtomicSet(&S.crowd, v); }
 void segacd_set_voice(int v) { SDL_AtomicSet(&S.voice, v); }
 void segacd_set_screens(int v) { SDL_AtomicSet(&S.screens, v); }
 void segacd_set_intro(int v) { SDL_AtomicSet(&S.intro, v); }
+void segacd_set_photos(int v) { SDL_AtomicSet(&S.photos, v); }
+void segacd_set_session(int on) { SDL_AtomicSet(&S.session, on); }
+
+/* (cd_picture_hook) the disc's photo of the card's player, by his team's abbreviation and his name */
+static void plain(const struct RosterText *t, char *s, int cap)
+{
+    int n = (t->s[0] << 8 | t->s[1]) - 2, k = 0;
+    for (int i = 0; i < n && k < cap - 1 && t->s[2 + i]; i++) s[k++] = (char)t->s[2 + i];
+    while (k && s[k - 1] == ' ') k--;
+    s[k] = 0;
+}
+
+static int photo_hook(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32])
+{
+    if (!SDL_AtomicGet(&S.photos) || SDL_AtomicGet(&S.session) || !segacd_disc()) return 0;
+    const struct RosterTeam *T = rosters_team(team);
+    if (player >= T->players) return 0;
+    char abbr[16], name[40];
+    plain(&T->abbr, abbr, sizeof abbr);
+    plain(&T->player[player].name, name, sizeof name);
+    int ok = segacd_photo(S.cd, abbr, name, buf, colours);
+    if (getenv("SEGACD_LOG")) fprintf(stderr, "segacd: photo %s %s: %s\n", abbr, name, ok ? "the disc's" : "none");
+    return ok;
+}
 void (*segacd_intro_hook)(void);
 
 static int music_on(void) { return SDL_AtomicGet(&S.music) && segacd_disc(); }

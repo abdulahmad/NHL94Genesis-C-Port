@@ -927,6 +927,13 @@ void DrawPictureBox(void)
     uint32_t pic = DrawPlayerPicture(player, card_team());
     printz(str_DrawPictureBox_1, sizeof str_DrawPictureBox_1);
     uint32_t pal = ART(PicturePalette) + rd32(rom_ptr(ART(PicturePalette))), map;
+    uint8_t colours[32];
+    if (cd_picture_hook && cd_picture_hook(card_team(), player, g.picturebuf, colours)) {   /* (a host's: the Sega CD's photo) */
+        map = ART(PicturePalette) + rd32(rom_ptr(ART(PicturePalette) + 4));
+        pal_load(0x20, colours, 0x10);
+        dobitmap(pal, map, ram_addr(g.picturebuf), 0, 0, 6, 6, g.cardlogochars2, 0);
+        return;
+    }
     if (rd32(rom_ptr(pic + 4)) == 0) map = ART(PicturePalette) + rd32(rom_ptr(ART(PicturePalette) + 4));
     else map = pic + rd32(rom_ptr(pic + 4));
     UnpackPicture(pic + 8);
