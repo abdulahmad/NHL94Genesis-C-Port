@@ -200,7 +200,7 @@ static int find_in(const char *dir)
 static int finder(void *dir)
 {
     if (SDL_AtomicGet(&A.searched)) { SDL_free(dir); return 0; }   /* (a file given on the command line) */
-    if (!find_in((const char *)dir) && !find_in(".")) fprintf(stderr, "Rink announcer: no XBRUCE2.VIV found beside the program\n");
+    if (!find_in((const char *)dir) && !find_in(".")) fprintf(stderr, "Rink announcer: no NHL 95 PC disc image found beside the program\n");
     SDL_MemoryBarrierRelease();
     SDL_AtomicSet(&A.found, A.nclips > 0);
     SDL_AtomicSet(&A.searched, 1);
