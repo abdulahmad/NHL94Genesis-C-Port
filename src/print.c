@@ -1,6 +1,7 @@
 /* print94.asm: text printing. VRAM address from printx / printy, small and big font
  * strings, frames, numbers and times, and the font tile uploads. */
 #include "game.h"
+#include "view.h"
 #include "hal.h"
 #include "rom.h"
 #include "symbols_gen.h"
@@ -56,12 +57,23 @@ static uint32_t push_string(uint8_t *p, const uint8_t *end)
     return ram_addr(p);
 }
 
+/* the widescreen sides' record of a full-width picture's rows (view.h), from printy on */
+struct view_row view_rows[32];
+void view_note_rows(uint32_t map, uint16_t maprow, uint16_t rows, uint16_t start, uint16_t attr)
+{
+    struct Plane m = print_map();
+    for (uint16_t i = 0; i < rows; i++)
+        view_rows[(g.printy + i) & 31] = (struct view_row){ map, (uint16_t)(maprow + i), start, attr, m.vram, m.colshift };
+}
+
 /* print94.asm:xyVmMap. Set the VDP to write at printx/printy on the map printm. */
 void xyVmMap(void)
 {
     struct Plane m = print_map();
     uint16_t row = asl_w(g.printy, m.colshift);
-    Vmaddr((uint16_t)(((uint16_t)(g.printx + row) << 1) + m.vram));
+    uint16_t x = g.printx;
+    if (m.vram == g.maps[0].vram && m.colshift == 6) x = view_box_col(x, g.printy);   /* (the wide view's boxes: further out) */
+    Vmaddr((uint16_t)(((uint16_t)(x + row) << 1) + m.vram));
 }
 
 /* print94.asm:eraser. d0/d1 = width/height, d2 = map word: fill the rectangle at
@@ -71,6 +83,12 @@ void eraser(uint16_t w, uint16_t h, uint16_t attr)
     uint16_t saved = g.disflags;
     g.disflags |= HI(dfng);
     do {
+        if (w > 12 && view_box_col(0, g.printy) != 0 && print_map().vram == g.maps[0].vram) {   /* (the wide view: the row's boxes are elsewhere on it) */
+            Vmaddr((uint16_t)((asl_w(g.printy, 6) << 1) + g.maps[0].vram));
+            for (int i = 0; i < 64; i++) vdp_data(attr);
+            g.printy = (uint16_t)((g.printy + 1) & 0x1F);
+            continue;
+        }
         xyVmMap();
         uint16_t n = w;
         do vdp_data(attr); while (--n != 0);

@@ -59,6 +59,7 @@ void updatepwrplay(void)
 void ClrHor(void)
 {
     g.sflags &= (uint16_t)~HI(sfhor);
+    view_rows_scroll();
     g.Oldrow = 0x3E8;
     uint16_t d4 = DecompressGraphicsPlain(ART(Rinktiles), g.rinkvrcset);
     LoadHomeTeamGfx(d4);
@@ -78,6 +79,7 @@ void SetHor(void)
     g.Vscroll = 0;
     SprSort();
     if (view_shift()) DoFill(0x800, g.maps[1].vram, 0x7FF);     /* (and nothing beside it) */
+    view_rows_scroll();
     printz(str_SetHor_1, sizeof str_SetHor_1);
     uint32_t a1 = ART(HorRinkMap) + rd32(rom_ptr(ART(HorRinkMap)) + 4);
     dobitmap(0, a1, ART(HorRinkTiles), 0, 0, 0x20, 0x1C, g.rinkvrcset, 0);   /* a0 (the palette) is not set */

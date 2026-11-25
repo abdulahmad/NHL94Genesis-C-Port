@@ -6,6 +6,7 @@
  * 68k made them. Source addresses (DMA sources, strings, graphics) are 68k addresses: ROM or
  * work RAM, read through m8() and its kin. */
 #include "game.h"
+#include "view.h"
 #include "hal.h"
 #include "rom.h"
 #include "symbols_gen.h"
@@ -547,6 +548,7 @@ uint16_t dobitmap(uint32_t pal, uint32_t map, uint32_t tiles, uint16_t x, uint16
         else for (int i = 0x1F; i >= 0; i--) w8(rp_add(RAM(palfadenew), (int32_t)(2 * c + i)), 0, m8(pal + i));   /* (past the four: on, as the 68000) */
     }
     uint16_t attr = g.printa & 0xF800;
+    if (w == 0x28 && x == 0 && g.printx == 0) view_note_rows(map, y, h, start, attr);   /* (a full-width picture: widescreen carries it on) */
     uint32_t m = map;
     uint16_t row = y, rows = h;
     do {

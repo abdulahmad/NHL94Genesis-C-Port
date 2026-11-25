@@ -23,6 +23,28 @@ static inline int16_t view_shift(void)
 {
     return view_wide() && (g.disflags & HI(df32c)) && g.VBint == SYM_VBlank && !(g.sflags & HI(sfpz)) ? VIEW_SHIFT : 0;
 }
+/* the clock box and the score box (plane A's rows VIEW_BOX_ROW on, at the left and the right of the
+ * 256 the game places them for) keep their gaps to the screen's edges in the wide view: VIEW_SHIFT
+ * further out each. Those rows of plane A scroll by VIEW_BOX_SCROLL instead of VIEW_SHIFT (the
+ * scroll is by 8 lines in the wide view), and column x of them (64 columns) is drawn at the
+ * column this gives: the left third at the screen's left edge, the right third at its right edge,
+ * between them as placed. No run of a row wraps. */
+#define VIEW_BOX_ROW 22
+#define VIEW_BOX_SCROLL 96
+static inline int view_boxes(void) { return view_wide() && (g.disflags & HI(df32c)) && !(g.sflags & HI(sfhor)); }
+static inline uint16_t view_box_col(uint16_t x, uint16_t y)
+{
+    if (!view_boxes() || y < VIEW_BOX_ROW || y > 27 || x >= 32) return x;
+    if (x < 12) return (uint16_t)(x + 52);
+    if (x >= 20) return (uint16_t)(x - 4);
+    return (uint16_t)(x - 8);
+}
+void view_rows_scroll(void);    /* plane A's scroll of each 8 lines, for the rink as it is now */
+/* Widescreen (native/wide.c): the full-width pictures dobitmap drew (the screens' backdrops), by
+ * screen row, so the sides can carry them on. Not game state: only the picture reads it */
+struct view_row { uint32_t map; uint16_t maprow, start, attr, vram, colshift; };
+extern struct view_row view_rows[32];
+void view_note_rows(uint32_t map, uint16_t maprow, uint16_t rows, uint16_t start, uint16_t attr);    /* plane A's scroll of each 8 lines, for the rink as it is now */
 /* the rink's screen mode and plane A's scroll, after a setVram or a screen over the rink */
 void view_rink_mode(void);
 void view_rink_resume(void);    /* (a snapshot's rink, set up in 32 columns) */

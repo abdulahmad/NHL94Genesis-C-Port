@@ -256,8 +256,23 @@ void view_rink_mode(void)
     uint16_t saved = g.disflags;
     g.disflags |= HI(dfng);
     vdp_ctrl16(SYM_VDPR_MODE4 + 0x81);
-    Vmaddr(g.VSCRLPM);
-    vdp_data(VIEW_SHIFT);
+    vdp_ctrl16(SYM_VDPR_MODE3 + 2);                       /* (the scroll by 8 lines: the boxes' rows have their own) */
+    view_rows_scroll();
+    SetScroll2();
+    g.disflags = saved;
+}
+
+/* plane A's scroll of each 8 lines in the wide view: VIEW_SHIFT, the boxes' rows VIEW_BOX_SCROLL
+ * on the vertical rink */
+void view_rows_scroll(void)
+{
+    if (!view_wide()) return;
+    uint16_t saved = g.disflags;
+    g.disflags |= HI(dfng);
+    for (uint16_t r = 0; r < 28; r++) {
+        Vmaddr((uint16_t)(g.VSCRLPM + r * 32));
+        vdp_data(r >= VIEW_BOX_ROW && view_boxes() ? VIEW_BOX_SCROLL : VIEW_SHIFT);
+    }
     g.disflags = saved;
 }
 

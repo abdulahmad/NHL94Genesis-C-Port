@@ -200,6 +200,8 @@ void SetScroll2(void)
 {
     Vmaddr((uint16_t)(g.VSCRLPM + 2));
     vdp_data(g.Hscroll);
+    if (view_wide() && (g.disflags & HI(df32c)) && !(g.sflags & HI(sfpz)))     /* (the wide view scrolls by 8 lines: plane B's every row) */
+        for (uint16_t r = 1; r < 28; r++) { Vmaddr((uint16_t)(g.VSCRLPM + r * 32 + 2)); vdp_data(g.Hscroll); }
     vdp_ctrl(VSRAM_W + (2u << 16));
     vdp_data(g.Vscroll);
 }
@@ -417,6 +419,7 @@ void showclock(struct Vid *v)
     const struct Plane *m = &g.maps[0];
     uint16_t y = 0x18, x = 3;
     if (g.sflags & HI(sfhor)) { m = &g.maps[1]; y = 5; x = 0xD; }
+    if (m == &g.maps[0]) x = view_box_col(x, y);          /* (the wide view's clock box: further out) */
     uint16_t dest = (uint16_t)((((y << m->colshift) + x) << 1) + m->vram);
     dma_entry(v, src, words, dest);
 }
