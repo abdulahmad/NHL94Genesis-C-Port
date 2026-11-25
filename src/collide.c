@@ -133,7 +133,7 @@ void checkcx(unsigned obj2, int16_t x, int16_t dy, struct SortObj *o)
             newcheck();
         checkint(p, o);
         checkcheck(p, o, (int16_t)imp);
-        /* checkfight: an rts */
+        checkfight(p, o);                                 /* (fight.c: the cartridge has only an rts) */
     }
     int16_t v1nw = (int16_t)v1n;
     if ((int16_t)g.collflag < 0)
@@ -1102,7 +1102,7 @@ void puckstick(struct SortObj *p, struct SortObj *puck, uint32_t dsq)
 
 /* collide94.asm:puckglue .setd0player. Give control of player d0 to a pad if his team is
  * controlled (pads 3 and 4 too). */
-static void setd0player(uint16_t d0)
+void setd0player(uint16_t d0)
 {
     if (d0 == g.c1playernum || d0 == g.c2playernum)
         return;

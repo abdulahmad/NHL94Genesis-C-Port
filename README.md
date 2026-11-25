@@ -166,6 +166,10 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   say it (the same fixed lengths on every machine, 95 PC's clips' about 6 s for a goal with an assist, 6 s a penalty, 7.5 s a penalty shot, with
   the time the replay and the face off set up already take counted), then the puck drops. Unlike the other rows here it is a game rule: the host's
   choice holds for everyone online, and it is on in the Recommended preset. Headless: `--rule hold_play=1`.
+- **Fighting**: NHL '93's fights, ported from its code. A hard enough hit between two players with fighting ratings can start a fight: both drop
+  their gloves, throw high and low punches or grab, one goes down, the pair get a fighting penalty and play restarts at a face off. Computer
+  players fight on their own; human players punch with the buttons, on any of the four pads. It is a game rule (the host's choice holds for
+  everyone online) and is off in the Sega CD preset. Headless: `--rule fighting=1`.
 - Headless: `--announcer FILE` plays the announcer from that `XBRUCE2.VIV` into `--wav`; `ANNOUNCER_LOG=1` prints each clip said.
 
 ### Game rules

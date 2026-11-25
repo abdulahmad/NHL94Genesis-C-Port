@@ -25,6 +25,7 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_CD_SOUNDS] = { "rules.cd_sounds", "Sega CD sound choices", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_CD_SONGS] = { "rules.cd_songs", "Sega CD song timing", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_CD_PERIOD_END] = { "rules.cd_period_end", "Sega CD period end", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_FIGHT] = { "rules.fighting", "Fighting", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_HOLD] = { "rules.hold_play", "Pause for the announcer", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
 
