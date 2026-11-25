@@ -301,15 +301,23 @@ static void stage_frame(void)
     int desk = st == S_DESK;
     fa->vis = !desk; fb->vis = desk;
     fb->pos[0] = 62; fb->pos[1] = DESK_Y; fb->pos[2] = 2;
-    float rx = c->rot[0], fy = c->pos[1] - (-cb[2] * fabsf(cosf(rx)) + (cb[5] - cb[4]) / 2 * fabsf(sinf(rx)));
-    fa->pos[0] = c->pos[0]; fa->pos[1] = fy; fa->pos[2] = c->pos[2];
+    /* the ground touches the lowest corner of the case, wherever the case is and however it is turned */
+    r3_update(BX_S);
+    const float *W = r3_world(BX_S, caseG);
+    float rx = c->rot[0], fy = 1e9f, wp[3] = { W[3], W[7], W[11] };
+    for (int i = 0; i < 8; i++) {
+        float p[3] = { cb[i & 1], cb[2 + ((i >> 1) & 1)], cb[4 + ((i >> 2) & 1)] };
+        float y = W[4] * p[0] + W[5] * p[1] + W[6] * p[2] + W[7];
+        if (y < fy) fy = y;
+    }
+    fa->pos[0] = wp[0]; fa->pos[1] = fy; fa->pos[2] = wp[2];
     float k = (1 - opn * 3) * (1 - fabsf(rx) * 3);
     if (k < 0) k = 0;
     rf->vis = !desk && k > .01f && st != S_PACK;
     rf->opacity = k;
-    rf->pos[0] = c->pos[0]; rf->pos[1] = 2 * fy - c->pos[1]; rf->pos[2] = c->pos[2];
+    rf->pos[0] = wp[0]; rf->pos[1] = 2 * fy - wp[1]; rf->pos[2] = wp[2];
     rf->rot[0] = -c->rot[0]; rf->rot[1] = c->rot[1]; rf->rot[2] = -c->rot[2];
-    rf->scale[0] = 1; rf->scale[1] = -1; rf->scale[2] = 1;
+    rf->scale[0] = c->scale[0]; rf->scale[1] = -c->scale[1]; rf->scale[2] = c->scale[2];
 }
 
 static void init(void)
