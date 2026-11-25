@@ -18,6 +18,8 @@ And things the cartridge never had:
 - **Sega CD options**: the changes the NHL '94 Sega CD made to the game, the disc's music, sound
   effects, opening screens, intro movie and player cards, each off until you turn it on. The
   game itself is the original, exactly.
+- **NHL 95 PC options**: things NHL 95 PC did that the cartridge did not, built from your own copy of that game's files, each
+  off until you turn it on. The first is the rink announcer.
 - **Save states**: eight slots with a picture each, the Autosave when you quit, and hold F4 to
   rewind the goal you just gave up.
 - **All of it online.** The host's choices go to every machine. Seasons go online in a save state: anyone saves one, and the host loads it for everyone.
@@ -136,6 +138,22 @@ The disc's sound needs your own rip of the NHL '94 Sega CD. Put it beside the pr
 - **Career stats**: *B on a player card* opens the disc's own player card screen, rebuilt from its data and its layout code (PLAYER.BIN): the team's page with his photo in the frame (or the disc's stock photo), his name, size, birthplace and birthday, his position and number in the disc's big letters, and his career seven seasons and three columns at a time under "Regular" or "Playoff". Up and down scroll the seasons, left and right the columns; Enter, Space or A turns to the team's card (its arena photo, name and arena, and the six advantage lines), as does B on a team's card, and then to the team's video card, which plays the disc's own clips of that team (up to 13, with their sound, in the TV frame; left and right pick the clip, up plays it again; de-dithered when FMV de-dither is on). Enter again goes back to the player. Esc, Backspace or a click closes it. Every one of the cartridge's 684 players has a career; a roster set's own teams get a plain page with the same words. Never in an online game.
 - **Colour player photos**: the cartridge's grey photos on the player cards and the scouting report shown in colour, from the same photo in your own NHL 95 PC or NHL 94 PC files. Put NHL 95 PC's disc image (or its `PORTR000.QFS` to `PORTR023.QFS`) or NHL 94 PC's `PORTRAIT.NSH` (or its disc image) beside the program; nothing of either game is shipped. 113 of the cartridge's photos are the same photo in one of them (93 in NHL 95 PC); the card keeps the cartridge's picture and most of its light and takes the PC photo's colour. A photo neither game has stays grey. It is drawn over the picture you see, so the game, its saves and online play are the same either way. On in *Recommended*, off in *Cartridge* and *Sega CD*; the row says so when no files were found. `tools/cardcolor_check.c` checks the maths against the prototype's pictures. Headless: `--pc-photos` (the folder `NHL94_PC_PORTRAITS` names is looked in first).
 - Headless: `--segacd-music`, `--segacd-crowd 0|1|2` and `--segacd-voice 0|1|2` mix the disc into `--wav`. `--segacd-screens` and `--segacd-title` put the opening and title pages into `--shot` / `--shots`, and `--segacd-photos` the player cards' photos. The golden lines hash the game's own sound, so they don't change.
+
+### NHL 95 PC options
+
+The **Game** page also has what NHL 95 PC added. None of it is in the game's own state, so replays, saved states and online play are the same with it
+on or off, and each machine in an online game can set it for itself. The sounds come from your own NHL 95 PC: nothing of it is in this repository or a release.
+
+- **Rink announcer**: the arena announcer of NHL 95 PC, which has the expansion teams (Anaheim and Florida) as well as the other 24.
+  It says, in 95 PC's words and with its voice: a goal ("Los Angeles goal number 99, assisted by number 4, and number 7"), a penalty
+  ("Montreal penalty on number 12, 2 minutes, hooking", "and number 14" for another of the same team's stoppage, then "at 12 minutes 30
+  seconds" after the last), a penalty shot ("Toronto penalty shot number 5, at 8 minutes 2 seconds"), "one minute left" (when the clock
+  reaches 1:00 in a period) and, at the end of a game, the three stars ("first star: Los Angeles, number 99"). A goal or a penalty shot
+  takes over from what is being said; a "one minute left" waits for a free voice, as in 95 PC. The announcer is quiet in the demo.
+  The clips are the rink calls of `XBRUCE2.VIV` (the ones for numbers, teams, penalties and the calls themselves). Put the file beside the
+  program (up to three folders below), loose or on a rip of the NHL 95 PC disc (`.cue`, `.ccd` or `.iso` / `.bin`): the game looks in the disc images
+  too. Without it the row says "(no XBRUCE2.VIV found)". The clip rate is 11025 Hz.
+- Headless: `--announcer FILE` plays the announcer from that `XBRUCE2.VIV` into `--wav`; `ANNOUNCER_LOG=1` prints each clip said.
 
 ### Game rules
 

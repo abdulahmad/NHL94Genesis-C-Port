@@ -155,6 +155,7 @@ void VBlank(void)
                     g.gameclock--;
                     if ((int16_t)g.gameclock <= 0x3D && (int16_t)g.gameclock >= 0x3C)
                         sfx(SYM_SFXbeep2);                /* one minute left */
+                    if (g.gameclock == 0x3C && pa_hook) pa_hook(PA_ONEMIN, NULL, 0, 0, 0);
                 }
             }
         }

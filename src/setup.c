@@ -1391,6 +1391,7 @@ void ShowThreeStars(void)
     for (int i = 0; i < 3; i++) {
         struct Team *tm;
         uint16_t player = TakeTopStarScore(&tm);
+        if (pa_hook) pa_hook(PA_STAR, tm, player, i, 0);   /* (the rink announcer) */
         g.printx = 0x1A;
         g.printy++;
         print_p(roster_text(&rosters_team(tm->tmteam)->abbr));
@@ -1486,6 +1487,7 @@ void PenaltyShotBox(void)
     Framer(0x1B, 8);
     printbig(SYM_PenShotBigTxt);
     uint16_t shooter = sortobj((int16_t)g.BA_Sktr_SCnum)->pnum;
+    if (pa_hook) pa_hook(PA_PENSHOT, team_struct(g.BA_Team != 0), shooter, 0, 0);   /* (the rink announcer) */
     print(FormatPlayerNumInitial(shooter, team_struct(g.BA_Team != 0)));
     PRINTZ(str_PenaltyShotBox_2);
     const uint8_t *list = rom_ptr(SYM_Penaltylist);
@@ -1523,6 +1525,11 @@ void ShowGoalBox(void)
     }
     printbig(text);
     uint16_t scorer = e[3];
+    if (pa_hook) {                                        /* (the rink announcer) */
+        int a1 = -1, a2 = -1;
+        if (!(e[4] & 0x80) && !(g.sflags4 & HI(5))) { a1 = e[4]; if (!(e[5] & 0x80)) a2 = e[5]; }
+        pa_hook(PA_GOAL, tm, scorer, a1, a2);
+    }
     g.printx = 0xC;
     print(FormatPlayerName(scorer, tm));
     if (scorer >= g.scorergoalies) PrintPlayerGoals(scorer, tm);

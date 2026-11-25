@@ -30,6 +30,7 @@
 #include "rules.h"
 #include "overbar/postfx.h"
 #include "segacd.h"
+#include "announcer.h"
 #include "cardcolor.h"
 #include "wide.h"
 
@@ -330,6 +331,7 @@ static void audio(void *user, const int16_t *samples, int frames)
     if (frames > 0 && frames <= 4096) {                 /* (the Sega CD disc's music and crowd, when they play) */
         memcpy(mixed, samples, (size_t)frames * 4);
         segacd_mix(mixed, frames, F.rate);
+        announcer_mix(mixed, frames, F.rate);
         samples = mixed;
     }
     SDL_QueueAudio(F.dev, samples, (Uint32)frames * 4);
@@ -549,8 +551,9 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_COLOUR (CD_ROWS + 10)
 #define CD_PHOTOS (CD_ROWS + 11)
 #define CD_CAREER (CD_ROWS + 12)
+#define CD_ANNOUNCER (CD_ROWS + 14)                        /* (NHL 95 PC's rink announcer, its own files: group 4) */
 #define CD_PCPHOTOS (CD_ROWS + 13)                        /* (the cartridge's photos in colour, from the player's PC files: cardcolor.c) */
-#define CD_OPTS (CD_ROWS + 14)
+#define CD_OPTS (CD_ROWS + 15)
 static ob_game_opt cd_opts[CD_OPTS];
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
 static SDL_atomic_t cd_smooth, cd_colour;                 /* the movie at 30 fps; each shot's colour */
@@ -580,6 +583,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_CAREER) { segacd_set_career(value, ending); return; }
     if (index == CD_PCPHOTOS) { cardcolor_set(value); return; }
     if (index == CD_SFX) { segacd_set_sfx(value); return; }
+    if (index == CD_ANNOUNCER) { announcer_set(value); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -641,6 +645,18 @@ static void cd_no_disc(void)
     }
 }
 
+/* the announcer's row says so when no XBRUCE2.VIV was found beside the program */
+static void pa_no_file(void)
+{
+    static int done;
+    static char label[64];
+    if (done || !announcer_searched()) return;
+    done = 1;
+    if (announcer_found()) return;
+    snprintf(label, sizeof label, "%s (no XBRUCE2.VIV found)", cd_opts[CD_ANNOUNCER].label);
+    cd_opts[CD_ANNOUNCER].label = label;
+}
+
 /* the colour photos' row says so when neither PC game's portraits were found */
 static void pc_no_files(void)
 {
@@ -679,6 +695,8 @@ static void game_page_init(void)
     static const char *const career[2] = { "off", "B on a player card" };
     cd_opts[CD_CAREER] = (ob_game_opt){ "cd_career", "Career stats", career, 2, 0, 0, 3 };
     cd_opts[CD_SFX] = (ob_game_opt){ "cd_sfx", "Sound effects", music, 2, 0, 0, 3 };
+    cd_opts[CD_ANNOUNCER] = (ob_game_opt){ "pc_announcer", "Rink announcer", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's voice: goals, penalties, the last minute, the three stars) */
+    announcer_start();
     cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 0, 0, 4 };
     segacd_start();
     cardcolor_start();
@@ -691,6 +709,8 @@ static void game_page_init(void)
     pv[1][CD_DEDITHER] = pv[1][CD_SMOOTH] = pv[1][CD_COLOUR] = 0;            /* (the movie as the disc has it) */
     pv[1][CD_VOICE] = 1; pv[1][CD_CROWD] = 1;
     pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
+    pv[1][CD_ANNOUNCER] = 0;                                                  /* (95 PC's voice: not the Sega CD's) */
+    pv[2][CD_ANNOUNCER] = 1;                                                  /* (on in Recommended; it does nothing without 95 PC's files) */
     pv[2][CD_PCPHOTOS] = 1;                                                    /* (Abdul: on in Recommended) */
     static const int disc_look[] = { CD_VOICE, CD_SCREENS, CD_TITLE, CD_INTRO, CD_SFX, CD_PHOTOS, CD_CAREER };
     for (size_t k = 0; k < sizeof disc_look / sizeof *disc_look; k++) pv[2][disc_look[k]] = 1;
@@ -968,6 +988,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         intro_tick();
         segacd_career_tick(F.dev, F.rate, SDL_AtomicGet(&cd_dedither));
         cd_no_disc();
+        pa_no_file();
         pc_no_files();
         hold_state = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open || ob_screen_up();
         ob_plat_present();

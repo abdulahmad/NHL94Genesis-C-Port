@@ -244,6 +244,12 @@ enum { CD_EV_SONG, CD_EV_STOP, CD_EV_TURNOFF, CD_EV_CROWD, CD_EV_PARAGRAPH /* th
        CD_EV_SCREEN /* an opening screen: 0 none, 1 High Score Productions, 2 the title, 3 its credits, 4 EA SPORTS, 5 the Sega CD's license page */,
        CD_EV_SFX /* a sound effect: its id, and its track slot in bits 8-11 (8: none was free) */ };
 extern void (*cd_event_hook)(int ev, uint16_t n);
+/* the rink announcer (native/announcer.c): what the cartridge's boxes show, said aloud; it only reads, the game is unchanged. NULL: nobody listens.
+ * PA_GOAL: tm the scorer's team, player him, a and b his assists (-1 none); PA_PENALTY: tm the penalized team, player him, a the penalty (its
+ * Penaltylist offset), b its minutes | the penalties still to come << 8 | 1 << 16 when the next is this team's; PA_PENSHOT: tm the shooter's team,
+ * player him; PA_ONEMIN: the clock reached one minute; PA_STAR: tm and player the star, a which (0-2) */
+enum { PA_GOAL, PA_PENALTY, PA_PENSHOT, PA_ONEMIN, PA_STAR };
+extern void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
 /* (the same host) the Sega CD's own pages around the title, which the host draws: CD_TITLE_LICENSE 1: its license page before the
  * title; CD_TITLE_BEGIN 1: its title page in place of the cartridge's (the cartridge's set-up and song stay, its credits do not);
  * CD_TITLE_STEP: a frame of that page's credits, 0 at their end. NULL or 0: the cartridge's (the game is unchanged then) */
