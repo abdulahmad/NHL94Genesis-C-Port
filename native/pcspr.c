@@ -45,6 +45,22 @@ static struct {
     int nshow;
 } P;
 
+/* the centre ice logos of NHL 95 PC (<ABBR>.MAP / .TIL on the disc and RINK.PAL: tiles of 8 x 8 pixels of 256 colours, colour 255 clear) */
+#define NLOGOS 26
+static struct {
+    SDL_atomic_t on;
+    int have;
+    uint8_t pal[256][3];
+    struct { int w, h; uint8_t *idx; } t[NLOGOS];
+    int crest;                               /* the first of the cartridge's 24 crest tiles in the VDP's memory (-1: not found yet) */
+    int seen;
+} LGO = { .crest = -1 };
+static const char *const logo_name[NLOGOS] = { "ANH", "BOS", "BUF", "CGY", "CHI", "DET", "EDM", "FLO", "HFD", "LA", "MIN", "MTL", "NJ",
+    "NYI", "NYR", "OTT", "PHI", "PIT", "QUE", "SJ", "STL", "TB", "TOR", "VAN", "WPG", "WSH" };
+/* the cartridge's art number of a team (ANA BOS BUF CGY CHI DAL DET EDM FLA HFD LA MTL NJ NYI NYR OTT PHI PIT QUE SJ STL TB TOR VAN WSH WPG ASE ASW)
+ * as the index of logo_name (-1: none, the All-Star teams) */
+static const signed char logo_of_art[28] = { 0, 1, 2, 3, 4, 10, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 24, -1, -1 };
+
 /* the referee: not in the cartridge's game at all, only in this picture (a visual one: nothing in the game knows of it) */
 static struct {
     SDL_atomic_t on;
@@ -198,6 +214,73 @@ static int load(const char *dir, ob_cd *cd)
         }
         FILE *o = fopen("/tmp/pcsheet.ppm", "wb");
         if (o) { fprintf(o, "P6\n%d %d\n255\n", 10 * cw, 10 * ch); fwrite(im, 1, sizeof im, o); fclose(o); }
+    }
+
+    {                                                              /* (the centre ice logos: optional) */
+        long pn = 0;
+        uint8_t *pb = NULL;
+        if (cd) pn = ob_cd_read_file(cd, "RINK.PAL", &pb); else pb = loose(dir, "RINK.PAL", &pn);
+        int got = 0;
+        if (pb && pn >= 512) {
+            for (int c = 0; c < 256; c++) {
+                int v = pb[c * 2] | pb[c * 2 + 1] << 8;
+                LGO.pal[c][0] = (uint8_t)((v & 31) * 255 / 31); LGO.pal[c][1] = (uint8_t)((v >> 5 & 31) * 255 / 31); LGO.pal[c][2] = (uint8_t)((v >> 10 & 31) * 255 / 31);
+            }
+            for (int k = 0; k < NLOGOS; k++) {
+                char fm[16], ft[16];
+                snprintf(fm, sizeof fm, "%s.MAP", logo_name[k]);
+                snprintf(ft, sizeof ft, "%s.TIL", logo_name[k]);
+                long mn = 0, tln = 0;
+                uint8_t *mb = NULL, *tb = NULL;
+                if (cd) { mn = ob_cd_read_file(cd, fm, &mb); tln = ob_cd_read_file(cd, ft, &tb); } else { mb = loose(dir, fm, &mn); tb = loose(dir, ft, &tln); }
+                if (mb && tb && mn >= 6) {
+                    int lw = mb[0] | mb[1] << 8, lh = mb[2] | mb[3] << 8;
+                    if (lw > 0 && lh > 0 && lw <= 8 && lh <= 8 && mn >= 6 + 2 * lw * lh) {
+                        uint8_t *ix = malloc((size_t)(lw * 8 * lh * 8));
+                        if (ix) {
+                            for (int ty = 0; ty < lh; ty++)
+                                for (int tx = 0; tx < lw; tx++) {
+                                    int wd = mb[6 + 2 * (ty * lw + tx)] | mb[7 + 2 * (ty * lw + tx)] << 8, ti = wd & 0x1FFF;
+                                    for (int y = 0; y < 8; y++)
+                                        for (int x = 0; x < 8; x++) {
+                                            int sx = wd & 0x2000 ? 7 - x : x, sy = wd & 0x4000 ? 7 - y : y;
+                                            long at = (long)ti * 64 + sy * 8 + sx;
+                                            ix[(ty * 8 + y) * lw * 8 + tx * 8 + x] = at < tln ? tb[at] : 255;
+                                        }
+                                }
+                            {                                          /* (the ice, its lines and the centre line the tiles bake in round the crest: clear, found from the edge in) */
+                                int fw = lw * 8, fh = lh * 8, *q = malloc(sizeof(int) * (size_t)(fw * fh));
+                                int qn = 0;
+                                if (q) {
+                                    qn = 0;
+                                    for (int y = 0; y < fh; y++)
+                                        for (int x = 0; x < fw; x++)
+                                            if ((x == 0 || y == 0 || x == fw - 1 || y == fh - 1)) { int c = ix[y * fw + x]; if (c == 96 || c == 23 || c == 91 || c == 102 || c == 103) { q[qn++] = y * fw + x; ix[y * fw + x] = 254; } }
+                                    for (int i = 0; i < qn; i++) {
+                                        int x = q[i] % fw, y = q[i] / fw;
+                                        static const int d[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+                                        for (int j = 0; j < 4; j++) {
+                                            int nx2 = x + d[j][0], ny2 = y + d[j][1];
+                                            if (nx2 < 0 || ny2 < 0 || nx2 >= fw || ny2 >= fh) continue;
+                                            int c = ix[ny2 * fw + nx2];
+                                            if (c == 96 || c == 23 || c == 91 || c == 102 || c == 103) { ix[ny2 * fw + nx2] = 254; q[qn++] = ny2 * fw + nx2; }
+                                        }
+                                    }
+                                    free(q);
+                                    for (int i = 0; i < fw * fh; i++) if (ix[i] == 254) ix[i] = 255;
+                                }
+                            }
+                            LGO.t[k].w = lw * 8; LGO.t[k].h = lh * 8; LGO.t[k].idx = ix;
+                            got++;
+                        }
+                    }
+                }
+                free(mb); free(tb);
+            }
+        }
+        free(pb);
+        LGO.have = got >= 20;
+        if (getenv("PCSPR_LOG")) fprintf(stderr, "pcspr: %d centre ice logos\n", got);
     }
     if (getenv("PCSPR_LOG")) fprintf(stderr, "pcspr: banks %d pal %d team %d %d\n", banks, pal, P.have_team[0], P.have_team[1]);
     return banks >= 20 && pal && P.have_team[0] && P.have_team[1];
@@ -364,33 +447,24 @@ int pcspr_searched(void) { return SDL_AtomicGet(&P.searched); }
 int pcspr_found(void) { return SDL_AtomicGet(&P.searched) && SDL_AtomicGet(&P.found); }
 void pcspr_set(int on) { SDL_AtomicSet(&P.on, on ? 1 : 0); }
 void pcspr_ref_set(int on) { SDL_AtomicSet(&R.on, on ? 1 : 0); }
+void pcspr_logo_set(int on) { SDL_AtomicSet(&LGO.on, on ? 1 : 0); }
+int pcspr_logos(void) { return LGO.have; }
 
 
-/* the referee over the finished picture: only where nothing of the picture's own is over the ice there. A solid sprite of the
- * referee's size is put into a copy of the VDP, last in the sprite order (where it shows, it is behind every sprite, over only
- * the ice) and first (where it shows, it is in front of the sprites and of what the planes draw with priority); the two pictures
- * against the copy without it say where. Where it is in front of the sprites, a skater below it (nearer) still covers it. */
-static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch, const shown *list, int n)
+/* Masks of where a solid sprite of nx x ny 32 pixel pieces at x0, y0 would show in the picture of vdp: back: put last in the sprite
+ * order (it shows over only the ice: nothing with priority and no sprite is over it); front: put first (it shows over the sprites
+ * too). Each a picture against base, the picture with it hidden. 0 when the sprite table has no room for it. */
+static int sprite_masks(const mdrt_vdp *vdp, int x0, int y0, int nx, int ny, uint16_t *base, uint16_t *back, uint16_t *front, int want_front)
 {
-    if (!SDL_AtomicGet(&R.on) || !R.valid) return;
-    int fr = ref_frame();
-    if (fr < 0 || fr >= NFRAMES || !P.f[fr].px) return;
-    const spr *s = &P.f[fr];
-    const uint8_t *rec = P.team[0][9];
-    int x0 = R.sx - 128 - s->xo, y0 = R.sy - 128 - s->yo;
-    int nx = (s->w + 31) / 32, ny = (s->h + 31) / 32;
-    if (nx * ny > 6) return;
     static mdrt_vdp sc;
-    static uint16_t base[320 * 240], back[320 * 240], front[320 * 240];
     unsigned sat = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
     unsigned tile = 0x7E0;
     while (tile > 0x40 && tile * 32 < sat + 0x280 && sat < tile * 32 + 0x200) tile -= 0x10;     /* (the solid tiles: not over the sprite table) */
     int tail = 0;                                                   /* (the last entry of the sprite table's chain; the entries after it are free) */
     for (int k = 0; k < 80; k++) { int l = vdp->sat[tail * 8 + 3] & 0x7F; if (!l) break; tail = l; }
     int cnt = nx * ny, fb = tail + 1;                               /* the free entries fb ... : the pieces, then the moved first entry */
-    if (fb + cnt + 1 > 80) return;
-    if (getenv("PCREF_LOG")) fprintf(stderr, "refdraw: tail %d\n", tail);
-    for (int variant = 0; variant < 3; variant++) {                /* 0: the copy without it, 1: last, 2: first */
+    if (fb + cnt + 1 > 80) return 0;
+    for (int variant = 0; variant < (want_front ? 3 : 2); variant++) {                /* 0: the copy without it, 1: last, 2: first */
         sc = *vdp;
         for (int t = 0; t < 16; t++) memset(sc.s.vram + tile * 32 + t * 32, 0xFF, 32);
         sc.s.cram[15] = 0x0E0E;
@@ -419,6 +493,25 @@ static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch
         }
         mdrt_vdp_render(&sc, variant == 0 ? base : variant == 1 ? back : front, 320);
     }
+    return 1;
+}
+
+/* the referee over the finished picture: only where nothing of the picture's own is over the ice there. A solid sprite of the
+ * referee's size is put into a copy of the VDP, last in the sprite order (where it shows, it is behind every sprite, over only
+ * the ice) and first (where it shows, it is in front of the sprites and of what the planes draw with priority); the two pictures
+ * against the copy without it say where. Where it is in front of the sprites, a skater below it (nearer) still covers it. */
+static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch, const shown *list, int n)
+{
+    if (!SDL_AtomicGet(&R.on) || !R.valid) return;
+    int fr = ref_frame();
+    if (fr < 0 || fr >= NFRAMES || !P.f[fr].px) return;
+    const spr *s = &P.f[fr];
+    const uint8_t *rec = P.team[0][9];
+    int x0 = R.sx - 128 - s->xo, y0 = R.sy - 128 - s->yo;
+    int nx = (s->w + 31) / 32, ny = (s->h + 31) / 32;
+    if (nx * ny > 6) return;
+    static uint16_t base[320 * 240], back[320 * 240], front[320 * 240];
+    if (!sprite_masks(vdp, x0, y0, nx, ny, base, back, front, 1)) return;
     uint8_t pal[256][3];
     memcpy(pal, P.pal, sizeof pal);
     if (getenv("PCREF_LOG")) { int nb = 0, nf = 0; for (int i = 0; i < 320 * 240; i++) { nb += back[i] != base[i]; nf += front[i] != base[i]; } fprintf(stderr, "refdraw: frame %d at %d,%d size %dx%d back %d front %d\n", fr, x0, y0, s->w, s->h, nb, nf); }
@@ -444,13 +537,77 @@ static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch
         }
 }
 
+
+/* the first of the 24 crest tiles the cartridge draws at centre ice for team art: found in the VDP's memory by their pixels (the art's
+ * own 24 tiles, as the cartridge has them for the team) */
+static int find_crest(const mdrt_vdp *v, int art)
+{
+    struct romsrc rs;
+    static uint8_t px[16 * 8 * 16 * 8], tiles[ART_ICE_BYTES];
+    uint16_t pal[16];
+    int w, h;
+    romsrc_game(&rs);
+    if (art_ice(&rs, art, px, &w, &h, pal) < 0 || art_ice_make(&rs, px, w, h, tiles) < 0) return -1;
+    for (unsigned a = 0; a + 24 * 32 <= 0x10000; a += 32)
+        if (!memcmp(v->s.vram + a, tiles + 10, 24 * 32)) return (int)(a / 32);
+    return -1;
+}
+
+/* the cartridge's crest at centre ice taken out of the picture and NHL 95 PC's logo of the home team put in its place, over only the
+ * rink: under the windows, the scoreboard and the players as the crest was. Called before the PC's players are drawn. */
+static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
+{
+    if (!SDL_AtomicGet(&LGO.on) || !LGO.have) return;
+    int art = rosters_art(team_struct(0)->tmteam);
+    if (art < 0 || art >= 28 || logo_of_art[art] < 0) return;
+    int k = logo_of_art[art];
+    if (!LGO.t[k].idx) return;
+    if (LGO.crest < 0 || !(g.Vcount & 63) || LGO.seen != art) { LGO.crest = find_crest(vdp, art); LGO.seen = art; }
+    if (getenv("PCLOGO_LOG") && !(g.Vcount & 63)) fprintf(stderr, "logo? art %d crest %d\n", art, LGO.crest);
+    if (LGO.crest < 0) return;
+    static mdrt_vdp sc;
+    static uint16_t blank[320 * 240], base[320 * 240], back[320 * 240], front[320 * 240];
+    sc = *vdp;
+    for (int t = 0; t < 24; t++) memset(sc.s.vram + (((unsigned)(LGO.crest + t) * 32) & 0xFFFF), 0, 32);
+    mdrt_vdp_render(&sc, blank, 320);
+    int x0 = 1 << 20, y0 = 1 << 20, x1 = -1, y1 = -1;
+    for (int y = 0; y < h; y++)                                      /* (the crest: where taking its tiles out changes the picture) */
+        for (int x = 0; x < w; x++)
+            if (blank[y * 320 + x] != px[y * pitch_px + x]) {
+                pic[(long)y * pitch + x] = 0xFF000000u | mdrt_vdp_rgb(blank[y * 320 + x], MDRT_RGB_GPGX);
+                if (x < x0) x0 = x;
+                if (x > x1) x1 = x;
+                if (y < y0) y0 = y;
+                if (y > y1) y1 = y;
+            }
+    int16_t cx = 0, cy = 0;
+    find3d(&cx, &cy, 0);
+    if (getenv("PCLOGO_LOG") && !(g.Vcount & 63)) fprintf(stderr, "logo: art %d crest tile %d bbox %d,%d-%d,%d find3d %d,%d shift %d\n", art, LGO.crest, x0, y0, x1, y1, cx + view_shift(), cy, view_shift());
+    int lw = LGO.t[k].w, lh = LGO.t[k].h;
+    int lx, ly;
+    if (cy == 0x4E20) return;
+    lx = cx + view_shift() - 128 - lw / 2;
+    ly = cy - 128 - lh / 2;
+    if (x1 >= 0 && x1 - x0 >= 40) { lx = (x0 + x1 + 1) / 2 - lw / 2; ly = (y0 + y1 + 1) / 2 - lh / 2; }   /* (the crest's own place, when it is all in view) */
+    int nx = (lw + 31) / 32, ny = (lh + 31) / 32;
+    if (nx * ny > 6 || !sprite_masks(&sc, lx, ly, nx, ny, base, back, front, 0)) return;
+    for (int y = 0; y < lh; y++)
+        for (int x = 0; x < lw; x++) {
+            int c = LGO.t[k].idx[y * lw + x];
+            if (c == 255) continue;                                                    /* (clear) */
+            int ppx = lx + x, ppy = ly + y;
+            if (ppx < 0 || ppx >= w || ppy < 0 || ppy >= h || back[ppy * 320 + ppx] == base[ppy * 320 + ppx]) continue;
+            pic[(long)ppy * pitch + ppx] = 0xFF000000u | (uint32_t)LGO.pal[c][0] << 16 | (uint32_t)LGO.pal[c][1] << 8 | LGO.pal[c][2];
+        }
+}
+
 /* Over the picture the game drew (px: its colours, pic: the same as RGB). The cartridge's own sprites of the objects drawn here are
  * still in it: the picture is drawn again from a copy of the VDP with those sprite table entries hidden, and where the two differ
  * the cartridge's sprite was visible (not under a window, the face off box or another sprite). The PC's sprite is drawn only there
  * and a few pixels around (the two shapes differ a little); everything else of the cartridge's sprites is given back its background. */
 void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
-    if ((!SDL_AtomicGet(&P.on) && !SDL_AtomicGet(&R.on)) || !SDL_AtomicGet(&P.found) || !in_game() || (int16_t)g.palcount >= 0) return;
+    if ((!SDL_AtomicGet(&P.on) && !SDL_AtomicGet(&R.on) && !SDL_AtomicGet(&LGO.on)) || !SDL_AtomicGet(&P.found) || !in_game() || (int16_t)g.palcount >= 0) return;
     shown list[16];
     int n = 0;
     unsigned sat0 = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
@@ -470,6 +627,7 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
         fprintf(stderr, "\n");
     }
     if (w > 320 || h > 240) return;
+    logo_draw(vdp, px, pitch_px, pic, w, h, pitch);
     static mdrt_vdp scratch;
     if (!SDL_AtomicGet(&P.on)) n = 0;
     if (n <= 0) { ref_draw(vdp, pic, w, h, pitch, list, 0); return; }

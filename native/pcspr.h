@@ -7,6 +7,8 @@ void pcspr_wait(void);                     /* (headless) until the search ends *
 int pcspr_searched(void);
 int pcspr_found(void);                     /* 1 when the sprites were read (after the search) */
 void pcspr_ref_set(int on);               /* the Game page: the referee on the ice (NHL 95 PC's frames) */
+void pcspr_logo_set(int on);              /* the Game page: NHL 95 PC's centre ice logos in place of the cartridge's */
+int pcspr_logos(void);                    /* 1 when the disc had them (after the search) */
 void pcspr_set(int on);                    /* the Game page: 0 off (the cartridge's sprites), 1 on (the PC's, the cartridge's where the PC has none) */
 struct mdrt_vdp;
 void pcspr_present(const struct mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch);   /* draw the PC's sprites over a finished picture (px: its VDP colours) */
