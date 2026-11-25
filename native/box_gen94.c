@@ -25,7 +25,7 @@ static int it_node[NIT], it_par[NIT], it_saved[NIT], laid;
 static float it_l[NIT][9], it_w[NIT][9];         /* each one's pose in the case (in its parent, and in the world) */
 /* the stage: dark ground with a pool of light, and the closed box's blurry reflection in it (after the game's TV commercial) */
 static int nfloorA = -1, nfloorB = -1, nrefl = -1;
-#define TV_DIST 58.0f                       /* the camera in front of the TV screen */
+#define TV_DIST 42.0f                       /* the camera in front of the TV screen */
 static float lk[3];                              /* where the camera looks on the desk (tweened) */
 #define CASE_W 5.03f
 #define CASE_H 7.02f
