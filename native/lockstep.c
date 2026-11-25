@@ -380,6 +380,7 @@ volatile unsigned native_menu_calls;                      /* HandleMenuInput / R
 static volatile int menu_kind;                            /* 1 the pause menu, 2 the setup screen */
 static volatile int in_readsetup;                       /* inside ReadSetupPads (it waits for a pad press inside) */
 int native_menu_waiting(void) { return in_readsetup; }
+int native_menu_kind(void) { return menu_kind; }
 static int pause_x[4], pause_y[4], pause_n, setup_d7 = -1, in_moveframe;
 
 /* the current menu's rows as rectangles on the 320x224 picture: -> kind (0 none) */
@@ -387,6 +388,34 @@ int native_menu_rows(int rect[][4], int max, int *n, int *sel, int *lr)
 {
     int k = menu_kind;
     *lr = 0;
+    if (k == 3) {                                             /* the line editor: a cell for each slot of the lines on show */
+        int c = 0, cur = -1;
+        for (int line = 0; line <= 6; line++) {
+            if (!(g.redrawicons & (1u << line))) continue;
+            const uint8_t *pos = rom_ptr(SYM_LineIconPosTable + (uint32_t)(6 * line) - (g.OptLine ? 6u : 0u));
+            int slots = (int16_t)rd16(pos + lipslots) + 1;
+            for (int j = 0; j < slots && c < max; j++, c++) {
+                if ((line << 3) + 1 + j == (int)(g.TestList[0] & 0xFF)) cur = c;
+                rect[c][0] = (int16_t)rd16(pos) * 8 - 32; rect[c][1] = (int16_t)rd16(pos + lipy) * 8 + 12 + 16 * j; rect[c][2] = 12 * 8; rect[c][3] = 16;
+            }
+        }
+        *n = c; *sel = cur;
+        return cur >= 0 ? 3 : 0;
+    }
+    if (k == 5) {                                             /* the playoff tree: one area, left / right of its middle scrolls a page */
+        *n = 1; *sel = 0; *lr = 1;
+        rect[0][0] = 0; rect[0][1] = 0; rect[0][2] = 320; rect[0][3] = 224;
+        return 5;
+    }
+    if (k == 4) {                                             /* the line editor's player list: six rows from the window's top */
+        int first = (int16_t)g.PlayerScrollCtr, last = (int16_t)g.screentimer, cnt = last - first + 1;
+        if (cnt > 6) cnt = 6;
+        *n = cnt < max ? cnt : max;
+        *sel = (int16_t)g.VertLineScrolling - first;
+        if (*n <= 0 || *sel < 0 || *sel >= *n) return 0;
+        for (int i = 0; i < *n; i++) { rect[i][0] = 0; rect[i][1] = 23 + 8 * i; rect[i][2] = 320; rect[i][3] = 8; }
+        return 4;
+    }
     if (k == 1) {
         int top = (int16_t)g.menu.top, item = (int16_t)g.menu.item;
         *n = pause_n < max ? pause_n : max;
@@ -434,6 +463,9 @@ void NI __cyg_profile_func_enter(void *fn, void *site)
     else if (fn == (void *)HandleMenuInput) { menu_kind = 1; native_menu_calls++; }
     else if (fn == (void *)ReadSetupPads) { menu_kind = 2; in_readsetup++; native_menu_calls++; }
     else if (fn == (void *)waitxsr || fn == (void *)Pausemode) { menu_kind = 1; in_readsetup++; native_menu_calls++; }
+    else if (fn == (void *)LineEditorMenu) { menu_kind = 3; in_readsetup++; native_menu_calls++; }
+    else if (fn == (void *)SelectLinePlayer) { menu_kind = 4; in_readsetup++; native_menu_calls++; }
+    else if (fn == (void *)PlayoffScreen) { menu_kind = 5; in_readsetup++; native_menu_calls++; }
     else if (fn == (void *)Pausemode_Pmenu) pause_n = 0;
     else if (fn == (void *)PrintMenuItem) { if (pause_n < 4) { pause_x[pause_n] = (int16_t)g.printx; pause_y[pause_n] = (int16_t)g.printy; pause_n++; } }
     else if (fn == (void *)MoveMenuFrame) in_moveframe = 1;
@@ -457,7 +489,7 @@ void NI __cyg_profile_func_exit(void *fn, void *site)
 {
     (void)site;
     if (native_in_vblank()) return;
-    if ((fn == (void *)ReadSetupPads || fn == (void *)waitxsr || fn == (void *)Pausemode) && in_readsetup > 0) in_readsetup--;
+    if ((fn == (void *)ReadSetupPads || fn == (void *)waitxsr || fn == (void *)Pausemode || fn == (void *)LineEditorMenu || fn == (void *)SelectLinePlayer || fn == (void *)PlayoffScreen) && in_readsetup > 0) in_readsetup--;
     if (clock_original()) clock_on_exit(routine_of(fn));
     if (!tracking) return;
     (void)fn;
