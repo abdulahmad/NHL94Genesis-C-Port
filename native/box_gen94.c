@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
-enum { S_CLOSED, S_OPEN, S_DESK, S_PACK };
+enum { S_CLOSED, S_OPEN, S_DESK, S_PACK, S_POSTER };
 static int st, ready;
 static int caseG, cart, tv, tvScreen, tvKnob, con, tap, cspine, ccover, cmanual, cseat, nslot, nsw, nled, nseat;
 static float opn;
@@ -18,7 +18,11 @@ static int tv_tex = -1, tv_mode = -1, led_mat = -1, tvPower = -1, tvRemote = -1;
 /* the pack-ins: hidden in the case until "Pack-ins" lays them out in front of it; each opens front and back */
 #define NPK 9
 static int pk[NPK];
-static float pk_home[NPK][3], case_home[3];
+static float case_home[3];
+/* everything in the case that can be laid out: the nine pack-ins, then the manual and the cartridge */
+#define NIT (NPK + 2)
+static int it_node[NIT], it_par[NIT], it_saved[NIT], laid;
+static float it_l[NIT][9], it_w[NIT][9];         /* each one's pose in the case (in its parent, and in the world) */
 /* the stage: dark ground with a pool of light, and the closed box's blurry reflection in it (after the game's TV commercial) */
 static int nfloorA = -1, nfloorB = -1, nrefl = -1;
 static float lk[3];                              /* where the camera looks on the desk (tweened) */
@@ -29,7 +33,6 @@ static float lk[3];                              /* where the camera looks on th
 static const char *pk_key[NPK] = { "pk4way", "pkFifa", "pkPoster", "pkHint", "pkReg", "pkWear", "pkOffer", "pkCard", "pkCap" };
 static const char *pk_name[NPK] = { "EA 4 Way Play card", "FIFA International Soccer card", "EA SPORTS poster", "NHL '94 Hint Cards pack",
     "Registration card", "EA SPORTS-WEAR card", "Hint Cards order card", "Hint card: Brad Shaw", "EA SPORTS milk cap" };
-static const float pk_w[NPK] = { 3.9f, 3.9f, 4.13f, 2.7f, 5.75f, 5.75f, 2.5f, 2.5f, 1.84f };
 
 /* ---- the TV's picture: 1280 x 960 on the glass, the MiSTer JVC D-Series shadow mask (mister/Shadow_Masks) over it,
  * the tube's turn-on (a bright line that opens to the full picture) and turn-off (the picture folds to a line, then a dot) ---- */
@@ -313,13 +316,14 @@ static void stage_frame(void)
     fa->pos[0] = wp[0]; fa->pos[1] = fy; fa->pos[2] = wp[2];
     float k = (1 - opn * 3) * (1 - fabsf(rx) * 3);
     if (k < 0) k = 0;
-    rf->vis = !desk && k > .01f && st != S_PACK;
+    rf->vis = !desk && k > .01f && st != S_PACK && st != S_POSTER;
     rf->opacity = k;
     rf->pos[0] = wp[0]; rf->pos[1] = 2 * fy - wp[1]; rf->pos[2] = wp[2];
     rf->rot[0] = -c->rot[0]; rf->rot[1] = c->rot[1]; rf->rot[2] = -c->rot[2];
     rf->scale[0] = c->scale[0]; rf->scale[1] = -c->scale[1]; rf->scale[2] = c->scale[2];
 }
 
+static void poster_make(void);
 static void init(void)
 {
     if (ready) return;
@@ -334,6 +338,7 @@ static void init(void)
     for (int i = 0; i < NPK; i++) { char n[8]; snprintf(n, sizeof n, "pk%d", i); pk[i] = bx_node(n); }
     mask_load();
     stage_make();
+    poster_make();
     bx_bg_paint = stage_bg;
     for (int i = 0; i < BX_S->nmeshes; i++) if (BX_S->meshes[i].node == tvScreen) {
         r3_mat m = BX_S->mats[BX_S->meshes[i].mat]; m.map = tv_tex; m.type = 'B'; m.col[0] = m.col[1] = m.col[2] = 1;
@@ -381,10 +386,11 @@ static void set_open(float t) { bx_n(cspine)->rot[1] = -PI_F / 2 * t; bx_n(ccove
 
 static void caption(void)
 {
-    if (st == S_PACK) { snprintf(BX.title, sizeof BX.title, "Pack-ins"); bx_say("<b>What else was in the box.</b> Pick one to read it."); return; }
+    if (st == S_POSTER) { snprintf(BX.title, sizeof BX.title, "The poster"); bx_say("<b>The poster, unfolded.</b> Flip it over for the catalog, or pick it for a close look."); return; }
+    if (st == S_PACK) { snprintf(BX.title, sizeof BX.title, "In the box"); bx_say(G.out ? "<b>Everything that came in the box.</b> Pick an item to look at it." : "<b>Everything that came in the box.</b> To play, pick the cartridge."); return; }
     snprintf(BX.title, sizeof BX.title, "%s", st == S_DESK ? "Set up the system" : "Box");
     if (st == S_CLOSED) bx_say("<b>The box.</b> Drag to spin it, pick it to open.");
-    else if (st == S_OPEN) bx_say(G.out ? "<b>Your box.</b> Back returns to the game." : "<b>Manual on the left, cartridge on the right.</b>");
+    else if (st == S_OPEN) bx_say(G.out ? "<b>Your box.</b> Pick the bundle to lay everything out." : "<b>Manual and pack-ins on the left, cartridge on the right.</b> Pick either to lay everything out.");
     else bx_say("<b>Set up the system.</b> Put the cartridge in the console.");
 }
 static void open_case(int instant)
@@ -401,49 +407,268 @@ static void open_case(int instant)
 }
 static void open_now(int a) { (void)a; open_case(1); }
 
-/* the pack-ins come out of the lid (from behind the manual) and lie in two rows in front of the camera, a little smaller than life */
-static void pk_hide(int a) { (void)a; for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_n(pk[i])->vis = 0; }
-static void pk_out(int a)
+/* ---- the bundle: the pack-ins sit in the lid behind the manual, their edges showing round it; picking the bundle lays
+ * everything out in two rows in front of the camera (a little smaller than life), the manual and the cartridge too ---- */
+static void pose_get(int node, float o[9]) { r3_node *n = bx_n(node); memcpy(o, n->pos, 12); memcpy(o + 3, n->rot, 12); memcpy(o + 6, n->scale, 12); }
+static void pose_set(int node, const float o[9]) { r3_node *n = bx_n(node); memcpy(n->pos, o, 12); memcpy(n->rot, o + 3, 12); memcpy(n->scale, o + 6, 12); }
+/* the pack-ins tucked behind the manual: across, up, turn (about the lid's normal), and a quarter turn for the two wide cards */
+static void stack_pose(void)
 {
-    (void)a;
-    float m[3]; r3_world_pos(BX_S, cmanual, m);
-    static const int row[2][5] = { { 0, 1, 2, 3, -1 }, { 4, 5, 6, 7, 8 } };
-    const float sc = .6f, gap = .35f, ry[2] = { 2.25f, -2.3f };
+    static const float off[NPK][4] = {
+        {  .12f,  .30f, -.10f, 0 },      /* 4 Way Play */
+        { -.12f,  .34f,  .12f, 0 },      /* FIFA */
+        {  .10f, -.30f,  .07f, 0 },      /* poster */
+        { -.55f, 1.25f, -.18f, 0 },      /* hint cards pack */
+        {  .22f,  .10f,  .10f, 1 },      /* registration card */
+        { -.22f, -.34f, -.11f, 1 },      /* sports wear */
+        { 1.00f, -1.55f, -.30f, 0 },     /* hint cards offer */
+        { -.95f, 1.50f,  .30f, 0 },      /* player card */
+        { 1.36f,  .9f,  0, 0 },          /* milk cap */
+    };
+    const float *m = bx_n(cmanual)->pos;
+    for (int i = 0; i < NPK; i++) {
+        if (pk[i] < 0) continue;
+        bx_parent(pk[i], bx_n(cmanual)->parent);
+        r3_node *n = bx_n(pk[i]);
+        /* seen from inside the lid (its -z side): turned about y to face that way, so across runs the other way */
+        bx_set3(n->pos, m[0] - off[i][0], m[1] + off[i][1], -.012f - .008f * i);
+        bx_set3(n->rot, 0, PI_F, off[i][2] + (off[i][3] > 0 ? PI_F / 2 : 0));
+        bx_set3(n->scale, 1, 1, 1);
+        n->vis = 1;
+    }
+}
+/* back in the case at once (the desk's Back, a new opening) */
+static void poster_away(void);
+static void lay_restore(void)
+{
+    poster_away();
+    for (int i = 0; i < NIT; i++) if (it_saved[i]) { bx_parent(it_node[i], it_par[i]); pose_set(it_node[i], it_l[i]); it_saved[i] = 0; }
+    if (laid) bx_set3(bx_n(caseG)->pos, case_home[0], case_home[1], case_home[2]);
+    laid = 0;
+}
+static void lay_restore_cb(int a) { (void)a; if (st == S_OPEN) lay_restore(); }
+static const float it_wd[NIT] = { 3.9f, 3.9f, 4.13f, 2.7f, 5.75f, 5.75f, 2.5f, 2.5f, 1.84f, 4.2f, 3.86f };
+#define LAY_Z 4.0f
+static void lay_out(void)
+{
+    if (st != S_OPEN || laid) return;
+    st = S_PACK; laid = 1; bx_sfx(SFX_SLIDE, 0);
+    static const int row[2][6] = { { 9, 10, 0, 1, 2, 3 }, { 4, 5, 6, 7, 8, -1 } };
+    const float sc = .6f, gap = .42f, ry[2] = { 1.85f, -2.8f };
     float *cm = BX_S->cam;
-    r3_node *cg = bx_n(caseG);   /* the case sinks back and down so the spread reads on its own */
-    case_home[0] = cg->pos[0]; case_home[1] = cg->pos[1]; case_home[2] = cg->pos[2];
-    bx_tw3(cg->pos, cg->pos[0], cg->pos[1] - 14, cg->pos[2], 600, 0);
+    r3_update(BX_S);
+    it_node[NPK] = cmanual; it_node[NPK + 1] = cart;
+    for (int i = 0; i < NPK; i++) it_node[i] = pk[i];
+    int order = 0;
     for (int r = 0; r < 2; r++) {
-        float tw = 0; int n = 0;
-        for (int k = 0; k < 5 && row[r][k] >= 0; k++) { tw += pk_w[row[r][k]] * sc; n++; }
+        float tw = 0; int n = 0, use[6];
+        for (int k = 0; k < 6 && row[r][k] >= 0; k++) {
+            int i = row[r][k];
+            if (it_node[i] < 0 || !r3_visible(BX_S, it_node[i])) continue;      /* the cartridge is in the system: it is not in the box */
+            use[n++] = i; tw += it_wd[i] * sc;
+        }
         tw += gap * (n - 1);
         float x = cm[0] - tw / 2;
-        for (int k = 0; k < n; k++) {
-            int i = row[r][k]; r3_node *p = pk[i] >= 0 ? bx_n(pk[i]) : NULL;
-            if (!p) continue;
-            float w = pk_w[i] * sc;
-            pk_home[i][0] = m[0]; pk_home[i][1] = m[1]; pk_home[i][2] = m[2] - .3f;
-            bx_set3(p->pos, m[0], m[1], m[2] - .3f); bx_set3(p->rot, 0, .3f, 0); bx_set3(p->scale, .4f, .4f, .4f); p->vis = 1;
-            bx_tw3(p->pos, x + w / 2, ry[r], 4, 700, i * 70.f);
-            bx_tw3(p->rot, 0, 0, i == 8 ? 0 : (i & 1 ? .025f : -.025f), 700, i * 70.f);
-            bx_tw3(p->scale, sc, sc, sc, 700, i * 70.f);
+        for (int k = 0; k < n; k++, order++) {
+            int i = use[k], node = it_node[i];
+            it_par[i] = bx_n(node)->parent; pose_get(node, it_l[i]); it_saved[i] = 1;
+            bx_attach(node, -1); pose_get(node, it_w[i]);
+            r3_node *p = bx_n(node);
+            float w = it_wd[i] * sc, d = order * 70.f;
+            bx_tw3(p->pos, x + w / 2, ry[r], LAY_Z, 800, d);
+            /* the manual lies face down in the lid: it is laid out cover up (a half turn, however the angles spell it) */
+            if (i == NPK && fabsf(p->rot[0]) > 1) bx_tw3(p->rot, p->rot[0] < 0 ? -PI_F : PI_F, 0, p->rot[2] < 0 ? -PI_F : PI_F, 800, d);
+            else bx_tw3(p->rot, 0, i == NPK ? (p->rot[1] < 0 ? -PI_F : PI_F) : 0, i >= NPK - 1 ? 0 : (i & 1 ? .025f : -.025f), 800, d);
+            bx_tw3(p->scale, sc, sc, sc, 800, d);
             x += w + gap;
         }
     }
+    r3_node *cg = bx_n(caseG);   /* the empty case sinks out of the picture */
+    case_home[0] = cg->pos[0]; case_home[1] = cg->pos[1]; case_home[2] = cg->pos[2];
+    bx_tw3(cg->pos, cg->pos[0], cg->pos[1] - 14, cg->pos[2], 700, 250);
 }
-static void pk_in(void)
+static void lay_in(void)
 {
-    r3_node *cg = bx_n(caseG);
-    bx_tw3(cg->pos, case_home[0], case_home[1], case_home[2], 600, 200);
-    for (int i = 0; i < NPK; i++) if (pk[i] >= 0) {
-        r3_node *p = bx_n(pk[i]);
-        bx_tw3(p->pos, pk_home[i][0], pk_home[i][1], pk_home[i][2], 500, (NPK - 1 - i) * 40.f);
-        bx_tw3(p->scale, .4f, .4f, .4f, 500, (NPK - 1 - i) * 40.f);
+    st = S_OPEN; bx_sfx(SFX_SLIDE, 0);
+    bx_tw3(bx_n(caseG)->pos, case_home[0], case_home[1], case_home[2], 600, 0);
+    for (int i = 0; i < NIT; i++) if (it_saved[i]) {
+        r3_node *p = bx_n(it_node[i]);
+        bx_tw3(p->pos, it_w[i][0], it_w[i][1], it_w[i][2], 650, 150);
+        bx_tw3(p->rot, it_w[i][3], it_w[i][4], it_w[i][5], 650, 150);
+        bx_tw3(p->scale, it_w[i][6], it_w[i][7], it_w[i][8], 650, 150);
     }
-    bx_after(500 + NPK * 40, pk_hide, 0);
+    bx_after(830, lay_restore_cb, 0);
+}
+
+/* ---- the poster: twelve panels (four across, three down) hinged on its creases, folded to one panel in the box. Each panel's
+ * picture comes from the photos of the whole poster unfolded (pkPosterOpenF: "If it's in the game", pkPosterOpenB: the catalog),
+ * cut along the creases as they lie in each photo. Unfolded, the creases stay a little bent, as the paper does. ---- */
+#define PW 4.13f
+#define PH 5.78f
+#define PT .015f
+#define P_SC .5f
+static int post = -1, pH[3], pP[3][4], post_tex[2] = { -1, -1 }, post_have, post_flip, post_busy;
+static float post_home[9];
+/* where the creases cross the photo's edges: the three upright ones at its top and bottom, the two level ones at its left and right */
+static const float f_cx[2][5] = { { 0, .253f, .494f, .751f, 1 }, { 0, .255f, .502f, .751f, 1 } }, f_ry[2][4] = { { 0, .335f, .663f, 1 }, { 0, .331f, .666f, 1 } };
+static const float c_cx[2][5] = { { 0, .265f, .518f, .774f, 1 }, { 0, .270f, .529f, .770f, 1 } }, c_ry[2][4] = { { 0, .340f, .677f, 1 }, { 0, .340f, .677f, 1 } };
+/* a place on the paper (0..1 across, 0..1 down) to its place in a photo */
+static void crease_uv(const float cx[2][5], const float ry[2][4], float X, float Y, float *u, float *v)
+{
+    float fx = X * 4, fy = Y * 3;
+    int i = (int)fx, j = (int)fy;
+    if (i > 3) i = 3;
+    if (j > 2) j = 2;
+    if (i < 0) i = 0;
+    if (j < 0) j = 0;
+    float x0 = cx[0][i] + (cx[1][i] - cx[0][i]) * Y, x1 = cx[0][i + 1] + (cx[1][i + 1] - cx[0][i + 1]) * Y;
+    float y0 = ry[0][j] + (ry[1][j] - ry[0][j]) * X, y1 = ry[0][j + 1] + (ry[1][j + 1] - ry[0][j + 1]) * X;
+    *u = x0 + (x1 - x0) * (fx - i); *v = y0 + (y1 - y0) * (fy - j);
+}
+/* one side of panel (row r from the top, column c from the left, seen from the front): a 4 x 4 grid so the picture follows the creases */
+static void poster_face(int node, int mat, float x0, float x1, int r, int c, int face)
+{
+    enum { N = 4 };
+    int me = r3_mesh_quad(BX_S, node, mat, x0, x1, 0, PH, 0, face, 0);
+    if (me < 0) return;
+    float *v = (float *)malloc((N + 1) * (N + 1) * 8 * sizeof(float));
+    uint32_t *ix = (uint32_t *)malloc(N * N * 6 * sizeof(uint32_t));
+    if (!v || !ix) { free(v); free(ix); return; }
+    for (int j = 0; j <= N; j++)
+        for (int i = 0; i <= N; i++) {
+            float a = (float)i / N, b = (float)j / N, *q = v + (j * (N + 1) + i) * 8, X = (c + a) / 4, Y = (r + 1 - b) / 3, u, t;
+            q[0] = x0 + (x1 - x0) * a; q[1] = PH * b; q[2] = 0; q[3] = 0; q[4] = 0; q[5] = face < 0 ? -1.f : 1.f;
+            if (face > 0) crease_uv(f_cx, f_ry, X, Y, &u, &t); else crease_uv(c_cx, c_ry, 1 - X, Y, &u, &t);
+            q[6] = u; q[7] = 1 - t;
+        }
+    int k = 0;
+    for (int j = 0; j < N; j++)
+        for (int i = 0; i < N; i++) {
+            uint32_t p = (uint32_t)(j * (N + 1) + i), e[6] = { p, p + 1, p + N + 2, p, p + N + 2, p + N + 1 };
+            if (face < 0) { e[1] = p + N + 2; e[2] = p + 1; e[4] = p + N + 1; e[5] = p + N + 2; }
+            memcpy(ix + k, e, sizeof e); k += 6;
+        }
+    r3_mesh *q = &BX_S->meshes[me];
+    free(q->v); free(q->idx);
+    q->v = v; q->idx = ix; q->nv = (N + 1) * (N + 1); q->ni = N * N * 6;
+}
+static void poster_make(void)
+{
+    int mat[2];
+    for (int k = 0; k < 2; k++) {
+        uint32_t *px = (uint32_t *)malloc(4 * sizeof(uint32_t));
+        if (px) for (int i = 0; i < 4; i++) px[i] = 0xff202020u;
+        post_tex[k] = r3_tex_add(BX_S, px, 2, 2);
+        r3_mat m; memset(&m, 0, sizeof m);
+        m.type = 'L'; m.col[0] = m.col[1] = m.col[2] = 1; m.map = post_tex[k]; m.opacity = 1; m.depth_write = 1; m.visible = 1; m.bright = 1;
+        mat[k] = r3_mat_add(BX_S, &m);
+    }
+    post = r3_node_add(BX_S, -1, "poster");
+    if (post < 0) return;
+    pH[2] = r3_node_add(BX_S, post, "posterRow2");
+    pH[1] = r3_node_add(BX_S, pH[2], "posterRow1");
+    pH[0] = r3_node_add(BX_S, pH[1], "posterRow0");
+    for (int r = 0; r < 3; r++) {
+        pP[r][2] = r3_node_add(BX_S, pH[r], "posterP2");
+        pP[r][3] = r3_node_add(BX_S, pP[r][2], "posterP3");
+        pP[r][1] = r3_node_add(BX_S, pP[r][2], "posterP1");
+        pP[r][0] = r3_node_add(BX_S, pP[r][1], "posterP0");
+    }
+    for (int r = 0; r < 3; r++) for (int c = 0; c < 4; c++) if (pH[r] < 0 || pP[r][c] < 0) { post = -1; return; }
+    bx_n(pH[2])->pos[1] = -PH / 2; bx_n(pH[1])->pos[1] = PH; bx_n(pH[0])->pos[1] = PH;
+    for (int r = 0; r < 3; r++) {
+        bx_n(pP[r][3])->pos[0] = PW / 2; bx_n(pP[r][1])->pos[0] = -PW / 2; bx_n(pP[r][0])->pos[0] = -PW;
+        static const float x0[4] = { -PW, -PW, -PW / 2, 0 };
+        for (int c = 0; c < 4; c++) { poster_face(pP[r][c], mat[0], x0[c], x0[c] + PW, r, c, 1); poster_face(pP[r][c], mat[1], x0[c], x0[c] + PW, r, c, -1); }
+    }
+    bx_n(post)->vis = 0;
+}
+static void pv(float *v, float to, float ms, float delay) { if (ms <= 0) *v = to; else bx_tw1(v, to, ms, delay); }
+/* fold (the columns behind the third one, then the rows behind the bottom one) or open out, the creases left a little bent */
+static void poster_cols(int fold, float ms, float delay)
+{
+    for (int r = 0; r < 3; r++) {
+        pv(&bx_n(pP[r][3])->rot[1], fold ? PI_F : .15f, ms, delay);   pv(&bx_n(pP[r][3])->pos[2], fold ? -PT : 0, ms, delay);
+        pv(&bx_n(pP[r][1])->rot[1], fold ? -PI_F : -.15f, ms, delay); pv(&bx_n(pP[r][1])->pos[2], fold ? -2 * PT : 0, ms, delay);
+        pv(&bx_n(pP[r][0])->rot[1], fold ? PI_F : .19f, ms, delay);   pv(&bx_n(pP[r][0])->pos[2], fold ? PT : 0, ms, delay);
+    }
+}
+static void poster_rows(int fold, float ms, float delay)
+{
+    pv(&bx_n(pH[1])->rot[0], fold ? -PI_F : -.11f, ms, delay); pv(&bx_n(pH[1])->pos[2], fold ? -7 * PT : 0, ms, delay);
+    pv(&bx_n(pH[0])->rot[0], fold ? PI_F : .15f, ms, delay);   pv(&bx_n(pH[0])->pos[2], fold ? PT : 0, ms, delay);
+}
+static int poster_load(void)
+{
+    static const char *key[2] = { "pkPosterOpenF", "pkPosterOpenB" };
+    if (post_have) return post_have > 0;
+    post_have = -1;
+    if (post < 0 || !bx_art_exists(key[0]) || !bx_art_exists(key[1])) return 0;
+    for (int k = 0; k < 2; k++) {
+        r3_tex *t = bx_art(key[k]);
+        if (!t || !t->nlv || t->w < 1 || t->h < 1) return 0;
+        uint32_t *px = (uint32_t *)malloc((size_t)t->w * t->h * 4);
+        if (!px) return 0;
+        memcpy(px, t->lv[0], (size_t)t->w * t->h * 4);
+        r3_tex_set(&BX_S->texs[post_tex[k]], px, t->w, t->h);
+    }
+    post_have = 1;
+    return 1;
 }
 static void caption(void);
-static void pk_btn(int a) { (void)a; if (st != S_OPEN) return; st = S_PACK; bx_sfx(SFX_CLICK, 0); pk_out(0); caption(); }
+static void pk_read(int i);
+static void poster_ready(int a) { (void)a; post_busy = 0; }
+static void poster_open(void)
+{
+    if (!poster_load()) { pk_read(2); return; }
+    st = S_POSTER; post_flip = 0; post_busy = 1; bx_sfx(SFX_SLIDE, 0);
+    for (int i = 0; i < NIT; i++) if (it_saved[i]) bx_n(it_node[i])->vis = 0;
+    pose_get(pk[2], post_home);
+    if (post_home[2] > LAY_Z) post_home[2] = LAY_Z;
+    pose_set(post, post_home);
+    poster_cols(1, 0, 0); poster_rows(1, 0, 0);
+    r3_node *p = bx_n(post);
+    p->vis = 1;
+    float *cm = BX_S->cam;
+    bx_tw3(p->pos, cm[0] + PW / 2 * P_SC, -.45f - PH * P_SC, LAY_Z, 800, 0);
+    bx_tw3(p->rot, 0, 0, 0, 800, 0);
+    bx_tw3(p->scale, P_SC, P_SC, P_SC, 800, 0);
+    poster_rows(0, 800, 500); poster_cols(0, 900, 1200);
+    bx_after(2100, poster_ready, 0);
+    caption();
+}
+static void poster_away(void)
+{
+    if (post >= 0) bx_n(post)->vis = 0;
+    for (int i = 0; i < NIT; i++) if (it_saved[i]) bx_n(it_node[i])->vis = 1;
+    post_busy = 0;
+}
+static void poster_closed(int a) { (void)a; if (st != S_POSTER) return; poster_away(); st = S_PACK; caption(); }
+static void poster_close(void)
+{
+    if (post_busy) return;
+    post_busy = 1; bx_sfx(SFX_SLIDE, 0);
+    r3_node *p = bx_n(post);
+    poster_cols(1, 700, 0); poster_rows(1, 650, 600);
+    bx_tw3(p->pos, post_home[0], post_home[1], post_home[2], 550, 1100);
+    bx_tw3(p->rot, post_home[3], post_home[4], post_home[5], 550, 1100);
+    bx_tw3(p->scale, post_home[6], post_home[7], post_home[8], 550, 1100);
+    bx_after(1700, poster_closed, 0);
+}
+static void poster_flip(int a)
+{
+    (void)a;
+    if (st != S_POSTER || post_busy) return;
+    post_flip = !post_flip; bx_sfx(SFX_SLIDE, 0);
+    r3_node *p = bx_n(post);
+    bx_tw1(&p->rot[1], post_flip ? PI_F : 0, 800, 0);
+    bx_tw1(&p->pos[0], BX_S->cam[0] + (post_flip ? -1 : 1) * PW / 2 * P_SC, 800, 0);
+}
+static void poster_look(void)
+{
+    static const char *k[2] = { "pkPosterOpenF", "pkPosterOpenB" };
+    bx_view_open_keys("EA SPORTS poster", k, 2, 0, NULL);
+}
 static void pk_read(int i)
 {
     static char kf[24], kb[24]; const char *k[2] = { kf, kb };
@@ -474,6 +699,7 @@ static void to_case(int a)
 {
     (void)a;
     st = S_OPEN;
+    lay_restore();
     bx_cam_to(0, 1.2f, 23, 900);
     G.cart = 0;
     if (bx_n(cart)->parent != cseat) { bx_parent(cart, cseat); bx_set3(bx_n(cart)->pos, 0, 0, 0); bx_set3(bx_n(cart)->rot, 0, 0, 0); bx_set3(bx_n(cart)->scale, 1, 1, 1); }
@@ -536,7 +762,8 @@ static void enter(int mode)
     bx_n(cmanual)->vis = 1;
     bx_parent(cart, cseat); bx_n(cart)->vis = 0; bx_set3(bx_n(cart)->pos, 0, 0, 0); bx_set3(bx_n(cart)->rot, 0, 0, 0); bx_set3(bx_n(cart)->scale, 1, 1, 1);
     tv_on_t = tv_off_t = -1; bx_n(tvKnob)->rot[0] = 0;
-    for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_n(pk[i])->vis = 0;
+    lay_restore(); memset(it_saved, 0, sizeof it_saved); laid = 0;
+    stack_pose();
     tv_mode = -1; tv_on(); set_power(0);
     G.pads = count_pads();
     bx_cam(0, 2.4f, 21);
@@ -554,10 +781,26 @@ static void frame(float dt)
     G.pads = count_pads();
     bx_n(tap)->opacity = G.pads > 2 ? 1 : .28f;
     if (st == S_CLOSED || st == S_OPEN) {
-        if (st == S_OPEN) { bx_hot_node(cmanual, "Read the manual"); if (bx_n(cart)->vis && !G.cart) bx_hot_node(cart, "Take the cartridge"); }
+        if (st == S_OPEN && !laid) {
+            static const char *all = "Everything in the box: pick to lay it out";
+            bx_hot_node(cmanual, all);
+            for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_hot_node(pk[i], all);
+            if (bx_n(cart)->vis && !G.cart) bx_hot_node(cart, all);
+        }
         bx_hot_node(caseG, st == S_CLOSED ? "Open the box" : "");
     }
-    if (st == S_PACK) for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_hot_node(pk[i], pk_name[i]);
+    if (st == S_PACK) {
+        int hv = bx_hovered_node();
+        if (it_saved[NPK]) bx_hot_node(cmanual, "Manual: pick to read");
+        if (it_saved[NPK + 1]) bx_hot_node(cart, G.out ? "Cartridge" : "Cartridge: pick to put it in the system");
+        for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_hot_node(pk[i], pk_name[i]);
+        for (int i = 0; i < NIT; i++) if (it_saved[i]) {           /* the one under the pointer lifts a little */
+            float *z = &bx_n(it_node[i])->pos[2];
+            if (it_node[i] == hv && *z >= LAY_Z - .01f) *z = LAY_Z + .5f;
+            else if (*z > LAY_Z) *z = fmaxf(LAY_Z, *z - .04f * dt / 16.7f);
+        }
+    }
+    if (st == S_POSTER && !post_busy) bx_hot_node(post, "Poster: pick for a close look");
     if (st == S_DESK) {
         if (!G.cart) { bx_hot_node(cart, "Insert the cartridge"); bx_hot_node(nslot, "Insert the cartridge"); }
         bx_hot_node(tvKnob, "TV power"); if (tvRemote >= 0) bx_hot_node(tvRemote, "TV power (remote)"); bx_hot_node(nsw, "System power");
@@ -571,16 +814,17 @@ static void frame(float dt)
 static void back(void)
 {
     if (st == S_DESK) { bx_fade(to_case, 0); return; }
-    if (st == S_PACK) { st = S_OPEN; pk_in(); caption(); return; }
+    if (st == S_POSTER) { poster_close(); return; }
+    if (st == S_PACK) { lay_in(); caption(); return; }
     if ((st == S_OPEN && G.out) || (st == S_CLOSED && !BX.first)) { bx_done(); return; }
 }
 static void back_btn(int a) { (void)a; back(); }
 static void draw2d(void)
 {
     float u = BX_C.u, top = BX_C.sy + 1.4f * u;
-    if (!(st == S_CLOSED && BX.first) && !(st == S_OPEN && BX.first)) bx_button(BX_C.sx + 2 * u, top, (st == S_DESK || st == S_PACK) ? "< Back" : "< Back to the game", back_btn, 0, -1);
-    if (st == S_OPEN && pk[0] >= 0) bx_button(BX_C.sx + BX_C.sw - 2 * u, top + 4.2f * u, "Pack-ins", pk_btn, 0, 1);
+    if (!(st == S_CLOSED && BX.first) && !(st == S_OPEN && BX.first)) bx_button(BX_C.sx + 2 * u, top, st >= S_DESK ? "< Back" : "< Back to the game", back_btn, 0, -1);
     bx_text(BX_C.sx + BX_C.sw - 2 * u, top + 2.0f * u, 1.5f * u, 0xb5a58f, 255, BX.title, 0, 1);
+    if (st == S_POSTER) bx_button(BX_C.sx + 11 * u, top, post_flip ? "Flip to the front" : "Flip over", poster_flip, 0, -1);
     if (st == S_DESK) {
         const char *s[3] = { "Put the cartridge in the system", "Turn on the TV", "Turn on the system" };
         int d[3] = { G.cart, G.tv, G.sys };
@@ -601,10 +845,16 @@ static void activate(int node, float sx, float sy)
 {
     (void)sx; (void)sy;
     if (node == caseG) { if (st == S_CLOSED) open_case(0); return; }
+    if (st == S_OPEN) {
+        int in = node == cmanual || node == cart;
+        for (int i = 0; i < NPK; i++) if (node == pk[i]) in = 1;
+        if (in) { lay_out(); caption(); return; }
+    }
     if (node == cmanual) { open_manual(); return; }
-    for (int i = 0; i < NPK; i++) if (st == S_PACK && node == pk[i]) { pk_read(i); return; }
+    if (st == S_POSTER) { if (!post_busy && r3_is_under(BX_S, node, post)) poster_look(); return; }
+    for (int i = 0; i < NPK; i++) if (st == S_PACK && node == pk[i]) { if (i == 2) poster_open(); else pk_read(i); return; }
     if (node == cart) {
-        if (st == S_OPEN && !G.out) bx_fade(to_desk, 0);
+        if (st == S_PACK && !G.out) bx_fade(to_desk, 0);
         else if (st == S_DESK) insert_cart();
         else bx_say("The cartridge is already in the system. Back returns to the game.");
         return;
@@ -623,7 +873,7 @@ static void spine_mid(float o[3])
 }
 static void drag(int node, float dx, float dy)
 {
-    if (st == S_DESK || st == S_PACK) return;
+    if (st >= S_DESK) return;
     int t = caseG;                                          /* the cartridge turns with its case: it is not taken out to be turned */
     r3_node *n = bx_n(t);
     float a[3], b[3];
