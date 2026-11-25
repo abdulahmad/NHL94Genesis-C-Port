@@ -246,6 +246,8 @@ extern void (*cd_event_hook)(int ev, uint16_t n);
 /* (the same host) the player card's picture for team's roster player: 1 with what UnpackPicture would leave in buf (the
  * tile count word, 36 tiles) and 16 colours (big-endian words) for palette 2; NULL or 0: the cartridge's */
 extern int (*cd_picture_hook)(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32]);
+/* (the same host) B on team's roster player's card: his career (the Sega CD's), the game waiting until it is closed */
+extern void (*cd_career_hook)(uint16_t team, uint16_t player);
 void ReadJoyData(void);
 uint8_t ReadPad4Way1(void);                /* -> d0 */
 uint8_t ReadPad4Way2(void);

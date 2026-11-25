@@ -49,7 +49,7 @@ static struct {
     int clip_id, queue[8], nqueue;          /* its paragraph, and the ones waiting */
     SDL_atomic_t screens;                   /* the Opening screens row: 1 the disc's */
     SDL_atomic_t intro;                     /* the Intro movie row: 1 HOCKEY.SEG before the title */
-    SDL_atomic_t photos, session;           /* the Player photos row; a session's console (none then: the machines keep the same RAM) */
+    SDL_atomic_t photos, session, career;   /* the Player photos and Career stats rows; a session's console (none then: the machines keep the same RAM) */
     int intro_done;                         /* it played (once a run) */
     int screen;                             /* the cartridge's opening screen now (CD_EV_SCREEN), 0 none */
     int pic_of;                             /* the picture in pic (SEGACD_PIC_* + 1), 0 none */
@@ -116,6 +116,26 @@ static void plain(const struct RosterText *t, char *s, int cap)
     for (int i = 0; i < n && k < cap - 1 && t->s[2 + i]; i++) s[k++] = (char)t->s[2 + i];
     while (k && s[k - 1] == ' ') k--;
     s[k] = 0;
+}
+
+/* (cd_career_hook, set by the window: B on a card) */
+static int (*career_ending)(void);
+static void career_hook(uint16_t team, uint16_t player)
+{
+    if (!SDL_AtomicGet(&S.career) || SDL_AtomicGet(&S.session) || !segacd_disc()) return;
+    const struct RosterTeam *T = rosters_team(team);
+    if (player >= T->players) return;
+    char abbr[16], name[40];
+    plain(&T->abbr, abbr, sizeof abbr);
+    plain(&T->player[player].name, name, sizeof name);
+    segacd_career_show(S.cd, abbr, name, player < T->goalies, career_ending);
+}
+
+void segacd_set_career(int v, int (*ending)(void))
+{
+    SDL_AtomicSet(&S.career, v);
+    career_ending = ending;
+    cd_career_hook = career_hook;
 }
 
 static int photo_hook(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32])
