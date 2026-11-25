@@ -1103,9 +1103,20 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
                 else ob_pads_mouse_anchor(0, 0);
             }
         }
+        int opening = segacd_opening();
+        ob_pads_mouse_steps(!opening);                        /* (moving the mouse is not a press on the logos and the title) */
         for (int p = 0; p < MDRT_PADS; p++) {
             int src = seat_n ? (p < seat_n ? seat_pad[p] : -1) : p;       /* (after the select-sides screen the pads are the seated players') */
             SDL_AtomicSet(&F.buttons[p], src >= 0 ? (int)ob_pads_read(src) : 0);
+        }
+        {   /* a left click on the logos, the title and the license page leaves them, as a press of Start does (the movie takes its own) */
+            static int was_down;
+            static Uint32 click_until;
+            int down = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON_LMASK) != 0;
+            if (down && !was_down && opening && !host.overlay_open && !ob_screen_up()) click_until = SDL_GetTicks() + 60;
+            was_down = down;
+            if (click_until && SDL_GetTicks() < click_until) SDL_AtomicSet(&F.buttons[0], SDL_AtomicGet(&F.buttons[0]) | MDRT_PAD_START);
+            else click_until = 0;
         }
         segacd_movie_pause(hold_state && !(segacd_movie_playing() && !hold_other));   /* (the movie is a full-window screen itself: only something over it pauses it) */
         intro_tick();
