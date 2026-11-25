@@ -162,6 +162,11 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   `NHL '94 (USA).sfc` (or `.smc`) put beside the program (up to three folders below); without it the row says "(no NHL 94 SNES ROM found)". Nothing
   of the game changes (the hats have a random generator of their own), so states, replays and online play are the same with it on or off. Headless:
   `--hats ROM`; `HATS_DEMO=1` starts the hats at once, for looking at them.
+- **PC player sprites**: draws NHL 95 PC's skaters and goalies in place of the cartridge's, in the teams' PC colours, from the player's own
+  files (`000_049.PPV` ... `11001149.PPV`, `RINKPAL.QFS`, `HOMEPALS.BIN` and `AWAYPALS.BIN`, beside the program or on the NHL 95 PC disc image).
+  PC frame numbers are the cartridge's less one (less nine from the siren frames on), so where the PC has no matching frame (the cartridge's extra goalie
+  frames) the cartridge's sprite stays. The game is untouched, only the sprite table: states, replays and online play are the same on or off.
+  Headless: `--pc-sprites`.
 - **Pause for the announcer**: with the rink announcer, play waits after a goal, a penalty or a penalty shot until the announcer has had time to
   say it (the same fixed lengths on every machine, 95 PC's clips' about 6 s for a goal with an assist, 6 s a penalty, 7.5 s a penalty shot, with
   the time the replay and the face off set up already take counted), then the puck drops. Unlike the other rows here it is a game rule: the host's

@@ -87,6 +87,7 @@
 #include "announcer.h"
 #include "whiteice.h"
 #include "hats.h"
+#include "pcspr.h"
 #include "cardcolor.h"
 #include "wide.h"
 #include "rules.h"
@@ -603,6 +604,7 @@ static void write_ppm(const char *path)
         for (int x = 0; x < w; x++) pic[i * 320 + x] = screen_frame ? screen_px[i * 320 + x] : 0xFF000000u | mdrt_vdp_rgb(px[i * 320 + x], 1);
     if (!screen_frame) whiteice_present(pic, w, h, 320);
     if (!screen_frame) hats_present(pic, w, h, 320);
+    if (!screen_frame) pcspr_present(pic, w, h, 320);
     if (!screen_frame) cardcolor_present(v, pic, w, h, 320);   /* (--pc-photos) */
     int pitch = 320;
     const uint32_t *src = pic;
@@ -665,6 +667,8 @@ void native_frame_done(long frame, int wait)
 static FILE *wav;
 static int segacd_on;                                     /* --segacd-music / --segacd-crowd */
 static int announcer_find;
+static int pcspr_cli;                                    /* --pc-sprites: NHL 95 PC's skater sprites, found beside the program
+ */
 static const char *hats_rom;                              /* --hats FILE: the hat trick hats, from this NHL 94 SNES ROM */
 static const char *announcer_file;                        /* --announcer FILE: the rink announcer, from this XBRUCE2.VIV (its voice joins the --wav) */
 static int segacd_sfx_flag;                               /* --segacd-sfx: the disc's sound effects (rendered before the run starts) */
@@ -746,6 +750,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--announcer-find")) announcer_find = 1;   /* (looks beside the program as the window does, then says what it found) */
         else if (!strcmp(argv[i], "--hats") && i + 1 < argc) hats_rom = argv[++i];
         else if (!strcmp(argv[i], "--white-ice")) whiteice_set(1);
+        else if (!strcmp(argv[i], "--pc-sprites")) pcspr_cli = 1;
         else if (!strcmp(argv[i], "--announcer") && i + 1 < argc) announcer_file = argv[++i];
         else if (!strcmp(argv[i], "--segacd-music")) { segacd_on = 1; segacd_set_music(1); }
         else if (!strcmp(argv[i], "--segacd-crowd") && i + 1 < argc) { segacd_on = 1; segacd_set_crowd(atoi(argv[++i])); }
@@ -892,6 +897,7 @@ int main(int argc, char **argv)
         hats_set(1);
         hats_start();
     }
+    if (pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-sprites: no NHL 95 PC sprite files found\n"); return 2; } pcspr_set(1); }
     if (announcer_find) { announcer_start(); announcer_wait(); fprintf(stderr, "announcer found: %d\n", announcer_found()); return !announcer_found(); }
     if (announcer_file) {
         wav_rate = c.audio_rate ? c.audio_rate : 48000;

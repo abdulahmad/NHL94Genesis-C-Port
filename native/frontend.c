@@ -34,6 +34,7 @@
 #include "announcer.h"
 #include "whiteice.h"
 #include "hats.h"
+#include "pcspr.h"
 #include "cardcolor.h"
 #include "wide.h"
 
@@ -314,6 +315,7 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
         for (int x = 0; x < w; x++) pic[y * 320 + x] = 0xFF000000u | mdrt_vdp_rgb(px[y * pitch + x], MDRT_RGB_GPGX);
     if (w <= 320 && h <= 240) whiteice_present(pic, w, h, 320);                  /* (white ice, when on) */
     if (w <= 320 && h <= 240) hats_present(pic, w, h, 320);                      /* (the SNES's hat trick hats, when on) */
+    if (w <= 320 && h <= 240) pcspr_present(pic, w, h, 320);                     /* (NHL 95 PC's skater sprites, when on) */
     if (w <= 320 && h <= 240) cardcolor_present(mdrt_get_vdp(F.m), pic, w, h, 320);   /* (the players' photos in colour, when on) */
     int cd = w <= 320 && h <= 224 && segacd_present(pic, w, h);   /* (the Sega CD's opening screens, when they are on) */
     if (cd) { w = 320; h = 224; }
@@ -570,7 +572,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_WHITEICE (CD_ROWS + 16)                         /* (white ice: group 4) */
 #define CD_HATS (CD_ROWS + 17)                            /* (NHL 94 SNES's hat trick hats, its own ROM: group 4) */
 #define CD_WIDESCREEN (CD_ROWS + 18)                      /* (the picture 4:3 or 16:9: Overbar's host.widescreen, also on its Scaling page) */
-#define CD_OPTS (CD_ROWS + 19)
+#define CD_PCSPR (CD_ROWS + 19)                            /* (NHL 95 PC's skater sprites, its own files: group 4) */
+#define CD_OPTS (CD_ROWS + 20)
 static ob_game_opt cd_opts[CD_OPTS];
 /* the Widescreen rows (the Game page's, Overbar's Scaling page's) are one setting: the Scaling page's change shown on the Game page */
 static void wide_rows_sync(void)
@@ -616,6 +619,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_ANNOUNCER) { announcer_set(value); return; }
     if (index == CD_WHITEICE) { whiteice_set(value); return; }
     if (index == CD_HATS) { hats_set(value); return; }
+    if (index == CD_PCSPR) { pcspr_set(value); return; }
     if (index == CD_WIDESCREEN) { host.widescreen = value != 0; return; }   /* (hook_frame keeps the two rows alike) */
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
@@ -702,6 +706,18 @@ static void hats_no_file(void)
     cd_opts[CD_HATS].label = label;
 }
 
+/* the PC sprites' row says so when no NHL 95 PC sprite files were found */
+static void pcspr_no_file(void)
+{
+    static int done;
+    static char label[64];
+    if (done || !pcspr_searched()) return;
+    done = 1;
+    if (pcspr_found()) return;
+    snprintf(label, sizeof label, "%s (no NHL 95 PC files found)", cd_opts[CD_PCSPR].label);
+    cd_opts[CD_PCSPR].label = label;
+}
+
 /* the colour photos' row says so when neither PC game's portraits were found */
 static void pc_no_files(void)
 {
@@ -765,12 +781,15 @@ static void game_page_init(void)
     ob_game_set_help(game_help);
     announcer_start();
     hats_start();
+    pcspr_start();
+    cd_opts[CD_PCSPR] = (ob_game_opt){ "pc_sprites", "PC player sprites", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's skaters and goalies, the cartridge's where the PC has none) */
     cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 0, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
     cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
     static const char *const shape[2] = { "4:3", "16:9" };
     cd_opts[CD_WIDESCREEN] = (ob_game_opt){ "widescreen", "Widescreen", shape, 2, host.widescreen ? 1 : 0, 0, 4 };   /* (each machine its own: wide.c) */
     cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 0, 0, 4 };
         game_help[CD_ANNOUNCER] = "NHL 95 PC's rink announcer: goals, penalties, last minute.";
+        game_help[CD_PCSPR] = "NHL 95 PC's skaters and goalies, from your NHL 95 PC files.";
         game_help[CD_HATS] = "Hats thrown on the ice after a home skater's third goal.";
         game_help[CD_WHITEICE] = "The PC games' white rink instead of the pale cyan one.";
         game_help[CD_PCPHOTOS] = "Player photos in colour.";
@@ -790,6 +809,7 @@ static void game_page_init(void)
     pv[2][CD_HOLD] = 1;                                                        /* (on in Recommended, with the announcer it is for) */
     pv[1][CD_FIGHT] = 0;                                                       /* (NHL 93's fights: not the Sega CD's; off in Recommended too until tried) */
     pv[1][CD_HATS] = 0;                                                        /* (the SNES's: not the Sega CD's) */
+    pv[1][CD_PCSPR] = 0;                                                       /* (the PC games' look: not the Sega CD's; off in Recommended until tried) */
     pv[2][CD_HATS] = 1;                                                        /* (on in Recommended; it does nothing without the SNES ROM) */
     pv[1][CD_WHITEICE] = 0;                                                    /* (the PC games' look: not the Sega CD's; off in Recommended too, it is a taste) */
     pv[2][CD_ANNOUNCER] = 1;                                                  /* (on in Recommended; it does nothing without 95 PC's files) */
@@ -1077,6 +1097,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         cd_no_disc();
         pa_no_file();
         hats_no_file();
+        pcspr_no_file();
         pc_no_files();
         hold_other = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open;
         hold_state = hold_other || ob_screen_up();
