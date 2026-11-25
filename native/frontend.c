@@ -866,7 +866,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
         intro_tick();
-        segacd_career_tick();
+        segacd_career_tick(F.dev, F.rate, SDL_AtomicGet(&cd_dedither));
         hold_state = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open || ob_screen_up();
         ob_plat_present();
         ob_plat_frame_done(SDL_AtomicSet(&F.fresh, 0));

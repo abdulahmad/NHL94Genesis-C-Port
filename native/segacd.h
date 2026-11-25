@@ -83,4 +83,4 @@ typedef struct {
     segacd_career career;
 } segacd_card;
 int segacd_card_show(ob_cd *cd, const segacd_card *card, int (*ending)(void));
-void segacd_career_tick(void);           /* (the window's loop) */
+void segacd_career_tick(uint32_t dev, unsigned rate, int dedither);   /* (the window's loop: its audio device and rate, the movie de-dither) */
