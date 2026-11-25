@@ -28,6 +28,7 @@
 #include "native.h"
 #include "optionsui.h"
 #include "rules.h"
+#include "overbar/postfx.h"
 #include "segacd.h"
 
 #define SETTINGS "settings.ini"
@@ -524,7 +525,9 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_VOICE (CD_ROWS + 3)
 #define CD_SCREENS (CD_ROWS + 4)
 #define CD_INTRO (CD_ROWS + 5)
-static ob_game_opt cd_opts[CD_ROWS + 6];
+#define CD_DEDITHER (CD_ROWS + 6)
+static ob_game_opt cd_opts[CD_ROWS + 7];
+static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
 /* the option of the rules page with this key, or -1 */
@@ -543,6 +546,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_VOICE) { segacd_set_voice(value); return; }
     if (index == CD_SCREENS) { segacd_set_screens(value); return; }
     if (index == CD_INTRO) { segacd_set_intro(value); return; }
+    if (index == CD_DEDITHER) { SDL_AtomicSet(&cd_dedither, value); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -581,7 +585,8 @@ static void intro_hook(void)
 static void intro_tick(void)
 {
     int st = SDL_AtomicGet(&intro_state);
-    if (st == 1) SDL_AtomicSet(&intro_state, segacd_movie_start(segacd_disc(), "HOCKEY.SEG", F.dev, F.rate) ? 2 : 0);
+    if (st == 1) SDL_AtomicSet(&intro_state, segacd_movie_start(segacd_disc(), "HOCKEY.SEG", F.dev, F.rate, SDL_AtomicGet(&cd_dedither),
+                                                                        beside("segacd-intro.dedither")) ? 2 : 0);
     else if (st == 2 && !segacd_movie_tick()) SDL_AtomicSet(&intro_state, 0);
 }
 
@@ -604,9 +609,10 @@ static void game_page_init(void)
     cd_opts[CD_VOICE] = (ob_game_opt){ "cd_voice", "Ron Barr scouting voice", voice, 3, 0, 0, 3 };
     cd_opts[CD_SCREENS] = (ob_game_opt){ "cd_screens", "Opening screens", music, 2, 0, 0, 3 };
     cd_opts[CD_INTRO] = (ob_game_opt){ "cd_intro", "Intro movie", cd_off_on, 2, 0, 0, 3 };
+    cd_opts[CD_DEDITHER] = (ob_game_opt){ "cd_dedither", "Movie de-dither", ob_postfx_names, OB_POSTFX_MODES, 0, 0, 3 };
     segacd_start();
     segacd_intro_hook = intro_hook;
-    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 6, cd_changed, NULL };
+    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 7, cd_changed, NULL };
     ob_game_set_ops(&host, &ops);
 }
 

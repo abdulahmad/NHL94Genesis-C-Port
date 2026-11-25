@@ -31,9 +31,12 @@ void segacd_film_close(segacd_film *f);
 void segacd_film_size(const segacd_film *f, int *w, int *h);    /* the picture, in pixels */
 long segacd_film_sound(const segacd_film *f, const int16_t **pcm);   /* all its sound: 16000 Hz mono */
 double segacd_film_next(segacd_film *f, const uint8_t **idx, const uint32_t **argb);   /* the next picture and when (s); -1 at the end */
+segacd_film *segacd_film_dup(const segacd_film *f);              /* the same movie from its start, for another thread */
+uint32_t segacd_film_id(const segacd_film *f);                   /* a hash of the file (the de-dither cache's source) */
 #define SEGACD_FILM_RATE 16000
 
 /* the intro movie in the window (native/segacd_movie.c): an Overbar screen, its sound on dev (an SDL audio device, 0 none) */
-int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate);
+int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate, int dedither, const char *cache_path);
+/* dedither: an Overbar ob_postfx_mode (off, live, cached); cache_path: where the cached pass is kept (made on the first play) */
 int segacd_movie_tick(void);             /* (the window's loop) 0 once it has ended */
 int segacd_movie_playing(void);
