@@ -353,6 +353,31 @@ static void column_ratings(void)
     CHECK(checked > 6000 && same == checked);
 }
 
+/* the Sega CD's changes (RULE_CD_*): its uniforms' colours, and ClearShotData's length */
+static void sega_cd(void)
+{
+    uint16_t hfd[16], otw[16];
+    memcpy(hfd, rosters_team(9)->colours[0], sizeof hfd);
+    memcpy(otw, rosters_team(15)->colours[1], sizeof otw);
+    CHECK(hfd[9] == 0x042 && otw[4] == 0x002 && otw[12] == 0x444);   /* (the cartridge's) */
+    cd_colours(9, 0, hfd);
+    cd_colours(15, 1, otw);
+    CHECK(hfd[9] == 0x264 && otw[4] == 0x200 && otw[5] == 0x200 && otw[8] == 0x006 && otw[10] == 0 && otw[11] == 0 && otw[12] == 0);
+    uint16_t same[16];
+    memcpy(same, rosters_team(9)->colours[1], sizeof same);   /* (HFD away: the same on the disc) */
+    cd_colours(9, 1, same);
+    CHECK(!memcmp(same, rosters_team(9)->colours[1], sizeof same));
+    for (int cd = 0; cd < 2; cd++) {
+        classic_rules();
+        rules[RULE_CD_CLEARSHOT] = (uint8_t)cd;
+        ram_fill(RAM(outputbuffer), 0xAA, 0xE4 * 2);
+        ClearShotData();
+        CHECK(r16(RAM(outputbuffer), 0x71 * 2) == 0);     /* (the last word the disc clears) */
+        CHECK(r16(RAM(outputbuffer), 0x72 * 2) == (cd ? 0xAAAA : 0));
+    }
+    classic_rules();
+}
+
 int main(void)
 {
     const char *rom = getenv("NHL94_ROM");
@@ -367,6 +392,7 @@ int main(void)
     play_rules();
     overall_ratings();
     column_ratings();
+    sega_cd();
     printf("rulestest: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

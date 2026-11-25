@@ -27,6 +27,7 @@
 #include "overbar/net.h"
 #include "native.h"
 #include "optionsui.h"
+#include "rules.h"
 
 #define SETTINGS "settings.ini"
 
@@ -479,8 +480,9 @@ static void test_aid_tick(void)
     if (test_quit_at && SDL_TICKS_PASSED(SDL_GetTicks(), test_quit_at)) SDL_AtomicSet(&F.quit, 1);
 }
 
-/* the session's match began: the console powered on again for it (the game on its thread anew) */
-static void restart_for_session(void)
+/* the console powered on again (the game on its thread anew): for a session's match (session), or
+ * for a new roster set */
+static void restart_console(int session)
 {
     SDL_AtomicSet(&F.stop, 1);
     for (int i = 0; F.thread && i < 300 && !SDL_AtomicGet(&F.done); i++) SDL_Delay(10);
@@ -491,12 +493,79 @@ static void restart_for_session(void)
     F.m = NULL;
     SDL_AtomicSet(&F.stop, 0);
     SDL_AtomicSet(&F.done, 0);
-    F.session = 1;
+    F.session = session;
     if (F.dev) { SDL_ClearQueuedAudio(F.dev); SDL_PauseAudioDevice(F.dev, 1); F.queued = 0; }
     if (!start_game()) { fprintf(stderr, "the game could not start\n"); SDL_AtomicSet(&F.quit, 1); }
 }
 
 static ob_host host;
+
+/* ---- the overlay's Game page: the Sega CD's changes to the game, each off (the cartridge's) or on ----
+ * Each row is a rule (src/rules.h RULE_CD_*), kept in overbar.ini (game_cd_...) and in settings.ini
+ * (rules.cd_...). A change plays from the next frame (the rules are in every state); in an online
+ * session the host's rules hold, so a change there waits for the session's end. */
+static const char *const cd_off_on[2] = { "off", "on" };
+static const struct { int rule; const char *key; } cd_rows[] = {
+    { RULE_CD_SKATING, "cd_skating" }, { RULE_CD_CORNERS, "cd_corners" }, { RULE_CD_PSBOX, "cd_penalty_shot_box" },
+    { RULE_CD_PASSWORD, "cd_password" }, { RULE_CD_CLEARSHOT, "cd_clear_shots" }, { RULE_CD_COLOURS, "cd_colours" },
+};
+#define CD_ROWS ((int)(sizeof cd_rows / sizeof cd_rows[0]))
+#define CD_ROSTERS CD_ROWS                                /* (the last row: the roster set, the built-in "sega-cd", list entry 1) */
+static ob_game_opt cd_opts[CD_ROWS + 1];
+static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
+
+/* the option of the rules page with this key, or -1 */
+static int option_index(const char *key)
+{
+    for (int i = 0; i < F.o->noptions; i++) if (F.o->options[i].key && !strcmp(F.o->options[i].key, key)) return i;
+    return -1;
+}
+
+static void cd_changed(void *ctx, int index, int value)
+{
+    char key[64];
+    (void)ctx;
+    if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
+        int i = option_index("rules.rosters");
+        if (i < 0) return;
+        int now = F.opt_values[i], v = value ? 1 : now == 1 ? 0 : now;
+        if (v == now) return;
+        F.opt_values[i] = v;
+        mdrt_settings_set(F.set, "rules.rosters", F.o->options[i].names[v]);
+        settings_write();
+        if (F.session) return;
+        if (F.o->options_use) F.o->options_use(F.opt_values, F.user);
+        cd_restart = F.thread != NULL;
+        return;
+    }
+    if (index < 0 || index >= CD_ROWS || !F.opt_values) return;
+    snprintf(key, sizeof key, "rules.%s", cd_rows[index].key);
+    int i = option_index(key);
+    if (i < 0) return;
+    if (F.opt_values[i] == value) return;
+    F.opt_values[i] = value;
+    mdrt_settings_set(F.set, key, cd_off_on[value ? 1 : 0]);
+    settings_write();
+    if (F.session) return;                              /* (a session plays by the host's rules) */
+    if (F.o->options_use) F.o->options_use(F.opt_values, F.user);   /* (the next power on's) */
+    rules[cd_rows[index].rule] = (uint8_t)(value ? 1 : 0);          /* (and this game's, from now on) */
+}
+
+static void game_page_init(void)
+{
+    static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
+                                                  "Sega CD playoff password", "Sega CD shot data fix", "Sega CD uniforms" };
+    for (int k = 0; k < CD_ROWS; k++) {
+        char key[64];
+        snprintf(key, sizeof key, "rules.%s", cd_rows[k].key);
+        int i = option_index(key);
+        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], cd_off_on, 2, i >= 0 && F.opt_values ? (F.opt_values[i] ? 1 : 0) : 0, 1, 1 };
+    }
+    int r = option_index("rules.rosters");
+    cd_opts[CD_ROSTERS] = (ob_game_opt){ "cd_rosters", "Sega CD rosters (restarts)", cd_off_on, 2, r >= 0 && F.opt_values && F.opt_values[r] == 1, 1, 2 };
+    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 1, cd_changed, NULL };
+    ob_game_set_ops(&host, &ops);
+}
 
 static void shell_controllers(void) { ob_pads_setup_open(-1); }
 static void shell_sides(void) { ob_pads_sides_open(); }
@@ -686,6 +755,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     ob_host_init(&host, OB_PORT_GENESIS, profile);
     ob_host_load_ini_beside(&host, "overbar.ini");   /* the Overbar settings stay set between runs */
     options_ui_init(o, F.opt_values, F.set, user, settings_write);
+    game_page_init();                                 /* (after overbar.ini: its game_ lines are kept until the rows are known) */
     {
         extern const bx_scene BOX_GEN94;              /* box_gen94.c: the box on the first launch (experimental) */
         ob_box_init(&host, &BOX_GEN94);
@@ -731,7 +801,8 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     test_aid_arm();
     while (!SDL_AtomicGet(&F.quit)) {
         test_aid_tick();
-        if (native_net_window_poll()) restart_for_session();
+        if (native_net_window_poll()) restart_console(1);
+        if (cd_restart) { cd_restart = 0; if (!F.session) restart_console(0); }   /* (the Game page's roster set) */
         ob_plat_pump();
         ob_pads_tick();
         if (SDL_AtomicGet(&sides_state) == 1) { ob_pads_sides_open(); SDL_AtomicSet(&sides_state, 2); }

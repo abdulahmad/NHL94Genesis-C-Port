@@ -292,6 +292,7 @@ static const char *rosters_folder(const char *arg)
     char probe[700];
     FILE *f;
     size_t n = strlen(arg);
+    if (!strcmp(arg, "sega-cd") || !strcmp(arg, "@sega-cd")) return "@sega-cd";   /* (built in: rosters.c) */
     if (n > 4 && !strcmp(arg + n - 4, ".zip")) {          /* (a package: the file, or one of rosters/) */
         if ((f = fopen(arg, "rb"))) { fclose(f); return arg; }
         snprintf(dir, sizeof dir, "rosters/%s", arg);

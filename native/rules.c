@@ -61,7 +61,17 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_PENALTIES] = { "rules.penalties", "Penalties", 3, penalty_names, penalty_labels, 0, 100, 5, 0, penalty_pct, "%", NULL },
     [RULE_STREAKS] = { "rules.streaks", "Streaks", 3, streak_names, streak_labels, 0, 200, 5, 0, streak_pct, "%", NULL },
     [RULE_VIEW] = { "rules.view", "Rink view", 2, view_names, view_labels, 0, 0, 0, 0, NULL, NULL, NULL },
+    /* the Sega CD's changes (the overlay's Game page: native/frontend.c) */
+    [RULE_CD_SKATING] = { "rules.cd_skating", "Sega CD skating", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_CD_CORNERS] = { "rules.cd_corners", "Sega CD corner bounce", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_CD_PSBOX] = { "rules.cd_penalty_shot_box", "Sega CD penalty shot box", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_CD_PASSWORD] = { "rules.cd_password", "Sega CD playoff password", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_CD_CLEARSHOT] = { "rules.cd_clear_shots", "Sega CD shot data fix", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_CD_COLOURS] = { "rules.cd_colours", "Sega CD uniforms", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
+
+/* a rule the presets set: not the view (a matter of taste) or the Sega CD's (the Game page's) */
+static int preset_rule(int i) { return i != RULE_VIEW && i < RULE_CD_SKATING; }
 
 /* a choice's value: its number, or (a list's) its index */
 static int value_of(int rule, int choice) { return rule_options[rule].numbers ? rule_options[rule].numbers[choice] : choice; }
@@ -155,13 +165,13 @@ int rules_page_changed(int which, int *values, void *user)
     if (which == P_ROSTERS || which == P_SPEED) return 0;
     if (which == P_PRESET) {
         if (values[P_PRESET] == PRESET_CUSTOM) return 0;
-        for (int i = 0; i < RULE_COUNT; i++) if (i != RULE_VIEW) values[P_RULES + i] = presets[values[P_PRESET]][i];
+        for (int i = 0; i < RULE_COUNT; i++) if (preset_rule(i)) values[P_RULES + i] = presets[values[P_PRESET]][i];
         return 1;
     }
     int now = PRESET_CUSTOM;
     for (int p = 0; p < 3 && now == PRESET_CUSTOM; p++) {
         int same = 1;
-        for (int i = 0; i < RULE_COUNT; i++) same &= i == RULE_VIEW || values[P_RULES + i] == presets[p][i];
+        for (int i = 0; i < RULE_COUNT; i++) same &= !preset_rule(i) || values[P_RULES + i] == presets[p][i];
         if (same) now = p;
     }
     if (values[P_PRESET] == now) return 0;
@@ -260,7 +270,7 @@ const char *rules_arg(const char *arg)
     if ((n == 6 && !strncmp(arg, "preset", 6)) || (n == 12 && !strncmp(arg, "rules.preset", 12))) {
         for (int p = 0; p < 3; p++)
             if (!strcmp(eq + 1, preset_names[p])) {
-                for (int i = 0; i < RULE_COUNT; i++) if (i != RULE_VIEW) next[i] = presets[p][i];
+                for (int i = 0; i < RULE_COUNT; i++) if (preset_rule(i)) next[i] = presets[p][i];
                 return NULL;
             }
         joined(list, sizeof list, preset_names, 3);
