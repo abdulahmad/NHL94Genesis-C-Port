@@ -133,16 +133,22 @@ static void anthem_pose(void)
 #define SKATE_SPEED 4                                   /* pixels a frame */
 static int sk_cap, sk_on, sk_dur;
 static uint16_t sk_t0;
-static struct { int16_t x, y; } sk_from[12], sk_to[12];
+static struct { int16_t x, y; } sk_from[12], sk_to[12], sk_via[12];
+static int8_t sk_pnum[12];
+static uint8_t sk_gate[12];                             /* 1: this place has a new player: the old one leaves by the gate to the bench, the new one comes in by it */
+int (*hold_ref_pos_fn)(int *x, int *y);                 /* the host's referee, on the rink (0: none): he carries the puck to the dot */
 
 void hold_skate_begin(void)
 {
     sk_cap = 0;
     if (!rules[RULE_HOLD]) return;
     struct SortObj *pl = sortobj(0);
-    for (int i = 0; i < 12; i++, pl++) { sk_from[i].x = pl->Xpos; sk_from[i].y = pl->Ypos; }
+    for (int i = 0; i < 12; i++, pl++) { sk_from[i].x = pl->Xpos; sk_from[i].y = pl->Ypos; sk_pnum[i] = (int8_t)pl->pnum; }
     sk_cap = 1;
 }
+
+static int plen(int ax, int ay, int bx, int by) { double dx = bx - ax, dy = by - ay; return (int)sqrt(dx * dx + dy * dy); }
+static int path_len(int i) { return sk_gate[i] ? plen(sk_from[i].x, sk_from[i].y, sk_via[i].x, sk_via[i].y) + plen(sk_via[i].x, sk_via[i].y, sk_to[i].x, sk_to[i].y) : plen(sk_from[i].x, sk_from[i].y, sk_to[i].x, sk_to[i].y); }
 
 void hold_skate_arm(void)
 {
@@ -154,14 +160,18 @@ void hold_skate_arm(void)
     for (int i = 0; i < 12; i++, pl++) {
         sk_to[i].x = pl->Xpos; sk_to[i].y = pl->Ypos;
         int fx = sk_from[i].x, fy = sk_from[i].y;
+        sk_gate[i] = 0;
         if (pl->position <= 0 || fx < -300 || fx > 300 || fy < -300 || fy > 300) { sk_from[i] = sk_to[i]; continue; }
-        int dx = sk_to[i].x - fx, dy = sk_to[i].y - fy;
-        int d = (int)(sqrt((double)dx * dx + (double)dy * dy));
+        if ((int8_t)pl->pnum != sk_pnum[i]) {             /* (a line change: out through the gate, the next one in) */
+            sk_gate[i] = 1;
+            sk_via[i].x = -0x90; sk_via[i].y = PFLAG(pl, pfteam) ? 0x50 : -0x50;
+        }
+        int d = path_len(i);
         if (d > far) far = d;
     }
     sk_dur = far / SKATE_SPEED + 1;
     if (sk_dur < 24) return;
-    if (sk_dur > 200) sk_dur = 200;
+    if (sk_dur > 300) sk_dur = 300;
     sk_t0 = g.Vcount;
     sk_on = 1;
     if (getenv("HOLDLOG")) fprintf(stderr, "hold: skate to the spots, %d frames, at %d\n", sk_dur, g.Vcount);
@@ -180,8 +190,7 @@ static void skate_pose(void)
     int t = (int16_t)(g.Vcount - sk_t0);
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) {
-        int dx = sk_to[i].x - sk_from[i].x, dy = sk_to[i].y - sk_from[i].y;
-        int d = (int)sqrt((double)dx * dx + (double)dy * dy);
+        int d = path_len(i);
         if (d < 2) continue;
         int run = t * SKATE_SPEED;
         if (run >= d || t >= sk_dur) {                  /* (there: face the puck, glide) */
@@ -191,13 +200,31 @@ static void skate_pose(void)
                 SetSPA(pl, SPAglide);
             }
         } else {
+            int ax = sk_from[i].x, ay = sk_from[i].y, bx = sk_to[i].x, by = sk_to[i].y, r = run, l = d;
+            if (sk_gate[i]) {
+                int l1 = plen(ax, ay, sk_via[i].x, sk_via[i].y);
+                if (run < l1) { bx = sk_via[i].x; by = sk_via[i].y; l = l1; }
+                else { ax = sk_via[i].x; ay = sk_via[i].y; r = run - l1; l = d - l1; }
+            }
             if (t == 0) SetSPA(pl, SPAskate);
-            pl->Xpos = (int16_t)(sk_from[i].x + dx * run / d);
-            pl->Ypos = (int16_t)(sk_from[i].y + dy * run / d);
-            pl->facedir = (int16_t)vtoa((int16_t)dx, (int16_t)dy);
+            if (l < 1) l = 1;
+            pl->Xpos = (int16_t)(ax + (bx - ax) * r / l);
+            pl->Ypos = (int16_t)(ay + (by - ay) * r / l);
+            pl->facedir = (int16_t)vtoa((int16_t)(bx - ax), (int16_t)(by - ay));
         }
         pl->Xvel = 0;
         pl->Yvel = 0;
+    }
+    int rx, ry;
+    struct SortObj *pk = sortobj(puckscnum);
+    if (t < sk_dur && hold_ref_pos_fn && hold_ref_pos_fn(&rx, &ry)) {   /* the referee carries the puck to the dot */
+        pk->Xpos = (int16_t)rx; pk->Ypos = (int16_t)ry;
+        g.puckx[0] = (uint16_t)rx; g.pucky = (uint16_t)ry;
+        g.puckz[0] = 0;
+    } else if (t >= sk_dur) {
+        pk->Xpos = (int16_t)g.fox; pk->Ypos = (int16_t)g.foy;
+        g.puckx[0] = g.fox; g.pucky = g.foy;
+        ST_W(g.puckz[0]);
     }
     if (t >= sk_dur) sk_on = 0;
 }

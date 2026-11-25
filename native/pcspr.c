@@ -544,6 +544,13 @@ static void ref_tick(void)
     if (getenv("PCREF_LOG") && !(g.Vcount & 63)) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos);
 }
 
+static int ref_pos(int *x, int *y)
+{
+    if (!SDL_AtomicGet(&R.on) || !R.init) return 0;
+    *x = R.x / 256; *y = R.y / 256;
+    return 1;
+}
+
 /* the frame the referee shows */
 static int ref_frame(void)
 {
@@ -600,6 +607,7 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
 
 void pcspr_start(void)
 {
+    hold_ref_pos_fn = ref_pos;
     static int started;
     if (started) return;
     started = 1;
