@@ -20,12 +20,15 @@
 #include "game.h"
 #include "rom.h"
 #include "symbols_gen.h"
+#include "rosters.h"
 #include "native.h"
 #include "segacd.h"
 #include "overbar/cdimage.h"
 
 #define SONG_GAIN 0.70f                     /* the disc's tracks against the FM chip's mix */
 #define BED_GAIN (SONG_GAIN * 0x300 / 0x400)
+#define VOICE_GAIN 0.85f
+#define VOICE_RATE 16276                    /* the RF5C164 at frequency $0400 (32552 Hz x $400 / $800) */
 #define CROWD_LIVE 20                       /* frames the crowd bed keeps going after the game's last updatesound */
 
 static struct {
@@ -38,6 +41,11 @@ static struct {
     int song_on_cd;                         /* the game's song is the disc's now: its FM notes are dropped */
     int crowd_live;                         /* frames left of the game's crowd (updatesound) */
     uint8_t ym_addr;                        /* the YM2612's part 1 address latch (the relay's last) */
+    SDL_atomic_t voice;                     /* the Ron Barr row: 0 off, 1 on (the music held back), 2 on over the music */
+    int16_t *clip;                          /* the clip playing (16276 Hz mono), NULL none */
+    long clip_len;
+    double clip_at;
+    int clip_id, queue[8], nqueue;          /* its paragraph, and the ones waiting */
 } S;
 
 static const char *const need[2] = { "HOCKEY.BIN", "GRAPH2.BIN" };
@@ -79,6 +87,7 @@ ob_cd *segacd_disc(void)
 
 void segacd_set_music(int on) { SDL_AtomicSet(&S.music, on ? 1 : 0); }
 void segacd_set_crowd(int v) { SDL_AtomicSet(&S.crowd, v); }
+void segacd_set_voice(int v) { SDL_AtomicSet(&S.voice, v); }
 
 static int music_on(void) { return SDL_AtomicGet(&S.music) && segacd_disc(); }
 /* the crowd: bit 0 the cartridge's PSG noise, bit 1 the disc's track 2 */
@@ -100,14 +109,99 @@ static void play(int track, int loop, int bed)
 }
 static void stop(void) { S.track = 0; S.bed = 0; }
 
+/* ---- Ron Barr: the disc's clip of a scouting paragraph ----
+ * The script is the cartridge's ScoutTextScript, a paragraph a line; the disc keeps it at the start
+ * of GRAPH2.BIN, the same lines, and records some of them: RON<line>.PCM, the line counted from 1
+ * (paragraph $1B, "Hi, I'm Ron Barr for EA Sports.", is RON0028). The welcome (paragraph $1A, "Welcome
+ * to a sold out ^, home of the =.") is a clip a team, named for the home team. */
+static const char *const team_clip[28] = {          /* the cartridge's teams, in its order */
+    "ANAHEIM", "BOSTON", "BUFFALO", "CALGORY", "CHICAGO", "DALLAS", "DETROIT", "EDMONTON", "FLORIDA", "HARTFORD",
+    "LAKINGS", "MONTREAL", "NJERSEY", "NEWYORK", "NYRANGER", "OTTAWA", "PHILLY", "PITTSBUR", "QUEBEC", "SANJOSE",
+    "STLOUIS", "TAMPBAY", "TORONTO", "VANCUVER", "WASHINGT", "WINNIPEG", "ALLSTARE", "ALLSTARW",
+};
+
+/* the clip's file for paragraph n: name (on the data track), 0 when it has none */
+static int clip_name(int n, char *name, size_t size)
+{
+    if (n == 0x1A) {                                       /* the welcome: the home team's (by its art: a roster set's team plays as one of the cartridge's) */
+        uint16_t t = rosters_art(team_struct(0)->tmteam);
+        if (t >= 28) return 0;
+        snprintf(name, size, "%s.PCM", team_clip[t]);
+        return 1;
+    }
+    snprintf(name, size, "RON%04d.PCM", n + 1);
+    return 1;
+}
+
+/* paragraph n's clip to play now; 0 when the disc has none */
+static int clip_load(int n)
+{
+    char name[24];
+    uint8_t *b;
+    if (!clip_name(n, name, sizeof name)) return 0;
+    long size = ob_cd_read_file(S.cd, name, &b);
+    if (size <= 0) return 0;
+    int16_t *c = SDL_malloc((size_t)size * sizeof *c);
+    long len = 0;
+    if (c)
+        for (; len < size && b[len] != 0xFF; len++) {     /* RF5C164 bytes: bit 7 the sign (set: positive), 7 bits of size; $FF the end */
+            int v = (b[len] & 0x7F) << 8;
+            c[len] = (int16_t)(b[len] & 0x80 ? v : -v);
+        }
+    free(b);
+    SDL_free(S.clip);
+    S.clip = c;
+    S.clip_len = c ? len : 0;
+    S.clip_at = 0;
+    S.clip_id = n;
+    return c != NULL;
+}
+
+static void voice_stop(void)
+{
+    SDL_free(S.clip);
+    S.clip = NULL;
+    S.nqueue = 0;
+    S.clip_id = -1;
+}
+
+/* the next waiting clip, if any */
+static void voice_next(void)
+{
+    SDL_free(S.clip);
+    S.clip = NULL;
+    while (S.nqueue && !S.clip) {
+        int n = S.queue[0];
+        memmove(S.queue, S.queue + 1, (size_t)--S.nqueue * sizeof S.queue[0]);
+        clip_load(n);
+    }
+}
+
+static void paragraph(int n)
+{
+    char name[24];
+    if (!SDL_AtomicGet(&S.voice) || !segacd_disc() || !clip_name(n, name, sizeof name) || ob_cd_file_size(S.cd, name) <= 0) return;
+    if (S.clip && S.clip_id == n) return;                 /* (a frame played again) */
+    for (int i = 0; i < S.nqueue; i++) if (S.queue[i] == n) return;
+    if (!S.clip) clip_load(n);
+    else if (S.nqueue < (int)(sizeof S.queue / sizeof S.queue[0])) S.queue[S.nqueue++] = n;
+}
+
 void segacd_event(int ev, uint16_t n)
 {
     static int log = -1;
     if (log < 0) log = SDL_getenv("SEGACD_LOG") != NULL;
-    if (log && ev != CD_EV_CROWD) fprintf(stderr, "segacd: frame %ld %s %02X (track %d)\n", native_frames(), ev == CD_EV_SONG ? "song" : ev == CD_EV_STOP ? "stop" : "turnoff", n, S.track);
+    if (log && ev != CD_EV_CROWD)
+        fprintf(stderr, "segacd: frame %ld %s %02X (track %d)\n", native_frames(),
+                ev == CD_EV_SONG ? "song" : ev == CD_EV_STOP ? "stop" : ev == CD_EV_PARAGRAPH ? "paragraph" : "turnoff", n, S.track);
     switch (ev) {
     case CD_EV_SONG: {
         S.song_on_cd = 0;
+        if (n == 0x7A && SDL_AtomicGet(&S.voice) == 1 && segacd_disc()) {   /* Ron Barr alone, as on the disc: no song */
+            if (S.track && !S.bed) stop();
+            S.song_on_cd = 1;
+            return;
+        }
         if (!music_on()) return;
         int track = n >= 0x30 && n <= 0x77 ? n - 0x29 : n == 0x78 ? 4 : n == 0x79 ? 5 : n == 0x7A ? 3 : 0;
         if (!track || ob_cd_track_frames(S.cd, track) <= 0) return;   /* (not on this disc: the FM song) */
@@ -119,9 +213,13 @@ void segacd_event(int ev, uint16_t n)
         S.song_on_cd = 0;
         if (S.track && S.loop && !S.bed) stop();
         break;
-    case CD_EV_TURNOFF:                       /* p_turnoff (pause, the full silences): all of it */
+    case CD_EV_TURNOFF:                       /* p_turnoff (pause, the full silences, leaving the scouting report): all of it */
         S.song_on_cd = 0;
         stop();
+        voice_stop();
+        break;
+    case CD_EV_PARAGRAPH:
+        paragraph(n);
         break;
     case CD_EV_CROWD:
         S.crowd_live = CROWD_LIVE;
@@ -166,8 +264,26 @@ uint8_t segacd_psg(uint8_t v)
     return v;
 }
 
+static void mix_voice(int16_t *out, int frames, unsigned rate)
+{
+    double step = (double)VOICE_RATE / rate;
+    for (int i = 0; i < frames && S.clip; i++) {
+        long j = (long)S.clip_at;
+        if (j + 1 >= S.clip_len) { voice_next(); continue; }
+        double frac = S.clip_at - j;
+        float v = (float)(S.clip[j] + (S.clip[j + 1] - S.clip[j]) * frac) * VOICE_GAIN;
+        for (int c = 0; c < 2; c++) {
+            float x = v + out[2 * i + c];
+            out[2 * i + c] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
+        }
+        S.clip_at += step;
+    }
+}
+
 void segacd_mix(int16_t *out, int frames, unsigned rate)
 {
+    if (S.clip && rate) mix_voice(out, frames, rate);
+    if (S.clip && !SDL_AtomicGet(&S.voice)) voice_stop();
     if (S.crowd_live > 0 && --S.crowd_live == 0 && S.bed) stop();   /* (the game's crowd stopped: the menus) */
     if (S.bed && !(crowd_bits() & 2)) stop();
     if (S.track && !S.bed && !music_on()) { stop(); S.song_on_cd = 0; }

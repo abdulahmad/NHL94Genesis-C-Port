@@ -748,6 +748,7 @@ void UpdateScoutingDisplay(void)
             return;
         }
         ScrollDisplayUp();
+        if (cd_sound_hook) cd_sound_hook(CD_EV_PARAGRAPH, (uint16_t)d0);
         const uint8_t *p = rom_ptr(a1);
         for (uint16_t n = (uint16_t)d0; n-- != 0;) while (*p++ != 0xD) {}
         d0 = (int16_t)(uint16_t)(p - rom_ptr(a1));

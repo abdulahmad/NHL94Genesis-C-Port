@@ -520,7 +520,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_ROSTERS CD_ROWS                                /* (the roster set, the built-in "sega-cd", list entry 1) */
 #define CD_MUSIC (CD_ROWS + 1)                            /* (this machine's sound only: the disc's music, its crowd bed) */
 #define CD_CROWD (CD_ROWS + 2)
-static ob_game_opt cd_opts[CD_ROWS + 3];
+#define CD_VOICE (CD_ROWS + 3)
+static ob_game_opt cd_opts[CD_ROWS + 4];
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
 /* the option of the rules page with this key, or -1 */
@@ -536,6 +537,7 @@ static void cd_changed(void *ctx, int index, int value)
     (void)ctx;
     if (index == CD_MUSIC) { segacd_set_music(value); return; }
     if (index == CD_CROWD) { segacd_set_crowd(value); return; }
+    if (index == CD_VOICE) { segacd_set_voice(value); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -577,8 +579,10 @@ static void game_page_init(void)
     static const char *const music[2] = { "cartridge", "Sega CD" }, *const crowd[3] = { "cartridge", "Sega CD", "both" };
     cd_opts[CD_MUSIC] = (ob_game_opt){ "cd_music", "Music", music, 2, 0, 0, 3 };
     cd_opts[CD_CROWD] = (ob_game_opt){ "cd_crowd", "Crowd", crowd, 3, 0, 0, 3 };
+    static const char *const voice[3] = { "off", "on", "over the music" };
+    cd_opts[CD_VOICE] = (ob_game_opt){ "cd_voice", "Ron Barr scouting voice", voice, 3, 0, 0, 3 };
     segacd_start();
-    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 3, cd_changed, NULL };
+    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 4, cd_changed, NULL };
     ob_game_set_ops(&host, &ops);
 }
 
