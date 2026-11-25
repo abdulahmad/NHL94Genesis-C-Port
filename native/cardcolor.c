@@ -11,8 +11,9 @@
  *
  * Or the finished faces: the folder NHL94-colored-faces (EA-NHL-Tools has it: CardNNN_Name.png, 48 x 48,
  * all 144 cards, Abdul's approved colours) beside the program, in NHL94_PC_PORTRAITS's folder, or where
- * NHL94_COLORED_FACES names. A card with its face there shows that face, pixel for pixel; the others
- * are made from the PC files as above. cardcolor_faces.inc only says which picture is CardNNN.
+ * NHL94_COLORED_FACES names (the PNGs in it or in its faces/). A card with its face there shows that face, pixel for pixel; the others
+ * are made from the PC files as above. The folder's SegaCD_*.png colour the Sega CD's own photos of
+ * players the cartridge has none of (segacd.c's, drawn with no ROM picture). cardcolor_faces.inc only says which picture is CardNNN.
  *
  * How it is shown: the game draws a picture as it always does (its tiles, its map, its grey palette).
  * picture_drawn_hook notes which picture went where (its tiles' first char, its 36 map entries); each
@@ -42,6 +43,12 @@ static const uint32_t faces[] = {                  /* CardNNN's picture: the has
 #include "cardcolor_faces.inc"
 };
 #define NFACES ((int)(sizeof faces / sizeof faces[0]))
+static const struct { uint32_t hash; const char *name; } cdfaces[] = {   /* the Sega CD's own photos, by the hash of */
+    { 0xD735D385u, "SegaCD_LA_JariKurri" },        /* picturebuf as its photo_hook fills it (the count word, */
+    { 0x57321F39u, "SegaCD_PIT_RickTocchet" },     /* 36 tiles): only these two are faces the cartridge lacks */
+};
+#define NCD ((int)(sizeof cdfaces / sizeof cdfaces[0]))
+#define NALL (NFACES + NCD)                        /* faces: the cartridge's CardNNN - 1, then the Sega CD's */
 #define FACES_DIR "NHL94-colored-faces"
 #define SHOWN 4                                    /* pictures on one screen (the scouting report has two) */
 #define QFS_FILES 24
@@ -53,8 +60,8 @@ static struct {
     long qfs_n[QFS_FILES];
     uint8_t *nsh;
     long nsh_n;
-    uint8_t made[NFACES];                          /* 0 not yet, 1 made (or a face read), 2 could not be */
-    uint8_t rgb[NFACES][CC_N * CC_N * 3];
+    uint8_t made[NALL];                            /* 0 not yet, 1 made (or a face read), 2 could not be */
+    uint8_t rgb[NALL][CC_N * CC_N * 3];
     struct shown {
         int used, card;
         uint16_t start, count, attr;               /* its first char, its tiles, the map's attribute bits */
@@ -109,8 +116,8 @@ static int find95_in(const char *dir)
     return got;
 }
 
-/* the faces in dir (CardNNN....png): how many */
-static int faces_in(const char *dir)
+/* the faces in dir (CardNNN....png, SegaCD_....png): how many */
+static int faces_in_one(const char *dir)
 {
     DIR *d = opendir(dir);
     if (!d) return 0;
@@ -119,11 +126,17 @@ static int faces_in(const char *dir)
     while ((e = readdir(d))) {
         const char *n = e->d_name;
         size_t len = strlen(n);
-        int k;
-        if (len < 11 || SDL_strncasecmp(n, "card", 4) || SDL_strcasecmp(n + len - 4, ".png")) continue;
-        if (n[4] < '0' || n[4] > '9' || n[5] < '0' || n[5] > '9' || n[6] < '0' || n[6] > '9') continue;
-        k = (n[4] - '0') * 100 + (n[5] - '0') * 10 + (n[6] - '0') - 1;
-        if (k < 0 || k >= NFACES || C.made[k] || (n[7] != '_' && n[7] != '.')) continue;
+        int k = -1;
+        for (int i = 0; i < NCD; i++)
+            if (len == strlen(cdfaces[i].name) + 4 && !SDL_strncasecmp(n, cdfaces[i].name, len - 4) && !SDL_strcasecmp(n + len - 4, ".png")) k = NFACES + i;
+        if (k < 0) {                                       /* CardNNN_Name.png */
+            if (len < 11 || SDL_strncasecmp(n, "card", 4) || SDL_strcasecmp(n + len - 4, ".png")) continue;
+            if (n[4] < '0' || n[4] > '9' || n[5] < '0' || n[5] > '9' || n[6] < '0' || n[6] > '9') continue;
+            if (n[7] != '_' && n[7] != '.') continue;
+            k = (n[4] - '0') * 100 + (n[5] - '0') * 10 + (n[6] - '0') - 1;
+            if (k < 0 || k >= NFACES) continue;
+        }
+        if (C.made[k]) continue;
         char path[1200];
         long size = 0;
         snprintf(path, sizeof path, "%s/%s", dir, n);
@@ -137,6 +150,14 @@ static int faces_in(const char *dir)
     }
     closedir(d);
     return got;
+}
+
+/* the faces in dir and in its faces/ (EA-NHL-Tools keeps them there) */
+static int faces_in(const char *dir)
+{
+    char sub[1216];                                    /* (dir is at most 1200) */
+    snprintf(sub, sizeof sub, "%s/faces", dir);
+    return faces_in_one(dir) + faces_in_one(sub);
 }
 
 static int finder(void *arg)
@@ -239,13 +260,23 @@ static int make(int k, uint32_t tiles, uint32_t map)
     return ok;
 }
 
+/* the Sega CD photo in picturebuf (no ROM picture): its face, -1 none */
+static int cd_of(void)
+{
+    if (rd16(g.picturebuf) != 36) return -1;
+    uint32_t h = cc_hash(g.picturebuf, 2 + 36 * 32);
+    for (int i = 0; i < NCD; i++) if (cdfaces[i].hash == h) return NFACES + i;
+    return -1;
+}
+
 static void drawn(uint32_t tiles, uint32_t map, uint16_t start, uint16_t attr)
 {
     for (int i = 0; i < SHOWN; i++) if (C.shown[i].used && C.shown[i].start == start) C.shown[i].used = 0;   /* (its chars hold this one now) */
-    if (!tiles || !SDL_AtomicGet(&C.on) || !cardcolor_found() || map + 4u + 72u > rom_limit) return;
-    int k = card_of(tiles);
-    if (k < 0 || rd16(rom_ptr(map)) != 6 || rd16(rom_ptr(map + 2)) != 6 || !make(k, tiles, map)) return;
-    uint16_t count = rd16(rom_ptr(tiles));
+    if (!SDL_AtomicGet(&C.on) || !cardcolor_found() || map + 4u + 72u > rom_limit) return;
+    int k = tiles ? card_of(tiles) : cd_of();
+    if (k < 0 || rd16(rom_ptr(map)) != 6 || rd16(rom_ptr(map + 2)) != 6) return;
+    if (tiles ? !make(k, tiles, map) : C.made[k] != 1) return;
+    uint16_t count = rd16(g.picturebuf);
     struct shown *s = NULL;
     for (int i = 0; i < SHOWN && !s; i++) if (!C.shown[i].used) s = &C.shown[i];
     if (!s) s = &C.shown[0];
@@ -257,7 +288,7 @@ static void drawn(uint32_t tiles, uint32_t map, uint16_t start, uint16_t attr)
     for (int i = 0; i < 36; i++) s->entry[i] = (uint16_t)((rd16(rom_ptr(map + 4 + 2u * i)) + start) ^ attr);
     uint32_t pal = ART(PicturePalette) + rd32(rom_ptr(ART(PicturePalette))) + 0x20;
     for (int i = 0; i < 16; i++) {
-        uint16_t w = rd16(rom_ptr(pal + 2u * i));
+        uint16_t w = tiles ? rd16(rom_ptr(pal + 2u * i)) : g.palfadenew[0x20 + i];   /* (the disc's photo: its own colours) */
         s->full[i][0] = (uint8_t)((w >> 1) & 7);
         s->full[i][1] = (uint8_t)((w >> 5) & 7);
         s->full[i][2] = (uint8_t)((w >> 9) & 7);
