@@ -45,6 +45,7 @@ extern uint8_t rules[RULE_COUNT];   /* each rule's value now (Classic until the 
  * every machine of a session waits the same, with the announcer or without. */
 void hold_for(int frames);
 void hold_anthem(int frames);
+extern int (*hold_ref_pos_fn)(int *x, int *y);      /* set by the host: the referee's place on the rink (1 while he is on the ice) */
 void hold_skate_begin(void);                        /* the face off set up: the skaters' places before it moves them ... */
 void hold_skate_arm(void);                          /* ... and after: with RULE_HOLD they skate from the first to the second */
 int hold_skate_ref(void);                           /* the referee's progress along his way to the dot, 0 to 256 (-1: none) */
