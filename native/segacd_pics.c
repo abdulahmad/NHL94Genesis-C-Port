@@ -127,7 +127,7 @@ static int stored(const uint8_t *d, long size, uint32_t *out)
     long c = 4 + (long)n * 32, m = c + 128;
     if (m + 4 > size) return 0;
     unsigned w = be16(d + m), h = be16(d + m + 2);
-    if (m + 4 + (long)w * h * 2 > size) return 0;
+    if (m + 4 + (long)w * (long)h * 2 > size) return 0;
     uint32_t col[64];
     cram(d + c, col);
     return draw(d + 4, n, d + m + 4, w, h, col, out);
