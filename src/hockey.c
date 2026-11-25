@@ -453,7 +453,7 @@ void Pausemode(void)
  * the horizontal rink, the crowd silenced, plane 3 erased. */
 void Pausemode_pall(void)
 {
-    if (view_wide()) vdp_ctrl16(SYM_VDPR_MODE4);         /* (the wide view: the window plane is 32 columns) */
+    if (view_wide()) { vdp_ctrl16(SYM_VDPR_MODE4); vdp_ctrl16(SYM_VDPR_MODE3); }   /* (the wide view: the window plane is 32 columns, and the whole screen scrolls as one) */
     vdp_ctrl16(SYM_VDPR_WINX);
     vdp_ctrl16(SYM_VDPR_WINY + 0x1C);
     SetHor();
