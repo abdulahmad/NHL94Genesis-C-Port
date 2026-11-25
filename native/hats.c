@@ -29,7 +29,7 @@
 #define PAL_AT    0xB4D4E                   /* HomeUniformPalettes */
 #define NTEAMS    28
 #define PATHMAX 1024
-#define LISTMAX 512
+#define LISTMAX 2048
 #define WALK_DEPTH 3
 
 static struct {
@@ -75,17 +75,21 @@ static long file_len(const char *p) { struct stat st; return stat(p, &st) == 0 ?
 
 static int walk(const char *dir, int depth, char (*list)[PATHMAX], int n)
 {
-    DIR *d = opendir(dir);
-    struct dirent *e;
-    if (!d) return n;
-    while ((e = readdir(d)) && n < LISTMAX) {
-        char p[PATHMAX];
-        if (e->d_name[0] == '.') continue;
-        snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
-        if (is_dir(p)) { if (depth > 0) n = walk(p, depth - 1, list, n); }
-        else snprintf(list[n++], PATHMAX, "%s", p);
+    /* a folder's own files first, then its folders (never the build's obj): a big folder must not use up the list before the disc image */
+    for (int pass = 0; pass < 2; pass++) {
+        DIR *d = opendir(dir);
+        struct dirent *e;
+        if (!d) return n;
+        while ((e = readdir(d)) && n < LISTMAX) {
+            char p[PATHMAX];
+            if (e->d_name[0] == '.') continue;
+            snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
+            if (is_dir(p)) {
+                if (pass == 1 && depth > 0 && strcmp(e->d_name, "obj")) n = walk(p, depth - 1, list, n);
+            } else if (pass == 0) snprintf(list[n++], PATHMAX, "%s", p);
+        }
+        closedir(d);
     }
-    closedir(d);
     return n;
 }
 
