@@ -51,6 +51,13 @@ static mdrt *console;
 static int headless, started, players_total;
 static const void *room_set;            /* the settings given at open (the host's: the match's too) */
 static size_t room_set_size;
+/* Widescreen in a session: each guest says its setting to the host (a message of TYPE_WIDE, one byte, 1 16:9),
+ * and the match plays the wide-view rink if any machine has 16:9 (the host's is in its settings already:
+ * rules_next_send). A 4:3 machine shows the middle of it (frontend.c, wide.c) */
+#define TYPE_WIDE 1
+static uint8_t wide_said[OB_NET_MAX_MACHINES];          /* (the host) 0 not yet, 1 4:3, 2 16:9 */
+static int wide_sent;
+static uint8_t *match_set;                               /* the match's settings when they are not the room's */
 static native_input_fn local_fn;
 static long stop_at = -1;
 static uint16_t latched[MDRT_PADS];     /* the buttons of step latched_step, as the game is given them */
@@ -201,6 +208,8 @@ int native_net_open(const mdrt_net_options *o, const char *setup, const void *se
     on.here = o->here > 0 ? o->here : 1;
     on.all = o->players > 0 ? o->players : 2;
     players_total = on.all;
+    memset(wide_said, 0, sizeof wide_said);
+    wide_sent = 0;
     room_set = set;
     room_set_size = set ? set_size : 0;
     ob_net_game gm = { .identity = native_net_identity(setup), .pads = MDRT_PADS, .settings = set, .settings_size = set ? set_size : 0,
@@ -239,7 +248,12 @@ static void messages(void)
             d = big;
         }
         if (type == OB_NET_TYPE_CONSOLE) ob_console_message(&con, net, from, d, size);
+        else if (type == TYPE_WIDE && size == 1 && from > 0 && from < OB_NET_MAX_MACHINES) wide_said[from] = ((const uint8_t *)d)[0] ? 2 : 1;
         free(big);
+    }
+    if (net && !wide_sent && !ob_net_is_host(net)) {     /* (a guest: once it is in the room) */
+        uint8_t b = (uint8_t)rules_widescreen_on();
+        if (ob_net_send(net, 0, TYPE_WIDE, &b, 1) == 0) wide_sent = 1;
     }
 }
 
@@ -251,6 +265,12 @@ static int begin_match(char *err, size_t errsize)
     int in = 0, pad = 0;
     for (int k = 0; k < OB_NET_MAX_MACHINES; k++) if (members >> k & 1) in += ob_net_here_of(net, k);
     if (in < players_total) return 0;
+    int wide = 0;
+    for (int k = 1; k < OB_NET_MAX_MACHINES; k++) {
+        if (!(members >> k & 1)) continue;
+        if (!wide_said[k]) return 0;                       /* (its Widescreen setting not here yet) */
+        wide |= wide_said[k] == 2;
+    }
     ob_net_match m;
     memset(&m, 0, sizeof m);
     for (int p = 0; p < OB_NET_MAX_PADS; p++) m.owner[p] = -1;
@@ -259,6 +279,13 @@ static int begin_match(char *err, size_t errsize)
     m.delay = -1;
     m.settings = room_set;
     m.settings_size = room_set_size;
+    if (wide && room_set && room_set_size > 6 + RULE_VIEW && ((const uint8_t *)room_set)[5] > RULE_VIEW) {
+        free(match_set);
+        if (!(match_set = malloc(room_set_size))) { snprintf(err, errsize, "out of memory"); return -1; }
+        memcpy(match_set, room_set, room_set_size);
+        match_set[6 + RULE_VIEW] = 1;                    /* (after "N94S", its version and the rules' count) */
+        m.settings = match_set;
+    }
     if (ob_net_match_begin(net, &m, err, (int)errsize)) return -1;
     return 1;
 }
@@ -272,6 +299,7 @@ int native_net_connect(void)
         int s = ob_net_poll(net);
         if (s == OB_NET_GO) break;
         if (s == OB_NET_ENDED) { fprintf(stderr, "netplay: %s\n", ob_net_why(net)); return 0; }
+        messages();
         if (s == OB_NET_LOBBY && ob_net_is_host(net) && begin_match(err, sizeof err) < 0) { fprintf(stderr, "netplay: %s\n", err); return 0; }
         nap();
     }
