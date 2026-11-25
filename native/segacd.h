@@ -5,6 +5,7 @@
 
 void segacd_start(void);                 /* look for the disc beside the program (a thread) and hook the game's sound */
 void segacd_wait(void);                  /* (headless) until the search ends */
+int segacd_searched(void);               /* 1 once the search ended (segacd_disc: what it found, NULL none) */
 ob_cd *segacd_disc(void);                /* the disc, NULL while looking or when there is none */
 void segacd_set_music(int on);           /* the Game page: songs from the disc */
 void segacd_set_crowd(int v);            /* 0 the cartridge's PSG crowd, 1 the disc's track 2, 2 both */
