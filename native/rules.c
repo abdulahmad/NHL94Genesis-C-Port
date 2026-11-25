@@ -9,6 +9,7 @@
 
 static const char *const off_on[2] = { "off", "on" };
 static const char *const fight_names[4] = { "off", "NHL 93", "NHL 92", "hybrid" };   /* (fighting: src/fight.c) */
+static const char *const announce_names[3] = { "off", "with the goal", "after the goal song" };
 static const char *const view_names[2] = { "classic", "wide" };
 static const char *const view_labels[2] = { "256 wide", "320 wide" };
 
@@ -27,7 +28,8 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_CD_SONGS] = { "rules.cd_songs", "Sega CD song timing", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_CD_PERIOD_END] = { "rules.cd_period_end", "Sega CD period end", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_FIGHT] = { "rules.fighting", "Fighting", 4, fight_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
-    [RULE_HOLD] = { "rules.hold_play", "Pause for the announcer", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_HOLD] = { "rules.hold_play", "PC between-play pause", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_ANNOUNCE] = { "rules.announce_timing", "Rink announcer timing", 3, announce_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
 
 /* a choice's value: its number, or (a list's) its index */
