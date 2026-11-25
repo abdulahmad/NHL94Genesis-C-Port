@@ -430,9 +430,10 @@ void NI __cyg_profile_func_enter(void *fn, void *site)
 {
     (void)site;
     if (native_in_vblank()) return;
-    if (fn == (void *)DoGameFrame) native_play_frames++;
+    if (fn == (void *)DoGameFrame) { native_play_frames++; in_readsetup = 0; }
     else if (fn == (void *)HandleMenuInput) { menu_kind = 1; native_menu_calls++; }
-    else if (fn == (void *)ReadSetupPads) { menu_kind = 2; in_readsetup = 1; native_menu_calls++; }
+    else if (fn == (void *)ReadSetupPads) { menu_kind = 2; in_readsetup++; native_menu_calls++; }
+    else if (fn == (void *)waitxsr || fn == (void *)Pausemode) { menu_kind = 1; in_readsetup++; native_menu_calls++; }
     else if (fn == (void *)Pausemode_Pmenu) pause_n = 0;
     else if (fn == (void *)PrintMenuItem) { if (pause_n < 4) { pause_x[pause_n] = (int16_t)g.printx; pause_y[pause_n] = (int16_t)g.printy; pause_n++; } }
     else if (fn == (void *)MoveMenuFrame) in_moveframe = 1;
@@ -456,7 +457,7 @@ void NI __cyg_profile_func_exit(void *fn, void *site)
 {
     (void)site;
     if (native_in_vblank()) return;
-    if (fn == (void *)ReadSetupPads) in_readsetup = 0;
+    if ((fn == (void *)ReadSetupPads || fn == (void *)waitxsr || fn == (void *)Pausemode) && in_readsetup > 0) in_readsetup--;
     if (clock_original()) clock_on_exit(routine_of(fn));
     if (!tracking) return;
     (void)fn;
