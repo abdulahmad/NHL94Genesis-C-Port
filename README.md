@@ -162,6 +162,7 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   `NHL '94 (USA).sfc` (or `.smc`) put beside the program (up to three folders below); without it the row says "(no NHL 94 SNES ROM found)". Nothing
   of the game changes (the hats have a random generator of their own), so states, replays and online play are the same with it on or off. Headless:
   `--hats ROM`; `HATS_DEMO=1` starts the hats at once, for looking at them.
+- **Referee on the ice**: NHL 95 PC's referee (its frames, from the same files as the PC player sprites) skates beside the play like the PC's, stands at the face off spot facing the dot and drops the puck. Visual only: the game does not know of it. It is drawn under whatever the cartridge puts over the ice (windows, scoreboard, outlines) and behind skaters nearer the camera. Command line: `--pc-ref`.
 - **PC player sprites**: draws NHL 95 PC's skaters and goalies in place of the cartridge's, in the teams' PC colours, from the player's own
   files (`000_049.PPV` ... `11001149.PPV`, `RINKPAL.QFS`, `HOMEPALS.BIN` and `AWAYPALS.BIN`, beside the program or on the NHL 95 PC disc image).
   PC frame numbers are the cartridge's less one (less nine from the siren frames on), so where the PC has no matching frame (the cartridge's extra goalie
