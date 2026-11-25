@@ -293,7 +293,7 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
     if (n <= 0 || w > 320 || h > 240) return;
     static mdrt_vdp scratch;
     static uint16_t clean[320 * 240];
-    static uint8_t vis[320 * 240], near[320 * 240];
+    static uint8_t vis[320 * 240];
     scratch = *vdp;
     unsigned sat = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
     for (int i = 0; i < n; i++)
@@ -305,13 +305,27 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
             scratch.sat[e * 8] = scratch.sat[e * 8 + 1] = 0;
         }
     mdrt_vdp_render(&scratch, clean, 320);
-    static uint16_t bare[320 * 240];                              /* (and with no sprite at all: where `clean` differs, another sprite is drawn, a shadow or a box) */
-    for (unsigned e = 0; e < 80; e++) {
-        scratch.s.vram[(sat + e * 8) & 0xFFFF] = 0;
-        scratch.s.vram[(sat + e * 8 + 1) & 0xFFFF] = 0;
-        scratch.sat[e * 8] = scratch.sat[e * 8 + 1] = 0;
-    }
-    mdrt_vdp_render(&scratch, bare, 320);
+    /* Where the listed sprites really are on top, as the VDP sees it (plane priority, other sprites, window): their tiles are
+     * filled solid in one exotic colour and the picture drawn once more. The PC sprites may cover only those pixels. */
+    static uint16_t solid[320 * 240];
+    scratch = *vdp;
+    uint16_t exo = 0x0E0E;
+    int lines_used[4] = {0, 0, 0, 0};
+    for (int i = 0; i < n; i++)
+        for (int k = 0; k < list[i].count; k++) {
+            unsigned e = (unsigned)(list[i].first + k);
+            if (e >= 80) continue;
+            const uint8_t *a8 = vdp->s.vram + 0;
+            unsigned o = (sat + e * 8) & 0xFFFF;
+            int sz = a8[(o + 2) & 0xFFFF], tw = ((sz >> 2) & 3) + 1, th = (sz & 3) + 1;
+            unsigned attr = (unsigned)a8[(o + 4) & 0xFFFF] << 8 | a8[(o + 5) & 0xFFFF];
+            unsigned tile = attr & 0x7FF;
+            lines_used[(attr >> 13) & 3] = 1;
+            for (int t = 0; t < tw * th; t++)
+                memset(scratch.s.vram + (((tile + (unsigned)t) * 32) & 0xFFFF), 0xFF, 32);
+        }
+    for (int l = 0; l < 4; l++) if (lines_used[l]) scratch.s.cram[l * 16 + 15] = exo;
+    mdrt_vdp_render(&scratch, solid, 320);
     memset(vis, 0, sizeof vis);
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++)
@@ -319,16 +333,6 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
                 vis[y * 320 + x] = 1;
                 pic[(long)y * pitch + x] = 0xFF000000u | mdrt_vdp_rgb(clean[y * 320 + x], MDRT_RGB_GPGX);
             }
-    for (int y = 0; y < h; y++)                                  /* (the pixels within 2 of a visible one) */
-        for (int x = 0; x < w; x++) {
-            int hit = 0;
-            for (int dy = -2; dy <= 2 && !hit; dy++)
-                for (int dx = -2; dx <= 2; dx++) {
-                    int xx = x + dx, yy = y + dy;
-                    if (xx >= 0 && xx < w && yy >= 0 && yy < h && vis[yy * 320 + xx]) { hit = 1; break; }
-                }
-            near[y * 320 + x] = (uint8_t)(hit && (vis[y * 320 + x] || clean[y * 320 + x] == bare[y * 320 + x]));   /* (not over another sprite: its dither shows the cartridge's) */
-        }
     for (int i = n - 1; i >= 0; i--) {                           /* (the sprite table's first is on top: drawn last) */
         const spr *s = &P.f[list[i].pc];
         int team = list[i].away ? (int)rosters_art(team_struct(1)->tmteam) : (int)rosters_art(team_struct(0)->tmteam);
@@ -346,7 +350,7 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
                 if (v == 255) continue;
                 int r = v < 0x80 ? rec[192 + v] : rec[320 + v - 0x80];
                 int px_ = x0 + x, py = y0 + y;
-                if (px_ < 0 || px_ >= w || py < 0 || py >= h || !near[py * 320 + px_]) continue;
+                if (px_ < 0 || px_ >= w || py < 0 || py >= h || solid[py * 320 + px_] == clean[py * 320 + px_]) continue;
                 pic[(long)py * pitch + px_] = 0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2];
             }
     }
