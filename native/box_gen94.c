@@ -25,6 +25,7 @@ static int it_node[NIT], it_par[NIT], it_saved[NIT], laid;
 static float it_l[NIT][9], it_w[NIT][9];         /* each one's pose in the case (in its parent, and in the world) */
 /* the stage: dark ground with a pool of light, and the closed box's blurry reflection in it (after the game's TV commercial) */
 static int nfloorA = -1, nfloorB = -1, nrefl = -1;
+#define TV_DIST 58.0f                       /* the camera in front of the TV screen */
 static float lk[3];                              /* where the camera looks on the desk (tweened) */
 #define CASE_W 5.03f
 #define CASE_H 7.02f
@@ -393,7 +394,7 @@ static void caption(void)
     if (st == S_PACK) { snprintf(BX.title, sizeof BX.title, "In the box"); bx_say(G.out ? "<b>Everything that came in the box.</b> Drag an item to spin it, pick it to look closer." : "<b>Everything that came in the box.</b> Drag an item to spin it. To play, pick the cartridge."); return; }
     snprintf(BX.title, sizeof BX.title, "%s", st == S_DESK ? "Set up the system" : "Box");
     if (st == S_CLOSED) bx_say("<b>The box.</b> Drag to spin it, pick it to open.");
-    else if (st == S_OPEN) bx_say(G.out ? "<b>Your box.</b> Pick the bundle to lay everything out." : "<b>Manual and pack-ins on the left, cartridge on the right.</b> Pick either to lay everything out.");
+    else if (st == S_OPEN) bx_say(G.out ? "<b>Your box.</b> Pick the bundle to lay everything out." : "<b>Manual and pack-ins on the left, cartridge on the right.</b> Pick anything in the box to lay it all out.");
     else bx_say("<b>Set up the system.</b> Put the cartridge in the console.");
 }
 static void open_case(int instant)
@@ -864,13 +865,12 @@ static void check(void)
 }
 static void sys_on(int a) { (void)a; G.sys = 1; bx_sfx(SFX_KEY, 0); set_power(1); tv_on(); check(); }
 static void tv_turn_on(int a) { (void)a; G.tv = 1; bx_sfx(SFX_KEY, 0); tv_switch(); tv_on(); bx_after(1500, sys_on, 0); }
-/* after the click: along to the TV and back only a little, so the console stays close and the screen is in the picture */
+/* after the click: over to the TV, centred on its screen (the console below it, in the picture) */
 static void cam_wide(int a)
 {
     (void)a;
-    float v[3], t[3]; seat_pos(v); r3_world_pos(BX_S, tvScreen, t);
-    float mx = (v[0] + t[0]) / 2 + .3f;
-    bx_cam_to(mx, t[1] - .9f, t[2] + 45, 1500); bx_tw3(lk, mx, t[1] - 1.7f, t[2] + 3, 1500, 0);
+    float t[3]; r3_world_pos(BX_S, tvScreen, t);
+    bx_cam_to(t[0], t[1], t[2] + TV_DIST, 1500); bx_tw3(lk, t[0], t[1], t[2], 1500, 0);
 }
 static void insert_cart(void)
 {
@@ -940,13 +940,9 @@ static void frame(float dt)
     G.pads = count_pads();
     bx_n(tap)->opacity = G.pads > 2 ? 1 : .28f;
     if (st == S_CLOSED || st == S_OPEN) {
-        if (st == S_OPEN && !laid) {
-            static const char *all = "Everything in the box: pick to lay it out";
-            bx_hot_node(cmanual, all);
-            for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_hot_node(pk[i], all);
-            if (bx_n(cart)->vis && !G.cart) bx_hot_node(cart, all);
-        }
-        bx_hot_node(caseG, st == S_CLOSED ? "Open the box" : "");
+        /* open, before the things are laid out: the case and everything in it are one selection (they sit under the case,
+           so a pick anywhere on them lands here) */
+        bx_hot_node(caseG, st == S_CLOSED ? "Open the box" : "Everything in the box: pick to lay it out");
     }
     if (st == S_PACK) {
         int hv = bx_hovered_node();
@@ -1010,7 +1006,7 @@ static void draw2d(void)
 static void activate(int node, float sx, float sy)
 {
     (void)sx; (void)sy;
-    if (node == caseG) { if (st == S_CLOSED) open_case(0); return; }
+    if (node == caseG) { if (st == S_CLOSED) open_case(0); else if (st == S_OPEN && !laid) { lay_out(); caption(); } return; }
     if (st == S_OPEN) {
         int in = node == cmanual || node == cart;
         for (int i = 0; i < NPK; i++) if (node == pk[i]) in = 1;
