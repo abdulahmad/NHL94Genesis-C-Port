@@ -123,6 +123,9 @@ Online, every machine plays by the host's.
 - **Sega CD playoff password**: a password's pad layout read as the disc reads it (which pads play which team in a continued playoff).
 - **Sega CD shot data fix**: a new game clears only the shot buffer (the cartridge runs past it into the sound driver's tables).
 - **Sega CD uniforms**: Hartford's home and Ottawa's away colours as the disc has them.
+- **Sega CD sound choices**: the breakaway "ding" is sound 2, not 1 (in breakaway, asspuckc and assnearest), and a pass always makes the same sound (the cartridge picks one of four by the puck's height).
+- **Sega CD song timing**: the home team's goal song starts at once (the cartridge waits 2 seconds), and the faceoff song late in a period starts when the faceoff is set up, not queued for the drop.
+- **Sega CD period end**: the end of a period goes straight to the intermission song, without the cartridge's two frame waits and the sound cut between them.
 - **Sega CD rosters (restarts)**: the disc's teams: 31 players fewer, with its goalie counts, forward counts and lines. It is a
   built-in roster set (`--rosters sega-cd`, `rules.rosters = sega-cd`), made from your cartridge, with records of its own; turning it on or off starts the console again.
 

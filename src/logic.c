@@ -1046,6 +1046,7 @@ void dopass(struct SortObj *o)
     o->pflags |= 1 << pfalock;
     uint16_t snd = (uint16_t)(uint8_t)(0xC - (uint8_t)(g.puckvz[0] >> 8));
     snd = (uint16_t)(((snd >> 2) & 3) + 0x10);            /* SFXpass, by the puck's hop */
+    if (rules[RULE_CD_SOUNDS]) snd = 0x10;                /* (rules: the Sega CD's move.w #$10 for addi.w #$10) */
     sfx((int16_t)snd);
 }
 
@@ -2285,7 +2286,7 @@ int breakaway(struct SortObj *o)
     g.sflags5 |= 4;
     if (PFLAG(o, pfna)) {
         o->pflags &= (uint8_t)~(1 << pfna);
-        sfx(SYM_SFXbeep1);
+        sfx(rules[RULE_CD_SOUNDS] ? 2 : SYM_SFXbeep1);   /* (rules: the Sega CD's "ding", SFXbeep2) */
         breakaway_crowd(o);
     }
     if (o->Yvel == 0) return 1;
@@ -2352,7 +2353,7 @@ void asspuckc(struct Team *tm, struct SortObj *o)
     if (PFLAG(o, pfjoycon)) { assexit(o); return; }
     if (PFLAG(o, pfna)) {
         o->pflags &= (uint8_t)~(1 << pfna);
-        if (o->pflags3 & (1 << pf3break)) sfx(SYM_SFXbeep1);
+        if (o->pflags3 & (1 << pf3break)) sfx(rules[RULE_CD_SOUNDS] ? 2 : SYM_SFXbeep1);   /* (rules: the Sega CD's SFXbeep2) */
         if (o->pflags3 & (1 << pf3break)) breakaway_crowd(o);
         o->temp1 = 0;
         o->temp2 = 8;
@@ -2623,7 +2624,7 @@ void assnearest(struct Team *tm, struct SortObj *o)
         assreplace(abreakaway, o);
     if (PFLAG(o, pfna)) {
         o->pflags &= (uint8_t)~(1 << pfna);
-        if (o->pflags3 & (1 << pf3break)) sfx(SYM_SFXbeep1);
+        if (o->pflags3 & (1 << pf3break)) sfx(rules[RULE_CD_SOUNDS] ? 2 : SYM_SFXbeep1);   /* (rules: the Sega CD's SFXbeep2) */
         if (o->pflags3 & (1 << pf3break)) breakaway_crowd(o);
         o->temp3 = 0;
         o->temp2 = 8;
@@ -3122,12 +3123,16 @@ void puckfaceoff(struct Team *tm, struct SortObj *o)
     {
         uint16_t half = (uint16_t)((int16_t)g.PerTimeTotal >> 1);
         if (!(half <= g.gameclock) && !((int16_t)g.gameclock < 0x3C) && (g.sflags3 & 0x80)) {
-            g.sflags3 &= (uint8_t)~0x80;                 /* once in the second half of a period */
+            if (!rules[RULE_CD_SONGS]) g.sflags3 &= (uint8_t)~0x80;   /* once in the second half of a period */
             if ((g.gmode & (1 << gmclock)) && !(g.sflags8 & 0x40)) {
                 g.HmTeam = g.HomeTeam;
                 g.SongIndex = 2;
                 ChooseSong();
-                g.sflags8 |= 0x10;
+                if (rules[RULE_CD_SONGS]) {              /* (rules: the Sega CD clears the flag only here and plays the song now) */
+                    g.sflags3 &= (uint8_t)~0x80;
+                    song((int16_t)g.SongNum);
+                } else
+                    g.sflags8 |= 0x10;
             }
         }
     }
