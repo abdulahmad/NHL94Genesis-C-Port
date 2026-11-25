@@ -135,9 +135,9 @@ list_done:
         if ((int16_t)--g.matchuptimer < 0) g.matchuptimer = 0x10E;
         PrintAdvantageMarks();
         if (d1 & 0x80) break;                             /* Start */
-        int page = 0;
+        int page = 0, timed = 0;
         if (g.matchuptimer == 0x10E) {
-            page = 1;                                     /* the timer ran out: the next matchup */
+            page = 1; timed = 1;                          /* the timer ran out: the next matchup */
         } else if (d1 & 0x20) {                           /* C: the next */
             g.screentimer = 0x7FFF;
             g.scoutwait = 0x8CA0;
@@ -152,7 +152,7 @@ list_done:
         }
         if (page) {
             RestartAdvantageMarks();
-            if (!scout_disc || scout_last) PageMatchup((int16_t)page);   /* (the disc: its voice turns them until its last paragraph) */
+            if (!scout_disc || scout_last || !timed) PageMatchup((int16_t)page);   /* (the disc: A and C turn them any time; the timer only after his last paragraph) */
         }
         if (g.waitxpad & 2) ST_W(g.asv);                  /* down held */
         UpdateScoutingDisplay();

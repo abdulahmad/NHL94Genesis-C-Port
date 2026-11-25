@@ -774,7 +774,9 @@ void UpdateScoutingDisplay(void)
         }
         if (scout_disc && (d0 & 0x8000)) {               /* (the disc: this player's matchup comes up with him) */
             d0 &= 0x7FFF;
-            PageMatchup(1);
+            int16_t at = 0;                               /* (the matchup he's on: one for each marked paragraph so far) */
+            for (uint16_t j = 0; j <= i / 2; j++) if (g.TestList[j] != 0xFFFF && (g.TestList[j] & 0x8000)) at++;
+            PageMatchup((int16_t)(at - (int16_t)g.matchup));
             g.advframe = 3;
             g.advcount = 0;
             PrintAdvantageMarks();
