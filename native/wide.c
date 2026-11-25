@@ -345,6 +345,9 @@ static int sports_line(const mdrt_vdp *v, int y, int M, const uint32_t *mid, int
 
 /* ---- the frame ---------------------------------------------------------------------------- */
 
+/* the wide view's horizontal rink (the penalty screen; SetHor): 256 in the middle of a 320 line, nothing beside it */
+int wide_hor_frame(int w) { return w == 320 && view_wide() && (g.sflags & HI(sfhor)) && (int16_t)g.Hscroll == VIEW_SHIFT; }
+
 int wide_rink_frame(int w) { return w == 320 && view_wide() && (g.disflags & HI(df32c)) && !(g.sflags & HI(sfhor)); }
 
 /* the main menu (the game setup screen): bars */
@@ -361,6 +364,11 @@ int wide_frame(const mdrt_vdp *v, const uint32_t *pic, int w, int h, int pitch, 
 {
     int M = w == 256 ? 32 : 40;
     if (!sega_cd && wide_rink_frame(w)) M = 0;
+    if (!sega_cd && wide_hor_frame(w)) {                  /* its sides as the pause screen's (stands.c), in the 320 */
+        for (int y = 0; y < h; y++) memcpy(out + (long)y * opitch, pic + (long)y * pitch, (size_t)w * 4);
+        stands_frame(v, 32, h, out, opitch);
+        return w;
+    }
     int ow = w + 2 * M;
     for (int y = 0; y < h; y++) memcpy(out + (long)y * opitch + M, pic + (long)y * pitch, (size_t)w * 4);
     if (!M) return ow;
@@ -377,7 +385,8 @@ int wide_frame(const mdrt_vdp *v, const uint32_t *pic, int w, int h, int pitch, 
         }
         return ow;
     }
-    int bars = w == 256 ? !(g.sflags & HI(sfhor)) : bars_screen(v);
+    int replay = w == 256 && view_wide() && (g.sflags2 & HI(sf2replay)) && !(g.sflags & HI(sfhor));
+    int bars = w == 256 ? !(g.sflags & HI(sfhor)) && !replay : bars_screen(v);
     if (bars) {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < M; x++) out[(long)y * opitch + x] = out[(long)y * opitch + w + M + x] = 0xFF000000u;
@@ -388,7 +397,7 @@ int wide_frame(const mdrt_vdp *v, const uint32_t *pic, int w, int h, int pitch, 
     for (int y = 0; y < h; y++) {
         uint32_t *o = out + (long)y * opitch;
         if (w == 320 && sports_line(v, y, M, pic + (long)y * pitch, w, o, pic, pitch, h)) continue;
-        wide_line(v, y, M, WIDE_ALL, idx);
+        wide_line(v, y, M, replay ? WIDE_BS : WIDE_ALL, idx);   /* (the instant replay's rink: plane A holds its icons) */
         for (int x = 0; x < M; x++) { o[x] = wide_rgb(v, idx[x]); o[w + M + x] = wide_rgb(v, idx[w + M + x]); }
     }
     return ow;
@@ -417,6 +426,10 @@ void wide_crop_follow(void)
 
 int wide_crop(const mdrt_vdp *v, const uint32_t *pic, int h, int pitch, uint32_t *out, int opitch)
 {
+    if (wide_hor_frame(320)) {                            /* the horizontal rink: the 256 in the middle as it is */
+        for (int y = 0; y < h; y++) memcpy(out + (long)y * opitch, pic + (long)y * pitch + 32, 256 * 4);
+        return 256;
+    }
     int hp = (int16_t)g.Hpos;
     if (!cam_known) wide_crop_follow();
     int x0 = 32 + cam - hp, boxes = view_boxes();

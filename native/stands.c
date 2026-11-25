@@ -97,9 +97,9 @@ int stands_frame(const mdrt_vdp *v, int M, int h, uint32_t *out, int opitch)
     if (M != 32 || !(g.sflags & HI(sfhor)) || h < ICE) return 0;
     static uint8_t idx[WIDE_MAX_W];
     static uint32_t bg[224][256], side[224][2][32];
-    int w = 256;
+    int w = 256, vm = mdrt_vdp_width(v) == 320 ? 0 : M;   /* (the wide view's horizontal rink: 256 in the middle of 320, its sides there) */
     for (int y = 0; y < h && y < 224; y++) {
-        wide_line(v, y, M, WIDE_B, idx);
+        wide_line(v, y, vm, WIDE_B, idx);
         for (int x = 0; x < w; x++) bg[y][x] = wide_rgb(v, idx[M + x]);
     }
     static uint32_t ls[Y1 - TOP][32], rs[Y1 - TOP][32];
@@ -120,7 +120,7 @@ int stands_frame(const mdrt_vdp *v, int M, int h, uint32_t *out, int opitch)
     }
     for (int y = 0; y < h; y++) {                                                   /* the sprites past the edges, on top */
         uint32_t *o = out + (long)y * opitch;
-        wide_line(v, y, M, WIDE_S, idx);
+        wide_line(v, y, vm, WIDE_S, idx);
         for (int x = 0; x < M; x++) {
             o[x] = idx[x] ? wide_rgb(v, idx[x]) : side[y][0][x];
             o[w + M + x] = idx[w + M + x] ? wide_rgb(v, idx[w + M + x]) : side[y][1][x];
