@@ -3,6 +3,7 @@
  * periods, and packs playoff results into the password. */
 #include <string.h>
 #include "game.h"
+#include "rosters.h"
 #include "hal.h"
 #include "rom.h"
 #include "symbols_gen.h"
@@ -754,23 +755,47 @@ void UpdateScoutingDisplay(void)
     if ((int16_t)g.asv >= 0 && (int16_t)--g.ScoutingReportTimer >= 0) return;
     const uint32_t a1 = SYM_ScoutTextScript;
     int16_t d0 = (int16_t)g.PlayerScrollCtr;
+    const uint8_t *base = rom_ptr(a1);                    /* (the disc's: the paragraph's own text, offsets from its start) */
     if (d0 < 0) {                                         /* the next paragraph */
+        if (scout_disc) {                                 /* (scout94cd.asm: the next waits for his voice, the blank lines too) */
+            static int waited;
+            uint16_t nx = g.TestList[g.SelectedPlayerIdx / 2];
+            if (nx != 0x1D && cd_scout_hook(CD_SCOUT_BUSY) && ++waited < 60 * 30) return;
+            waited = 0;
+        }
         g.DispAttribCtr = 0;
         uint16_t i = g.SelectedPlayerIdx;
         g.SelectedPlayerIdx += 2;
         d0 = (int16_t)g.TestList[i / 2];                  /* (SelectedPlayerIdx: its byte offset) */
-        if (d0 < 0) {                                     /* the list's end */
+        if (scout_disc ? (uint16_t)d0 == 0xFFFF : d0 < 0) {   /* the list's end (the disc's: $8000 marks a matchup) */
             g.ScoutingReportTimer = 0x7FFF;
             g.screentimer = 0x1E0;
             return;
         }
+        if (scout_disc && (d0 & 0x8000)) {               /* (the disc: this player's matchup comes up with him) */
+            d0 &= 0x7FFF;
+            PageMatchup(1);
+            g.advframe = 3;
+            g.advcount = 0;
+            PrintAdvantageMarks();
+        }
+        if (scout_disc && d0 == 0x21) scout_last = 1;
         ScrollDisplayUp();
         if (cd_event_hook) cd_event_hook(CD_EV_PARAGRAPH, (uint16_t)d0);
-        const uint8_t *p = rom_ptr(a1);
-        for (uint16_t n = (uint16_t)d0; n-- != 0;) while (*p++ != 0xD) {}
-        d0 = (int16_t)(uint16_t)(p - rom_ptr(a1));
+        if (scout_disc) d0 = 0;                           /* (the disc's paragraph: from its start) */
+        else {
+            const uint8_t *p = rom_ptr(a1);
+            for (uint16_t n = (uint16_t)d0; n-- != 0;) while (*p++ != 0xD) {}
+            d0 = (int16_t)(uint16_t)(p - rom_ptr(a1));
+        }
     }
-    const uint8_t *a2 = rom_ptr(a1) + d0;
+    if (scout_disc) {                                     /* (this paragraph's text on the disc) */
+        uint16_t n = (uint16_t)(g.TestList[g.SelectedPlayerIdx / 2 - 1] & 0x7FFF);
+        if (n == 0x1A) n = (uint16_t)(0xEA + (rosters_art(g.HomeTeam) < 0x1A ? rosters_art(g.HomeTeam) : rosters_art(g.VisTeam) < 0x1A ? 0x1A : 0x1B));
+        base = cd_scout_text(n);
+        if (!base) { g.PlayerScrollCtr = 0xFF00; return; }
+    }
+    const uint8_t *a2 = base + d0;
     g.ScoutingReportTimer = 0xA;
     d0 = (int16_t)g.DispAttribCtr;
     struct Text str;                                      /* a String the special character puts in */
@@ -799,7 +824,9 @@ void UpdateScoutingDisplay(void)
         ST_W(g.PlayerScrollCtr);
         uint8_t *a0 = text_buffer();
         d1 = 0;
-        while (*a2 != 0xD) {
+        for (;;) {
+            if (scout_disc && *a2 == '!') a2 += 3;        /* (the disc's text: a line that goes on, "!\r\n") */
+            if (*a2 == 0xD) break;
             d0++;
             int more;
             do {
@@ -810,7 +837,7 @@ void UpdateScoutingDisplay(void)
             } while (more);
             if (a2[-1] == ' ') {
                 d0--;
-                g.PlayerScrollCtr = (uint16_t)(a2 - rom_ptr(a1));
+                g.PlayerScrollCtr = (uint16_t)(a2 - base);
                 break;
             }
         }

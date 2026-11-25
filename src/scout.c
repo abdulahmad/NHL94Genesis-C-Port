@@ -4,6 +4,7 @@
  * side that has the advantage. */
 #include <string.h>
 #include "game.h"
+#include "rosters.h"
 #include "hal.h"
 #include "rom.h"
 #include "symbols_gen.h"
@@ -28,6 +29,8 @@ uint32_t ScoutCrowdRecord(void)
  * welcome, the teams' form, their hot / cold players, the crowd record, start), the matchups. A /
  * C page them (they turn by themselves every $10E frames), down types fast, Start leaves; it ends
  * when the text is done (Demo), else after about ten minutes more. */
+int scout_disc, scout_last;
+
 void ScoutingReport(void)
 {
     static const uint8_t bigfont[8] = { 0x05, 0x43, 0x15, 0x67, 0x79, 0xAB, 0xCD, 0xEF };
@@ -90,6 +93,24 @@ void ScoutingReport(void)
     InitScoutingDisplay();                                /* the paragraphs of ScoutTextScript, to TestList */
     int k = 0;
     #define PARA(n) (g.TestList[k++] = (n))
+    scout_disc = cd_scout_hook && cd_scout_text && cd_scout_hook(CD_SCOUT_ON);
+    scout_last = 0;
+    if (scout_disc) {                                     /* (scout94cd.asm: the disc's list, its teams' write-ups and the matchups' players) */
+        uint16_t h = (uint16_t)(rosters_art(g.HomeTeam) * 7 + 0x26), v = (uint16_t)(rosters_art(g.VisTeam) * 7 + 0x26);
+        static const uint8_t pos[6] = { 1, 5, 6, 3, 2, 4 };   /* (centre, wings, defence, goalie: the matchups' order) */
+        PARA(0x1B); PARA(0x1D);                           /* "Hi, I'm Ron Barr ..." */
+        PARA(0x1A); PARA(0x1D);                           /* the home team's welcome */
+        PARA(0x24); PARA(0x1D);                           /* "Let's take a look at tonight's matchups." */
+        PARA(h); PARA(0x1D); PARA(0x1D);                  /* the two teams */
+        PARA(v); PARA(0x1D); PARA(0x1D);
+        for (int i = 0; i < 6; i++) {                     /* a position each: the home player's (the next matchup), then the visitor's */
+            PARA((uint16_t)((h + pos[i]) | 0x8000)); PARA(0x1D);
+            PARA((uint16_t)(v + pos[i])); PARA(0x1D);
+        }
+        PARA(0x21);                                       /* "Hit the start button ..." */
+        g.TestList[k] = 0xFFFF;
+        goto list_done;
+    }
     PARA(0x1B);                                           /* "Hi, I'm Ron Barr ..." */
     PARA(0x1D);                                           /* (a blank line) */
     PARA(0x1A);                                           /* "Welcome to a sold out ^ ..." */
@@ -104,6 +125,7 @@ void ScoutingReport(void)
     PARA(0x1D);
     PARA(0x21);                                           /* "Hit the start button ..." */
     g.TestList[k] = 0xFFFF;
+list_done:
     g.asv = 0;
     g.screentimer = 0x7FFF;
     g.scoutwait = 0x8CA0;
@@ -130,7 +152,7 @@ void ScoutingReport(void)
         }
         if (page) {
             RestartAdvantageMarks();
-            PageMatchup((int16_t)page);
+            if (!scout_disc || scout_last) PageMatchup((int16_t)page);   /* (the disc: its voice turns them until its last paragraph) */
         }
         if (g.waitxpad & 2) ST_W(g.asv);                  /* down held */
         UpdateScoutingDisplay();

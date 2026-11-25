@@ -265,6 +265,14 @@ extern int (*spr_hook)(int ev, int sc, int16_t x, int16_t y, const struct Sprite
  * CD_TITLE_STEP: a frame of that page's credits, 0 at their end. NULL or 0: the cartridge's (the game is unchanged then) */
 enum { CD_TITLE_LICENSE, CD_TITLE_BEGIN, CD_TITLE_STEP };
 extern int (*cd_title_hook)(int what);
+/* (the same host) the Sega CD's scouting report, Ron Barr's whole spiel as the disc has it: CD_SCOUT_ON 1: the disc's paragraph
+ * list and text (its teams' and players' write-ups), each paragraph waiting for his voice; CD_SCOUT_BUSY 1: his voice is still on
+ * a paragraph. cd_scout_text: the disc's paragraph n (its own numbering), NULL none. NULL or 0: the cartridge's */
+enum { CD_SCOUT_ON, CD_SCOUT_BUSY };
+extern int (*cd_scout_hook)(int what);
+extern const uint8_t *(*cd_scout_text)(int n);
+extern int scout_disc;                                    /* (scout.c / setup.c) this scouting report is the disc's */
+extern int scout_last;                                    /* (the disc's) its last paragraph is up */
 /* (the same host) the player card's picture for team's roster player: 1 with what UnpackPicture would leave in buf (the
  * tile count word, 36 tiles) and 16 colours (big-endian words) for palette 2; NULL or 0: the cartridge's */
 extern int (*cd_picture_hook)(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32]);
