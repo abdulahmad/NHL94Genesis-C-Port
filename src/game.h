@@ -250,6 +250,12 @@ extern void (*cd_event_hook)(int ev, uint16_t n);
  * player him; PA_ONEMIN: the clock reached one minute; PA_STAR: tm and player the star, a which (0-2) */
 enum { PA_GOAL, PA_PENALTY, PA_PENSHOT, PA_ONEMIN, PA_STAR };
 extern void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
+
+/* The hat trick hats (native/hats.c): a home skater's third goal starts them (HAT_START), the next face off
+ * ends them (HAT_END), and each game frame steps them (HAT_FRAME, arg = the frames since the last). NULL in
+ * the game; only the host sets it. They read the game and never write it. */
+enum { HAT_START, HAT_END, HAT_FRAME };
+extern void (*hat_hook)(int ev, int arg);
 /* (the same host) the Sega CD's own pages around the title, which the host draws: CD_TITLE_LICENSE 1: its license page before the
  * title; CD_TITLE_BEGIN 1: its title page in place of the cartridge's (the cartridge's set-up and song stay, its credits do not);
  * CD_TITLE_STEP: a frame of that page's credits, 0 at their end. NULL or 0: the cartridge's (the game is unchanged then) */

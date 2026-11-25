@@ -19,7 +19,7 @@ And things the cartridge never had:
   effects, opening screens, intro movie and player cards, each off until you turn it on. The
   game itself is the original, exactly.
 - **NHL 95 PC options**: things NHL 95 PC did that the cartridge did not, built from your own copy of that game's files, each
-  off until you turn it on. The first is the rink announcer; **White ice** is another.
+  off until you turn it on. The first is the rink announcer; **White ice** and the **Hat trick hats** are others.
 - **Save states**: eight slots with a picture each, the Autosave when you quit, and hold F4 to
   rewind the goal you just gave up.
 - **All of it online.** The host's choices go to every machine. Seasons go online in a save state: anyone saves one, and the host loads it for everyone.
@@ -156,6 +156,11 @@ on or off, and each machine in an online game can set it for itself. The sounds 
 - **White ice**: the rink drawn white, as on the PC games, in place of the cartridge's pale cyan (and the glass's sheen in white). It needs no
   files from anywhere and changes only the picture, in the 4:3 and the wide rink; menus and the opening film keep their colours. Off in every
   preset (a taste). Headless: `--white-ice`.
+- **Hat trick hats**: as on NHL 94 SNES, a home skater's third goal sends hats flying onto the ice from both sides, tumbling, landing and sliding
+  to a stop with a shadow each, until the next face off. The hats are the SNES game's own sprites in the home team's colours, read from your own
+  `NHL '94 (USA).sfc` (or `.smc`) put beside the program (up to three folders below); without it the row says "(no NHL 94 SNES ROM found)". Nothing
+  of the game changes (the hats have a random generator of their own), so states, replays and online play are the same with it on or off. Headless:
+  `--hats ROM`; `HATS_DEMO=1` starts the hats at once, for looking at them.
 - Headless: `--announcer FILE` plays the announcer from that `XBRUCE2.VIV` into `--wav`; `ANNOUNCER_LOG=1` prints each clip said.
 
 ### Game rules

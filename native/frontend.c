@@ -32,6 +32,7 @@
 #include "segacd.h"
 #include "announcer.h"
 #include "whiteice.h"
+#include "hats.h"
 #include "cardcolor.h"
 #include "wide.h"
 
@@ -310,6 +311,7 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++) pic[y * 320 + x] = 0xFF000000u | mdrt_vdp_rgb(px[y * pitch + x], MDRT_RGB_GPGX);
     if (w <= 320 && h <= 240) whiteice_present(pic, w, h, 320);                  /* (white ice, when on) */
+    if (w <= 320 && h <= 240) hats_present(pic, w, h, 320);                      /* (the SNES's hat trick hats, when on) */
     if (w <= 320 && h <= 240) cardcolor_present(mdrt_get_vdp(F.m), pic, w, h, 320);   /* (the players' photos in colour, when on) */
     int cd = w <= 320 && h <= 224 && segacd_present(pic, w, h);   /* (the Sega CD's opening screens, when they are on) */
     if (cd) { w = 320; h = 224; }
@@ -556,7 +558,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_ANNOUNCER (CD_ROWS + 14)                        /* (NHL 95 PC's rink announcer, its own files: group 4) */
 #define CD_PCPHOTOS (CD_ROWS + 13)                        /* (the cartridge's photos in colour, from the player's PC files: cardcolor.c) */
 #define CD_WHITEICE (CD_ROWS + 15)                         /* (white ice: group 4) */
-#define CD_OPTS (CD_ROWS + 16)
+#define CD_HATS (CD_ROWS + 16)                            /* (NHL 94 SNES's hat trick hats, its own ROM: group 4) */
+#define CD_OPTS (CD_ROWS + 17)
 static ob_game_opt cd_opts[CD_OPTS];
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
 static SDL_atomic_t cd_smooth, cd_colour;                 /* the movie at 30 fps; each shot's colour */
@@ -588,6 +591,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_SFX) { segacd_set_sfx(value); return; }
     if (index == CD_ANNOUNCER) { announcer_set(value); return; }
     if (index == CD_WHITEICE) { whiteice_set(value); return; }
+    if (index == CD_HATS) { hats_set(value); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -661,6 +665,18 @@ static void pa_no_file(void)
     cd_opts[CD_ANNOUNCER].label = label;
 }
 
+/* the hats' row says so when no NHL 94 SNES ROM was found beside the program */
+static void hats_no_file(void)
+{
+    static int done;
+    static char label[64];
+    if (done || !hats_searched()) return;
+    done = 1;
+    if (hats_found()) return;
+    snprintf(label, sizeof label, "%s (no NHL 94 SNES ROM found)", cd_opts[CD_HATS].label);
+    cd_opts[CD_HATS].label = label;
+}
+
 /* the colour photos' row says so when neither PC game's portraits were found */
 static void pc_no_files(void)
 {
@@ -701,6 +717,8 @@ static void game_page_init(void)
     cd_opts[CD_SFX] = (ob_game_opt){ "cd_sfx", "Sound effects", music, 2, 0, 0, 3 };
     cd_opts[CD_ANNOUNCER] = (ob_game_opt){ "pc_announcer", "Rink announcer", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's voice: goals, penalties, the last minute, the three stars) */
     announcer_start();
+    hats_start();
+    cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 0, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
     cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
     cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 0, 0, 4 };
     segacd_start();
@@ -715,6 +733,8 @@ static void game_page_init(void)
     pv[1][CD_VOICE] = 1; pv[1][CD_CROWD] = 1;
     pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
     pv[1][CD_ANNOUNCER] = 0;                                                  /* (95 PC's voice: not the Sega CD's) */
+    pv[1][CD_HATS] = 0;                                                        /* (the SNES's: not the Sega CD's) */
+    pv[2][CD_HATS] = 1;                                                        /* (on in Recommended; it does nothing without the SNES ROM) */
     pv[1][CD_WHITEICE] = 0;                                                    /* (the PC games' look: not the Sega CD's; off in Recommended too, it is a taste) */
     pv[2][CD_ANNOUNCER] = 1;                                                  /* (on in Recommended; it does nothing without 95 PC's files) */
     pv[2][CD_PCPHOTOS] = 1;                                                    /* (Abdul: on in Recommended) */
@@ -995,6 +1015,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         segacd_career_tick(F.dev, F.rate, SDL_AtomicGet(&cd_dedither));
         cd_no_disc();
         pa_no_file();
+        hats_no_file();
         pc_no_files();
         hold_state = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open || ob_screen_up();
         ob_plat_present();

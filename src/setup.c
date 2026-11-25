@@ -1521,7 +1521,10 @@ void ShowGoalBox(void)
     if (g.DelayedPen & 1) { g.DelayedPen &= (uint8_t)~1; text = SYM_PPGoalBigTxt; }
     if (tm->tmgoals[e[3]] == 3 && e[3] >= g.scorergoalies) {          /* third goal of a skater */
         text += rd16(rom_ptr(text));                               /* HAT TRICK! */
-        if (tm->tmteam == g.HomeTeam) StartArenaAnim(0);
+        if (tm->tmteam == g.HomeTeam) {
+            StartArenaAnim(0);
+            if (hat_hook) hat_hook(HAT_START, 0);                 /* (the SNES's hats) */
+        }
     }
     printbig(text);
     uint16_t scorer = e[3];

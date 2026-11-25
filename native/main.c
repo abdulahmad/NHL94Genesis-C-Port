@@ -86,6 +86,7 @@
 #include "segacd.h"
 #include "announcer.h"
 #include "whiteice.h"
+#include "hats.h"
 #include "cardcolor.h"
 #include "wide.h"
 #include "rules.h"
@@ -601,6 +602,7 @@ static void write_ppm(const char *path)
     for (int i = 0; i < h; i++)
         for (int x = 0; x < w; x++) pic[i * 320 + x] = screen_frame ? screen_px[i * 320 + x] : 0xFF000000u | mdrt_vdp_rgb(px[i * 320 + x], 1);
     if (!screen_frame) whiteice_present(pic, w, h, 320);
+    if (!screen_frame) hats_present(pic, w, h, 320);
     if (!screen_frame) cardcolor_present(v, pic, w, h, 320);   /* (--pc-photos) */
     int pitch = 320;
     const uint32_t *src = pic;
@@ -662,6 +664,7 @@ void native_frame_done(long frame, int wait)
 
 static FILE *wav;
 static int segacd_on;                                     /* --segacd-music / --segacd-crowd */
+static const char *hats_rom;                              /* --hats FILE: the hat trick hats, from this NHL 94 SNES ROM */
 static const char *announcer_file;                        /* --announcer FILE: the rink announcer, from this XBRUCE2.VIV (its voice joins the --wav) */
 static int segacd_sfx_flag;                               /* --segacd-sfx: the disc's sound effects (rendered before the run starts) */
 static unsigned wav_rate = 48000;
@@ -739,6 +742,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--shots") && i + 1 < argc) shots_dir = argv[++i];
         else if (!strcmp(argv[i], "--every") && i + 1 < argc) shots_every = atol(argv[++i]);
         else if (!strcmp(argv[i], "--wav") && i + 1 < argc) wav_path = argv[++i];
+        else if (!strcmp(argv[i], "--hats") && i + 1 < argc) hats_rom = argv[++i];
         else if (!strcmp(argv[i], "--white-ice")) whiteice_set(1);
         else if (!strcmp(argv[i], "--announcer") && i + 1 < argc) announcer_file = argv[++i];
         else if (!strcmp(argv[i], "--segacd-music")) { segacd_on = 1; segacd_set_music(1); }
@@ -881,6 +885,11 @@ int main(int argc, char **argv)
     if (wav_path && !(wav = fopen(wav_path, "wb"))) { fprintf(stderr, "cannot write %s\n", wav_path); return 1; }
     if (wav) wav_header(c.audio_rate);
     if (segacd_on) { wav_rate = c.audio_rate ? c.audio_rate : 48000; segacd_start(); segacd_wait(); }
+    if (hats_rom) {
+        if (!hats_load_file(hats_rom)) { fprintf(stderr, "--hats: %s is not an NHL 94 SNES ROM\n", hats_rom); return 2; }
+        hats_set(1);
+        hats_start();
+    }
     if (announcer_file) {
         wav_rate = c.audio_rate ? c.audio_rate : 48000;
         if (!announcer_load_file(announcer_file)) { fprintf(stderr, "--announcer: %s is not a bank of clips\n", announcer_file); return 2; }

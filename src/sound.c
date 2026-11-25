@@ -22,6 +22,7 @@
 
 void (*cd_event_hook)(int ev, uint16_t n);
 void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
+void (*hat_hook)(int ev, int arg);
 int (*cd_title_hook)(int what);
 int (*cd_picture_hook)(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32]);
 void (*cd_career_hook)(uint16_t team, uint16_t player);

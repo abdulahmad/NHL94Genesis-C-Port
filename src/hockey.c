@@ -181,6 +181,7 @@ void DoGameFrame(void)
     while ((d7 = (int16_t)(g.Vcount - g.OldVcount)) == 0) hal_wait_vblank();
     g.OldVcount = g.Vcount;
     elapsed = d7;
+    if (hat_hook) hat_hook(HAT_FRAME, d7);
     periodicevents();
     updateplayers();
     if ((int16_t)g.songdelay > 0 && --g.songdelay == 0) {
