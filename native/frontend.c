@@ -312,6 +312,7 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     F.wide = host.widescreen;
     rules_widescreen(host.widescreen);           /* (the wide rink from the next power on: rules.c) */
     if (F.wide) w = wide_frame(mdrt_get_vdp(F.m), pic, w, h, 320, F.picture, WIDE_MAX_W, cd);   /* (the sides: wide.c) */
+    else if (!cd && native_net_on() && wide_rink_frame(w)) wide_crop_follow(), w = wide_crop(mdrt_get_vdp(F.m), pic, h, 320, F.picture, WIDE_MAX_W);   /* (a 16:9 player's wide rink, here 4:3) */
     else for (int y = 0; y < h; y++) memcpy(F.picture + y * WIDE_MAX_W, pic + y * 320, (size_t)w * 4);
     F.width = w;
     F.height = h;

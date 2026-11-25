@@ -122,6 +122,7 @@ void rules_next(const int *values, void *user)
  * rule of its own: a session plays by the host's (native_net_settings sends it), a check by Classic */
 static volatile int widescreen;
 void rules_widescreen(int on) { widescreen = on; }
+int rules_widescreen_on(void) { return widescreen; }
 
 void rules_power_on(void)
 {
