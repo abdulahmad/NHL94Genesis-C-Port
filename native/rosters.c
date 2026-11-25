@@ -2239,6 +2239,45 @@ static int shared_extract(const struct romsrc *s, const char *dir)
     return 0;
 }
 
+/* one of the cartridge's shared pictures (art.c's list: "ScoutMap") as 0xAARRGGBB pixels, malloc'd (the caller frees): its size in *w, *h.
+ * NULL when there is no cartridge or the picture does not read. The select-sides screen's field is the scouting screen's. */
+uint32_t *rosters_picture(const char *name, int *w, int *h, int clear0)
+{
+    struct romsrc s;
+    uint16_t screen[64], team[16];
+    if (!rom_cart) return NULL;
+    romsrc_cartridge(&s, rom_cart);
+    shared_colours(&s, screen, team);
+    for (int i = 0; i < art_shared(); i++) {
+        struct art_view v;
+        uint32_t *out;
+        if (strcmp(art_shared_name(i), name)) continue;
+        if (art_shared_view(&s, i, s.asset[art_shared_asset(i)], screen, team, &v) < 0) return NULL;
+        out = malloc((size_t)v.w * (size_t)v.h * 4);
+        if (out) {
+            for (int k = 0; k < v.w * v.h; k++) out[k] = clear0 && v.px[k] % 16 == 0 ? 0 : 0xFF000000u | art_rgb(v.pal[v.px[k] % 64]);
+            *w = v.w;
+            *h = v.h;
+        }
+        art_view_free(&v);
+        return out;
+    }
+    return NULL;
+}
+
+/* a team's setup-screen banner (88 x 16, the lower half of its banners picture) as ARGB into out; 0, -1 */
+int rosters_banner(int team, uint32_t out[88 * 16])
+{
+    struct romsrc s;
+    uint8_t px[ART_BANNER_H * ART_BANNER_W];
+    uint16_t pal[ART_BANNER_COLOURS];
+    if (!rom_cart || team < 0) return -1;
+    romsrc_cartridge(&s, rom_cart);
+    if (art_banners(&s, team, px, pal) < 0) return -1;
+    for (int k = 0; k < 88 * 16; k++) out[k] = 0xFF000000u | art_rgb(pal[px[88 * 16 + k] % ART_BANNER_COLOURS]);
+    return 0;
+}
+
 int rosters_export(const char *dir)
 {
     struct romsrc s;
