@@ -133,6 +133,7 @@ static void compose(const mdrt_vdp *v, int line, int M, int what, uint8_t *idx, 
         }
     } else memset(a.col, 0, sizeof a.col);
     if (what == WIDE_A) { memcpy(idx, a.col, (size_t)ow); if (at) memcpy(at, a.at, (size_t)ow * sizeof *at); return; }
+    if (what == WIDE_S) { sprite_line(v, line, width, M, &s); memcpy(idx, s.col, (size_t)ow); return; }
     if (what != WIDE_B) sprite_line(v, line, width, M, &s);
     else memset(s.col, 0, sizeof s.col);
     for (int x = 0; x < ow; x++) {
@@ -363,11 +364,16 @@ int wide_frame(const mdrt_vdp *v, const uint32_t *pic, int w, int h, int pitch, 
     int ow = w + 2 * M;
     for (int y = 0; y < h; y++) memcpy(out + (long)y * opitch + M, pic + (long)y * pitch, (size_t)w * 4);
     if (!M) return ow;
-    if (sega_cd) {                                        /* its edges' two columns on to the screen's edges */
+    if (sega_cd) {                                        /* its edges' two columns on to the screen's edges, when */
+        int plain = 1;                                    /* both are one colour top to bottom (the EA SPORTS white): */
+        for (int y = 0; y < h && plain; y++) {            /* else bars (the licence page's goalie at its edge) */
+            const uint32_t *p = pic + (long)y * pitch;
+            plain = p[0] == pic[0] && p[1] == pic[0] && p[w - 1] == pic[w - 1] && p[w - 2] == pic[w - 1];
+        }
         for (int y = 0; y < h; y++) {
             uint32_t *o = out + (long)y * opitch;
             const uint32_t *p = pic + (long)y * pitch;
-            for (int x = 0; x < M; x++) { o[x] = p[x & 1]; o[w + M + x] = p[w - 2 + (x & 1)]; }
+            for (int x = 0; x < M; x++) { o[x] = plain ? p[0] : 0xFF000000u; o[w + M + x] = plain ? p[w - 1] : 0xFF000000u; }
         }
         return ow;
     }

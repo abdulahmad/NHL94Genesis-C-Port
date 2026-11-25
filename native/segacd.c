@@ -71,6 +71,7 @@ static struct {
     double ea_rate;                         /* its rate (Hz) */
     double ea_at;                           /* (the mixer's) where it is, -1 not playing */
     SDL_atomic_t ea_go;                     /* 1: start it (the picture's thread to the mixer's) */
+    SDL_atomic_t ea_halt;                   /* (the game's thread) the EA SPORTS screen was left: its voice stops */
 } S;
 
 static const char *const need[2] = { "HOCKEY.BIN", "GRAPH2.BIN" };
@@ -91,6 +92,8 @@ static int finder(void *dir)
 
 static int photo_hook(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32]);
 static int title_hook(int what);
+static int scout_hook(int what);
+static const uint8_t *scout_text(int n);
 
 void segacd_start(void)
 {
@@ -101,6 +104,8 @@ void segacd_start(void)
     cd_event_hook = segacd_event;
     cd_picture_hook = photo_hook;
     cd_title_hook = title_hook;
+    cd_scout_hook = scout_hook;
+    cd_scout_text = scout_text;
     char *base = SDL_GetBasePath();
     SDL_Thread *t = SDL_CreateThread(finder, "segacd", base ? base : SDL_strdup("."));
     if (t) SDL_DetachThread(t);
@@ -217,6 +222,53 @@ static const char *const team_clip[28] = {          /* the cartridge's teams, in
 };
 
 /* the clip's file for paragraph n: name (on the data track), 0 when it has none */
+/* the disc's scouting text (GRAPH2.BIN's first block): its paragraphs as the disc counts them (scout94cd.asm:ScoutParaOffset: a
+ * paragraph is a line, or lines ending " !" and the one after), where each starts and its line, which numbers its speech
+ * (RON<line + 1>.PCM). Loaded once, on the game's thread */
+static struct { uint8_t *text; long len; int tried, n; long at[0x120]; int line[0x120]; } ST;
+static int scout_load(void)
+{
+    if (ST.tried) return ST.text != NULL;
+    ST.tried = 1;
+    ob_cd *cd = segacd_disc();
+    uint8_t *b;
+    long size = cd ? ob_cd_read_file(cd, "GRAPH2.BIN", &b) : 0;
+    if (size < 16) return 0;
+    uint32_t from = (uint32_t)b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3], to = (uint32_t)b[4] << 24 | b[5] << 16 | b[6] << 8 | b[7];
+    if (from < 8 || to <= from || to > (uint32_t)size || !(ST.text = malloc(to - from + 4))) { free(b); return 0; }
+    memcpy(ST.text, b + from, to - from);
+    ST.len = (long)(to - from);
+    memcpy(ST.text + ST.len, "\r\n\0", 4);                 /* (a last line end, for a short file) */
+    free(b);
+    long i = 0;
+    int line = 0;
+    for (ST.n = 0; ST.n < (int)(sizeof ST.at / sizeof ST.at[0]) && i < ST.len; ST.n++) {
+        ST.at[ST.n] = i;
+        ST.line[ST.n] = line;
+        for (;;) {
+            line++;
+            while (i < ST.len && ST.text[i] != 0xD) i++;
+            i++;
+            if (i < ST.len && ST.text[i] == 0xA) {
+                i++;
+                if (i >= 3 && ST.text[i - 3] == '!') continue;
+            }
+            break;
+        }
+    }
+    return 1;
+}
+static const uint8_t *scout_text(int n)
+{
+    return scout_load() && n >= 0 && n < ST.n ? ST.text + ST.at[n] : NULL;
+}
+/* (cd_scout_hook) the disc's scouting report: with Ron Barr's voice and the disc's text; not in a session (the machines keep step) */
+static int scout_hook(int what)
+{
+    if (what == CD_SCOUT_BUSY) return S.clip != NULL || S.nqueue > 0;
+    return SDL_AtomicGet(&S.voice) && segacd_disc() && !SDL_AtomicGet(&S.session) && scout_load() && ST.n > 0xEA + 0x1B;
+}
+
 static int clip_name(int n, char *name, size_t size)
 {
     if (n == 0x1A) {                                       /* the welcome: the home team's (by its art: a roster set's team plays as one of the cartridge's) */
@@ -225,7 +277,7 @@ static int clip_name(int n, char *name, size_t size)
         snprintf(name, size, "%s.PCM", team_clip[t]);
         return 1;
     }
-    snprintf(name, size, "RON%04d.PCM", n + 1);
+    snprintf(name, size, "RON%04d.PCM", (scout_load() && n < ST.n ? ST.line[n] : n) + 1);   /* (by the paragraph's line: its speech's number) */
     return 1;
 }
 
@@ -327,6 +379,10 @@ void segacd_event(int ev, uint16_t n)
     case CD_EV_SCREEN:
         if (n == 2 && !S.intro_done && SDL_AtomicGet(&S.intro) && segacd_intro_hook && segacd_disc()) {
             S.intro_done = 1;                 /* (the disc's movie before its title, as the disc plays it: the game waits) */
+            S.screen = 0;                     /* (the last disc picture is gone: not shown again between the movie and the title) */
+            S.pic_of = 0;
+            S.out = 0;
+            S.hold = 1;
             segacd_intro_hook();
         }
         {
@@ -336,6 +392,7 @@ void segacd_event(int ev, uint16_t n)
             if (n == 2 && (S.intro_done == 1 || S.screen == 5)) S.hold = 1;   /* (after the movie or the license page: black until the game's is) */
             if (S.intro_done == 1) S.intro_done = 2;
         }
+        if (S.screen == 4 && n != 4) SDL_AtomicSet(&S.ea_halt, 1);   /* (skipped, or over: the logo's voice ends with it) */
         S.screen = n;
         S.ea_t0 = 0;
         S.hsp_t = 0;
@@ -424,6 +481,7 @@ void segacd_mix(int16_t *out, int frames, unsigned rate)
     segacd_sfx_mix(out, frames, rate);
     if (S.clip && rate) mix_voice(out, frames, rate);
     if (SDL_AtomicCAS(&S.ea_go, 1, 0)) { SDL_MemoryBarrierAcquire(); S.ea_at = 0; }
+    if (SDL_AtomicCAS(&S.ea_halt, 1, 0)) S.ea_at = -1;
     if (S.ea_pcm && S.ea_at >= 0 && rate) {               /* (the EA SPORTS logo's voice) */
         double step = S.ea_rate / rate;
         for (int i = 0; i < frames; i++, S.ea_at += step) {
@@ -603,7 +661,7 @@ int segacd_present(uint32_t *frame, int w, int h)
         S.ramp = 0;
         S.full = 0;
     }
-    if (!S.dark) return 0;                                 /* (the screen before it, still fading out) */
+    if (!S.dark && !S.out) return 0;                       /* (the screen before it, still fading out) */
     if (sum > S.full) S.full = sum;
     float k = S.full > 0 ? sum / S.full : 0;
     if (S.ramp < 1 && sum >= 16 * 255) S.ramp += 1.0f / 24;   /* (the cartridge's cramfade: about 24 frames) */

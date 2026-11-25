@@ -743,7 +743,7 @@ static void game_page_init(void)
     static const char *const music[2] = { "cartridge", "Sega CD" }, *const crowd[3] = { "cartridge", "Sega CD", "both" };
     cd_opts[CD_MUSIC] = (ob_game_opt){ "cd_music", "Music", music, 2, 0, 0, 3 };
     cd_opts[CD_CROWD] = (ob_game_opt){ "cd_crowd", "Crowd", crowd, 3, 0, 0, 3 };
-    static const char *const voice[3] = { "off", "on", "over the music" };
+    static const char *const voice[3] = { "off", "speech only", "speech and music" };   /* (speech only: Ron Barr alone as on the disc) */
     cd_opts[CD_VOICE] = (ob_game_opt){ "cd_voice", "Ron Barr scouting voice", voice, 3, 0, 0, 3 };
     cd_opts[CD_SCREENS] = (ob_game_opt){ "cd_screens", "Opening screens", music, 2, 0, 0, 3 };
     cd_opts[CD_TITLE] = (ob_game_opt){ "cd_title", "Title page", music, 2, 0, 0, 3 };
@@ -772,7 +772,7 @@ static void game_page_init(void)
         game_help[CD_ROSTERS] = "The Sega CD's rosters (the game restarts to change them).";
         game_help[CD_MUSIC] = "Where the songs come from: the cartridge or the Sega CD disc.";
         game_help[CD_CROWD] = "Where the crowd comes from: the cartridge, the disc, or both.";
-        game_help[CD_VOICE] = "Ron Barr's spoken scouting report from the disc.";
+        game_help[CD_VOICE] = "Ron Barr's scouting lines from the disc; speech and music plays them over the scouting song.";
         game_help[CD_SCREENS] = "The opening screens: the cartridge's or the disc's.";
         game_help[CD_TITLE] = "The title page: the cartridge's or the disc's.";
         game_help[CD_INTRO] = "The disc's opening movie before the title.";
@@ -975,17 +975,24 @@ static void sides_background(void *ud, uint32_t *px, int w, int h, int pitch)
         for (int x = 0; x < w; x++) px[(size_t)y * pitch + x] = pic ? pic[(y % ph) * pw + x % pw] : 0xFF0000B2u;
 }
 static SDL_atomic_t sides_state;                   /* 0 none, 1 asked for by the game, 2 open */
+static volatile int seat_n, seat_pad[4];              /* the select-sides screen's seating: game pad j reads player seat_pad[j] (seat_n: none, no remap) */
 
 /* (the game's thread, as a new game begins: lockstep.c) the select-sides screen first; the game waits for it. Not in a session, where the room
  * decides, and not with sides.at_start=0 in settings.ini. */
 static void game_starting(void)
 {
+    seat_n = 0;
     if (native_net_on() || !F.o || SDL_AtomicGet(&F.quit) || !atoi(pads_get("sides.at_start", "1"))) return;
     segacd_event(2 /* CD_EV_TURNOFF */, 0);                    /* the scouting report's voice and song end with the screen: not behind the sides screen */
     sides_team[0] = native_game_teams[0];
     sides_team[1] = native_game_teams[1];
     SDL_AtomicSet(&sides_state, 1);
     while (SDL_AtomicGet(&sides_state) && !SDL_AtomicGet(&F.quit)) SDL_Delay(5);
+    {   int team[4], n = 0;                            /* who plays what: game pad j is the j-th player with a device (visitors play team 2, home team 1) */
+        for (int p = 0; p < 4 && p < MDRT_PADS; p++)
+            if (ob_pads_seated(p)) { seat_pad[n] = p; team[n] = (p & 1) ? 1 : 2; n++; }
+        seat_n = native_apply_seats(team, n) ? n : 0;
+    }
 }
 static const ob_sides_skin sides_skin = { .background = sides_background, .text = sides_text, .text_width = sides_text_width, .frame = sides_frame,
                                         .team = sides_team_plate, .team_w = 88, .team_h = 16 };
@@ -1086,11 +1093,15 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
                 } else ob_pads_menu(NULL);
             }
             {   int ax, ay, mp = ob_pads_mouse_player();
+                if (seat_n) { int jj = -1; for (int q = 0; q < seat_n; q++) if (seat_pad[q] == mp) jj = q; mp = jj; }
                 if (mp >= 0 && native_player_on_screen(mp, &ax, &ay)) ob_pads_mouse_anchor(ax, ay);
                 else ob_pads_mouse_anchor(0, 0);
             }
         }
-        for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
+        for (int p = 0; p < MDRT_PADS; p++) {
+            int src = seat_n ? (p < seat_n ? seat_pad[p] : -1) : p;       /* (after the select-sides screen the pads are the seated players') */
+            SDL_AtomicSet(&F.buttons[p], src >= 0 ? (int)ob_pads_read(src) : 0);
+        }
         segacd_movie_pause(hold_state && !(segacd_movie_playing() && !hold_other));   /* (the movie is a full-window screen itself: only something over it pauses it) */
         intro_tick();
         segacd_career_tick(F.dev, F.rate, SDL_AtomicGet(&cd_dedither));

@@ -291,7 +291,7 @@ uint16_t waitxsr(uint16_t frames)
     uint16_t d0, d1, d2, d3;
     g.Vcount = (uint16_t)-frames;
     for (;;) {
-        if (g.Zamx <= 0x708) g.Zamx++;
+        if (g.Zamx <= 0x708 + view_zam_more()) g.Zamx++;   /* (the wide view: further out: view.h) */
         elapsed = 1;
         updatecrowdf();
         RunArenaAnim();
