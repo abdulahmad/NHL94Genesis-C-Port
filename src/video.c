@@ -599,7 +599,7 @@ void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
         t += o->VRchar;
         sat_entry(v, (uint16_t)(y + yy), a2[7], t, (uint16_t)(x + xx));
     }
-    if (rep) spr_hook(SPR_MARK, first, (int)v->link - 1 - first, 0, NULL);   /* (its sprite table entries: the host takes them out of its own picture) */
+    if (rep) spr_hook(SPR_MARK, first, (int)v->link - 1 - first, 0, (const struct SpriteHead *)(const void *)(v->sat - 8 * ((int)v->link - 1 - first)));   /* (its sprite table entries: the host takes them out of its own picture) */
     o->attribute = attr_saved;
 }
 
