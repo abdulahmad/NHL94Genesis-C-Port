@@ -45,8 +45,9 @@ static struct {
     SDL_mutex *lock;
     struct clip *clips;                     /* sorted by name (upper case) */
     int nclips;
-    const struct clip *cur;                 /* the clip playing, NULL none */
-    double at;
+    struct { const struct clip *c; double at; } v[2];   /* the two channels the clips alternate on (95 PC's speechchannel) */
+    int ch;                                 /* the channel the last clip started on */
+    double wait;                            /* source samples until the next queued clip starts (SpeechTimerTick's delay) */
     const struct clip *queue[QUEUE];
     int nq;
     int log;                                /* ANNOUNCER_LOG: the clips said, to stderr */
@@ -247,7 +248,7 @@ void announcer_stop(void)
 {
     if (!A.lock) return;
     SDL_LockMutex(A.lock);
-    A.cur = NULL;
+    A.v[0].c = A.v[1].c = NULL;
     A.nq = 0;
     SDL_UnlockMutex(A.lock);
 }
@@ -332,8 +333,8 @@ static const char *pen_clip(int pen)
  * the voice is busy, as 95 PC's SpeechIdle) */
 static int begin(int interrupt, int drop_if_busy)
 {
-    if (A.cur || A.nq) {
-        if (interrupt) { A.cur = NULL; A.nq = 0; }
+    if (A.v[0].c || A.v[1].c || A.nq) {
+        if (interrupt) { A.v[0].c = A.v[1].c = NULL; A.nq = 0; }
         else if (drop_if_busy) return 0;
     }
     return 1;
@@ -407,21 +408,32 @@ void announcer_mix(int16_t *out, int frames, unsigned rate)
     SDL_LockMutex(A.lock);
     double step = (double)RATE / rate;
     for (int i = 0; i < frames; i++) {
-        while (!A.cur && A.nq) {                        /* the next waiting clip */
-            A.cur = A.queue[0];
+        /* 95 PC's SpeechTimerTick: the next clip starts when the delay of the one before has run out, which is that clip's length
+         * less 26 ticks of 1/100 s (OpenSpeechBank: size * 100 / 5512 - 1Ah): it starts over the tail of the last, on the other channel */
+        while (A.nq && A.wait <= 0) {
+            const struct clip *c = A.queue[0];
             memmove(A.queue, A.queue + 1, (size_t)--A.nq * sizeof A.queue[0]);
-            A.at = 0;
+            A.ch ^= 1;
+            A.v[A.ch].c = c;
+            A.v[A.ch].at = 0;
+            long ticks = (long)(c->len / 2) * 100 / 5512 - 26;
+            A.wait = ticks > 0 ? (double)ticks * RATE / 100.0 : 0;
         }
-        if (!A.cur) break;
-        long j = (long)A.at;
-        if (j + 1 >= A.cur->len) { A.cur = NULL; i--; continue; }
-        double frac = A.at - j;
-        float v = (float)(A.cur->pcm[j] + (A.cur->pcm[j + 1] - A.cur->pcm[j]) * frac) * GAIN;
+        if (!A.v[0].c && !A.v[1].c && !A.nq) { A.wait = 0; break; }
+        float sum = 0;
+        for (int k = 0; k < 2; k++) {
+            if (!A.v[k].c) continue;
+            long j = (long)A.v[k].at;
+            if (j + 1 >= A.v[k].c->len) { A.v[k].c = NULL; continue; }
+            double frac = A.v[k].at - j;
+            sum += (float)(A.v[k].c->pcm[j] + (A.v[k].c->pcm[j + 1] - A.v[k].c->pcm[j]) * frac) * GAIN;
+            A.v[k].at += step;
+        }
+        if (A.nq && A.wait > 0) A.wait -= step;
         for (int c = 0; c < 2; c++) {
-            float x = v + out[2 * i + c];
+            float x = sum + out[2 * i + c];
             out[2 * i + c] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
         }
-        A.at += step;
     }
     SDL_UnlockMutex(A.lock);
 }
