@@ -409,7 +409,6 @@ void clearTeamStats(void)
     memcpy(g.awayhotcoldsave, away->tmHotCold, 0x1A0);
     memset(home, 0, sizeof *home);
     memset(away, 0, sizeof *away);
-    rules_clear_stats();                                  /* (the rules' own, beside the RAM) */
     memcpy(home->tmHotCold, g.homehotcoldsave, 0x1A0);
     memcpy(away->tmHotCold, g.awayhotcoldsave, 0x1A0);
     away->tmgoalie = ag;

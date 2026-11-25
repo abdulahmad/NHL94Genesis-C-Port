@@ -40,8 +40,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS = os.path.join(ROOT, 'tools', 'oracle', 'scripts')
 NHL94 = os.path.join(ROOT, 'build', 'nhl94')
 
-RULES_ON = ['--rule', 'period_lengths=more', '--rule', 'overtime=5min', '--rule', 'weight_fix=on', '--rule', 'assist_fix=on',
-            '--rule', 'more_stats=on']
+RULES_ON = ['--rule', 'weight_fix=on']
 # (name, frames, options): power on unless --snap
 RUNS = [
     ('attract', 7200, []),
@@ -55,8 +54,6 @@ RUNS = [
     # the game rules (native extras: their own baselines, not the original's): every rule on
     ('rules_game', 16000, ['--input', 'full_game_30s.txt'] + RULES_ON),
     ('rules_faceoff', 18000, ['--snap', 'out/states/faceoff.snap', '--input', 'random_seed94.txt'] + RULES_ON),
-    ('arcade_faceoff', 18000, ['--snap', 'out/states/faceoff.snap', '--input', 'random_seed94.txt', '--rule', 'preset=arcade']),
-    ('simulation_faceoff', 18000, ['--snap', 'out/states/faceoff.snap', '--input', 'random_seed94.txt', '--rule', 'preset=simulation']),
     # roster sets (rosters.c): the cartridge's built from its files, and 32 teams
     ('rosters_game', 16000, ['--input', 'full_game_30s.txt', '--rosters', 'out/rosters/cartridge']),
     ('rosters_playoff', 15000, ['--input', 'playoff_game_30s.txt', '--rosters', 'out/rosters/cartridge']),
@@ -71,7 +68,7 @@ RUNS = [
 # runs that must be another's frame for frame but for work RAM (the roster set's tables elsewhere)
 LIKE = {'rosters_game': 'full_game', 'rosters_playoff': 'playoff_game'}
 # the runs a state is saved in (from this frame on) and loaded from
-STATES = {'full_game': 3000, 'playoff_game': 9000, 'faceoff': 6000, 'rules_faceoff': 6000, 'simulation_faceoff': 6000,
+STATES = {'full_game': 3000, 'playoff_game': 9000, 'faceoff': 6000, 'rules_faceoff': 6000,
           'rosters32_game': 3000, 'wide_faceoff': 6000}
 COLUMNS = ['work RAM', 'VDP state', 'Z80 RAM', 'picture', 'sound', 'samples']
 SAVED = re.compile(r'state saved at frame (\d+) \(golden line (\d+)\)')

@@ -845,8 +845,7 @@ int main(int argc, char **argv)
         mdrt_sdl_options o = { .title = "NHL '94", .scale = scale, .aspect = aspect, .sram_path = sram, .app = "ninety-four",
                                .rom_path = rom_given, .rom_default = rom, .rom_hint = "NHL '94: the 1 MB cartridge (US/Europe)",
                                .rom_check = rom_check, .rom_use = rom_use,
-                               .options_use = rules_page_use, .options_changed = rules_page_changed, .options_text = rules_page_text,
-                               .options_pick = rules_page_pick, .options_detail = rules_page_detail, .sram_file = sram_for };
+                               .options_use = rules_page_use, .options_changed = rules_page_changed, .sram_file = sram_for };
         sram_base = sram;
         o.options = rules_page(&o.noptions);
         o.pages = rules_pages(&o.npages);

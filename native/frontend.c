@@ -177,7 +177,7 @@ static void options_from_settings(void)
             F.opt_values[i] = mdrt_settings_get_int(F.set, op->key, op->def);
         }
     }
-    if (o->options_changed) o->options_changed(-1, F.opt_values, F.user);   /* a preset agreeing with them */
+    if (o->options_changed) o->options_changed(-1, F.opt_values, F.user);   
 }
 
 /* ---- the ROM beside the program ---- */

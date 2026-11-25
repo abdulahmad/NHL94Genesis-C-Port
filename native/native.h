@@ -91,13 +91,10 @@ extern const mdrt_sdl_option rule_options[];
 void rules_next(const int *values, void *user);
 void rules_next_get(uint8_t *v);                         /* the next game's rules' values (RULE_COUNT of them) */
 int rules_next_set(const uint8_t *v, int count);         /* count of them (the rest Classic): 0, or -1 when one is out of range */
-/* the menu's page: a preset, then the rules (its options_use and options_changed) */
+/* the menu's page: the rules (its options_use and options_changed) */
 const mdrt_sdl_option *rules_page(int *count);
-/* the menu's pages of them: Rosters (who plays, and what the roster set chosen holds), Game rules */
+/* the menu's pages of them: Game rules, Speed */
 const mdrt_sdl_page *rules_pages(int *count);
-void rules_page_text(int page, const int *values, char *text, size_t size, void *user);
-int rules_page_pick(int which, const char *path, char *why, size_t why_size, void *user);
-void rules_page_detail(int which, int value, char *text, size_t size, void *user);
 void rules_page_use(const int *values, void *user);
 int rules_page_changed(int which, int *values, void *user);
 int rules_page_session(int *values, void *user);        /* the session's choices, for the pages (options_session) */
