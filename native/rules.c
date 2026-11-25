@@ -118,9 +118,24 @@ void rules_next(const int *values, void *user)
     for (int i = 0; i < RULE_COUNT; i++) next[i] = (uint8_t)(valid(i, values[i]) < 0 ? rule_classic[i] : values[i]);
 }
 
-void rules_power_on(void) { memcpy(rules, next, sizeof rules); }
+/* the Widescreen setting at 16:9: the rink is the wide view (320), so the game fills the screen. Not a
+ * rule of its own: a session plays by the host's (native_net_settings sends it), a check by Classic */
+static volatile int widescreen;
+void rules_widescreen(int on) { widescreen = on; }
+
+void rules_power_on(void)
+{
+    memcpy(rules, next, sizeof rules);
+    if (widescreen && !native_net_on()) rules[RULE_VIEW] = 1;   /* (in a session the host's settings say it) */
+}
 
 void rules_next_get(uint8_t *v) { memcpy(v, next, sizeof next); }
+
+void rules_next_send(uint8_t *v)
+{
+    rules_next_get(v);
+    if (widescreen) v[RULE_VIEW] = 1;
+}
 
 int rules_next_set(const uint8_t *v, int count)
 {

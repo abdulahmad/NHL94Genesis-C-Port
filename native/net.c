@@ -97,7 +97,7 @@ const void *native_net_settings(size_t *size)
     uint8_t v[RULE_COUNT], *pkg;
     long n = rosters_next_package(&pkg);
     if (n < 0) { fprintf(stderr, "netplay: the roster set: %s: the session plays the cartridge's teams\n", rosters_error()); n = 0; }
-    rules_next_get(v);
+    rules_next_send(v);
     size_t total = 5 + 1 + RULE_COUNT + 4 + (size_t)n;
     free(settings);
     if (!(settings = malloc(total))) { free(pkg); *size = 0; return NULL; }
