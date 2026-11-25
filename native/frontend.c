@@ -536,6 +536,7 @@ static ob_host host;
  * (rules.cd_...). A change plays from the next frame (the rules are in every state); in an online
  * session the host's rules hold, so a change there waits for the session's end. */
 static const char *const cd_off_on[2] = { "off", "on" };
+static const char *game_help[64];                /* the Game page's description lines (ob_game_set_help) */
 static const struct { int rule; const char *key; } cd_rows[] = {
     { RULE_CD_SKATING, "cd_skating" }, { RULE_CD_CORNERS, "cd_corners" }, { RULE_CD_PSBOX, "cd_penalty_shot_box" },
     { RULE_CD_PASSWORD, "cd_password" }, { RULE_CD_CLEARSHOT, "cd_clear_shots" }, { RULE_CD_COLOURS, "cd_colours" },
@@ -716,11 +717,32 @@ static void game_page_init(void)
     cd_opts[CD_CAREER] = (ob_game_opt){ "cd_career", "Career stats", career, 2, 0, 0, 3 };
     cd_opts[CD_SFX] = (ob_game_opt){ "cd_sfx", "Sound effects", music, 2, 0, 0, 3 };
     cd_opts[CD_ANNOUNCER] = (ob_game_opt){ "pc_announcer", "Rink announcer", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's voice: goals, penalties, the last minute, the three stars) */
+    {   static const char *const hp[] = {
+            "The Sega CD's skating speed, a touch different from the cartridge.", "The puck's bounce off the corners, as on the Sega CD.",
+            "The penalty shot box takes the pad, as on the Sega CD.", "The Sega CD's playoff password rules.",
+            "The Sega CD's fix for the shot data.", "The Sega CD's uniform colours for each team.",
+            "The Sega CD's sounds: the ding at line changes and breaks.", "Songs play when the Sega CD plays them: in the second half of a period.",
+            "At a period's end the Sega CD goes straight to the song." };
+        for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];
+        game_help[CD_ROSTERS] = "The Sega CD's rosters (the game restarts to change them).";
+        game_help[CD_MUSIC] = "Where the songs come from: the cartridge or the Sega CD disc.";
+        game_help[CD_CROWD] = "Where the crowd comes from: the cartridge, the disc, or both.";
+        game_help[CD_VOICE] = "Ron Barr's spoken scouting report from the disc.";
+        game_help[CD_SCREENS] = "The opening screens: the cartridge's or the disc's.";
+        game_help[CD_TITLE] = "The title page: the cartridge's or the disc's.";
+        game_help[CD_INTRO] = "The disc's opening movie before the title.";
+        game_help[CD_SFX] = "Sound effects: the cartridge's or the disc's.";
+    }
+    ob_game_set_help(game_help);
     announcer_start();
     hats_start();
     cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 0, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
     cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
     cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 0, 0, 4 };
+        game_help[CD_ANNOUNCER] = "NHL 95 PC's rink announcer: goals, penalties, last minute.";
+        game_help[CD_HATS] = "Hats thrown on the ice after a home skater's third goal.";
+        game_help[CD_WHITEICE] = "The PC games' white rink instead of the pale cyan one.";
+        game_help[CD_PCPHOTOS] = "Player photos in colour.";
     segacd_start();
     cardcolor_start();
     segacd_intro_hook = intro_hook;
@@ -902,6 +924,7 @@ static SDL_atomic_t sides_state;                   /* 0 none, 1 asked for by the
 static void game_starting(void)
 {
     if (native_net_on() || !F.o || SDL_AtomicGet(&F.quit) || !atoi(pads_get("sides.at_start", "1"))) return;
+    segacd_event(2 /* CD_EV_TURNOFF */, 0);                    /* the scouting report's voice and song end with the screen: not behind the sides screen */
     sides_team[0] = native_game_teams[0];
     sides_team[1] = native_game_teams[1];
     SDL_AtomicSet(&sides_state, 1);
@@ -1011,6 +1034,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
             }
         }
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
+        segacd_movie_pause(hold_state);
         intro_tick();
         segacd_career_tick(F.dev, F.rate, SDL_AtomicGet(&cd_dedither));
         cd_no_disc();

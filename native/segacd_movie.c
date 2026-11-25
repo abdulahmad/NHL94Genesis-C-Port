@@ -350,6 +350,15 @@ static void stop(void)
     M.nscenes = 0;
 }
 
+/* the overlay (or another full screen) is up: the intro waits (its clock is the speaker's, so the picture waits too) */
+void segacd_movie_pause(int on)
+{
+    static int was;
+    if (!M.film || !M.dev || on == was) return;
+    was = on;
+    SDL_PauseAudioDevice(M.dev, on ? 1 : 0);
+}
+
 /* (the window's loop) the sound topped up and the picture brought to its time; 0 once it has ended */
 int segacd_movie_tick(void)
 {
