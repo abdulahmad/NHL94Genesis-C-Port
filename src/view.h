@@ -29,6 +29,9 @@ static inline int16_t view_shift(void)
  * scroll is by 8 lines in the wide view), and column x of them (64 columns) is drawn at the
  * column this gives: the left third at the screen's left edge, the right third at its right edge,
  * between them as placed. No run of a row wraps. */
+/* the zamboni's crossing (in quarter pixels) VIEW_SHIFT further out each way in the wide view, so that a
+ * 16:9 picture's sides (native/wide.c: the pause screen's 32 pixels a side) see it come in and go out whole */
+static inline uint16_t view_zam_more(void) { return view_wide() ? VIEW_SHIFT * 4 : 0; }
 #define VIEW_BOX_ROW 22
 #define VIEW_BOX_SCROLL 96
 static inline int view_boxes(void) { return view_wide() && (g.disflags & HI(df32c)) && !(g.sflags & HI(sfhor)); }

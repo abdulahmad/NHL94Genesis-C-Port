@@ -12,7 +12,7 @@
 
 /* one line M pixels a side past the screen, as colour indices (0 the backdrop): everything, plane B
  * alone, or plane B and the sprites; and an index's colour */
-enum { WIDE_ALL, WIDE_B, WIDE_BS, WIDE_A };   /* (WIDE_A: plane A and the window alone, colour 0 where they show nothing) */
+enum { WIDE_ALL, WIDE_B, WIDE_BS, WIDE_A, WIDE_S };   /* (WIDE_A: plane A and the window alone, WIDE_S the sprites alone: colour 0 where they show nothing) */
 void wide_line(const mdrt_vdp *v, int line, int M, int what, uint8_t *idx);
 uint32_t wide_rgb(const mdrt_vdp *v, uint8_t c);
 /* one line of the screen as wide_line (WIDE_ALL, no sides), and where each pixel came from: its plane

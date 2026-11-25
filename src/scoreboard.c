@@ -366,7 +366,7 @@ void Intermission(void)
     SetupTeamForIntermission();
     for (int i = 0; i < 0x10; i++) sortobj(i)->Xpos = 0;
     DecompressGraphicsPlain(ART(ZamFrameList) + 8, g.ExtraChars);
-    g.Zamx = 0x140;
+    g.Zamx = (uint16_t)(0x140 - view_zam_more());
     uint16_t list = g.gsp;
     if (g.OptPlayMode != 0) list += 5;
     uint32_t items = sslist[list];

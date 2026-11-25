@@ -120,12 +120,10 @@ int stands_frame(const mdrt_vdp *v, int M, int h, uint32_t *out, int opitch)
     }
     for (int y = 0; y < h; y++) {                                                   /* the sprites past the edges, on top */
         uint32_t *o = out + (long)y * opitch;
-        wide_line(v, y, M, WIDE_BS, idx);
-        static uint8_t bidx[WIDE_MAX_W];
-        wide_line(v, y, M, WIDE_B, bidx);
+        wide_line(v, y, M, WIDE_S, idx);
         for (int x = 0; x < M; x++) {
-            o[x] = idx[x] != bidx[x] ? wide_rgb(v, idx[x]) : side[y][0][x];
-            o[w + M + x] = idx[w + M + x] != bidx[w + M + x] ? wide_rgb(v, idx[w + M + x]) : side[y][1][x];
+            o[x] = idx[x] ? wide_rgb(v, idx[x]) : side[y][0][x];
+            o[w + M + x] = idx[w + M + x] ? wide_rgb(v, idx[w + M + x]) : side[y][1][x];
         }
     }
     return 1;
