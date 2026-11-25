@@ -85,6 +85,7 @@
 #include "native.h"
 #include "segacd.h"
 #include "announcer.h"
+#include "whiteice.h"
 #include "cardcolor.h"
 #include "wide.h"
 #include "rules.h"
@@ -599,6 +600,7 @@ static void write_ppm(const char *path)
     if (screen_frame) { w = 320; h = 224; }
     for (int i = 0; i < h; i++)
         for (int x = 0; x < w; x++) pic[i * 320 + x] = screen_frame ? screen_px[i * 320 + x] : 0xFF000000u | mdrt_vdp_rgb(px[i * 320 + x], 1);
+    if (!screen_frame) whiteice_present(pic, w, h, 320);
     if (!screen_frame) cardcolor_present(v, pic, w, h, 320);   /* (--pc-photos) */
     int pitch = 320;
     const uint32_t *src = pic;
@@ -737,6 +739,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--shots") && i + 1 < argc) shots_dir = argv[++i];
         else if (!strcmp(argv[i], "--every") && i + 1 < argc) shots_every = atol(argv[++i]);
         else if (!strcmp(argv[i], "--wav") && i + 1 < argc) wav_path = argv[++i];
+        else if (!strcmp(argv[i], "--white-ice")) whiteice_set(1);
         else if (!strcmp(argv[i], "--announcer") && i + 1 < argc) announcer_file = argv[++i];
         else if (!strcmp(argv[i], "--segacd-music")) { segacd_on = 1; segacd_set_music(1); }
         else if (!strcmp(argv[i], "--segacd-crowd") && i + 1 < argc) { segacd_on = 1; segacd_set_crowd(atoi(argv[++i])); }

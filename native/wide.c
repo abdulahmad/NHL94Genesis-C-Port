@@ -16,6 +16,7 @@
  * Sprites are drawn past the screen's edges too (the Zamboni comes in from the side). */
 #include <string.h>
 #include "wide.h"
+#include "whiteice.h"
 #include "game.h"
 #include "view.h"
 #include "rom.h"
@@ -153,7 +154,7 @@ void wide_line_at(const mdrt_vdp *v, int line, uint8_t *idx, uint32_t *at) { com
 
 uint32_t wide_rgb(const mdrt_vdp *v, uint8_t c)
 {
-    return 0xFF000000u | mdrt_vdp_rgb(c ? v->s.cram[c] : v->s.cram[v->s.reg[7] & 0x3F], MDRT_RGB_GPGX);
+    return whiteice_rgb(0xFF000000u | mdrt_vdp_rgb(c ? v->s.cram[c] : v->s.cram[v->s.reg[7] & 0x3F], MDRT_RGB_GPGX));
 }
 
 /* ---- the SPORTS backdrop ---------------------------------------------------------------- */

@@ -31,6 +31,7 @@
 #include "overbar/postfx.h"
 #include "segacd.h"
 #include "announcer.h"
+#include "whiteice.h"
 #include "cardcolor.h"
 #include "wide.h"
 
@@ -308,6 +309,7 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     if (h > 240) h = 240;
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++) pic[y * 320 + x] = 0xFF000000u | mdrt_vdp_rgb(px[y * pitch + x], MDRT_RGB_GPGX);
+    if (w <= 320 && h <= 240) whiteice_present(pic, w, h, 320);                  /* (white ice, when on) */
     if (w <= 320 && h <= 240) cardcolor_present(mdrt_get_vdp(F.m), pic, w, h, 320);   /* (the players' photos in colour, when on) */
     int cd = w <= 320 && h <= 224 && segacd_present(pic, w, h);   /* (the Sega CD's opening screens, when they are on) */
     if (cd) { w = 320; h = 224; }
@@ -553,7 +555,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_CAREER (CD_ROWS + 12)
 #define CD_ANNOUNCER (CD_ROWS + 14)                        /* (NHL 95 PC's rink announcer, its own files: group 4) */
 #define CD_PCPHOTOS (CD_ROWS + 13)                        /* (the cartridge's photos in colour, from the player's PC files: cardcolor.c) */
-#define CD_OPTS (CD_ROWS + 15)
+#define CD_WHITEICE (CD_ROWS + 15)                         /* (white ice: group 4) */
+#define CD_OPTS (CD_ROWS + 16)
 static ob_game_opt cd_opts[CD_OPTS];
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
 static SDL_atomic_t cd_smooth, cd_colour;                 /* the movie at 30 fps; each shot's colour */
@@ -584,6 +587,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_PCPHOTOS) { cardcolor_set(value); return; }
     if (index == CD_SFX) { segacd_set_sfx(value); return; }
     if (index == CD_ANNOUNCER) { announcer_set(value); return; }
+    if (index == CD_WHITEICE) { whiteice_set(value); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -697,6 +701,7 @@ static void game_page_init(void)
     cd_opts[CD_SFX] = (ob_game_opt){ "cd_sfx", "Sound effects", music, 2, 0, 0, 3 };
     cd_opts[CD_ANNOUNCER] = (ob_game_opt){ "pc_announcer", "Rink announcer", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's voice: goals, penalties, the last minute, the three stars) */
     announcer_start();
+    cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
     cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 0, 0, 4 };
     segacd_start();
     cardcolor_start();
@@ -710,6 +715,7 @@ static void game_page_init(void)
     pv[1][CD_VOICE] = 1; pv[1][CD_CROWD] = 1;
     pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
     pv[1][CD_ANNOUNCER] = 0;                                                  /* (95 PC's voice: not the Sega CD's) */
+    pv[1][CD_WHITEICE] = 0;                                                    /* (the PC games' look: not the Sega CD's; off in Recommended too, it is a taste) */
     pv[2][CD_ANNOUNCER] = 1;                                                  /* (on in Recommended; it does nothing without 95 PC's files) */
     pv[2][CD_PCPHOTOS] = 1;                                                    /* (Abdul: on in Recommended) */
     static const int disc_look[] = { CD_VOICE, CD_SCREENS, CD_TITLE, CD_INTRO, CD_SFX, CD_PHOTOS, CD_CAREER };
