@@ -18,6 +18,8 @@
 #include <ctype.h>
 #include <sys/stat.h>
 #include "game.h"
+#include "view.h"
+#include <math.h>
 #include "rosters.h"
 #include "native.h"
 #include "pcspr.h"
@@ -42,6 +44,14 @@ static struct {
     struct { int n; shown l[16]; } ring[4];     /* the last frames the game wrote (newest first): the picture draws the one its sprite table is */
     int nshow;
 } P;
+
+/* the referee: not in the cartridge's game at all, only in this picture (a visual one: nothing in the game knows of it) */
+static struct {
+    SDL_atomic_t on;
+    int init, x, y, vx, vy;                 /* the rink position and velocity in 1/256 pixels */
+    int dir, t, wasfo, drop;
+    int sx, sy, valid;                      /* the sprite table position of the last frame */
+} R;
 
 static long file_len(const char *p) { struct stat st; return stat(p, &st) == 0 ? (long)st.st_size : -1; }
 static uint8_t *slurp(const char *path, long *size)
@@ -170,6 +180,25 @@ static int load(const char *dir, ob_cd *cd)
         if (b && n >= NTEAMS * 448) { memcpy(P.team[s], b, NTEAMS * 448); P.have_team[s] = 1; }
         free(b);
     }
+    if (getenv("PCSPR_SHEET") && pal && P.have_team[0]) {          /* (a contact sheet of the frames FIRST..FIRST+99, for reading the art) */
+        int first = atoi(getenv("PCSPR_SHEET")), cw = 64, ch = 80;
+        static uint8_t im[10 * 64 * 10 * 80 * 3];
+        const uint8_t *rec = P.team[0][9];
+        for (int i = 0; i < 100; i++) {
+            const spr *f = first + i < NFRAMES ? &P.f[first + i] : NULL;
+            if (!f || !f->px) continue;
+            for (int y = 0; y < f->h && y < ch - 2; y++)
+                for (int x = 0; x < f->w && x < cw - 2; x++) {
+                    int v = f->px[y * f->w + x];
+                    if (v == 255) continue;
+                    int r = v < 0x80 ? rec[192 + v] : rec[320 + v - 0x80];
+                    uint8_t *d = im + (((i / 10) * ch + y + 1) * 10 * cw + (i % 10) * cw + x + 1) * 3;
+                    d[0] = P.pal[r][0]; d[1] = P.pal[r][1]; d[2] = P.pal[r][2];
+                }
+        }
+        FILE *o = fopen("/tmp/pcsheet.ppm", "wb");
+        if (o) { fprintf(o, "P6\n%d %d\n255\n", 10 * cw, 10 * ch); fwrite(im, 1, sizeof im, o); fclose(o); }
+    }
     if (getenv("PCSPR_LOG")) fprintf(stderr, "pcspr: banks %d pal %d team %d %d\n", banks, pal, P.have_team[0], P.have_team[1]);
     return banks >= 20 && pal && P.have_team[0] && P.have_team[1];
 }
@@ -214,11 +243,81 @@ static int pc_frame(int fr)
 
 static int in_game(void) { return g.demoflag && (g.disflags & HI(dfok)); }
 
+
+/* where the referee stands, from the PC's assreffollow (the puck's zone picks a spot beside the boards; the view's middle gives the y)
+ * and assrefatdot (at the face off spot, facing the dot) */
+static void ref_tick(void)
+{
+    R.valid = 0;
+    if (getenv("PCREF_LOG") && !(g.Vcount & 255)) fprintf(stderr, "ref? on %d found %d ingame %d hor %d gm2 %d\n", SDL_AtomicGet(&R.on), SDL_AtomicGet(&P.found), in_game(), !!(g.sflags & HI(sfhor)), g.gmode2 & 1);
+    if (!SDL_AtomicGet(&R.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || (g.sflags & HI(sfhor)) || (g.gmode2 & 1)) { R.init = 0; return; }
+    const struct SortObj *pk = sortobj(puckscnum);
+    int asn = pk->asslist[pk->assnum & 7];
+    int fo = asn == pfaceoff || asn == pfaceoff2;
+    int fx = (int16_t)g.fox, fy = (int16_t)g.foy;
+    int px = pk->Xpos, py = pk->Ypos, cy = (int16_t)g.Vpos;
+    if (fo) {
+        R.x = (fx > 0 ? fx + 15 : fx - 15) * 256;
+        R.y = fy * 256;
+        R.vx = R.vy = 0;
+        R.dir = fx > 0 ? 6 : 2;
+        R.wasfo = 1; R.drop = 0; R.init = 1;
+    } else {
+        if (!R.init) { R.x = (px > 0 ? 0x7C : -0x7C) * 256; R.y = cy * 256; R.init = 1; R.vx = R.vy = 0; }
+        if (R.wasfo) { R.wasfo = 0; R.drop = 24; }                           /* (the puck is dropped: the referee's drop) */
+        int rx = R.x / 256, ry = R.y / 256, tx, ty;
+        int ax = px < 0 ? -px : px, ay = py < 0 ? -py : py;
+        if (ax < 0x32 && ay > 0xAC && ay < 0xE8) { tx = rx > 0 ? 0x46 : -0x46; ty = py > 0 ? 0xED : -0xED; }          /* behind the net */
+        else if (ax > 0x62 && ay > 0x80) { tx = rx > 0 ? 0x6A : -0x6A; ty = py > 0 ? 0xE8 : -0xE8; }              /* in a corner */
+        else { tx = rx > 0 ? 0x7C : -0x7C; ty = (ry - cy < 0 ? cy - ry : ry - cy) > 0x32 ? cy : ry; }          /* beside the play */
+        int dx = tx * 256 - R.x, dy = ty * 256 - R.y;
+        int wx = dx / 12, wy = dy / 12, m = 2 * 256;                              /* (the speed it wants: easing in, at most 2 a frame) */
+        double l = sqrt((double)wx * wx + (double)wy * wy);
+        if (l > m) { wx = (int)(wx * m / l); wy = (int)(wy * m / l); }
+        R.vx += (wx - R.vx) / 6;
+        R.vy += (wy - R.vy) / 6;
+        R.x += R.vx; R.y += R.vy;
+        double sp = sqrt((double)R.vx * R.vx + (double)R.vy * R.vy) / 256.0;
+        if (sp > 0.45) {
+            int d = (int)floor(atan2((double)R.vx, (double)R.vy) / (M_PI / 4) + 0.5);
+            R.dir = ((d % 8) + 8) % 8;
+        }
+        if (R.drop > 0) { R.drop--; R.vx = R.vy = 0; }
+        R.t = sp > 0.45 ? R.t + 1 : 0;
+    }
+    int16_t x = (int16_t)(R.x / 256), y = (int16_t)(R.y / 256);
+    find3d(&x, &y, 0);
+    if (y == 0x4E20) return;
+    R.sx = x + view_shift();
+    R.sy = y;
+    R.valid = 1;
+    if (getenv("PCREF_LOG") && !(g.Vcount & 63)) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos);
+}
+
+/* the frame the referee shows */
+static int ref_frame(void)
+{
+    const struct SortObj *pk = sortobj(puckscnum);
+    int asn = pk->asslist[pk->assnum & 7];
+    int d = R.dir & 7;
+    if (asn == pfaceoff || asn == pfaceoff2) return (d >= 2 && d <= 5) ? 711 : 703;       /* (SPAreffowait) */
+    if (R.drop > 0) {                                                                    /* (SPArefdrop: 8 ticks each) */
+        int k = (24 - R.drop) / 8;
+        if (d >= 2 && d <= 5) return k == 0 ? 845 : k == 1 ? 846 : 711;
+        return k == 0 ? 843 : k == 1 ? 844 : 703;
+    }
+    int b = 5 * ((8 - d) & 7);
+    if (R.t == 0) return 650 + b;                                                      /* (SPArefglide) */
+    static const int o[4] = { 2, 3, 0, 1 };
+    return 651 + b + o[(R.t / 6) & 3];                                                   /* (SPArefskate) */
+}
+
 /* the sprite table entries of the last sprite the hook took */
 static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o)
 {
     if (ev == SPR_BEGIN) { P.nshow = 0; return 0; }
     if (ev == SPR_END) {
+        ref_tick();
         SDL_AtomicLock(&P.lock);
         memmove(&P.ring[1], &P.ring[0], sizeof P.ring - sizeof P.ring[0]);
         memcpy(P.ring[0].l, P.show, sizeof P.show);
@@ -264,6 +363,86 @@ void pcspr_wait(void) { while (!SDL_AtomicGet(&P.searched)) SDL_Delay(5); }
 int pcspr_searched(void) { return SDL_AtomicGet(&P.searched); }
 int pcspr_found(void) { return SDL_AtomicGet(&P.searched) && SDL_AtomicGet(&P.found); }
 void pcspr_set(int on) { SDL_AtomicSet(&P.on, on ? 1 : 0); }
+void pcspr_ref_set(int on) { SDL_AtomicSet(&R.on, on ? 1 : 0); }
+
+
+/* the referee over the finished picture: only where nothing of the picture's own is over the ice there. A solid sprite of the
+ * referee's size is put into a copy of the VDP, last in the sprite order (where it shows, it is behind every sprite, over only
+ * the ice) and first (where it shows, it is in front of the sprites and of what the planes draw with priority); the two pictures
+ * against the copy without it say where. Where it is in front of the sprites, a skater below it (nearer) still covers it. */
+static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch, const shown *list, int n)
+{
+    if (!SDL_AtomicGet(&R.on) || !R.valid) return;
+    int fr = ref_frame();
+    if (fr < 0 || fr >= NFRAMES || !P.f[fr].px) return;
+    const spr *s = &P.f[fr];
+    const uint8_t *rec = P.team[0][9];
+    int x0 = R.sx - 128 - s->xo, y0 = R.sy - 128 - s->yo;
+    int nx = (s->w + 31) / 32, ny = (s->h + 31) / 32;
+    if (nx * ny > 6) return;
+    static mdrt_vdp sc;
+    static uint16_t base[320 * 240], back[320 * 240], front[320 * 240];
+    unsigned sat = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
+    unsigned tile = 0x7E0;
+    while (tile > 0x40 && tile * 32 < sat + 0x280 && sat < tile * 32 + 0x200) tile -= 0x10;     /* (the solid tiles: not over the sprite table) */
+    int tail = 0;                                                   /* (the last entry of the sprite table's chain; the entries after it are free) */
+    for (int k = 0; k < 80; k++) { int l = vdp->sat[tail * 8 + 3] & 0x7F; if (!l) break; tail = l; }
+    int cnt = nx * ny, fb = tail + 1;                               /* the free entries fb ... : the pieces, then the moved first entry */
+    if (fb + cnt + 1 > 80) return;
+    if (getenv("PCREF_LOG")) fprintf(stderr, "refdraw: tail %d\n", tail);
+    for (int variant = 0; variant < 3; variant++) {                /* 0: the copy without it, 1: last, 2: first */
+        sc = *vdp;
+        for (int t = 0; t < 16; t++) memset(sc.s.vram + tile * 32 + t * 32, 0xFF, 32);
+        sc.s.cram[15] = 0x0E0E;
+        if (variant) {
+            int old0 = fb + cnt, first;
+            if (variant == 2) {                                    /* the old first entry moves behind the pieces */
+                memcpy(sc.s.vram + ((sat + old0 * 8) & 0xFFFF), vdp->s.vram + ((sat + 0) & 0xFFFF), 8);
+                memcpy(sc.sat + old0 * 8, vdp->sat, 8);
+                first = 0;
+            } else {
+                first = fb;
+                sc.sat[tail * 8 + 3] = (uint8_t)fb;
+                sc.s.vram[(sat + tail * 8 + 3) & 0xFFFF] = (uint8_t)fb;
+            }
+            for (int i = 0; i < cnt; i++) {
+                int e = (variant == 2 && i == 0) ? 0 : fb + i;
+                int nxt = i + 1 < cnt ? fb + i + 1 : (variant == 2 ? old0 : 0);
+                int sy = y0 + 128 + 32 * (i / nx), sx = x0 + 128 + 32 * (i % nx);
+                uint8_t *a = sc.s.vram + ((sat + e * 8) & 0xFFFF);
+                a[0] = (uint8_t)(sy >> 8); a[1] = (uint8_t)sy; a[2] = 0x0F; a[3] = (uint8_t)nxt;
+                a[4] = (uint8_t)(tile >> 8); a[5] = (uint8_t)tile;                /* (palette 0, low priority, tiles solid: 16 cells) */
+                a[6] = (uint8_t)(sx >> 8); a[7] = (uint8_t)sx;
+                memcpy(sc.sat + e * 8, a, 4);
+            }
+            (void)first;
+        }
+        mdrt_vdp_render(&sc, variant == 0 ? base : variant == 1 ? back : front, 320);
+    }
+    uint8_t pal[256][3];
+    memcpy(pal, P.pal, sizeof pal);
+    if (getenv("PCREF_LOG")) { int nb = 0, nf = 0; for (int i = 0; i < 320 * 240; i++) { nb += back[i] != base[i]; nf += front[i] != base[i]; } fprintf(stderr, "refdraw: frame %d at %d,%d size %dx%d back %d front %d\n", fr, x0, y0, s->w, s->h, nb, nf); }
+    for (int y = 0; y < s->h; y++)
+        for (int x = 0; x < s->w; x++) {
+            int v = s->px[y * s->w + x];
+            if (v == 255) continue;
+            int px_ = x0 + x, py = y0 + y;
+            if (px_ < 0 || px_ >= w || py < 0 || py >= h) continue;
+            int p = py * 320 + px_;
+            int ok = back[p] != base[p];
+            if (!ok && front[p] != base[p]) {                      /* in front of a sprite or an overlay: if no skater nearer covers this */
+                ok = 1;
+                for (int i = 0; i < n && ok; i++) {
+                    const spr *o = &P.f[list[i].pc];
+                    int ox = list[i].x - 128 - (list[i].flip ? o->w - 1 - o->xo : o->xo), oy = list[i].y - 128 - o->yo;
+                    if (px_ >= ox && px_ < ox + o->w && py >= oy && py < oy + o->h && list[i].y >= R.sy) ok = 0;
+                }
+            }
+            if (!ok) continue;
+            int r = v < 0x80 ? rec[192 + v] : rec[320 + v - 0x80];
+            pic[(long)py * pitch + px_] = 0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2];
+        }
+}
 
 /* Over the picture the game drew (px: its colours, pic: the same as RGB). The cartridge's own sprites of the objects drawn here are
  * still in it: the picture is drawn again from a copy of the VDP with those sprite table entries hidden, and where the two differ
@@ -271,7 +450,7 @@ void pcspr_set(int on) { SDL_AtomicSet(&P.on, on ? 1 : 0); }
  * and a few pixels around (the two shapes differ a little); everything else of the cartridge's sprites is given back its background. */
 void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
-    if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !in_game() || (int16_t)g.palcount >= 0) return;
+    if ((!SDL_AtomicGet(&P.on) && !SDL_AtomicGet(&R.on)) || !SDL_AtomicGet(&P.found) || !in_game() || (int16_t)g.palcount >= 0) return;
     shown list[16];
     int n = 0;
     unsigned sat0 = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
@@ -290,8 +469,10 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
         for (int k = 0; k < 8; k++) fprintf(stderr, " %02X/%02X", P.ring[0].l[0].sig[k], vdp->s.vram[(sat0 + (unsigned)P.ring[0].l[0].first * 8 + (unsigned)k) & 0xFFFF]);
         fprintf(stderr, "\n");
     }
-    if (n <= 0 || w > 320 || h > 240) return;
+    if (w > 320 || h > 240) return;
     static mdrt_vdp scratch;
+    if (!SDL_AtomicGet(&P.on)) n = 0;
+    if (n <= 0) { ref_draw(vdp, pic, w, h, pitch, list, 0); return; }
     static uint16_t clean[320 * 240];
     static uint8_t vis[320 * 240];
     scratch = *vdp;
@@ -354,4 +535,5 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
                 pic[(long)py * pitch + px_] = 0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2];
             }
     }
+    ref_draw(vdp, pic, w, h, pitch, list, n);
 }

@@ -579,7 +579,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_PCSPR (CD_ROWS + 19)                            /* (NHL 95 PC's skater sprites, its own files: group 4) */
 #define CD_PCSIREN (CD_ROWS + 20)                          /* (NHL 95 PC's goal siren, its own file: group 4) */
 #define CD_PCHORN (CD_ROWS + 21)                           /* (and its end of period horn) */
-#define CD_OPTS (CD_ROWS + 22)
+#define CD_PCREF (CD_ROWS + 22)                            /* (a referee on the ice, from NHL 95 PC's frames: group 4) */
+#define CD_OPTS (CD_ROWS + 23)
 static ob_game_opt cd_opts[CD_OPTS];
 /* the Widescreen rows (the Game page's, Overbar's Scaling page's) are one setting: the Scaling page's change shown on the Game page */
 static void wide_rows_sync(void)
@@ -628,6 +629,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_WHITEICE) { whiteice_set(value); return; }
     if (index == CD_HATS) { hats_set(value); return; }
     if (index == CD_PCSPR) { pcspr_set(value); return; }
+    if (index == CD_PCREF) { pcspr_ref_set(value); return; }
     if (index == CD_WIDESCREEN) { host.widescreen = value != 0; return; }   /* (hook_frame keeps the two rows alike) */
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
@@ -809,6 +811,7 @@ static void game_page_init(void)
     cd_opts[CD_PCSIREN] = (ob_game_opt){ "pc_goal_siren", "PC goal siren", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's siren in place of the cartridge's) */
     cd_opts[CD_PCHORN] = (ob_game_opt){ "pc_period_horn", "PC end of period horn", cd_off_on, 2, 1, 0, 4 };
     cd_opts[CD_PCSPR] = (ob_game_opt){ "pc_sprites", "PC player sprites", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's skaters and goalies, the cartridge's where the PC has none) */
+    cd_opts[CD_PCREF] = (ob_game_opt){ "pc_referee", "Referee on the ice", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's referee skating with the play and dropping the puck) */
     cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 1, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
     cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
     static const char *const shape[2] = { "4:3", "16:9" };
@@ -818,6 +821,7 @@ static void game_page_init(void)
         game_help[CD_PCSIREN] = "NHL 95 PC's goal siren, from your NHL 95 PC files, in place of the cartridge's.";
         game_help[CD_PCHORN] = "NHL 95 PC's horn at the end of a period, from your NHL 95 PC files.";
         game_help[CD_PCSPR] = "NHL 95 PC's skaters and goalies, from your NHL 95 PC files.";
+        game_help[CD_PCREF] = "A referee skating on the ice, NHL 95 PC's, from your NHL 95 PC files.";
         game_help[CD_HATS] = "Hats thrown on the ice after a home skater's third goal.";
         game_help[CD_WHITEICE] = "The PC games' white rink instead of the pale cyan one.";
         game_help[CD_PCPHOTOS] = "Player photos in colour.";
@@ -841,6 +845,8 @@ static void game_page_init(void)
     pv[1][CD_HATS] = 0;                                                        /* (the SNES's: not the Sega CD's) */
     pv[1][CD_PCSIREN] = pv[1][CD_PCHORN] = 0;                                  /* (the PC games' sounds: not the Sega CD's) */
     pv[2][CD_PCSIREN] = pv[2][CD_PCHORN] = 1;                                  /* (on in Recommended; they do nothing without 95 PC's files) */
+    pv[1][CD_PCREF] = 0;                                                       /* (the PC games' look: not the Sega CD's) */
+    pv[2][CD_PCREF] = 1;
     pv[1][CD_PCSPR] = 0;                                                       /* (the PC games' look: not the Sega CD's; off in Recommended until tried) */
     pv[2][CD_HATS] = 1;                                                        /* (on in Recommended; it does nothing without the SNES ROM) */
     pv[1][CD_WHITEICE] = 0;                                                    /* (the PC games' look: not the Sega CD's; off in Recommended too, it is a taste) */

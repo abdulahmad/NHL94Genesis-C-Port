@@ -668,6 +668,7 @@ void native_frame_done(long frame, int wait)
 static FILE *wav;
 static int segacd_on;                                     /* --segacd-music / --segacd-crowd */
 static int announcer_find;
+static int pcref_cli;                                    /* --pc-ref: the referee on the ice (needs the PC files as --pc-sprites does) */
 static int pcspr_cli;                                    /* --pc-sprites: NHL 95 PC's skater sprites, found beside the program
  */
 static const char *hats_rom;                              /* --hats FILE: the hat trick hats, from this NHL 94 SNES ROM */
@@ -754,6 +755,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--hats") && i + 1 < argc) hats_rom = argv[++i];
         else if (!strcmp(argv[i], "--white-ice")) whiteice_set(1);
         else if (!strcmp(argv[i], "--pc-sprites")) pcspr_cli = 1;
+        else if (!strcmp(argv[i], "--pc-ref")) pcref_cli = 1;
         else if (!strcmp(argv[i], "--announcer") && i + 1 < argc) announcer_file = argv[++i];
         else if (!strcmp(argv[i], "--pc-sfx") && i + 1 < argc) pcsfx_file = argv[++i];
         else if (!strcmp(argv[i], "--segacd-music")) { segacd_on = 1; segacd_set_music(1); }
@@ -902,6 +904,7 @@ int main(int argc, char **argv)
         hats_start();
     }
     if (pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-sprites: no NHL 95 PC sprite files found\n"); return 2; } pcspr_set(1); }
+    if (pcref_cli) { if (!pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-ref: no NHL 95 PC sprite files found\n"); return 2; } } pcspr_ref_set(1); }
     if (announcer_find) { announcer_start(); announcer_wait(); fprintf(stderr, "announcer found: %d\n", announcer_found()); return !announcer_found(); }
     if (announcer_file) {
         wav_rate = c.audio_rate ? c.audio_rate : 48000;
