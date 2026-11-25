@@ -126,6 +126,12 @@ Online, every machine plays by the host's.
 - **Sega CD rosters (restarts)**: the disc's teams: 31 players fewer, with its goalie counts, forward counts and lines. It is a
   built-in roster set (`--rosters sega-cd`, `rules.rosters = sega-cd`), made from your cartridge, with records of its own; turning it on or off starts the console again.
 
+The disc's sound needs your own rip of the NHL '94 Sega CD. Put it beside the program, in the same folder or up to three folders below. Any common rip works: a `.cue` with one file per track or one file for the whole disc, a CloneCD `.ccd`, or a data track `.iso` / `.bin` with numbered track files beside it ("Track 02.wav", "02 - Name.bin"). The game finds the disc by the files on its data track, so the file names don't matter. These two rows change only what you hear on this machine, so each machine in an online game can set them differently:
+
+- **Music**: *Sega CD* plays the disc's CD audio in place of the FM songs. The organ and goal songs (`$30`-`$77`) are tracks 7-78, played once. The title is track 4, intermission and end of game are track 5, and the scouting report is track 3, all looped. The sound effects stay on the FM chip. A song with no track on the disc plays on FM.
+- **Crowd**: *cartridge* is the PSG noise crowd. *Sega CD* is the disc's crowd recording, track 2, looped at the disc's level whenever no CD song is playing during a game. *both* plays them together.
+- Headless: `--segacd-music` and `--segacd-crowd 0|1|2` mix the disc into `--wav`. The golden lines hash the game's own sound, so they don't change.
+
 ### Game rules
 
 Things the cartridge never offered, for every player and the whole game. They are set before a

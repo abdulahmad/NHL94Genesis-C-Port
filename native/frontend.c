@@ -28,6 +28,7 @@
 #include "native.h"
 #include "optionsui.h"
 #include "rules.h"
+#include "segacd.h"
 
 #define SETTINGS "settings.ini"
 
@@ -310,6 +311,12 @@ static void audio(void *user, const int16_t *samples, int frames)
 {
     (void)user;
     if (!F.dev || hold_state) return;
+    static int16_t mixed[2 * 4096];
+    if (frames > 0 && frames <= 4096) {                 /* (the Sega CD disc's music and crowd, when they play) */
+        memcpy(mixed, samples, (size_t)frames * 4);
+        segacd_mix(mixed, frames, F.rate);
+        samples = mixed;
+    }
     SDL_QueueAudio(F.dev, samples, (Uint32)frames * 4);
     if (++F.queued == SQUEUE) SDL_PauseAudioDevice(F.dev, 0);
 }
@@ -510,8 +517,10 @@ static const struct { int rule; const char *key; } cd_rows[] = {
     { RULE_CD_PASSWORD, "cd_password" }, { RULE_CD_CLEARSHOT, "cd_clear_shots" }, { RULE_CD_COLOURS, "cd_colours" },
 };
 #define CD_ROWS ((int)(sizeof cd_rows / sizeof cd_rows[0]))
-#define CD_ROSTERS CD_ROWS                                /* (the last row: the roster set, the built-in "sega-cd", list entry 1) */
-static ob_game_opt cd_opts[CD_ROWS + 1];
+#define CD_ROSTERS CD_ROWS                                /* (the roster set, the built-in "sega-cd", list entry 1) */
+#define CD_MUSIC (CD_ROWS + 1)                            /* (this machine's sound only: the disc's music, its crowd bed) */
+#define CD_CROWD (CD_ROWS + 2)
+static ob_game_opt cd_opts[CD_ROWS + 3];
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
 /* the option of the rules page with this key, or -1 */
@@ -525,6 +534,8 @@ static void cd_changed(void *ctx, int index, int value)
 {
     char key[64];
     (void)ctx;
+    if (index == CD_MUSIC) { segacd_set_music(value); return; }
+    if (index == CD_CROWD) { segacd_set_crowd(value); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
@@ -563,7 +574,11 @@ static void game_page_init(void)
     }
     int r = option_index("rules.rosters");
     cd_opts[CD_ROSTERS] = (ob_game_opt){ "cd_rosters", "Sega CD rosters (restarts)", cd_off_on, 2, r >= 0 && F.opt_values && F.opt_values[r] == 1, 1, 2 };
-    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 1, cd_changed, NULL };
+    static const char *const music[2] = { "cartridge", "Sega CD" }, *const crowd[3] = { "cartridge", "Sega CD", "both" };
+    cd_opts[CD_MUSIC] = (ob_game_opt){ "cd_music", "Music", music, 2, 0, 0, 3 };
+    cd_opts[CD_CROWD] = (ob_game_opt){ "cd_crowd", "Crowd", crowd, 3, 0, 0, 3 };
+    segacd_start();
+    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 3, cd_changed, NULL };
     ob_game_set_ops(&host, &ops);
 }
 
