@@ -540,10 +540,14 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_SCREENS (CD_ROWS + 5)
 #define CD_INTRO (CD_ROWS + 6)
 #define CD_DEDITHER (CD_ROWS + 7)
-#define CD_PHOTOS (CD_ROWS + 8)
-#define CD_CAREER (CD_ROWS + 9)
-static ob_game_opt cd_opts[CD_ROWS + 10];
+#define CD_SMOOTH (CD_ROWS + 8)
+#define CD_COLOUR (CD_ROWS + 9)
+#define CD_PHOTOS (CD_ROWS + 10)
+#define CD_CAREER (CD_ROWS + 11)
+#define CD_OPTS (CD_ROWS + 12)
+static ob_game_opt cd_opts[CD_OPTS];
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
+static SDL_atomic_t cd_smooth, cd_colour;                 /* the movie at 30 fps; each shot's colour */
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
 /* the option of the rules page with this key, or -1 */
@@ -563,6 +567,8 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_SCREENS) { segacd_set_screens(value); return; }
     if (index == CD_INTRO) { segacd_set_intro(value); return; }
     if (index == CD_DEDITHER) { SDL_AtomicSet(&cd_dedither, value); return; }
+    if (index == CD_SMOOTH) { SDL_AtomicSet(&cd_smooth, value); return; }
+    if (index == CD_COLOUR) { SDL_AtomicSet(&cd_colour, value); return; }
     if (index == CD_PHOTOS) { segacd_set_photos(value); return; }
     if (index == CD_CAREER) { segacd_set_career(value, ending); return; }
     if (index == CD_SFX) { segacd_set_sfx(value); return; }
@@ -604,8 +610,11 @@ static void intro_hook(void)
 static void intro_tick(void)
 {
     int st = SDL_AtomicGet(&intro_state);
+    char intro_base[1100];                               /* (the made files: segacd-intro.dedither, .smooth, .colour) */
+    snprintf(intro_base, sizeof intro_base, "%s", beside("segacd-intro"));
     if (st == 1) SDL_AtomicSet(&intro_state, segacd_movie_start(segacd_disc(), "HOCKEY.SEG", F.dev, F.rate, SDL_AtomicGet(&cd_dedither),
-                                                                        beside("segacd-intro.dedither")) ? 2 : 0);
+                                                                        SDL_AtomicGet(&cd_smooth), SDL_AtomicGet(&cd_colour), intro_base,
+                                                                        beside("rife-v4.6")) ? 2 : 0);
     else if (st == 2 && !segacd_movie_tick()) SDL_AtomicSet(&intro_state, 0);
 }
 
@@ -616,7 +625,7 @@ static void cd_no_disc(void)
     if (done || !segacd_searched()) return;
     done = 1;
     if (segacd_disc()) return;
-    static char labels[CD_ROWS + 10][64];
+    static char labels[CD_OPTS][64];
     for (int k = CD_MUSIC; k <= CD_CAREER; k++) {
         if (!cd_opts[k].label) continue;
         snprintf(labels[k], sizeof labels[k], "%s (no disc found)", cd_opts[k].label);
@@ -645,13 +654,16 @@ static void game_page_init(void)
     cd_opts[CD_SCREENS] = (ob_game_opt){ "cd_screens", "Opening screens", music, 2, 0, 0, 3 };
     cd_opts[CD_INTRO] = (ob_game_opt){ "cd_intro", "Intro movie", cd_off_on, 2, 0, 0, 3 };
     cd_opts[CD_DEDITHER] = (ob_game_opt){ "cd_dedither", "Movie de-dither", ob_postfx_names, OB_POSTFX_MODES, 0, 0, 3 };
+    static const char *const smooth[2] = { "original", "30 fps" }, *const colour[2] = { "original", "enhanced" };
+    cd_opts[CD_SMOOTH] = (ob_game_opt){ "cd_smooth", "Movie frame rate", smooth, 2, 0, 0, 3 };
+    cd_opts[CD_COLOUR] = (ob_game_opt){ "cd_colour", "Movie colour", colour, 2, 0, 0, 3 };
     cd_opts[CD_PHOTOS] = (ob_game_opt){ "cd_photos", "Player photos", music, 2, 0, 0, 3 };
     static const char *const career[2] = { "off", "B on a player card" };
     cd_opts[CD_CAREER] = (ob_game_opt){ "cd_career", "Career stats", career, 2, 0, 0, 3 };
     cd_opts[CD_SFX] = (ob_game_opt){ "cd_sfx", "Sound effects", music, 2, 0, 0, 3 };
     segacd_start();
     segacd_intro_hook = intro_hook;
-    ob_game_ops ops = { NULL, cd_opts, CD_ROWS + 10, cd_changed, NULL };
+    ob_game_ops ops = { NULL, cd_opts, CD_OPTS, cd_changed, NULL };
     ob_game_set_ops(&host, &ops);
 }
 
