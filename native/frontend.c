@@ -668,7 +668,20 @@ static void game_page_init(void)
     cd_opts[CD_SFX] = (ob_game_opt){ "cd_sfx", "Sound effects", music, 2, 0, 0, 3 };
     segacd_start();
     segacd_intro_hook = intro_hook;
-    ob_game_ops ops = { NULL, cd_opts, CD_OPTS, cd_changed, NULL };
+    /* the presets: a quick select over the rows below (each row stays free to change; the row then reads Custom).
+     * Cartridge = every row at its default; Sega CD = everything the disc gives, as the disc has it; Recommended =
+     * the cartridge's game with the disc's presentation. -1 would leave a row alone (a new row starts there). */
+    static signed char pv[3][CD_OPTS];
+    for (int p = 0; p < 3; p++) for (int k = 0; k < CD_OPTS; k++) pv[p][k] = p == 1 ? 1 : 0;   /* Cartridge 0, Sega CD 1 */
+    pv[1][CD_DEDITHER] = pv[1][CD_SMOOTH] = pv[1][CD_COLOUR] = 0;            /* (the movie as the disc has it) */
+    pv[1][CD_VOICE] = 1; pv[1][CD_CROWD] = 1;
+    static const int disc_look[] = { CD_VOICE, CD_SCREENS, CD_TITLE, CD_INTRO, CD_SFX, CD_PHOTOS, CD_CAREER };
+    for (size_t k = 0; k < sizeof disc_look / sizeof *disc_look; k++) pv[2][disc_look[k]] = 1;
+    pv[2][CD_CROWD] = 2;                                                       /* (both beds) */
+    pv[2][CD_DEDITHER] = OB_POSTFX_LIVE;                                       /* (the movie without the dither) */
+    for (int k = 0; k < CD_ROWS; k++) if (!strcmp(cd_rows[k].key, "cd_clear_shots")) pv[2][k] = 1;   /* (the one fix) */
+    static const ob_game_preset presets[3] = { { "Recommended", pv[2] }, { "Cartridge", pv[0] }, { "Sega CD", pv[1] } };
+    ob_game_ops ops = { NULL, cd_opts, CD_OPTS, cd_changed, NULL, presets, 3 };
     ob_game_set_ops(&host, &ops);
 }
 
