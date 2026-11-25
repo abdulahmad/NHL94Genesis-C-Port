@@ -379,6 +379,10 @@ void segacd_event(int ev, uint16_t n)
     case CD_EV_SCREEN:
         if (n == 2 && !S.intro_done && SDL_AtomicGet(&S.intro) && segacd_intro_hook && segacd_disc()) {
             S.intro_done = 1;                 /* (the disc's movie before its title, as the disc plays it: the game waits) */
+            S.screen = 0;                     /* (the last disc picture is gone: not shown again between the movie and the title) */
+            S.pic_of = 0;
+            S.out = 0;
+            S.hold = 1;
             segacd_intro_hook();
         }
         {
