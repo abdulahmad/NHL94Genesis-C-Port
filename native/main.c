@@ -644,6 +644,7 @@ void native_frame_done(long frame, int wait)
 
 static FILE *wav;
 static int segacd_on;                                     /* --segacd-music / --segacd-crowd */
+static int segacd_sfx_flag;                               /* --segacd-sfx: the disc's sound effects (rendered before the run starts) */
 static unsigned wav_rate = 48000;
 static uint32_t wav_frames;
 static long golden_lines;
@@ -723,6 +724,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--segacd-voice") && i + 1 < argc) { segacd_on = 1; segacd_set_voice(atoi(argv[++i])); }
         else if (!strcmp(argv[i], "--segacd-screens")) { segacd_on = segacd_screens = 1; segacd_set_screens(1); }
         else if (!strcmp(argv[i], "--segacd-photos")) { segacd_on = 1; segacd_set_photos(1); }
+        else if (!strcmp(argv[i], "--segacd-sfx")) segacd_on = segacd_sfx_flag = 1;
         else if (!strcmp(argv[i], "--headless")) headless = 1;
         else if (!strcmp(argv[i], "--lockstep") && i + 1 < argc) { lockstep_path = argv[++i]; headless = 1; }
         else if (!strcmp(argv[i], "--golden") && i + 1 < argc) { golden_path = argv[++i]; headless = 1; }
@@ -854,6 +856,7 @@ int main(int argc, char **argv)
     if (wav_path && !(wav = fopen(wav_path, "wb"))) { fprintf(stderr, "cannot write %s\n", wav_path); return 1; }
     if (wav) wav_header(c.audio_rate);
     if (segacd_on) { wav_rate = c.audio_rate ? c.audio_rate : 48000; segacd_start(); segacd_wait(); }
+    if (segacd_sfx_flag) { segacd_set_sfx(1); segacd_sfx_wait(); }
     if (golden_path && !(golden = fopen(golden_path, "w"))) { fprintf(stderr, "cannot write %s\n", golden_path); return 1; }
     if (hashes_path && !(hashes = fopen(hashes_path, "w"))) { fprintf(stderr, "cannot write %s\n", hashes_path); return 1; }
     c.platform = (mdrt_platform){ .present = golden ? golden_present : NULL, .audio = wav_audio };

@@ -21,6 +21,15 @@ uint8_t segacd_ym(int port, uint8_t v);  /* a YM2612 port write on its way to th
 uint8_t segacd_psg(uint8_t v);           /* a PSG write on its way to the chip */
 void segacd_mix(int16_t *out, int frames, unsigned rate);   /* the disc's track into a frame of sound */
 
+/* the disc's sound effects (native/segacd_sfx.c, the Sound effects row): 0 the cartridge's, 1 the disc's (rendered in a thread
+ * the first time); segacd_sfx_on: effect id is the disc's now (its cartridge notes are kept from the chips) */
+void segacd_set_sfx(int v);
+int segacd_sfx_on(int id);
+void segacd_sfx_play(int id);
+void segacd_sfx_stop(void);
+void segacd_sfx_mix(int16_t *out, int frames, unsigned rate);
+void segacd_sfx_wait(void);             /* (headless) until they are rendered */
+
 /* the disc's opening pictures (native/segacd_pics.c): 320 x 224 ARGB into out; 0 when it cannot */
 enum { SEGACD_PIC_HSP, SEGACD_PIC_TITLE, SEGACD_PIC_LICENSE };
 int segacd_picture(ob_cd *cd, int which, uint32_t *out);

@@ -40,6 +40,7 @@ static struct {
     double at;                              /* its frame, at 44.1 kHz */
     long frames;                            /* its length */
     int song_on_cd;                         /* the game's song is the disc's now: its FM notes are dropped */
+    uint8_t fx_slot[8];                     /* a track slot's effect is the disc's: its FM notes and samples are dropped */
     int crowd_live;                         /* frames left of the game's crowd (updatesound) */
     uint8_t ym_addr;                        /* the YM2612's part 1 address latch (the relay's last) */
     SDL_atomic_t voice;                     /* the Ron Barr row: 0 off, 1 on (the music held back), 2 on over the music */
@@ -271,7 +272,7 @@ void segacd_event(int ev, uint16_t n)
     if (log < 0) log = SDL_getenv("SEGACD_LOG") != NULL;
     if (log && ev != CD_EV_CROWD)
         fprintf(stderr, "segacd: frame %ld %s %02X (track %d)\n", native_frames(),
-                ev == CD_EV_SONG ? "song" : ev == CD_EV_STOP ? "stop" : ev == CD_EV_PARAGRAPH ? "paragraph" : ev == CD_EV_SCREEN ? "screen" : "turnoff", n, S.track);
+                ev == CD_EV_SONG ? "song" : ev == CD_EV_STOP ? "stop" : ev == CD_EV_PARAGRAPH ? "paragraph" : ev == CD_EV_SCREEN ? "screen" : ev == CD_EV_SFX ? "sfx" : "turnoff", n, S.track);
     switch (ev) {
     case CD_EV_SONG: {
         S.song_on_cd = 0;
@@ -295,10 +296,17 @@ void segacd_event(int ev, uint16_t n)
         S.song_on_cd = 0;
         stop();
         voice_stop();
+        segacd_sfx_stop();
         break;
     case CD_EV_PARAGRAPH:
         paragraph(n);
         break;
+    case CD_EV_SFX: {                         /* the disc's effect in place of the cartridge's (its slot's notes dropped) */
+        int id = n & 0xFF, slot = n >> 8 & 15, disc = !SDL_AtomicGet(&S.session) && segacd_disc() && segacd_sfx_on(id);
+        if (slot < 8) S.fx_slot[slot] = (uint8_t)disc;
+        if (disc) segacd_sfx_play(id);
+        break;
+    }
     case CD_EV_SCREEN:
         if (n == 2 && !S.intro_done && SDL_AtomicGet(&S.intro) && segacd_intro_hook && segacd_disc()) {
             S.intro_done = 1;                 /* (the disc's movie before its title, as the disc plays it: the game waits) */
@@ -324,15 +332,15 @@ static int song_track(void)
         if (first <= (int32_t)g.fm_slots[i].stream) return 7 - i;
     return -1;
 }
-/* output channel out (0-2, 4-6; 6 the PCM one too) is playing the disc's song's notes */
+/* output channel out (0-2, 4-6; 6 the PCM one too) is playing the disc's song's notes, or a disc effect's */
 static int owned(int out, int pcm)
 {
-    if (!S.song_on_cd) return 0;
     int t = song_track();
-    if (t < 0) return 0;
     for (int k = pcm ? 5 : 0; k < (pcm ? 6 : 5); k++) {
         struct Channel *ch = &g.fm_channels[k];
-        if ((pcm || ch->out == out) && (ch->key & 7) == t && ch->key != 0xFF) return 1;
+        if ((!pcm && ch->out != out) || ch->key == 0xFF) continue;
+        int slot = ch->key & 7;
+        if (slot == t ? S.song_on_cd : S.fx_slot[slot]) return 1;
     }
     return 0;
 }
@@ -340,7 +348,7 @@ static int owned(int out, int pcm)
 uint8_t segacd_ym(int port, uint8_t v)
 {
     if (port == 0) { S.ym_addr = v; return v; }
-    if (port != 1 || !S.song_on_cd) return v;
+    if (port != 1) return v;
     if (S.ym_addr == 0x28 && (v & 0xF0) && owned(v & 7, 0)) return (uint8_t)(v & 0x07);   /* key on: kept off */
     if (S.ym_addr == 0x2A && owned(6, 1)) return 0x80;                                     /* a drum sample: silence */
     return v;
@@ -370,6 +378,7 @@ static void mix_voice(int16_t *out, int frames, unsigned rate)
 
 void segacd_mix(int16_t *out, int frames, unsigned rate)
 {
+    segacd_sfx_mix(out, frames, rate);
     if (S.clip && rate) mix_voice(out, frames, rate);
     if (S.clip && !SDL_AtomicGet(&S.voice)) voice_stop();
     if (S.crowd_live > 0 && --S.crowd_live == 0 && S.bed) stop();   /* (the game's crowd stopped: the menus) */
