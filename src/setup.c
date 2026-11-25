@@ -1488,6 +1488,7 @@ void PenaltyShotBox(void)
     printbig(SYM_PenShotBigTxt);
     uint16_t shooter = sortobj((int16_t)g.BA_Sktr_SCnum)->pnum;
     if (pa_hook) pa_hook(PA_PENSHOT, team_struct(g.BA_Team != 0), shooter, 0, 0);   /* (the rink announcer) */
+    hold_for(450);                                        /* (RULE_HOLD: "penalty shot number n, at 8 minutes 2 seconds", 7.5 s) */
     print(FormatPlayerNumInitial(shooter, team_struct(g.BA_Team != 0)));
     PRINTZ(str_PenaltyShotBox_2);
     const uint8_t *list = rom_ptr(SYM_Penaltylist);
@@ -1532,6 +1533,11 @@ void ShowGoalBox(void)
         int a1 = -1, a2 = -1;
         if (!(e[4] & 0x80) && !(g.sflags4 & HI(5))) { a1 = e[4]; if (!(e[5] & 0x80)) a2 = e[5]; }
         pa_hook(PA_GOAL, tm, scorer, a1, a2);
+    }
+    {                                                    /* (RULE_HOLD: 3.7 s for the goal, 2.6 s and 2 s for the assists) */
+        int assists = 0;
+        if (!(e[4] & 0x80) && !(g.sflags4 & HI(5))) assists = (e[5] & 0x80) ? 1 : 2;
+        hold_for(222 + (assists ? 156 : 0) + (assists > 1 ? 120 : 0));
     }
     g.printx = 0xC;
     print(FormatPlayerName(scorer, tm));
