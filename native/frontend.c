@@ -636,11 +636,11 @@ static void cd_changed(void *ctx, int index, int value)
     if (i < 0) return;
     if (F.opt_values[i] == value) return;
     F.opt_values[i] = value;
-    mdrt_settings_set(F.set, key, cd_off_on[value ? 1 : 0]);
+    mdrt_settings_set(F.set, key, F.o->options[i].names[value]);
     settings_write();
     if (F.session) return;                              /* (a session plays by the host's rules) */
     if (F.o->options_use) F.o->options_use(F.opt_values, F.user);   /* (the next power on's) */
-    rules[cd_rows[index].rule] = (uint8_t)(value ? 1 : 0);          /* (and this game's, from now on) */
+    rules[cd_rows[index].rule] = (uint8_t)value;          /* (and this game's, from now on) */
 }
 
 /* the disc's intro movie (segacd_intro_hook, the game's thread): the window's loop plays it, this waits */
@@ -720,7 +720,7 @@ static void game_page_init(void)
         char key[64];
         snprintf(key, sizeof key, "rules.%s", cd_rows[k].key);
         int i = option_index(key);
-        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], cd_off_on, 2, i >= 0 && F.opt_values ? (F.opt_values[i] ? 1 : 0) : 0, 1, (cd_rows[k].rule == RULE_HOLD || cd_rows[k].rule == RULE_FIGHT) ? 4 : 1 };
+        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], i >= 0 ? F.o->options[i].names : cd_off_on, i >= 0 ? F.o->options[i].count : 2, i >= 0 && F.opt_values ? F.opt_values[i] : 0, 1, (cd_rows[k].rule == RULE_HOLD || cd_rows[k].rule == RULE_FIGHT) ? 4 : 1 };
     }
     int r = option_index("rules.rosters");
     cd_opts[CD_ROSTERS] = (ob_game_opt){ "cd_rosters", "Sega CD rosters (restarts)", cd_off_on, 2, r >= 0 && F.opt_values && F.opt_values[r] == 1, 1, 2 };
