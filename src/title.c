@@ -19,6 +19,7 @@ static void cd_license(void)
         if (!(orjoy() & 0xF0)) held = 0;
         else if (!held) break;
     }
+    for (int i = 0; i < 60 && (orjoy() & 0xF0); i++) hal_wait_vblank();   /* (the press is the license page's, not the next screen's) */
 }
 static struct Picture picture(uint32_t img)
 {
