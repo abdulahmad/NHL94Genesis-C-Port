@@ -28,6 +28,7 @@ enum {
     RULE_CD_PERIOD_END,         /* PeriodOver_sp without the two vblank waits and the p_turnoff between them */
     RULE_HOLD,                  /* play waits between a goal, a penalty or a penalty shot and the next face off for
                                  * about as long as NHL 95 PC's announcer takes to say it (src/hold.c) */
+    RULE_FIGHT,                 /* NHL 93's fighting (src/fight.c): hard checks between opposing skaters can start a fight */
     RULE_COUNT
 };
 /* the original's values */

@@ -399,7 +399,7 @@ void updateanim(struct SortObj *o)
         o->pflags2 &= (uint8_t)~(1 << pf2aip);
         return;
     }
-    const uint8_t *a0 = rom_ptr(SYM_SPAlist + o->SPA);
+    const uint8_t *a0 = spa_table(o->SPA);
     uint16_t d1 = rd16(a0 + 0x10);                                /* animation attributes: bit 0 loops */
     int16_t d0 = o->facedir;
     if ((g.sflags & HI(sfhor)) && o->SCnum < 0xC) d0 = (int16_t)((d0 - 2) & 7);
@@ -565,7 +565,7 @@ void doinput(uint16_t d0, uint16_t d1, uint16_t d2, uint16_t d3, int16_t d4, str
         }
     }
     if (!(o->pflags3 & (1 << pf3onetimer)) && PFLAG(o, pfalock)) { doinput_islocked(d1, d4, o); return; }
-    if (o->pflags2 & 1) return;                           /* fightinput: nothing */
+    if (o->pflags2 & 1) { fightinput((uint16_t)d0, (uint16_t)d1, o); return; }   /* fightinput: fight.c (the cartridge: nothing) */
     if (puckc() == o->SCnum) { doinput_ispc(d0, d1, d2, d3, d4, o); return; }
     if (o->position != 0 && !(o->pflags3 & (1 << pf3onetimer)) && (d1 & BUT_A)) { Holdplayer(o); return; }
     if (o->position != 0) {
@@ -1635,10 +1635,7 @@ void assfaceoffpl(struct Team *tm, struct SortObj *o)
     SetSPA(o, d1);
 }
 
-/* logic94.asm:assfight, assfwatch. rts only: there is no fighting. */
-void assfight(struct Team *tm, struct SortObj *o) { }
-/* assfwatch. rts only: there is no fighting */
-void assfwatch(struct Team *tm, struct SortObj *o) { }
+/* assfight, assfwatch: fight.c (RULE_FIGHT; the 94 cartridge has only an rts) */
 
 /* logic94.asm:donothing. The player should do nothing: coast. */
 void donothing(struct SortObj *o)
