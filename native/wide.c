@@ -112,7 +112,7 @@ void wide_line(const mdrt_vdp *v, int line, int M, int what, uint8_t *idx)
     else if ((v->s.reg[11] & 3) == 3) hl = line;
     int hsa = vword(v, hs + (uint32_t)(hl << 2)) & 0x3FF, hsb = vword(v, hs + (uint32_t)(hl << 2) + 2) & 0x3FF;
     plane_line(v, line, tb, hsb, 1, width, M, &b);
-    if (what == WIDE_ALL) {
+    if (what == WIDE_ALL || what == WIDE_A) {
         int wy = (v->s.reg[18] & 0x1F) * 8, w0, w1;
         if ((v->s.reg[18] & 0x80) ? line >= wy : line < wy) { w0 = 0; w1 = width; }
         else {
@@ -128,6 +128,7 @@ void wide_line(const mdrt_vdp *v, int line, int M, int what, uint8_t *idx)
             a.pri[x + M] = (uint8_t)(e >> 15);
         }
     } else memset(a.col, 0, sizeof a.col);
+    if (what == WIDE_A) { memcpy(idx, a.col, (size_t)ow); return; }
     if (what != WIDE_B) sprite_line(v, line, width, M, &s);
     else memset(s.col, 0, sizeof s.col);
     for (int x = 0; x < ow; x++) {
@@ -334,7 +335,7 @@ static int sports_line(const mdrt_vdp *v, int y, int M, const uint32_t *mid, int
 
 /* ---- the frame ---------------------------------------------------------------------------- */
 
-static int is_rink_wide(int w) { return w == 320 && view_wide() && (g.disflags & HI(df32c)) && !(g.sflags & HI(sfhor)); }
+int wide_rink_frame(int w) { return w == 320 && view_wide() && (g.disflags & HI(df32c)) && !(g.sflags & HI(sfhor)); }
 
 /* the main menu (the game setup screen): bars */
 static int bars_screen(const mdrt_vdp *v)
@@ -349,7 +350,7 @@ static int bars_screen(const mdrt_vdp *v)
 int wide_frame(const mdrt_vdp *v, const uint32_t *pic, int w, int h, int pitch, uint32_t *out, int opitch, int sega_cd)
 {
     int M = w == 256 ? 32 : 40;
-    if (!sega_cd && is_rink_wide(w)) M = 0;
+    if (!sega_cd && wide_rink_frame(w)) M = 0;
     int ow = w + 2 * M;
     for (int y = 0; y < h; y++) memcpy(out + (long)y * opitch + M, pic + (long)y * pitch, (size_t)w * 4);
     if (!M) return ow;
@@ -376,4 +377,45 @@ int wide_frame(const mdrt_vdp *v, const uint32_t *pic, int w, int h, int pitch, 
         for (int x = 0; x < M; x++) { o[x] = wide_rgb(v, idx[x]); o[w + M + x] = wide_rgb(v, idx[w + M + x]); }
     }
     return ow;
+}
+
+/* ---- the wide rink on a 4:3 screen (a session's, played wide for a 16:9 player) ------------------------
+ * The middle 256 of the 320, panning with a camera of the picture's own that follows the game's target
+ * (xc1) as the cartridge's does (checkwindow: a dead zone of $28, a 1/16 step, its reach $3C), kept inside
+ * the wide picture. Plane A (the overlays and the boxes, which the wide view places for 256 and shifts) is
+ * put back where the cartridge has it: 32 in, and the boxes' rows from the screen's edges. Only the
+ * picture: the game plays the wide rink as every machine does */
+static int cam, cam_known;
+void wide_crop_follow(void)
+{
+    int hp = (int16_t)g.Hpos, t = (int16_t)g.xc1;
+    if (!cam_known) { cam = hp; cam_known = 1; }
+    int d = t - cam, to = cam;
+    if (d > 0x28) to = t - 0x28;
+    else if (d < -0x28) to = t + 0x28;
+    if (to > 0x3C) to = 0x3C;
+    if (to < -0x3C) to = -0x3C;
+    if (to != cam) { int step = (to - cam) / 16; cam += step ? step : (to > cam ? 1 : -1); }
+    if (cam > hp + 32) cam = hp + 32;
+    if (cam < hp - 32) cam = hp - 32;
+}
+
+int wide_crop(const mdrt_vdp *v, const uint32_t *pic, int h, int pitch, uint32_t *out, int opitch)
+{
+    int hp = (int16_t)g.Hpos;
+    if (!cam_known) wide_crop_follow();
+    int x0 = 32 + cam - hp, boxes = view_boxes();
+    static uint8_t idx[WIDE_MAX_W], am[WIDE_MAX_W];
+    for (int y = 0; y < h; y++) {
+        const uint32_t *p = pic + (long)y * pitch;
+        uint32_t *o = out + (long)y * opitch;
+        wide_line(v, y, 0, WIDE_BS, idx);                 /* the rink: plane B and the sprites */
+        wide_line(v, y, 0, WIDE_A, am);                   /* plane A (and the window): the overlays */
+        int boxrow = boxes && y >= VIEW_BOX_ROW * 8;
+        for (int x = 0; x < 256; x++) {
+            int ax = boxrow ? (x < 128 ? x : x + 64) : x + 32;
+            o[x] = am[ax] ? p[ax] : wide_rgb(v, idx[x0 + x]);   /* (an overlay with what is drawn over it: the faceoff box's players) */
+        }
+    }
+    return 256;
 }

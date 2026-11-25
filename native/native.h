@@ -63,7 +63,9 @@ int native_net_four_way(void);                          /* the session plays pad
 void native_net_start(mdrt *m);                         /* at power on, the states' parts added */
 void native_net_stop_at(long frame);                    /* headless: the session ends at --frames */
 void native_net_wait(void);                             /* at each of the game's waits, before the handshake */
-extern int native_game_teams[2];                       /* (away, home) as it is called */
+extern int native_game_teams[2];
+int native_player_on_screen(int p, int *dx, int *dy);   /* the controlled player of pad p: picture pixels from the picture's middle */
+extern volatile unsigned native_play_frames;          /* counts DoGameFrame calls: the window front end tells play from menus by it */                       /* (away, home) as it is called */
 extern void (*native_game_start_hook)(void);           /* a new game begins (the game's thread; frontend.c sets it: the select-sides screen) */
 int native_net_on(void);                                /* in a session (headless: from before power on) */
 /* the session's settings (the host's, sent to the guests before power on): the next game's rules
@@ -89,7 +91,10 @@ int native_net_window_status(char *line, size_t size);
  * options_use, or the command line's --rule NAME=VALUE), set at power on, and the state part */
 extern const mdrt_sdl_option rule_options[];
 void rules_next(const int *values, void *user);
-void rules_next_get(uint8_t *v);                         /* the next game's rules' values (RULE_COUNT of them) */
+void rules_next_get(uint8_t *v);
+void rules_next_send(uint8_t *v);                        /* the same with the Widescreen setting's wide rink: what a host sends */
+void rules_widescreen(int on);
+int rules_widescreen_on(void);                           /* the Widescreen setting (16:9: the wide-view rink from the next power on) */                         /* the next game's rules' values (RULE_COUNT of them) */
 int rules_next_set(const uint8_t *v, int count);         /* count of them (the rest Classic): 0, or -1 when one is out of range */
 /* the menu's page: the rules (its options_use and options_changed) */
 const mdrt_sdl_option *rules_page(int *count);

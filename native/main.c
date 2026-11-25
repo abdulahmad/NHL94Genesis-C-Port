@@ -584,6 +584,8 @@ static void segacd_frame(void)
 
 /* pictures to files (--widescreen: with the sides, wide.c) */
 static int shots_wide;
+static int crop43;                                        /* --crop43: a wide rink cropped to 4:3 as a session's 4:3 machine shows it */
+static int shots_crop(int w) { return !screen_frame && (crop43 || native_net_on()) && wide_rink_frame(w); }
 static void write_ppm(const char *path)
 {
     static uint16_t px[320 * 240];
@@ -597,6 +599,7 @@ static void write_ppm(const char *path)
     int pitch = 320;
     const uint32_t *src = pic;
     if (shots_wide) { w = wide_frame(v, pic, w, h, 320, wide, WIDE_MAX_W, screen_frame); src = wide; pitch = WIDE_MAX_W; }
+    else if (shots_crop(w)) { w = wide_crop(v, pic, h, 320, wide, WIDE_MAX_W); src = wide; pitch = WIDE_MAX_W; }
     FILE *f = fopen(path, "wb");
     if (!f) return;
     fprintf(f, "P6\n%d %d\n255\n", w, h);
@@ -615,6 +618,7 @@ void native_frame_done(long frame, int wait)
     long run = (long)mdrt_frame_count(native_m) + run_offset;   /* (the game's frames, on through a reset in place: the console's go on, and a rollback puts them back) */
     if (wait) lockstep_check(frame);
     if (segacd_screens) segacd_frame();
+    if (!shots_wide && shots_dir && shots_crop(mdrt_vdp_width(mdrt_get_vdp(native_m)))) wide_crop_follow();
     if (golden) golden_wait();
     if (hashes) {
         static uint8_t ram[RAM_SIZE];
@@ -730,7 +734,8 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--segacd-music")) { segacd_on = 1; segacd_set_music(1); }
         else if (!strcmp(argv[i], "--segacd-crowd") && i + 1 < argc) { segacd_on = 1; segacd_set_crowd(atoi(argv[++i])); }
         else if (!strcmp(argv[i], "--segacd-voice") && i + 1 < argc) { segacd_on = 1; segacd_set_voice(atoi(argv[++i])); }
-        else if (!strcmp(argv[i], "--widescreen")) shots_wide = 1;
+        else if (!strcmp(argv[i], "--crop43")) crop43 = 1;
+        else if (!strcmp(argv[i], "--widescreen")) { shots_wide = 1; rules_widescreen(1); }   /* (16:9: the wide rink too, as in the window) */
         else if (!strcmp(argv[i], "--segacd-screens")) { segacd_on = segacd_screens = 1; segacd_set_screens(1); }
         else if (!strcmp(argv[i], "--segacd-title")) { segacd_on = segacd_screens = 1; segacd_set_title(1); }
         else if (!strcmp(argv[i], "--segacd-photos")) { segacd_on = 1; segacd_set_photos(1); }

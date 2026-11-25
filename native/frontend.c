@@ -310,7 +310,9 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     if (cd) { w = 320; h = 224; }
     SDL_LockMutex(F.lock);
     F.wide = host.widescreen;
+    rules_widescreen(host.widescreen);           /* (the wide rink from the next power on: rules.c) */
     if (F.wide) w = wide_frame(mdrt_get_vdp(F.m), pic, w, h, 320, F.picture, WIDE_MAX_W, cd);   /* (the sides: wide.c) */
+    else if (!cd && native_net_on() && wide_rink_frame(w)) wide_crop_follow(), w = wide_crop(mdrt_get_vdp(F.m), pic, h, 320, F.picture, WIDE_MAX_W);   /* (a 16:9 player's wide rink, here 4:3) */
     else for (int y = 0; y < h; y++) memcpy(F.picture + y * WIDE_MAX_W, pic + y * 320, (size_t)w * 4);
     F.width = w;
     F.height = h;
@@ -857,6 +859,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     settings_write();
     ob_host_init(&host, OB_PORT_GENESIS, profile);
     ob_host_load_ini_beside(&host, "overbar.ini");   /* the Overbar settings stay set between runs */
+    rules_widescreen(host.widescreen);
     options_ui_init(o, F.opt_values, F.set, user, settings_write);
     game_page_init();                                 /* (after overbar.ini: its game_ lines are kept until the rows are known) */
     {
@@ -884,7 +887,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_shell_set(&shell);
     }
     {
-        ob_plat_hooks hooks = { .title = o->title ? o->title : "NHL '94", .win_w = 320 * (o->scale > 0 ? o->scale : 3), .win_h = 224 * (o->scale > 0 ? o->scale : 3),
+        ob_plat_hooks hooks = { .title = o->title ? o->title : "NHL '94", .win_w = (host.widescreen ? 400 : 320) * (o->scale > 0 ? o->scale : 3), .win_h = 224 * (o->scale > 0 ? o->scale : 3),
                                 .cls = OB_CLASS_LORES, .src_w = 320, .src_h = 224, .frame = hook_frame, .wide = hook_wide, .changed = hook_changed,
                                 .action = hook_action, .captures = hook_captures, .raw_key = hook_raw_key, .raw_button = hook_raw_button,
                                 .draw_over = hook_draw_over, .quit = hook_quit, .esc_opens = 1,
@@ -911,6 +914,16 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_pads_tick();
         if (SDL_AtomicGet(&sides_state) == 1) { ob_pads_sides_open(); SDL_AtomicSet(&sides_state, 2); }
         else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);
+        {   /* the mouse steers in play (the game's frames are running) and steps through the menus otherwise */
+            static unsigned seen_frames;
+            static Uint32 play_ms;
+            if (native_play_frames != seen_frames) { seen_frames = native_play_frames; play_ms = SDL_GetTicks(); }
+            ob_pads_mouse_mode(play_ms && SDL_GetTicks() - play_ms < 250u);
+            {   int ax, ay, mp = ob_pads_mouse_player();
+                if (mp >= 0 && native_player_on_screen(mp, &ax, &ay)) ob_pads_mouse_anchor(ax, ay);
+                else ob_pads_mouse_anchor(0, 0);
+            }
+        }
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
         intro_tick();
         segacd_career_tick(F.dev, F.rate, SDL_AtomicGet(&cd_dedither));

@@ -12,10 +12,17 @@
 
 /* one line M pixels a side past the screen, as colour indices (0 the backdrop): everything, plane B
  * alone, or plane B and the sprites; and an index's colour */
-enum { WIDE_ALL, WIDE_B, WIDE_BS };
+enum { WIDE_ALL, WIDE_B, WIDE_BS, WIDE_A };   /* (WIDE_A: plane A and the window alone, colour 0 where they show nothing) */
 void wide_line(const mdrt_vdp *v, int line, int M, int what, uint8_t *idx);
 uint32_t wide_rgb(const mdrt_vdp *v, uint8_t c);
 
 /* the frame pic (w x h, ARGB, rows pitch apart) made wide into out (rows opitch apart) -> its width.
  * sega_cd: pic is a Sega CD screen drawn by the port (segacd_present), not the VDP's */
 int wide_frame(const mdrt_vdp *v, const uint32_t *pic, int w, int h, int pitch, uint32_t *out, int opitch, int sega_cd);
+
+/* a w-wide frame is the wide-view rink (rules.view) */
+int wide_rink_frame(int w);
+/* the wide rink's picture (320 x h) for a 4:3 screen: its middle 256, panning with the puck, plane A's
+ * overlays and boxes where the cartridge has them -> 256 */
+void wide_crop_follow(void);   /* (each frame the rink is up: the crop's camera) */
+int wide_crop(const mdrt_vdp *v, const uint32_t *pic, int h, int pitch, uint32_t *out, int opitch);
