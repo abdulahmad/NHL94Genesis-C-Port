@@ -5,6 +5,8 @@
  * began (the clips' lengths in 95 PC's XBRUCE2.VIV, fixed here: the game must not depend on whether a machine has the
  * file). What the game already spends on the replay and the face off set up counts towards it.
  * RULE_ANNOUNCE 2: a home goal's speech starts after the goal song, and the wait covers the song and then the speech. */
+#include <stdio.h>
+#include <stdlib.h>
 #include "game.h"
 #include "rules.h"
 
@@ -37,6 +39,7 @@ void hold_anthem(int frames)
 
 void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a2)
 {
+    if (getenv("HOLDLOG")) fprintf(stderr, "hold: frame %d goal, song playing %d, delay %d\n", g.Vcount, song_playing(), (int16_t)g.songdelay);
     if (!song_playing() && (int16_t)g.songdelay <= 0) {   /* no song coming: the speech now */
         if (pa_hook) pa_hook(PA_GOAL, tm, player, a1, a2);
         hold_for(frames);
@@ -56,6 +59,7 @@ void hold_tick(void)
     int playing = song_playing() || (int16_t)g.songdelay > 0;
     if (playing) sg.started = 1;
     if (!(sg.started && !playing) && (int16_t)(sg.limit - g.Vcount) > 0) return;
+    if (getenv("HOLDLOG")) fprintf(stderr, "hold: frame %d speech starts (started %d)\n", g.Vcount, sg.started);
     sg.on = 0;                                          /* the song is over: the speech, and the wait for it */
     if (pa_hook) pa_hook(PA_GOAL, sg.tm, sg.player, sg.a1, sg.a2);
     until = (uint16_t)(g.Vcount + sg.frames);

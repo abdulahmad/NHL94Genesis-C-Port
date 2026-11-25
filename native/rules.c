@@ -121,6 +121,10 @@ void rules_next(const int *values, void *user)
 {
     (void)user;
     for (int i = 0; i < RULE_COUNT; i++) next[i] = (uint8_t)(valid(i, values[i]) < 0 ? rule_classic[i] : values[i]);
+    if (!native_net_on()) {                               /* (the stoppage waits only time the face off: a change counts at once when playing alone) */
+        rules[RULE_HOLD] = next[RULE_HOLD];
+        rules[RULE_ANNOUNCE] = next[RULE_ANNOUNCE];
+    }
 }
 
 /* the Widescreen setting at 16:9: the rink is the wide view (320), so the game fills the screen. Not a
