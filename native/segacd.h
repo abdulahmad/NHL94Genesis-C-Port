@@ -10,6 +10,8 @@ void segacd_set_music(int on);           /* the Game page: songs from the disc *
 void segacd_set_crowd(int v);            /* 0 the cartridge's PSG crowd, 1 the disc's track 2, 2 both */
 void segacd_set_voice(int v);            /* Ron Barr's scouting report: 0 off, 1 on (no song under it), 2 on over the music */
 void segacd_set_screens(int v);          /* the opening screens: 0 the cartridge's, 1 the disc's */
+void segacd_set_photos(int v);           /* the player cards' photos: 0 the cartridge's, 1 the disc's where it has one */
+void segacd_set_session(int on);         /* (a session's console: the photos stay the cartridge's) */
 void segacd_set_intro(int v);            /* the intro movie (HOCKEY.SEG) before the title: 0 off, 1 on */
 extern void (*segacd_intro_hook)(void);  /* (the window's) plays it, the game's thread waiting; NULL: no movie */
 int segacd_present(uint32_t *frame, int w, int h);   /* a w x h ARGB frame in a 320 x 224 buffer: the disc's opening picture over it, 320 x 224 (1), or left alone (0) */
@@ -40,3 +42,9 @@ int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate,
 /* dedither: an Overbar ob_postfx_mode (off, live, cached); cache_path: where the cached pass is kept (made on the first play) */
 int segacd_movie_tick(void);             /* (the window's loop) 0 once it has ended */
 int segacd_movie_playing(void);
+
+/* the disc's player photos (native/segacd_photos.c): team abbr's player name's, as UnpackPicture leaves a picture
+ * (the tile count word, 36 tiles) into buf and its 16 colours (big-endian words) into colours; 0 when the disc has none */
+int segacd_photo(ob_cd *cd, const char *abbr, const char *name, uint8_t *buf, uint8_t colours[32]);
+int segacd_photo_count(ob_cd *cd);
+const char *segacd_photo_name(int i, const char **abbr);

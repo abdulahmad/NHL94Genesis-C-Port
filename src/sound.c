@@ -21,6 +21,7 @@
 #define IO_CT2_PORT 0xA10005u
 
 void (*cd_event_hook)(int ev, uint16_t n);
+int (*cd_picture_hook)(uint16_t team, uint16_t player, uint8_t *buf, uint8_t colours[32]);
 
 static void bset(uint8_t *p, unsigned bit) { *p |= (uint8_t)(1u << (bit & 7)); }
 static void needs_update(void) { g.music_needs_z80_update = 0xFF; }
