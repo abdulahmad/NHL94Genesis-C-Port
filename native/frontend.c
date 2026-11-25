@@ -390,11 +390,11 @@ static const uint32_t *hook_frame(int *w, int *h)
     }
 }
 
-static int hook_captures(void) { return ob_pads_setup_active() || options_ui_active(); }
+static int hook_captures(void) { return ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active(); }
 static void hook_raw_key(int sc) { if (options_ui_active()) options_ui_key(sc); else ob_pads_setup_key(sc); }
 static void hook_raw_button(int slot, int b) { if (options_ui_active()) options_ui_button(slot, b); else ob_pads_setup_button(slot, b); }
 static int hook_action(int id) { if (id == OB_ID_CONTROLLERS) ob_pads_setup_open(-1); return 1; }
-static void hook_draw_over(const SDL_Rect *dst) { ob_pads_setup_draw(dst); options_ui_draw(dst); }
+static void hook_draw_over(const SDL_Rect *dst) { ob_pads_setup_draw(dst); ob_pads_mouse_draw(dst); options_ui_draw(dst); }
 static void hook_changed(void) { settings_write(); }
 /* the game stopped, its save RAM and the settings written */
 static void shutdown_game(void)
@@ -499,6 +499,7 @@ static void restart_for_session(void)
 static ob_host host;
 
 static void shell_controllers(void) { ob_pads_setup_open(-1); }
+static void shell_sides(void) { ob_pads_sides_open(); }
 
 int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game, void *user)
 {
@@ -518,7 +519,8 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         return 1;
     }
     ob_pads_init(&(ob_pads_cfg){ .players = MDRT_PADS, .n = BUTTONS, .b = buttons, .start = 7, .src_w = 320, .src_h = 224,
-                                 .get = pads_get, .set = pads_set, .save = settings_write });
+                                 .get = pads_get, .set = pads_set, .save = settings_write,
+                                 .team_name = { "Away", "Home" }, .mouse_btn = { 6, 7, 5 } });   /* the mouse: left B, right C, middle A */
     F.adaptor = ob_pads_extra() ? MDRT_ADAPTOR_EA4WAY : MDRT_ADAPTOR_NONE;
     options_from_settings();
     settings_write();
@@ -545,6 +547,8 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_shell shell;
         memset(&shell, 0, sizeof shell);
         shell.controllers = shell_controllers;
+        shell.sides = shell_sides;
+        host.sides_menu = 1;
         ob_shell_set(&shell);
     }
     {
@@ -571,7 +575,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_plat_pump();
         ob_pads_tick();
         for (int p = 0; p < MDRT_PADS; p++) SDL_AtomicSet(&F.buttons[p], (int)ob_pads_read(p));
-        hold_state = ob_pads_setup_active() || options_ui_active() || host.overlay_open || ob_screen_up();
+        hold_state = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open || ob_screen_up();
         ob_plat_present();
         ob_plat_frame_done(SDL_AtomicSet(&F.fresh, 0));
         if (SDL_AtomicGet(&F.done)) break;
