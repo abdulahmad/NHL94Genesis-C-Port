@@ -3357,6 +3357,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
         int fr = anthem_hook_fn(rosters_art(team_struct(0)->tmteam), rosters_art(team_struct(1)->tmteam));
         if (fr > 0) hold_anthem(fr);
     }
+    hold_skate_begin();                                      /* (RULE_HOLD: where the skaters were) */
     if (hat_hook) hat_hook(HAT_END, 0);                      /* (the SNES clears its hats here) */
     g.BA_PS_flags &= (uint16_t)~(HI(2) | HI(5));
     g.sflags4 &= (uint16_t)~(HI(0) | HI(1));
@@ -3444,6 +3445,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
         pl->pflags &= (uint8_t)~(1 << pfalock);
         SetSPA(pl, SPAglide);
     }
+    hold_skate_arm();                                       /* (... and where they are to be: they skate there) */
     SprSort();
     ResetAndSelectPlayers(o);
     uint16_t d4 = DecompressGraphicsPlain(ART(FaceOffMap) + 8, g.ExtraChars);

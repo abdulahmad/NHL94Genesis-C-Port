@@ -801,7 +801,7 @@ static void game_page_init(void)
             "The Sega CD's fix for the shot data.", "The Sega CD's uniform colours for each team.",
             "The Sega CD's sounds: the ding at line changes and breaks.", "Songs play when the Sega CD plays them: in the second half of a period.",
             "At a period's end the Sega CD goes straight to the song.",
-            "NHL 95 PC's between-play time: play waits a moment after a goal, penalty or penalty shot before the face off.",
+            "NHL 95 PC's between-play time: play waits a moment after a goal, penalty or penalty shot before the face off, and at every whistle the players and the referee skate from where they were to the face off spot instead of appearing there.",
             "NHL 93's fights: a hard check between two fighters can start one (B low punch, C high punch, A grab).",
             "When the rink announcer speaks. Right after the goal or penalty, as on NHL 95 PC: play waits until he is done (the goal celebration lasts as long as the speech, with or without the between-play pause). After the goal song: a home goal's speech starts when the song ends. Talks over the face off: the cartridge's pace." };
         for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];

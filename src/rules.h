@@ -45,6 +45,9 @@ extern uint8_t rules[RULE_COUNT];   /* each rule's value now (Classic until the 
  * every machine of a session waits the same, with the announcer or without. */
 void hold_for(int frames);
 void hold_anthem(int frames);
+void hold_skate_begin(void);                        /* the face off set up: the skaters' places before it moves them ... */
+void hold_skate_arm(void);                          /* ... and after: with RULE_HOLD they skate from the first to the second */
+int hold_skate_ref(void);                           /* the referee's progress along his way to the dot, 0 to 256 (-1: none) */
 int hold_anthem_time(void);                         /* the frames into the anthem's song; -1 when it is not playing */
 int hold_anthem_pending(void);                      /* 1 once the anthem has been asked for, until the face off drops */
 int hold_anthem_ref(int *x, int *y, int *dir, int *moving);   /* the anthem's referee: its place on the rink (1 while the anthem and the skate to the spots last) */
