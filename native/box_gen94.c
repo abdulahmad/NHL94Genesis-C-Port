@@ -35,6 +35,14 @@ static void init(void)
     /* the LED gets a material of its own (its colour changes) */
     int lm = mesh_mat_of(nled);
     if (lm >= 0) { r3_mat m = BX_S->mats[lm]; led_mat = r3_mat_add(BX_S, &m); for (int i = 0; i < BX_S->nmeshes; i++) if (BX_S->meshes[i].node == nled) BX_S->meshes[i].mat_override = led_mat; }
+    /* a label with no scan in the art folder (the cartridge's back and end labels) is left off, not drawn as a blank white sticker */
+    int hid = -1;
+    for (int i = 0; i < BX_S->nmeshes; i++) {
+        int m = BX_S->meshes[i].mat, tx = m >= 0 ? BX_S->mats[m].map : -1;
+        if (tx < 0 || BX_S->texs[tx].loaded || !BX_S->texs[tx].key[0] || strncmp(BX_S->texs[tx].key, "genCart", 7)) continue;
+        if (hid < 0) { r3_mat h = BX_S->mats[m]; h.visible = 0; hid = r3_mat_add(BX_S, &h); }
+        BX_S->meshes[i].mat_override = hid;
+    }
     ready = 1;
 }
 
@@ -168,7 +176,8 @@ static void open_manual(void)
     }
     if (!n) { bx_say("<b>No manual scans.</b> Put them in the box art folder."); if (BX.manual_only) bx_manual_only_closed(0); return; }
     for (int i = 0; i < n; i++) k[i] = keys[i];
-    bx_view_open_keys("NHL '94 Genesis manual", k, n, 0, BX.manual_only ? bx_manual_only_closed : NULL);
+    if (BX.manual_only) bx_view_open_keys("NHL '94 Genesis manual", k, n, 1, bx_manual_only_closed);
+    else bx_book_open("NHL '94 Genesis manual", k, n, NULL);         /* read in 3D, in front of the open case */
 }
 
 static void enter(int mode)
@@ -260,7 +269,7 @@ static void spine_mid(float o[3])
 static void drag(int node, float dx, float dy)
 {
     if (st == S_DESK) return;
-    int t = (node == cart && st == S_OPEN) ? cart : caseG;
+    int t = caseG;                                          /* the cartridge turns with its case: it is not taken out to be turned */
     r3_node *n = bx_n(t);
     float a[3], b[3];
     int pivot = t == caseG && st == S_OPEN;                 /* open, the case turns about the middle of its spine, so it stays in view */
