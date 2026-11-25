@@ -57,6 +57,15 @@ static uint32_t push_string(uint8_t *p, const uint8_t *end)
     return ram_addr(p);
 }
 
+/* the widescreen sides' record of a full-width picture's rows (view.h), from printy on */
+struct view_row view_rows[32];
+void view_note_rows(uint32_t map, uint16_t maprow, uint16_t rows, uint16_t start, uint16_t attr)
+{
+    struct Plane m = print_map();
+    for (uint16_t i = 0; i < rows; i++)
+        view_rows[(g.printy + i) & 31] = (struct view_row){ map, (uint16_t)(maprow + i), start, attr, m.vram, m.colshift };
+}
+
 /* print94.asm:xyVmMap. Set the VDP to write at printx/printy on the map printm. */
 void xyVmMap(void)
 {

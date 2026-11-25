@@ -40,6 +40,11 @@ static inline uint16_t view_box_col(uint16_t x, uint16_t y)
     return (uint16_t)(x - 8);
 }
 void view_rows_scroll(void);    /* plane A's scroll of each 8 lines, for the rink as it is now */
+/* Widescreen (native/wide.c): the full-width pictures dobitmap drew (the screens' backdrops), by
+ * screen row, so the sides can carry them on. Not game state: only the picture reads it */
+struct view_row { uint32_t map; uint16_t maprow, start, attr, vram, colshift; };
+extern struct view_row view_rows[32];
+void view_note_rows(uint32_t map, uint16_t maprow, uint16_t rows, uint16_t start, uint16_t attr);    /* plane A's scroll of each 8 lines, for the rink as it is now */
 /* the rink's screen mode and plane A's scroll, after a setVram or a screen over the rink */
 void view_rink_mode(void);
 void view_rink_resume(void);    /* (a snapshot's rink, set up in 32 columns) */

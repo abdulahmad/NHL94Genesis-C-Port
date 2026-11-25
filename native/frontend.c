@@ -30,6 +30,7 @@
 #include "rules.h"
 #include "overbar/postfx.h"
 #include "segacd.h"
+#include "wide.h"
 
 #define SETTINGS "settings.ini"
 
@@ -55,8 +56,8 @@ static struct {
     SDL_Thread *thread;
     SDL_atomic_t done, stop, quit, fresh;
     SDL_mutex *lock;
-    uint32_t picture[320 * 240], shown[320 * 240];
-    int width, height;
+    uint32_t picture[WIDE_MAX_W * 240], shown[WIDE_MAX_W * 240];   /* (rows WIDE_MAX_W apart) */
+    int width, height, wide;                          /* wide: the picture is a widescreen one (wide.h) */
     SDL_atomic_t buttons[MDRT_PADS];
     SDL_AudioDeviceID dev;
     unsigned rate, queued, waits;
@@ -296,13 +297,21 @@ static void sram_load(void)
     fclose(f);
 }
 
+static ob_host host;                                  /* (Overbar's settings: defined below) */
 static void present(void *user, const uint16_t *px, int w, int h, int pitch)
 {
     (void)user;
-    SDL_LockMutex(F.lock);
+    static uint32_t pic[320 * 240];
+    if (w > 320) w = 320;
+    if (h > 240) h = 240;
     for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++) F.picture[y * 320 + x] = 0xFF000000u | mdrt_vdp_rgb(px[y * pitch + x], MDRT_RGB_GPGX);
-    if (w <= 320 && h <= 224 && segacd_present(F.picture, w, h)) { w = 320; h = 224; }   /* (the Sega CD's opening screens, when they are on) */
+        for (int x = 0; x < w; x++) pic[y * 320 + x] = 0xFF000000u | mdrt_vdp_rgb(px[y * pitch + x], MDRT_RGB_GPGX);
+    int cd = w <= 320 && h <= 224 && segacd_present(pic, w, h);   /* (the Sega CD's opening screens, when they are on) */
+    if (cd) { w = 320; h = 224; }
+    SDL_LockMutex(F.lock);
+    F.wide = host.widescreen;
+    if (F.wide) w = wide_frame(mdrt_get_vdp(F.m), pic, w, h, 320, F.picture, WIDE_MAX_W, cd);   /* (the sides: wide.c) */
+    else for (int y = 0; y < h; y++) memcpy(F.picture + y * WIDE_MAX_W, pic + y * 320, (size_t)w * 4);
     F.width = w;
     F.height = h;
     SDL_AtomicSet(&F.fresh, 1);
@@ -393,13 +402,15 @@ static const uint32_t *hook_frame(int *w, int *h)
     *w = F.width > 0 ? F.width : 320;
     *h = F.height > 0 ? F.height : 224;
     SDL_UnlockMutex(F.lock);
-    {                                                   /* the picture's rows are 320 apart; give them packed */
-        static uint32_t packed[320 * 240];
-        for (int y = 0; y < *h; y++) memcpy(packed + y * *w, F.shown + y * 320, (size_t)*w * 4);
+    {                                                   /* the picture's rows are WIDE_MAX_W apart; give them packed */
+        static uint32_t packed[WIDE_MAX_W * 240];
+        for (int y = 0; y < *h; y++) memcpy(packed + y * *w, F.shown + y * WIDE_MAX_W, (size_t)*w * 4);
         return packed;
     }
 }
 
+/* a widescreen picture is 5 / 4 as wide as the 4:3 one, whatever its width (wide.h) */
+static void hook_wide(int *num, int *den) { if (F.wide) { *num = 5; *den = 4; } }
 static int hook_captures(void) { return ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active(); }
 static void hook_raw_key(int sc) { if (options_ui_active()) options_ui_key(sc); else ob_pads_setup_key(sc); }
 static void hook_raw_button(int slot, int b) { if (options_ui_active()) options_ui_button(slot, b); else ob_pads_setup_button(slot, b); }
@@ -844,10 +855,11 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     }
     {
         ob_plat_hooks hooks = { .title = o->title ? o->title : "NHL '94", .win_w = 320 * (o->scale > 0 ? o->scale : 3), .win_h = 224 * (o->scale > 0 ? o->scale : 3),
-                                .cls = OB_CLASS_LORES, .src_w = 320, .src_h = 224, .frame = hook_frame, .changed = hook_changed,
+                                .cls = OB_CLASS_LORES, .src_w = 320, .src_h = 224, .frame = hook_frame, .wide = hook_wide, .changed = hook_changed,
                                 .action = hook_action, .captures = hook_captures, .raw_key = hook_raw_key, .raw_button = hook_raw_button,
                                 .draw_over = hook_draw_over, .quit = hook_quit, .esc_opens = 1,
                                 .game_name = "NHL 94", .game_platform = "For Sega Genesis" };
+        host.widescreen_ok = 1;                       /* (the Widescreen setting: wide.c) */
         if (!ob_plat_open(&hooks, &host)) return 1;
     }
     {

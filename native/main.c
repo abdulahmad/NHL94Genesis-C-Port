@@ -84,6 +84,7 @@
 #include "z80.h"
 #include "native.h"
 #include "segacd.h"
+#include "wide.h"
 #include "rules.h"
 #include "view.h"
 #include "mdrt/platform_sdl2.h"
@@ -581,20 +582,27 @@ static void segacd_frame(void)
     screen_frame = segacd_present(screen_px, w, h);
 }
 
-/* pictures to files */
+/* pictures to files (--widescreen: with the sides, wide.c) */
+static int shots_wide;
 static void write_ppm(const char *path)
 {
     static uint16_t px[320 * 240];
+    static uint32_t pic[320 * 240], wide[WIDE_MAX_W * 240];
     mdrt_vdp *v = mdrt_get_vdp(native_m);
     int w = mdrt_vdp_width(v), h = mdrt_vdp_height(v);
     mdrt_vdp_render(v, px, 320);
     if (screen_frame) { w = 320; h = 224; }
+    for (int i = 0; i < h; i++)
+        for (int x = 0; x < w; x++) pic[i * 320 + x] = screen_frame ? screen_px[i * 320 + x] : 0xFF000000u | mdrt_vdp_rgb(px[i * 320 + x], 1);
+    int pitch = 320;
+    const uint32_t *src = pic;
+    if (shots_wide) { w = wide_frame(v, pic, w, h, 320, wide, WIDE_MAX_W, screen_frame); src = wide; pitch = WIDE_MAX_W; }
     FILE *f = fopen(path, "wb");
     if (!f) return;
     fprintf(f, "P6\n%d %d\n255\n", w, h);
     for (int i = 0; i < h; i++)
         for (int x = 0; x < w; x++) {
-            uint32_t c = screen_frame ? screen_px[i * 320 + x] : mdrt_vdp_rgb(px[i * 320 + x], 1);
+            uint32_t c = src[i * pitch + x];
             uint8_t rgb[3] = { (uint8_t)(c >> 16), (uint8_t)(c >> 8), (uint8_t)c };
             fwrite(rgb, 1, 3, f);
         }
@@ -722,6 +730,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--segacd-music")) { segacd_on = 1; segacd_set_music(1); }
         else if (!strcmp(argv[i], "--segacd-crowd") && i + 1 < argc) { segacd_on = 1; segacd_set_crowd(atoi(argv[++i])); }
         else if (!strcmp(argv[i], "--segacd-voice") && i + 1 < argc) { segacd_on = 1; segacd_set_voice(atoi(argv[++i])); }
+        else if (!strcmp(argv[i], "--widescreen")) shots_wide = 1;
         else if (!strcmp(argv[i], "--segacd-screens")) { segacd_on = segacd_screens = 1; segacd_set_screens(1); }
         else if (!strcmp(argv[i], "--segacd-photos")) { segacd_on = 1; segacd_set_photos(1); }
         else if (!strcmp(argv[i], "--segacd-sfx")) segacd_on = segacd_sfx_flag = 1;
