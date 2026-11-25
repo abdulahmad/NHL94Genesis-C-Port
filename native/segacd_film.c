@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "segacd.h"
+#include "overbar/postfx.h"
 
 static unsigned be16(const uint8_t *p) { return (unsigned)p[0] << 8 | p[1]; }
 static uint32_t be32(const uint8_t *p) { return (uint32_t)be16(p) << 16 | be16(p + 2); }
@@ -190,3 +191,25 @@ double segacd_film_next(segacd_film *f, const uint8_t **idx, const uint32_t **ar
     }
     return -1;
 }
+
+/* the same movie from its start, for another thread (its own copy of the file) */
+segacd_film *segacd_film_dup(const segacd_film *f)
+{
+    segacd_film *g = calloc(1, sizeof *g);
+    if (!g) return NULL;
+    *g = *f;
+    long nt = (long)f->w * f->h;
+    g->file = malloc((size_t)f->size);
+    g->tiles = calloc((size_t)nt, 32);
+    g->line = calloc((size_t)nt, 1);
+    g->idx = malloc((size_t)nt * 64);
+    g->pcm = NULL;
+    g->pcm_len = 0;
+    g->next = 0;
+    g->time = -1;
+    if (!g->file || !g->tiles || !g->line || !g->idx) { segacd_film_close(g); return NULL; }
+    memcpy(g->file, f->file, (size_t)f->size);
+    return g;
+}
+
+uint32_t segacd_film_id(const segacd_film *f) { return ob_postfx_hash(f->file, f->size); }

@@ -21,3 +21,5 @@ __pycache__/
 # working notes, kept outside the repository
 /docs/HANDOFF.md
 /docs/PLAN.md
+*.dedither
+*.dedither.part
