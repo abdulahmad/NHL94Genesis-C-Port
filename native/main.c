@@ -83,6 +83,7 @@
 #include "symbols_gen.h"
 #include "z80.h"
 #include "native.h"
+#include "segacd.h"
 #include "rules.h"
 #include "view.h"
 #include "mdrt/platform_sdl2.h"
@@ -624,6 +625,8 @@ void native_frame_done(long frame, int wait)
 /* ---- headless: no window, no pacing, the sound to a file -------------------------------------- */
 
 static FILE *wav;
+static int segacd_on;                                     /* --segacd-music / --segacd-crowd */
+static unsigned wav_rate = 48000;
 static uint32_t wav_frames;
 static long golden_lines;
 long native_golden_lines(void) { return golden_lines; }
@@ -635,6 +638,12 @@ static void wav_audio(void *user, const int16_t *s, int n)
                         (unsigned long long)golden_vdp, (unsigned long long)golden_z80, (unsigned long long)golden_pic,
                         (unsigned long long)fnv(FNV0, s, (size_t)n * 4), n);
     if (!wav) return;
+    static int16_t mixed[2 * 4096];
+    if (segacd_on && n > 0 && n <= 4096) {                /* (the Sega CD disc's music and crowd: after the golden line, which is the game's) */
+        memcpy(mixed, s, (size_t)n * 4);
+        segacd_mix(mixed, n, wav_rate);
+        s = mixed;
+    }
     fwrite(s, 4, (size_t)n, wav);                         /* (a little-endian host) */
     wav_frames += (uint32_t)n;
 }
@@ -691,6 +700,9 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--shots") && i + 1 < argc) shots_dir = argv[++i];
         else if (!strcmp(argv[i], "--every") && i + 1 < argc) shots_every = atol(argv[++i]);
         else if (!strcmp(argv[i], "--wav") && i + 1 < argc) wav_path = argv[++i];
+        else if (!strcmp(argv[i], "--segacd-music")) { segacd_on = 1; segacd_set_music(1); }
+        else if (!strcmp(argv[i], "--segacd-crowd") && i + 1 < argc) { segacd_on = 1; segacd_set_crowd(atoi(argv[++i])); }
+        else if (!strcmp(argv[i], "--segacd-voice") && i + 1 < argc) { segacd_on = 1; segacd_set_voice(atoi(argv[++i])); }
         else if (!strcmp(argv[i], "--headless")) headless = 1;
         else if (!strcmp(argv[i], "--lockstep") && i + 1 < argc) { lockstep_path = argv[++i]; headless = 1; }
         else if (!strcmp(argv[i], "--golden") && i + 1 < argc) { golden_path = argv[++i]; headless = 1; }
@@ -821,6 +833,7 @@ int main(int argc, char **argv)
     }
     if (wav_path && !(wav = fopen(wav_path, "wb"))) { fprintf(stderr, "cannot write %s\n", wav_path); return 1; }
     if (wav) wav_header(c.audio_rate);
+    if (segacd_on) { wav_rate = c.audio_rate ? c.audio_rate : 48000; segacd_start(); segacd_wait(); }
     if (golden_path && !(golden = fopen(golden_path, "w"))) { fprintf(stderr, "cannot write %s\n", golden_path); return 1; }
     if (hashes_path && !(hashes = fopen(hashes_path, "w"))) { fprintf(stderr, "cannot write %s\n", hashes_path); return 1; }
     c.platform = (mdrt_platform){ .present = golden ? golden_present : NULL, .audio = wav_audio };

@@ -12,6 +12,7 @@
 #include "hal.h"
 #include "native.h"
 #include "z80.h"
+#include "segacd.h"
 
 mdrt *native_m;
 static uint64_t frame_base;             /* the relay's master clock at this frame's start */
@@ -38,7 +39,7 @@ static void relay_now(void)
 /* the relay's YM2612 writes and its reset, to the runtime's chip at their time in the frame */
 void z80_ym_port(int port, uint8_t value)
 {
-    mdrt_ym_write(native_m, z80.zc > frame_base ? (uint32_t)(z80.zc - frame_base) : 0, port, value);
+    mdrt_ym_write(native_m, z80.zc > frame_base ? (uint32_t)(z80.zc - frame_base) : 0, port, segacd_ym(port, value));   /* (the Sega CD music's filter) */
 }
 void z80_ym_reset(void)
 {
@@ -114,7 +115,7 @@ void cpu_set_sr(uint16_t v)
     if (unmask && !in_vblank) lockstep_unmask(accesses);
 }
 
-void psg_write(uint8_t v) { before(); t68k += PORT_ACCESS; mdrt_psg_port(native_m, t68k, v); counted(); }
+void psg_write(uint8_t v) { before(); t68k += PORT_ACCESS; mdrt_psg_port(native_m, t68k, segacd_psg(v)); counted(); }
 
 void z80_busreq(uint16_t v) { t68k += BUS_ACCESS; clock_on_bus(); relay_now(); z80_relay_busreq(v); }
 uint8_t z80_busack(void) { t68k += BUS_ACCESS; clock_on_bus(); relay_now(); return 0; }   /* granted at once */
