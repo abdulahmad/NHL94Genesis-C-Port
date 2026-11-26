@@ -271,6 +271,10 @@ extern void (*test_frame_hook)(void);
  * the picture too, and SPR_MARK then says which table entries (sc = the first, x = how many) the frame's sprites took. */
 enum { SPR_BEGIN, SPR_DRAW, SPR_MARK, SPR_END };
 extern int (*spr_hook)(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o);
+/* (a host) a frame's sprites from other art than the cartridge's (native/fight93.c: NHL 93's fight frames, which the 94 cartridge
+ * dropped): 1 with *pieces (the frame's 8 byte sprite entries, *n of them) and *tiles (the 68k bus address their tile numbers
+ * count from, which the host serves to the VDP's DMA); 0 or NULL: the cartridge's */
+extern int (*spr_art_hook)(uint16_t frame, const uint8_t **pieces, int *n, uint32_t *tiles);
 /* (the same host) the Sega CD's own pages around the title, which the host draws: CD_TITLE_LICENSE 1: its license page before the
  * title; CD_TITLE_BEGIN 1: its title page in place of the cartridge's (the cartridge's set-up and song stay, its credits do not);
  * CD_TITLE_STEP: a frame of that page's credits, 0 at their end. NULL or 0: the cartridge's (the game is unchanged then) */
