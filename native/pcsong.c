@@ -390,12 +390,12 @@ static int canadian(int art) { return art == 3 || art == 7 || art == 11 || art =
 
 static int playing_hook(void) { return S.playing; }
 
-/* the first face off's anthems: the visitors', then the home team's when it is the other country. Its length in frames of the game (60 a second) */
+/* the first face off's anthem: the home team's. Its length in frames of the game (60 a second) */
 static int anthem_hook(int home_art, int away_art)
 {
     if (!SDL_AtomicGet(&S.on) || !SDL_AtomicGet(&S.found) || !g.demoflag) return 0;
     SDL_MemoryBarrierAcquire();
-    int first = canadian(away_art) ? 1 : 0, second = canadian(home_art) ? 1 : 0;
+    int first = canadian(home_art) ? 1 : 0, second = first;           /* (the home team's anthem only) */
     SDL_LockMutex(S.lock);
     S.which = first | (first != second ? (second + 1) << 1 : 0);     /* (bit 0 the first anthem; bits 1-2: the second, +1) */
     S.playing = 1;
