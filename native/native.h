@@ -71,6 +71,7 @@ int native_apply_seats(const int team[4], int n);   /* the pads' teams from the 
 int native_player_on_screen(int p, int *dx, int *dy);   /* the controlled player of pad p: picture pixels from the picture's middle */
 int native_menu_rows(int rect[][4], int max, int *n, int *sel, int *lr);   /* the game menu being read: rows on the 320x224 picture, the selected one; 0 none */
 extern volatile unsigned native_menu_calls;
+int native_in_replay(void);                          /* the instant replay is on (inside the pause menu, but not a menu: the mouse is its own there) */
 int native_menu_waiting(void);                       /* the setup screen is inside its wait for a pad */
 int native_menu_kind(void);                          /* which menu the game is reading: 1 pause, 2 setup, 3 line editor grid, 4 line editor player list */
 extern volatile unsigned native_play_frames;          /* counts DoGameFrame calls: the window front end tells play from menus by it */                       /* (away, home) as it is called */
