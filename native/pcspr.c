@@ -638,7 +638,7 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
     }
     if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || sc > 13 || P.nshow >= 16) return 0;
     int pf = pc_frame(o->frame & 0x7FF);
-    if (hold_anthem_time() >= 0 && sc < 12 && sortobj(sc)->position > 0) pf = idle_skater(sc, hold_anthem_time()) - 1;      /* (the anthem: the PC's standing picture, number 369) */
+    if (hold_anthem_time() >= 0 && sc < 12 && sortobj(sc)->position > 0) pf = idle_skater(sc, hold_anthem_time());      /* (the anthem: the PC's standing picture, number 369) */
     if (pf < 0 || pf >= NFRAMES || !P.f[pf].px) return 0;   /* (no such PC frame: the cartridge's sprite stays) */
     P.show[P.nshow].pc = (int16_t)pf;
     P.show[P.nshow].x = x;
