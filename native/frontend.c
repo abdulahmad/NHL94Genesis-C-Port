@@ -890,7 +890,7 @@ static void game_page_init(void)
         game_help[CD_PCSPR] = "NHL 95 PC's skaters and goalies, from your NHL 95 PC files.";
         game_help[CD_PCREF] = "A referee skating on the ice, NHL 95 PC's, from your NHL 95 PC files.";
         game_help[CD_PCLOGO] = "The logo at centre ice: the cartridge's, NHL 95 PC's, or NHL 94 PC's (NHL 95's where 94 has none) from your PC game files.";
-        game_help[CD_PCANTHEM] = "NHL 95 PC's national anthems before the first face off, from your NHL 95 PC files.";
+        game_help[CD_PCANTHEM] = "NHL 95 PC's national anthems before the first face off, from your NHL 95 PC files. The crowd cheers over the last bars, as the PC's does.";
         game_help[CD_HATS] = "Hats thrown on the ice after a home skater's third goal.";
         game_help[CD_WHITEICE] = "The PC games' white rink instead of the pale cyan one.";
         game_help[CD_PCPHOTOS] = "Player photos in colour.";

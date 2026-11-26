@@ -18,6 +18,8 @@
 #include "native.h"
 #include "pcsfx.h"
 #include "announcer.h"
+#include "pcsong.h"
+#include "rules.h"
 #include "overbar/cdimage.h"
 
 #define RATE 11025
@@ -38,10 +40,11 @@ static struct {
     long len[NSND];
     int playing[NSND];
     double at[NSND];
-    SDL_atomic_t crowd_on, crowd_vol, crowd_live;        /* the Game page's row, its volume (percent), frames the game's crowd is still on */
+    SDL_atomic_t crowd_on, crowd_vol, crowd_live, cheer_live;       /* the Game page's row, its volume (percent), frames the game's crowd is still on */
     SDL_atomic_t v8, v7, pan7, bend8;                           /* the PC's voices: volume 0-127 and (voice 7) the pan */
     float g8, g7;                                        /* (the mixer's smoothed gains) */
     int smooth;                                          /* Crowd_Noise's crowdsmooth */
+    int cheer, cheered;                                  /* the anthem's cheer: its Crowdlevel (PC units), and 1 once raised */
 } S;
 
 static int parse(const uint8_t *d, long n)
@@ -224,8 +227,19 @@ void pcsfx_set_crowd_vol(int pct) { SDL_AtomicSet(&S.crowd_vol, pct); }
  * the cartridge's crowd meter (decibels, 65 up) stands in for its Crowdlevel (0x200 up) */
 static void crowd_hook(int meter)
 {
-    if (!SDL_AtomicGet(&S.found) || !SDL_AtomicGet(&S.crowd_on)) return;
-    int level = 0x200 + (meter - 0x41) * 0x3DC / 60;
+    if (!SDL_AtomicGet(&S.found)) return;
+    /* the anthem's end (NHL 95 PC's assintroline: Crowdlevel 320h), eased down as DecayCrowdLevel does each game frame;
+     * it plays with NHL 95 PC's anthems whether or not the crowd bed is on */
+    int at = hold_anthem_time(), cf = pcsong_cheer_frame();
+    if (at >= 0 && cf >= 0 && at < cf) S.cheered = 0;
+    else if (at >= cf && cf >= 0 && !S.cheered) { S.cheered = 1; S.cheer = 0x320; if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsfx: the anthem's cheer at frame %d of the song\n", at); }
+    if (S.cheer > 0) S.cheer -= S.cheer > 0x2BC ? 3 : S.cheer > 0x15E ? 4 : 1;
+    if (S.cheer < 0) S.cheer = 0;
+    int crowd = SDL_AtomicGet(&S.crowd_on);
+    SDL_AtomicSet(&S.cheer_live, S.cheer > 0);
+    if (!crowd && !S.cheer) return;
+    int level = crowd ? 0x200 + (meter - 0x41) * 0x3DC / 60 : 0;
+    if (level < S.cheer) level = S.cheer;
     if (level < 0) level = 0;
     int d = level - S.smooth;                              /* (eased toward it, at most 30 a frame) */
     S.smooth = (d < 0 ? -d : d) > 30 ? S.smooth + (d < 0 ? -30 : 30) : level;
@@ -269,7 +283,7 @@ void pcsfx_mix(int16_t *out, int frames, unsigned rate)
         }
     }
     /* the crowd bed: the PC's two looping voices, kept going while the game's crowd is */
-    int on = SDL_AtomicGet(&S.crowd_on) && SDL_AtomicGet(&S.crowd_live) > 0;
+    int on = (SDL_AtomicGet(&S.crowd_on) || SDL_AtomicGet(&S.cheer_live)) && SDL_AtomicGet(&S.crowd_live) > 0;
     if (!on) { S.g8 = S.g7 = 0; SDL_AtomicAdd(&S.crowd_live, 0); }
     float vol = (float)SDL_AtomicGet(&S.crowd_vol) / 100.0f;
     float t8 = on ? SDL_AtomicGet(&S.v8) / 127.0f * vol : 0, t7 = on ? SDL_AtomicGet(&S.v7) / 127.0f * vol : 0;
