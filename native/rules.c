@@ -12,6 +12,7 @@ static const char *const fight_names[4] = { "off", "NHL 93", "NHL 92", "hybrid" 
 static const char *const announce_names[3] = { "talks over the face off", "right after the goal", "after the goal song" };
 static const char *const view_names[2] = { "classic", "wide" };
 static const char *const view_labels[2] = { "256 wide", "320 wide" };
+static const char *const anthem_names[3] = { "off", "NHL 95 PC", "NHL 96 PC" };
 
 /* the rules */
 const mdrt_sdl_option rule_options[RULE_COUNT] = {
@@ -31,6 +32,7 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_HOLD] = { "rules.hold_play", "PC between-play pause", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_ANNOUNCE] = { "rules.announce_timing", "Rink announcer: when he speaks", 3, announce_names, NULL, 0, 0, 0, 1, NULL, NULL, NULL },
     [RULE_REFEREE] = { "rules.referee_in_play", "PC referee in play", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_ANTHEM] = { "rules.anthems", "National anthems", 3, anthem_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
 
 /* a choice's value: its number, or (a list's) its index */
@@ -206,10 +208,11 @@ const char *rules_arg(const char *arg)
  * from a build with fewer rules leaves the rest Classic; one with more is not this build's), then
  * the roster set: its checksum (8 bytes, 0 the cartridge's) and folder (a length byte, the name;
  * none in a netplay session, whose states stay in memory and whose hash the peers compare), then
- * (version 6) the referee's REFEREE_STATE_SIZE bytes (RULE_REFEREE: src/referee.c). The
+ * (version 6) the referee's REFEREE_STATE_SIZE bytes (RULE_REFEREE: src/referee.c), then (version 7) the
+ * pause's HOLD_STATE_SIZE (RULE_HOLD, the anthems: src/hold.c). The
  * roster set's tables are in the ROM the state's RAM points into, so a state loads with its own
- * roster set or not at all. Version 6 is this layout; version 5 is it without the referee (he
- * starts off the ice). Version 4 (before the game's own extras
+ * roster set or not at all. Version 7 is this layout; version 6 is it without the pause (none then),
+ * version 5 without the referee too (he starts off the ice). Version 4 (before the game's own extras
  * were taken out) held 24 rules and 64 bytes of plus/minus stats; it loads when those extras are at
  * their original values (OLD4: each old rule's place now, or -1 and the original value it needs). */
 #define OLD4_COUNT 24
@@ -229,24 +232,25 @@ size_t rules_state_save(void *user, uint8_t *out)
     size_t n = strlen(dir) > 255 ? 255 : strlen(dir), at = 2 + RULE_COUNT;
     if (out) {
         uint64_t h = rosters_hash();
-        out[0] = 6;
+        out[0] = 7;
         out[1] = RULE_COUNT;
         memcpy(out + 2, rules, RULE_COUNT);
         for (int k = 0; k < 8; k++) out[at + k] = (uint8_t)(h >> (56 - 8 * k));
         out[at + 8] = (uint8_t)n;
         memcpy(out + at + 9, dir, n);
         referee_state_save(out + at + 9 + n);
+        hold_state_save(out + at + 9 + n + REFEREE_STATE_SIZE);
     }
-    return at + 9 + n + REFEREE_STATE_SIZE;
+    return at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE;
 }
 
 /* where the roster set's part starts in a state's part, or 0 when it is not this build's */
 static size_t roster_part(const uint8_t *in, size_t size)
 {
-    if (size < 2 || in[0] < 4 || in[0] > 6) return 0;
+    if (size < 2 || in[0] < 4 || in[0] > 7) return 0;
     if (in[0] == 4 ? in[1] > OLD4_COUNT : in[1] > RULE_COUNT) return 0;
     size_t at = 2u + in[1] + (in[0] == 4 ? 64u : 0u);       /* (version 4: the plus/minus stats) */
-    size_t tail = in[0] >= 6 ? REFEREE_STATE_SIZE : 0;      /* (version 6: the referee) */
+    size_t tail = (in[0] >= 6 ? REFEREE_STATE_SIZE : 0) + (in[0] >= 7 ? HOLD_STATE_SIZE : 0);   /* (version 6: the referee; 7: the pause) */
     return size >= at + 9 && size - tail >= at + 9 && size == at + 9 + in[at + 8] + tail ? at : 0;
 }
 
@@ -284,9 +288,11 @@ int rules_state_load(void *user, const uint8_t *in, size_t size)
     }
     const uint8_t *referee = in[0] >= 6 ? in + at + 9 + in[at + 8] : NULL;   /* (before version 6: none, he starts off the ice) */
     if (referee && referee_state_load(referee) < 0) { fprintf(stderr, "the state: the referee's part is not one of this game's\n"); return -1; }
+    const uint8_t *pause = in[0] >= 7 ? referee + REFEREE_STATE_SIZE : NULL;   /* (before version 7: none, no pause) */
+    if (pause && hold_state_load(pause) < 0) { fprintf(stderr, "the state: the pause's part is not one of this game's\n"); return -1; }
     if (rosters_use(dir, h) < 0) { fprintf(stderr, "the state: %s\n", rosters_error()); return -1; }
     if (!referee) referee_state_load(NULL);
     memcpy(rules, v, sizeof rules);
-    hold_reset();                                          /* (a state keeps no pause: every machine that loads it starts without) */
+    if (!pause) hold_state_load(NULL);                     /* (a state from before the pause was kept: every machine that loads it starts without) */
     return 0;
 }

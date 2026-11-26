@@ -795,8 +795,8 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--pc-crowd")) pccrowd_cli = 1;
         else if (!strcmp(argv[i], "--pc-logos")) pclogo_cli = 1;
         else if (!strcmp(argv[i], "--pc-logos94")) pclogo_cli = 2;
-        else if (!strcmp(argv[i], "--pc-anthems")) pcsong_cli = 1;
-        else if (!strcmp(argv[i], "--pc-anthems-96")) pcsong_cli = 2;
+        else if (!strcmp(argv[i], "--pc-anthems")) { pcsong_cli = 1; rules_arg("anthems=1"); }      /* (RULE_ANTHEM: the game's wait for it) */
+        else if (!strcmp(argv[i], "--pc-anthems-96")) { pcsong_cli = 2; rules_arg("anthems=2"); }
         else if (!strcmp(argv[i], "--pc-anthem-wav") && i + 1 < argc) pcsong_wav = argv[++i];
         else if (!strcmp(argv[i], "--announcer") && i + 1 < argc) announcer_file = argv[++i];
         else if (!strcmp(argv[i], "--pc-sfx") && i + 1 < argc) pcsfx_file = argv[++i];

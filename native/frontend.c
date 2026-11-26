@@ -449,10 +449,12 @@ static int start_game(void)
 
 static void wide_rows_sync(void);
 static void ref_row_sync(void);
+static void anthem_rule_sync(int row_changed);
 static const uint32_t *hook_frame(int *w, int *h)
 {
     wide_rows_sync();
     ref_row_sync();
+    anthem_rule_sync(0);
     SDL_LockMutex(F.lock);
     memcpy(F.shown, F.picture, sizeof F.shown);
     *w = F.width > 0 ? F.width : 320;
@@ -700,7 +702,7 @@ static void cd_changed(void *ctx, int index, int value)
         return;
     }
     if (index == CD_PCLOGO) { pcspr_logo_set(value); return; }
-    if (index == CD_PCANTHEM) { pcsong_set(value); return; }
+    if (index == CD_PCANTHEM) { pcsong_set(value); anthem_rule_sync(1); return; }
     if (index == CD_WIDESCREEN) { host.widescreen = value != 0; return; }   /* (hook_frame keeps the two rows alike) */
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
@@ -745,6 +747,35 @@ static void ref_row_sync(void)
     int row = ob_game_get(&host, CD_PCREFPHYS), on = F.opt_values[i] != 0;
     if (on && row != 2) ob_game_set(&host, CD_PCREFPHYS, 2);
     else if (!on && row == 2) { ob_game_set(&host, CD_PCREFPHYS, 1); pcspr_ref_phys_set(1); }
+}
+
+/* the anthems' row and RULE_ANTHEM (the game's wait for the anthem, so every machine of a session waits the same): the rule
+ * is the set the row asks for that this machine has (the other when only it was found, off when neither was); a change on
+ * the Game rules page shows on the row */
+static int anthem_rule_of(int row)
+{
+    int f95 = pcsong_found95(), f96 = pcsong_found96();
+    if (row == 1) return f95 ? 1 : f96 ? 2 : 0;
+    if (row == 2) return f96 ? 2 : f95 ? 1 : 0;
+    return 0;
+}
+static void anthem_rule_sync(int row_changed)
+{
+    static int last = -1;
+    if (!host.game_ready || !F.opt_values) return;
+    int i = option_index("rules.anthems");
+    if (i < 0) return;
+    int rule = F.opt_values[i], row = ob_game_get(&host, CD_PCANTHEM);
+    if (!row_changed && last >= 0 && rule != last) {       /* (the Game rules page changed it) */
+        last = rule;
+        if (row != rule) ob_game_set(&host, CD_PCANTHEM, rule);
+        pcsong_set(rule);
+        return;
+    }
+    if (!pcsong_searched()) return;                       /* (the files are still being looked for: the rule as it is) */
+    int want = anthem_rule_of(row);
+    if (want != rule) rule_from_row("anthems", RULE_ANTHEM, want);
+    last = F.opt_values[i];
 }
 
 /* the disc's intro movie (segacd_intro_hook, the game's thread): the window's loop plays it, this waits */

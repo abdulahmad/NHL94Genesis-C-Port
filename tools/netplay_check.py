@@ -41,6 +41,10 @@ the setup screen), EA's 4 Way Play in the ports (the solo run's --four-way).
            the state's game, save RAM and all
   referee  host and join, 25 ms +-15, 5% lost, delay 1: the host's RULE_REFEREE (NHL 95 PC's referee in play,
            src/referee.c), his state in every rollback's
+  hold     host and join, 25 ms +-15, 5% lost, delay 1: the host's RULE_HOLD (the skaters and the referee with the puck
+           skate to the dot between plays, src/hold.c), RULE_REFEREE and RULE_ANTHEM (the first face off waits for the
+           anthem), the pause's state in every rollback's; the host alone draws the PC referee (--pc-ref: the guest
+           does not), which must not move the puck
 
     tools/netplay_check.py [NAME...]
 """
@@ -71,6 +75,8 @@ SCENARIOS = [
     ('reset', 7000, [], 'join', 2, '30,10,5,1', 4, [1, 1]),
     ('load', 7000, [], 'join', 2, '30,10,5,1', 5, [1, 1]),
     ('referee', 7000, ['--rule', 'referee_in_play=on'], 'join', 1, '25,15,5,1', 6, [1, 1]),
+    ('hold', 9000, ['--rule', 'hold_play=on', '--rule', 'referee_in_play=on', '--rule', 'anthems=1', '--pc-ref'], 'join', 1,
+     '25,15,5,1', 7, [1, 1]),
 ]
 NEEDS = {'rosters': 'out/rosters/thirty-two'}
 RESETS = {'reset': 3600}                                  # (the host's pad 1 resets the console at this frame)

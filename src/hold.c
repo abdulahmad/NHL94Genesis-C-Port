@@ -40,7 +40,7 @@ void hold_for(int frames)
     pending = 1;
 }
 
-/* the anthems before the first face off: the drop waits for them whatever the rules say */
+/* the anthem before the first face off (RULE_ANTHEM: src/logic.c asks with the rule's fixed length): the drop waits for it */
 void hold_anthem(int frames)
 {
     if (frames > 60 * 120) frames = 60 * 120;
@@ -54,6 +54,15 @@ void hold_anthem(int frames)
 }
 
 int hold_anthem_pending(void) { return anth; }
+
+/* RULE_ANTHEM: the anthems' lengths in frames (60 a second), half a second after each: NHL 95 PC's USA.KMS and CANADA.KMS as
+ * native/pcsong.c renders them, NHL 96 PC's ANTHUS.ASF and ANTHCAN.ASF. Fixed here: the game must not depend on whether a
+ * machine has the files, or which of them */
+static const int16_t anthem_len[2][2] = { { 795, 723 }, { 990, 909 } };
+static int canadian(int art) { return art == 3 || art == 7 || art == 11 || art == 15 || art == 18 || art == 22 || art == 23 || art == 25; }
+int hold_anthem_frames(int set, int home_art) { return set >= 1 && set <= 2 ? anthem_len[set - 1][canadian(home_art)] : 0; }
+
+int hold_anthem_song(void) { return anth && pending && (int16_t)(g.Vcount - anth_t0) < anth_len; }
 
 /* RULE_HOLD: a face off in the middle of play comes with no fade to black (the PC game has none: the players skate to their dots with the
  * rink in view). The start of a period keeps the cartridge's. */
@@ -175,7 +184,6 @@ static uint16_t sk_view[4];                             /* the view at the whist
 #define GATE_Y(away) ((away) ? 0x41 : -0x32)
 #define GATE_IN (-0x70)                                 /* (just inside the boards: out of the gate straight onto the ice, then to his spot) */
 #define REF_START_X (-0x78)                             /* (the PC's referee at the start of play: StartHL2, x -78h, y 0) */
-int (*hold_ref_pos_fn)(int *x, int *y);                 /* the host's referee, on the rink (0: none): he carries the puck to the dot */
 
 void hold_skate_begin(void)
 {
@@ -259,6 +267,47 @@ int hold_skate_ref(void)
     return t >= sk_dur ? 256 : t * 256 / sk_dur;
 }
 
+/* the referee's spot by the dot (assrefatdot: 15 off it, on the side away from centre ice) */
+static int ref_spot_x(void) { int fx = (int16_t)g.fox; return fx > 0 ? fx + 15 : fx - 15; }
+
+/* where the referee has the puck on his way to the dot, in 256ths of a pixel: from where it lay at the whistle to his spot by
+ * the dot, from SK_PICKUP of the walk to its end. Only the game's state decides it (the walk's time, the puck's place, the
+ * dot), so every copy of the game puts the puck in the same place whatever its host draws. 0: he does not carry it now */
+int hold_skate_carry(int *x, int *y)
+{
+    if (!sk_on || sk_pstart) return 0;
+    int pr = hold_skate_ref();
+    if (pr < sk_pick || pr >= 256) return 0;
+    int sx = sk_puckx * 256, sy = sk_pucky * 256, ex = ref_spot_x() * 256, ey = (int16_t)g.foy * 256;
+    int k = pr - sk_pick, kn = 256 - sk_pick;
+    *x = sx + (ex - sx) * k / kn;
+    *y = sy + (ey - sy) * k / kn;
+    return 1;
+}
+
+/* the referee's place on his walk, in 256ths of a pixel (x, y in: where he is now). The start of a period: from the PC's start
+ * of play to his spot; else to the puck where it lay (each call a step: the frames left to SK_PICKUP share what is left of
+ * the way), then with it to the dot (hold_skate_carry). For a referee of the game's own (RULE_REFEREE: src/referee.c), whose
+ * place is in every state: one call a frame. 0: no walk */
+int hold_skate_ref_step(int *x, int *y)
+{
+    if (!sk_on) return 0;
+    int pr = hold_skate_ref(), ex = ref_spot_x() * 256, ey = (int16_t)g.foy * 256;
+    if (sk_pstart) {
+        if (pr > 256) pr = 256;
+        *x = REF_START_X * 256 + (ex - REF_START_X * 256) * pr / 256;
+        *y = ey * pr / 256;
+        return 1;
+    }
+    if (hold_skate_carry(x, y)) return 1;
+    if (pr >= 256) { *x = ex; *y = ey; return 1; }
+    int t = (int16_t)(g.Vcount - sk_t0), tp = (sk_pick * sk_dur + 255) / 256, n = tp - t;   /* (tp: the first frame he has it) */
+    if (n < 1) n = 1;
+    *x += (sk_puckx * 256 - *x) / n;
+    *y += (sk_pucky * 256 - *y) / n;
+    return 1;
+}
+
 static void skate_pose(void)
 {
     int t = (int16_t)(g.Vcount - sk_t0);
@@ -312,9 +361,9 @@ static void skate_pose(void)
         pk->Xpos = sk_puckx; pk->Ypos = sk_pucky;
         g.puckx[0] = (uint16_t)sk_puckx; g.pucky = (uint16_t)sk_pucky;
         g.puckz[0] = 0;
-    } else if (t < sk_dur && hold_ref_pos_fn && hold_ref_pos_fn(&rx, &ry)) {   /* the referee carries the puck to the dot */
-        pk->Xpos = (int16_t)rx; pk->Ypos = (int16_t)ry;
-        g.puckx[0] = (uint16_t)rx; g.pucky = (uint16_t)ry;
+    } else if (t < sk_dur && hold_skate_carry(&rx, &ry)) {   /* the referee carries the puck to the dot (the host's picture of him follows it) */
+        pk->Xpos = (int16_t)(rx / 256); pk->Ypos = (int16_t)(ry / 256);
+        g.puckx[0] = (uint16_t)pk->Xpos; g.pucky = (uint16_t)pk->Ypos;
         g.puckz[0] = 0;
     } else if (t >= sk_dur) {
         pk->Xpos = (int16_t)g.fox; pk->Ypos = (int16_t)g.foy;
@@ -391,4 +440,76 @@ int hold_wait(void)
     return 0;
 }
 
-void hold_reset(void) { if (sk_lock) { g.sflags &= (uint16_t)~HI(sfslock); sk_lock = 0; } sk_on = 0; sk_cap = 0; pending = 0; anth = 0; anth_pose = 0; sg.on = 0; }
+void hold_reset(void) { if (sk_lock) { g.sflags &= (uint16_t)~HI(sfslock); sk_lock = 0; } sk_on = 0; sk_cap = 0; pending = 0; anth = 0; anth_pose = 0; sg.on = 0; face_set = 0; }
+
+/* The pause's state, kept in every state (native/rules.c's part): a rollback, or a machine that joins, goes on with the wait,
+ * the anthem's line up and the walk to the spots where they were (little-endian, the same on every host). Then the face off's
+ * assignments the anthem holds back (src/logic.c). */
+static uint8_t *hs_w8(uint8_t *p, int v) { *p = (uint8_t)v; return p + 1; }
+static uint8_t *hs_w16(uint8_t *p, int v) { p[0] = (uint8_t)v; p[1] = (uint8_t)((unsigned)v >> 8); return p + 2; }
+static int hs_r8(const uint8_t **p) { return *(*p)++; }
+static int hs_r16(const uint8_t **p) { int v = (int16_t)((*p)[0] | (*p)[1] << 8); *p += 2; return v; }
+
+size_t hold_state_save(uint8_t *out)
+{
+    if (!out) return HOLD_STATE_SIZE;
+    uint8_t *p = out;
+    p = hs_w16(p, until); p = hs_w8(p, pending); p = hs_w8(p, anth); p = hs_w8(p, anth_pose); p = hs_w16(p, anth_len); p = hs_w8(p, anth_lock); p = hs_w16(p, anth_t0);
+    for (int i = 0; i < 12; i++) { p = hs_w16(p, spot[i].x); p = hs_w16(p, spot[i].y); p = hs_w16(p, spot_face[i]); }
+    p = hs_w8(p, face_set);
+    p = hs_w8(p, sg.on); p = hs_w8(p, sg.started); p = hs_w16(p, sg.limit); p = hs_w16(p, sg.frames); p = hs_w8(p, sg.tm == team_struct(1));
+    p = hs_w16(p, sg.player); p = hs_w16(p, sg.a1); p = hs_w16(p, sg.a2);
+    p = hs_w8(p, sk_cap); p = hs_w8(p, sk_on); p = hs_w16(p, sk_dur); p = hs_w16(p, sk_t0);
+    for (int i = 0; i < 12; i++) {
+        p = hs_w16(p, sk_from[i].x); p = hs_w16(p, sk_from[i].y); p = hs_w16(p, sk_to[i].x); p = hs_w16(p, sk_to[i].y); p = hs_w16(p, sk_via[i].x); p = hs_w16(p, sk_via[i].y);
+        p = hs_w8(p, sk_pnum[i]); p = hs_w16(p, sk_face[i]); p = hs_w8(p, sk_gate[i]); p = hs_w16(p, sk_delay[i]);
+    }
+    p = hs_w16(p, sk_puckx); p = hs_w16(p, sk_pucky); p = hs_w16(p, sk_pick); p = hs_w8(p, sk_pstart); p = hs_w8(p, sk_lock);
+    for (int k = 0; k < 4; k++) p = hs_w16(p, sk_view[k]);
+    p += faceoff_defer_save(p);
+    return (size_t)(p - out);
+}
+
+static int flag(int v) { return v == 0 || v == 1; }
+
+/* a state's bytes, or NULL (a state from before them: no pause). -1 for bytes that are not a pause of this game's (nothing
+ * changed then: a state is checked before it is used) */
+int hold_state_load(const uint8_t *in)
+{
+    if (!in) { hold_reset(); return faceoff_defer_load(NULL); }
+    const uint8_t *p = in;
+    int u = hs_r16(&p), pe = hs_r8(&p), an = hs_r8(&p), ap = hs_r8(&p), al = hs_r16(&p), alk = hs_r8(&p), at0 = hs_r16(&p);
+    if (!flag(pe) || !flag(an) || !flag(ap) || al < 0 || al > 60 * 120 || !flag(alk)) return -1;
+    const uint8_t *spots = p;
+    p += 12 * 6;
+    int fs = hs_r8(&p), so = hs_r8(&p), sst = hs_r8(&p), sl = hs_r16(&p), sf = hs_r16(&p), stm = hs_r8(&p), spl = hs_r16(&p), sa1 = hs_r16(&p), sa2 = hs_r16(&p);
+    if (!flag(fs) || !flag(so) || !flag(sst) || sf < 0 || sf > 900 || !flag(stm) || spl < 0 || spl > 31 || sa1 < -1 || sa1 > 31 || sa2 < -1 || sa2 > 31) return -1;
+    int kc = hs_r8(&p), ko = hs_r8(&p), kd = hs_r16(&p), kt0 = hs_r16(&p);
+    if (!flag(kc) || !flag(ko) || kd < 0 || kd > 300 || (ko && kd < 24)) return -1;
+    const uint8_t *walk = p;
+    for (int i = 0; i < 12; i++) {
+        p += 12;
+        hs_r8(&p); hs_r16(&p);
+        int gt = hs_r8(&p), dl = hs_r16(&p);
+        if (!flag(gt) || dl < 0 || dl > 300) return -1;
+    }
+    int px = hs_r16(&p), py = hs_r16(&p), pk = hs_r16(&p), ps = hs_r8(&p), lk = hs_r8(&p);
+    if ((pk != 0 && pk != SK_PICKUP) || !flag(ps) || !flag(lk)) return -1;
+    const uint8_t *view = p;
+    p += 8;
+    if (faceoff_defer_check(p) < 0) return -1;
+    until = (uint16_t)u; pending = pe; anth = an; anth_pose = ap; anth_len = al; anth_lock = alk; anth_t0 = (uint16_t)at0;
+    for (int i = 0; i < 12; i++) { spot[i].x = (int16_t)hs_r16(&spots); spot[i].y = (int16_t)hs_r16(&spots); spot_face[i] = (int16_t)hs_r16(&spots); }
+    face_set = fs;
+    sg.on = so; sg.started = sst; sg.limit = (uint16_t)sl; sg.frames = sf; sg.tm = team_struct(stm); sg.player = spl; sg.a1 = sa1; sg.a2 = sa2;
+    sk_cap = kc; sk_on = ko; sk_dur = kd; sk_t0 = (uint16_t)kt0;
+    for (int i = 0; i < 12; i++) {
+        sk_from[i].x = (int16_t)hs_r16(&walk); sk_from[i].y = (int16_t)hs_r16(&walk); sk_to[i].x = (int16_t)hs_r16(&walk); sk_to[i].y = (int16_t)hs_r16(&walk);
+        sk_via[i].x = (int16_t)hs_r16(&walk); sk_via[i].y = (int16_t)hs_r16(&walk);
+        sk_pnum[i] = (int8_t)hs_r8(&walk); sk_face[i] = (int16_t)hs_r16(&walk); sk_gate[i] = (uint8_t)hs_r8(&walk); sk_delay[i] = (int16_t)hs_r16(&walk);
+    }
+    sk_puckx = (int16_t)px; sk_pucky = (int16_t)py; sk_pick = pk; sk_pstart = ps; sk_lock = lk;
+    for (int k = 0; k < 4; k++) sk_view[k] = (uint16_t)hs_r16(&view);
+    faceoff_defer_load(p);
+    return 0;
+}

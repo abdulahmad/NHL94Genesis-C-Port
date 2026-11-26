@@ -256,9 +256,8 @@ enum { SFX_GOAL, SFX_HORN, SFX_ONEMIN };
 extern int (*sfx_hook)(int ev);
 extern void (*crowd_level_hook)(int meter);              /* each frame of play: the crowd meter in decibels (65 and up), for the host's own crowd bed */
 extern int (*siren_busy_hook)(void);                    /* 1 while the host's own goal siren plays */
-extern int (*anthem_hook_fn)(int home_art, int away_art);   /* the first face off of a game: the host plays the anthems and returns the frames to wait (0: none) */
+extern int (*anthem_hook_fn)(int home_art, int away_art);   /* RULE_ANTHEM, the first face off of a game: the host plays the anthem (the wait is the game's: hold_anthem_frames) */
 extern void (*stoppage_hook)(int pen);                      /* a whistle stops play (src/penalty.c Stop4Pen): the stoppage's penalty number, for the host's own sound; -1 the face off's drop */
-extern int (*song_block_hook)(void);                         /* 1: the cartridge's songs stay quiet (an anthem plays) */
 
 /* The hat trick hats (native/hats.c): a home skater's third goal starts them (HAT_START), the next face off
  * ends them (HAT_END), and each game frame steps them (HAT_FRAME, arg = the frames since the last). NULL in
