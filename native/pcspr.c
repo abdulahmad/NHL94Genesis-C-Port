@@ -950,6 +950,37 @@ static int is_pink(const mdrt_vdp *v, uint16_t e, int x, int y)
     return c && (u & 0xE) >= 0x8 && (u & 0xE) > (u >> 4 & 0xE) + 2 && (u & 0xE) > (u >> 8 & 0xE) + 2;
 }
 
+/* tiles of the VDP's memory nothing shows: no plane, window or sprite uses them and no table is over them (at most max, into out) */
+static int free_tiles(const mdrt_vdp *v, uint16_t *out, int max)
+{
+    static uint8_t used[2048];
+    memset(used, 0, sizeof used);
+    static const int cells[4] = { 32, 64, 32, 128 };
+    int w = cells[v->s.reg[16] & 3], h = cells[(v->s.reg[16] >> 4) & 3], h40 = mdrt_vdp_width(v) == 320;
+    uint32_t tab[3] = { (uint32_t)(v->s.reg[2] & 0x38) << 10, (uint32_t)(v->s.reg[4] & 7) << 13, (uint32_t)(v->s.reg[3] & (h40 ? 0x3C : 0x3E)) << 10 };
+    int tn[3] = { w * h, w * h, h40 ? 64 * 32 : 32 * 32 };
+    for (int t = 0; t < 3; t++) {
+        for (int i = 0; i < tn[t]; i++) {
+            uint32_t a = (tab[t] + (uint32_t)(i << 1)) & 0xFFFE;
+            used[(v->s.vram[a] << 8 | v->s.vram[a + 1]) & 0x7FF] = 1;
+        }
+        for (uint32_t a = tab[t]; a < tab[t] + (uint32_t)tn[t] * 2 && a < 0x10000; a += 32) used[a >> 5] = 1;
+    }
+    uint32_t sat = (uint32_t)(v->s.reg[5] & (h40 ? 0x7E : 0x7F)) << 9, hs = (uint32_t)(v->s.reg[13] & 0x3F) << 10;
+    for (uint32_t a = sat; a < sat + 640 && a < 0x10000; a += 32) used[a >> 5] = 1;
+    for (uint32_t a = hs; a < hs + 1024 && a < 0x10000; a += 32) used[a >> 5] = 1;
+    for (int k = 0, e = 0; k < 80; k++) {
+        const uint8_t *q = v->s.vram + ((sat + (uint32_t)e * 8) & 0xFFFF);
+        int t0 = (q[4] << 8 | q[5]) & 0x7FF, n = (((q[2] >> 2) & 3) + 1) * ((q[2] & 3) + 1);
+        for (int i = 0; i < n; i++) used[(t0 + i) & 0x7FF] = 1;
+        e = q[3] & 0x7F;
+        if (!e) break;
+    }
+    int n = 0;
+    for (int t = 1; t < 2048 && n < max; t++) if (!used[t]) out[n++] = (uint16_t)t;
+    return n;
+}
+
 /* the cartridge's crest at centre ice taken out of the picture and NHL 95 PC's logo of the home team put in its place, over only the
  * rink: under the windows, the scoreboard and the players as the crest was. vdp: the VDP as it drew the picture, less the cartridge
  * sprites the PC's skaters replace; px its picture (pitch_px apart). Everything is from that VDP state, the same scroll and plane
@@ -1042,6 +1073,46 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
             else { sc.s.vram[a] = (uint8_t)(run >> 8); sc.s.vram[a + 1] = (uint8_t)run; }
         }
     }
+    /* the PC's centre line across the whole rink, not only the logo's width (NHL 94 / 95 PC: one line, red with light dashes, the
+     * logo's own line its middle part). The cartridge's line is taken out of its cells (its colours, in the rows it has at a cell
+     * left of the crest, become the ice: new tiles in the crest's, which the plane no longer shows), and a second picture, with the
+     * rows of the PC's line marked in those tiles, says where it shows (not under a window, a sprite or a priority tile): there the
+     * logo's own line rows are drawn, their 8 pixel pattern repeated out from the logo's edges */
+    static mdrt_vdp mk;
+    static uint16_t mark[320 * 240];
+    int pl_top = -1, pl_n = 0;                                         /* (the PC line's rows in the plane, when it is drawn) */
+    int b0 = 1 << 20, b1 = -1, nS = 0;
+    unsigned S[16], ice_c = have_ice ? sc.s.cram[((ice >> 13) & 3) * 16 + tile_px(&sc, ice, 0, 0)] : 0;
+    if (have_ice && ly1 >= 0 && a0 >= 0 && lw >= 16) {
+        int mid = (ly0 + ly1 + 1) / 2;
+        for (int y = mid - 6; y <= mid + 6; y++) {                     /* (the cartridge's line: the rows most cells left of the crest have, their colours) */
+            int r = (y >> 3) & (C.ph / 8 - 1), cells = 0;
+            for (int q = C.x0 / 8 - 12; q < C.x0 / 8; q++) {
+                uint32_t a = (C.table + (uint32_t)((r * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
+                uint16_t e = (uint16_t)(sc.s.vram[a] << 8 | sc.s.vram[a + 1]);
+                int n = 0;
+                for (int x = 0; x < 8; x++) { int c; n += px_colour(&sc, e, x, y & 7, &c) != ice_c && c; }
+                cells += n >= 4;
+            }
+            if (cells < 8) continue;                                    /* (a row of the ice, its sparkles, or the circle) */
+            if (y < b0) b0 = y;
+            if (y > b1) b1 = y;
+            for (int q = C.x0 / 8 - 12; q < C.x0 / 8; q++) {
+                uint32_t a = (C.table + (uint32_t)((r * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
+                uint16_t e = (uint16_t)(sc.s.vram[a] << 8 | sc.s.vram[a + 1]);
+                for (int x = 0; x < 8; x++) {
+                    int c;
+                    unsigned u = px_colour(&sc, e, x, y & 7, &c);
+                    if (!c || u == ice_c) continue;
+                    int k2 = 0;
+                    while (k2 < nS && S[k2] != u) k2++;
+                    if (k2 == nS && nS < 16) S[nS++] = u;
+                }
+            }
+        }
+    }
+    if (b1 >= b0 && b1 - b0 > 10) b1 = -1;
+    if (b1 >= b0) py0 = (b0 + b1 + 1) / 2 - (a0 + a1 + 1) / 2;          /* (the logo's line on the middle of the cartridge's, edges and all) */
     if (have_ice)                                                      /* (under the logo, in the crest's rows: the ice; the circle stays) */
         for (int r = (py0 > C.y0 ? py0 : C.y0) >> 3; r <= (py0 + lh < C.y1 ? py0 + lh - 1 : C.y1 - 1) >> 3; r++)
             for (int q = px0 >> 3; q <= (px0 + lw - 1) >> 3; q++) {
@@ -1049,6 +1120,68 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
                 sc.s.vram[a] = (uint8_t)(ice >> 8);
                 sc.s.vram[a + 1] = (uint8_t)ice;
             }
+    {
+        if (b1 >= b0) {
+            mk = sc;
+            pl_top = py0 + a0; pl_n = a1 - a0 + 1;
+            uint32_t key[160];
+            uint16_t slots[160];
+            int nslot = free_tiles(&sc, slots, 160), nk = 0, full = 0;
+            for (int r = b0 >> 3; r <= b1 >> 3; r++)
+                for (int q = 0; q < cw; q++) {
+                    int rr = r & (C.ph / 8 - 1);
+                    uint32_t a = (C.table + (uint32_t)((rr * cw + q) << 1)) & 0xFFFE;
+                    uint16_t e = (uint16_t)(sc.s.vram[a] << 8 | sc.s.vram[a + 1]);
+                    int n = 0;
+                    for (int y = 0; y < 8; y++) {
+                        if (r * 8 + y < b0 || r * 8 + y > b1) continue;
+                        for (int x = 0; x < 8; x++) {
+                            int c;
+                            unsigned u = px_colour(&sc, e, x, y, &c);
+                            for (int i = 0; c && i < nS; i++) n += u == S[i];
+                        }
+                    }
+                    int span = (q - (px0 >> 3)) & (cw - 1), near = (q - (C.x0 / 8 - 5)) & (cw - 1);
+                    if (span <= ((px0 + lw - 1) >> 3) - (px0 >> 3)) continue;   /* (the logo's own) */
+                    near = near <= C.x1 / 8 + 4 - (C.x0 / 8 - 5);      /* (where the cartridge's line stops short of its crest: the line goes on) */
+                    if (n < 4 && !near) continue;                       /* (no line here: the boards, the crowd) */
+                    int slot = 0;
+                    uint32_t kk = (uint32_t)near << 31 | (uint32_t)r << 16 | e;
+                    while (slot < nk && key[slot] != kk) slot++;
+                    if (slot == nk) {
+                        if (nk == nslot) { full++; continue; }
+                        key[nk++] = kk;
+                        int pal = (e >> 13) & 3, ic = 1, bc = 1, bd = -1, id = 1 << 30;
+                        for (int i = 1; i < 16 - !pal; i++) {           /* (the palette's ice, and the colour furthest from it: the mark; not
+                                                                           * colour 15 of palette 0, which sprite_masks makes its own) */
+                            unsigned u = sc.s.cram[pal * 16 + i];
+                            int dr = (int)(u & 0xE) - (int)(ice_c & 0xE), dg = (int)(u >> 4 & 0xE) - (int)(ice_c >> 4 & 0xE), db = (int)(u >> 8 & 0xE) - (int)(ice_c >> 8 & 0xE);
+                            int d = dr * dr + dg * dg + db * db;
+                            if (d < id) { id = d; ic = i; }
+                            if (d > bd) { bd = d; bc = i; }
+                        }
+                        uint8_t *t = sc.s.vram + (uint32_t)slots[slot] * 32, *tm = mk.s.vram + (uint32_t)slots[slot] * 32;
+                        for (int y = 0; y < 8; y++)
+                            for (int x = 0; x < 8; x++) {
+                                int c, py = r * 8 + y, line = 0;
+                                unsigned u = px_colour(&sc, e, x, y, &c);
+                                int pcrow = py >= pl_top && py < pl_top + pl_n;
+                                if (py >= b0 && py <= b1) for (int i = 0; c && i < nS; i++) line |= u == S[i];
+                                line |= near && pcrow;                  /* (the PC's line over the circle, as on the PC) */
+                                int v = line ? ic : c, vm = line || (pcrow && c && u == ice_c) ? bc : v;
+                                uint8_t *d = t + y * 4 + (x >> 1), *dm = tm + y * 4 + (x >> 1);
+                                *d = (uint8_t)(x & 1 ? (*d & 0xF0) | v : (*d & 0x0F) | v << 4);
+                                *dm = (uint8_t)(x & 1 ? (*dm & 0xF0) | vm : (*dm & 0x0F) | vm << 4);
+                            }
+                    }
+                    uint16_t ne = (uint16_t)((e & 0xE000) | slots[slot]);
+                    sc.s.vram[a] = mk.s.vram[a] = (uint8_t)(ne >> 8);
+                    sc.s.vram[a + 1] = mk.s.vram[a + 1] = (uint8_t)ne;
+                }
+            if (log) fprintf(stderr, "logo: PC line rows %d-%d over the cartridge's %d-%d (%d colours, %d tiles of %d free, %d cells left)\n", pl_top, pl_top + pl_n - 1, b0, b1, nS, nk, nslot, full);
+            mdrt_vdp_render(&mk, mark, 320);
+        }
+    }
     mdrt_vdp_render(&sc, blank, 320);
     for (int y = 0; y < h; y++)                                      /* (the crest's pixels: where the picture changes) */
         for (int x = 0; x < w; x++)
@@ -1067,7 +1200,21 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     int sx = ((C.x0 + C.x1) / 2 + hsv) & (C.pw - 1);
     if (sx >= w / 2 + C.pw / 2) sx -= C.pw;
     int lx = sx - lw / 2, ly = sy + py0 - (C.y0 + C.y1) / 2;         /* (its rows as in the plane: the line's on the cartridge's) */
-    if (log) fprintf(stderr, "logo: line plane rows %d-%d, art rows %d-%d, plane top %d, ice %d\n", ly0, ly1, a0, a1, py0, have_ice);
+    uint32_t ice_rgb = 0xFF000000u | mdrt_vdp_rgb((uint16_t)ice_c, MDRT_RGB_GPGX);
+    if (pl_n > 0)                                                      /* (the PC's line out from the logo's edges, where it shows; the ice where the cartridge's was) */
+        for (int y = 0; y < h && y < 240; y++)
+            for (int x = 0; x < w && x < 320; x++) {
+                if (blank[y * 320 + x] == mark[y * 320 + x]) continue;
+                int row = y - ly, d = (((x - hsv) & (C.pw - 1)) - pmx) & (C.pw - 1), col;
+                if (d >= C.pw / 2) d -= C.pw;
+                d += lw / 2;                                           /* (the logo's column) */
+                if (d < 0) col = ((d % 8) + 8) % 8;
+                else if (d >= lw) col = lw - 8 + (d - lw) % 8;
+                else continue;                                         /* (the logo draws its own) */
+                int c = row >= a0 && row <= a1 ? LS->t[k].idx[row * lw + col] : 255;
+                pic[(long)y * pitch + x] = c == 255 ? ice_rgb : fadec(0xFF000000u | (uint32_t)lp[c][0] << 16 | (uint32_t)lp[c][1] << 8 | lp[c][2]);
+            }
+    if (log) fprintf(stderr, "logo: line plane rows %d-%d, art rows %d-%d, plane top %d, ice %d, screen %d,%d\n", ly0, ly1, a0, a1, py0, have_ice, lx, ly);
     if (log) fprintf(stderr, "logo: art %d crest tile %d plane %c cells %d,%d-%d,%d scroll %d,%d middle %d,%d\n", art, LGO.crest, C.plane ? 'B' : 'A', C.x0, C.y0, C.x1, C.y1, hsv, vs, sx, sy);
     if (lx >= w || ly >= h || lx + lw <= 0 || ly + lh <= 0) return;
     int nx = (lw + 31) / 32, ny = (lh + 31) / 32;
