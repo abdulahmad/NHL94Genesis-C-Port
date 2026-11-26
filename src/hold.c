@@ -18,7 +18,8 @@ static uint16_t until;                                /* the vblank (g.Vcount) t
 static int pending;
 static int anth;                                      /* the wait is the anthems' */
 #define ANTH_SKATE 90                                  /* frames the skaters take from their lines to the face off spot after the anthem */
-static int anth_pose, anth_len;                        /* the anthem's line up (1 once the spots are taken); the anthem's own frames */
+static int anth_pose, anth_len, anth_lock;
+#define ANTH_VPOS (-18)                                 /* (the PC shows centre ice half way down its rink view) */                        /* the anthem's line up (1 once the spots are taken); the anthem's own frames */
 static uint16_t anth_t0;
 static struct { int16_t x, y; } spot[12];
 
@@ -131,13 +132,19 @@ static void anthem_pose(void)
             if (k < ANTH_SKATE) pl->facedir = (int16_t)vtoa((int16_t)(spot[i].x - lx), (int16_t)(spot[i].y - ly));
             else pl->facedir = (int16_t)vtoa((int16_t)((int16_t)g.puckx[0] - x), (int16_t)((int16_t)g.pucky - y));
         } else {
-            pl->facedir = (int16_t)vtoa((int16_t)(120 - x), (int16_t)(100 - y));
+            pl->facedir = (int16_t)vtoa(0, 100);                /* (all face the viewer: facedir 4, as the PC's skaters) */
         }
         pl->Xpos = (int16_t)x;
         pl->Ypos = (int16_t)y;
         pl->Xvel = 0;
         pl->Yvel = 0;
     }
+    if (!skating) {                                     /* (the PC's view: centre ice half way down the rink view, held still) */
+        g.sflags |= HI(sfslock);
+        g.Vpos = g.yc1 = ANTH_VPOS;
+        g.Hpos = g.xc1 = 0;
+        anth_lock = 1;
+    } else if (anth_lock) { g.sflags &= (uint16_t)~HI(sfslock); anth_lock = 0; }
 }
 
 /* NHL 95 PC's between-play: the skaters do not appear at the face off spots; each skates there from where he was when
@@ -265,6 +272,7 @@ int hold_wait(void)
     if ((wanted() || anth) && (int16_t)(until - g.Vcount) > 0) return 1;
     pending = 0;
     anth = 0;
+    if (anth_lock) { g.sflags &= (uint16_t)~HI(sfslock); anth_lock = 0; }
     return 0;
 }
 
