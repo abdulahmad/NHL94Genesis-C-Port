@@ -3342,8 +3342,9 @@ int faceoff_defer_load(const uint8_t *in)
     return 0;
 }
 
-/* the face off window (the two men, the line lists) and the tiles it needs: drawn at the setup, or after the anthem */
-static void fo_window(void)
+/* the face off window (the two men, the line lists) and the tiles it needs: drawn at the setup, or after the anthem (before it,
+ * draw 0: only the print state the window leaves, which the scoreboard's clock prints with) */
+static void fo_window(int draw)
 {
     printz(str_puckfaceoff2_1, sizeof str_puckfaceoff2_1);
     int16_t d0 = 0x36;                                    /* x of the faceoff window */
@@ -3353,6 +3354,7 @@ static void fo_window(void)
     d0 = 0x5C;
     g.fodropy = (uint16_t)d0;
     g.printy = (uint16_t)((int16_t)(d0 - 0x44) >> 3);
+    if (!draw) return;
     {
         const uint8_t *map = rom_ptr(ART(FaceOffMap));
         uint32_t pal = ART(FaceOffMap) + rd32(map), mp = ART(FaceOffMap) + rd32(map + 4);
@@ -3386,7 +3388,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
             fo_deferred = 0;
             for (int i = 0; i < fo_defer_n; i++) assreplace(fo_defer_as[i], fo_defer_pl[i]);   /* (now they take the face off: in place of the standing one, so the old assignment resumes after it as ever) */
             fo_defer_n = 0;
-            fo_window();                                     /* (drawn again: the box and its picture were not kept through the anthem) */
+            fo_window(1);                                    /* (drawn again: the box and its picture were not kept through the anthem) */
             g.disflags |= HI(4);
             o->temp1 = (int16_t)(randomd0(0x78) + 0xB4);
         }
@@ -3500,8 +3502,8 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     g.arenaanim = 0xFFFF;
     if ((g.sflags7 & 1) && (int16_t)g.faceoffanim[0] >= 0)
         StartArenaAnim(g.faceoffanim[0]);
-    fo_window();
-    if (hold_anthem_pending()) { fo_deferred = 1; g.disflags &= (uint16_t)~HI(4); }   /* (the anthem first: the face off men come after it) */
+    fo_window(!hold_anthem_pending());
+    if (hold_anthem_pending()) { fo_deferred = 1; g.disflags &= (uint16_t)~HI(4); }   /* (the anthem first: the face off window and its men come after it, as on the PC) */
     int16_t d0 = (int16_t)(randomd0(0x78) + 0xB4);        /* time to the drop */
     {
         uint16_t a = g.arenaanim;
