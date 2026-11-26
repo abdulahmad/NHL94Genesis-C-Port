@@ -251,6 +251,12 @@ static void skate_pose(void)
 
 void hold_tick(void)
 {
+    if (getenv("HOLDMOVE") && !(g.Vcount % 120)) {         /* (a test: how much the skaters move, to see the AI is alive after the face off) */
+        int sum = 0, ass = 0;
+        struct SortObj *q = sortobj(0);
+        for (int i = 0; i < 12; i++, q++) { sum += abs(q->Xvel) + abs(q->Yvel); if (q->position > 0 && q->asslist[q->assnum & 7] != pnothing) ass++; }
+        fprintf(stderr, "holdmove: frame %d speed %d active %d\n", g.Vcount, sum, ass);
+    }
     if (sk_on) skate_pose();
     if (anth && pending) anthem_pose();
     if (!sg.on) return;
