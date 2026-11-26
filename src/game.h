@@ -280,6 +280,7 @@ extern int (*cd_title_hook)(int what);
  * a paragraph. cd_scout_text: the disc's paragraph n (its own numbering), NULL none. NULL or 0: the cartridge's */
 enum { CD_SCOUT_ON, CD_SCOUT_BUSY };
 extern int (*cd_scout_hook)(int what);
+extern uint8_t scout_b_back;                  /* (the window) B turns the scouting report's matchups back, as A does */
 extern const uint8_t *(*cd_scout_text)(int n);
 extern int scout_disc;                                    /* (scout.c / setup.c) this scouting report is the disc's */
 extern int scout_last;                                    /* (the disc's) its last paragraph is up */

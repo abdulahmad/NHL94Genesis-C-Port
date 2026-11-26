@@ -176,5 +176,20 @@ int native_hal_load(const uint8_t *in, size_t size)
     return 0;
 }
 
+/* a frame while the game waits on the window (the select-sides screen): only the music's vblank, so the song plays on and nothing else of the game moves */
+void native_idle_frame(void)
+{
+    native_frame_done(++frames, 1);
+    if (mdrt_wait_vblank(native_m)) native_quit();
+    handshakes++;
+    frame_base += mdrt_frame_mclks(native_m);
+    t68k = 0;
+    z80_relay_frame();
+    in_vblank = 1;
+    p_music_vblank();
+    in_vblank = 0;
+    mdrt_vblank_end(native_m);
+}
+
 /* a vblank in the middle of the game's work (lockstep: the oracle's lag frames) */
 void native_vblank_now(void) { vblank(0); }
