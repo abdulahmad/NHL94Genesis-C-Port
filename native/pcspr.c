@@ -23,6 +23,7 @@
 #include "rosters.h"
 #include "native.h"
 #include "pcspr.h"
+#include "fight93.h"
 #include "anim_gen.h"
 #include "pcsong.h"
 #include "rules.h"
@@ -507,7 +508,13 @@ static void fade_update(const mdrt_vdp *vdp)
     fade256 = ref > 0 ? (cur >= ref ? 256 : cur * 256 / ref) : 256;
 }
 
-/* The fight frames, SPFgloves 353 to SPFfinjury+5 376 (NHL 93's fights: src/fight.c), have no PC frames: NHL 95 PC has no fights and
+/* The wall jump frames, SPFPen 377-383 (the PC's SPFPen 376-382, frames.asm). The cartridge's 377-380 (SPAwallright / SPAwallleft
+ * in directions 1-7: the bench gates) are the PC's 376-379, the same four pictures (up, leaning, over, down). Its 381-383 (direction
+ * 0, the penalty box in the side view, sfhor: facing away to jump, over the boards, sitting) are not: the PC's 380 and 381 are a man
+ * standing face on (its anthem's SPAanthem4 / 5 use them too) and only its 382 is one sitting in the box. So 381 and 382 keep the
+ * cartridge's sprite and 383 is the PC's 382.
+ *
+ * The fight frames, SPFgloves 353 to SPFfinjury+5 376 (NHL 93's fights: src/fight.c), have no PC frames: NHL 95 PC has no fights and
  * gave those numbers (352-375) to other pictures (frames.asm: the face off stances 360-368, the anthem's standing 369-371, the goalie's
  * wall jump 372-375, the cup 357-358), so a fighter was drawn as a face off or anthem man. The hook takes a fighter's frame through
  * fight_frame_shown first (the cartridge frame he is drawn with: holding, hooking, falling), whose PC frame is the real one. */
@@ -515,6 +522,7 @@ static int pc_frame(int fr)
 {
     if (fr < 1 || fr > 657) return -1;
     if (fr >= SPFgloves && fr < SPFPen) return -1;      /* (the fight frames: fight_frame_shown leaves only the gloves, 353) */
+    if (fr == SPFPen + 4 || fr == SPFPen + 5) return -1; /* (the box's wall jump seen from the side, below) */
     if (fr <= 554) return fr - 1;
     if (fr <= 562) return -1;                          /* (the cartridge's extra goalie ready frames) */
     return fr - 9;
@@ -712,6 +720,7 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
         return 0;
     }
     if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || sc > 13 || P.nshow >= 16) return 0;
+    if (sc < 12 && fight93_have(o->frame & 0x7FF)) return 0;   /* (a fighter in NHL 93's own fight frames: his sprite stays, the PC has none) */
     int pf = pc_frame(sc < 12 ? fight_frame_shown(o->frame & 0x7FF, sortobj(sc)->facedir) : (o->frame & 0x7FF));   /* (a fighter: the cartridge frame his is drawn with, fight.c) */
     if (hold_anthem_time() >= 0 && sc < 12 && sortobj(sc)->position > 0) pf = idle_skater(sc, hold_anthem_time());      /* (the anthem: the PC's standing picture, number 369) */
     if (pf < 0 || pf >= NFRAMES || !P.f[pf].px) return 0;   /* (no such PC frame: the cartridge's sprite stays) */

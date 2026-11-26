@@ -440,6 +440,7 @@ void checksso(struct Vid *v)
 
 /* video94.asm:setsortcords. addframe for the 16 objects in OOlist order. */
 int (*spr_hook)(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o);
+int (*spr_art_hook)(uint16_t frame, const uint8_t **pieces, int *n, uint32_t *tiles);
 static int spr_sc = -1;                                   /* the object addframe is drawing (for spr_hook) */
 
 void setsortcords(struct Vid *v)
@@ -559,10 +560,18 @@ void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
     o->attribute ^= (uint16_t)(d4 & 0xF800);
     uint16_t fr = (uint16_t)(o->frame & 0x7FF);
     const uint8_t *a2 = rom_ptr(ART(Sprites) + rd32(rom_ptr(ART(Sprites)) + 4));
-    unsigned idx = (spr_sc >= 0 && spr_sc < 12 ? fight_frame_shown(fr, sortobj((uint16_t)spr_sc)->facedir) : fr) * 2u;   /* (a fighter: the cartridge has no fight art, fight.c) */
-    if (!((int16_t)idx < (int16_t)rd16(a2 + 2))) { o->attribute = attr_saved; return; }
-    int16_t d5 = (int16_t)(((rd16(a2 + idx + 2) - rd16(a2 + idx)) >> 3) - 1);
-    a2 += rd16(a2 + idx);
+    uint32_t tiles = ART(Spritetiles);
+    const uint8_t *own = NULL;
+    int own_n = 0;
+    int16_t d5;
+    if (spr_art_hook && spr_art_hook(fr, &own, &own_n, &tiles) && own_n > 0 && own_n <= 8) { a2 = own; d5 = (int16_t)(own_n - 1); }   /* (the host's art: NHL 93's fight frames) */
+    else {
+        tiles = ART(Spritetiles);
+        unsigned idx = (spr_sc >= 0 && spr_sc < 12 ? fight_frame_shown(fr, sortobj((uint16_t)spr_sc)->facedir) : fr) * 2u;   /* (a fighter: the cartridge has no fight art, fight.c) */
+        if (!((int16_t)idx < (int16_t)rd16(a2 + 2))) { o->attribute = attr_saved; return; }
+        d5 = (int16_t)(((rd16(a2 + idx + 2) - rd16(a2 + idx)) >> 3) - 1);
+        a2 += rd16(a2 + idx);
+    }
     uint16_t d3 = 0, prev_tile = 0, prev_count = 0;
     for (; d5 >= 0; d5--, a2 += 8) {
         if (fr != o->oldframe) {
@@ -576,7 +585,7 @@ void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
             }
             if (!dup) {
                 d3 = (uint16_t)(d3 + prev_count);
-                uint32_t src = ART(Spritetiles) + ((int32_t)(int16_t)tile << 5);
+                uint32_t src = tiles + ((int32_t)(int16_t)tile << 5);
                 dma_entry(v, src, (uint16_t)(count << 4), (uint16_t)((d3 + o->VRchar) << 5));
             }
             prev_tile = tile;

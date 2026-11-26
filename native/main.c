@@ -90,6 +90,7 @@
 #include "whiteice.h"
 #include "hats.h"
 #include "pcspr.h"
+#include "fight93.h"
 #include "pcsong.h"
 #include "cardcolor.h"
 #include "wide.h"
@@ -231,6 +232,7 @@ static uint8_t read68k(void *user, uint32_t addr)
             }
         }
     }
+    { uint8_t v; if (fight93_bus(addr, &v)) return v; }   /* (NHL 93's fight frames' tiles: fight93.c) */
     return m8(addr);
 }
 
@@ -797,8 +799,11 @@ static void wav_header(uint32_t rate)
 static void make_parent(const char *path)
 {
     char d[1024];
-    snprintf(d, sizeof d, "%s", path);
-    char *slash = strrchr(d, '/');
+    size_t n = strlen(path);
+    if (n >= sizeof d) return;                            /* (too long to hold: leave it to the open to fail) */
+    memcpy(d, path, n + 1);
+    char *slash = strrchr(d, '/'), *bs = strrchr(d, '\\');
+    if (bs > slash) slash = bs;                           /* (a Windows path from the exe's folder) */
     if (!slash || slash == d) return;
     *slash = 0;
     make_dir(d);                                          /* (fails harmlessly when it exists) */
@@ -970,6 +975,7 @@ int main(int argc, char **argv)
     c.fm_model = fm_model;
     c.audio_rate = 48000;
     c.sram_size = 0x2000;
+    fight93_start();                                      /* (NHL 93's fight frames, when its cartridge is beside the program) */
     c.read68k = read68k;
     if (!headless) {
         mdrt_sdl_options o = { .title = "NHL '94", .scale = scale, .aspect = aspect, .sram_path = sram, .app = "ninety-four",
