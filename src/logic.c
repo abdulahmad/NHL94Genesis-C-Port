@@ -3348,6 +3348,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
             fo_deferred = 0;
             for (int i = 0; i < fo_defer_n; i++) assreplace(fo_defer_as[i], fo_defer_pl[i]);   /* (now they take the face off: in place of the standing one, so the old assignment resumes after it as ever) */
             fo_defer_n = 0;
+            fo_window();                                     /* (drawn again: the box and its picture were not kept through the anthem) */
             g.disflags |= HI(4);
             o->temp1 = (int16_t)(randomd0(0x78) + 0xB4);
         }
