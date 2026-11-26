@@ -1019,6 +1019,7 @@ int main(int argc, char **argv)
         o.net_pads = 4;                                   /* (up to four players online: 4 Way Play) */
         if (netopt.on) { fprintf(stderr, "netplay in the window: its Online page (` or F11); --host / --join / --peer are for --headless\n"); return 2; }
         if (inputs) frontend_script = script_source;      /* (test aid: the window's own path, the pads from the script) */
+        if (getenv("HOLDTEST")) { const char *h = getenv("HOLDTEST"), *q; if ((q = strstr(h, "goal:"))) holdtest_goal = atoi(q + 5); if ((q = strstr(h, "pen:"))) holdtest_pen = atoi(q + 4); test_frame_hook = holdtest_frame; }   /* (test aid: the forced goal in the window too) */
         int r = mdrt_sdl_run(&c, &o, native_game, NULL);
         native_net_close();
         return r;
