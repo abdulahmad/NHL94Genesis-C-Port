@@ -102,6 +102,7 @@ void PlayerCardScreen(void)
     uint16_t chars = g.homepicchars, d3 = (uint16_t)(g.featuredplayer * 6);
     const struct RosterTeam *T = rosters_team(team);
     g.cardroster = T->picture[d3 / 6].slot;
+    picture_who = (uint32_t)team << 16 | (uint16_t)(g.cardroster + 1);   /* (for a host's picture_drawn_hook) */
     uint32_t pic = T->picture[d3 / 6].pic;
     uint32_t pal = ART(PicturePalette) + rd32(rom_ptr(ART(PicturePalette))), map;
     if (rd32(rom_ptr(pic + 4)) == 0) map = ART(PicturePalette) + rd32(rom_ptr(ART(PicturePalette) + 4));   /* no map: the common one */
