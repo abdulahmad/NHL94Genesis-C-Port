@@ -333,26 +333,44 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     if (F.wide) w = wide_frame(mdrt_get_vdp(F.m), pic, w, h, 320, F.picture, WIDE_MAX_W, cd);   /* (the sides: wide.c) */
     else if (!cd && native_net_on() && (wide_rink_frame(w) || wide_hor_frame(w))) wide_crop_follow(), w = wide_crop(mdrt_get_vdp(F.m), pic, h, 320, F.picture, WIDE_MAX_W);   /* (a 16:9 player's wide rink, here 4:3) */
     else for (int y = 0; y < h; y++) memcpy(F.picture + y * WIDE_MAX_W, pic + y * 320, (size_t)w * 4);
-    {   /* a new picture width (the 320-wide screens and the 256-wide ones: the window's shape changes): the old picture fades out first, then
-         * the new one fades in, so the shape never changes under a picture that is showing */
-        enum { FADE = 15 };
+    {   /* a new picture width (the 320-wide screens and the 256-wide ones, or the wide rink's: the window's shape changes): the old picture
+         * fades out first, then black while the game's own picture is still fading out (no flash of it back), then the new one fades in,
+         * so the shape never changes under a picture that is showing */
+        enum { FADE = 15, STEADY = 6 };
         static uint32_t last[WIDE_MAX_W * 240];
-        static int last_w, last_h, out, in;
-        if (last_w && (w != last_w) && !out && !native_net_on()) {
+        static int last_w, last_h, out, in, dark, still;
+        static long prev;
+        if (last_w && (w != last_w) && !out && !dark && !native_net_on()) {
             long sum = 0;
             for (int y = 0; y < last_h; y += 4)
                 for (int x = 0; x < last_w; x += 4) { uint32_t c = last[y * WIDE_MAX_W + x]; sum += (c >> 16 & 255) + (c >> 8 & 255) + (c & 255); }
             if (sum / ((last_h / 4 + 1) * (last_w / 4 + 1)) > 24) out = FADE, in = FADE;   /* (a picture already black needs no fade) */
         }
-        if (out) {                                    /* the old picture, darker each frame */
-            out--;
-            for (int y = 0; y < last_h; y++)
-                for (int x = 0; x < last_w; x++) {
-                    uint32_t c = last[y * WIDE_MAX_W + x];
-                    F.picture[y * WIDE_MAX_W + x] = 0xFF000000u | ((c >> 16 & 255) * out / FADE) << 16 | ((c >> 8 & 255) * out / FADE) << 8 | (c & 255) * out / FADE;
+        if (out || dark) {
+            long sum = 0, n = 0;                      /* (the game's picture now: dark, or no longer getting darker, ends the black) */
+            for (int y = 0; y < h; y += 4)
+                for (int x = 0; x < w; x += 4, n++) { uint32_t c = F.picture[y * WIDE_MAX_W + x]; sum += (c >> 16 & 255) + (c >> 8 & 255) + (c & 255); }
+            sum = n ? sum / n : 0;
+            if (out) {                                /* the old picture, darker each frame */
+                if (!--out) dark = 1, still = 0, prev = sum;
+                for (int y = 0; y < last_h; y++)
+                    for (int x = 0; x < last_w; x++) {
+                        uint32_t c = last[y * WIDE_MAX_W + x];
+                        F.picture[y * WIDE_MAX_W + x] = 0xFF000000u | ((c >> 16 & 255) * out / FADE) << 16 | ((c >> 8 & 255) * out / FADE) << 8 | (c & 255) * out / FADE;
+                    }
+                w = last_w; h = last_h;
+            } else {
+                still = sum < prev ? 0 : still + 1;
+                prev = sum;
+                if (sum <= 24 || still >= STEADY) dark = 0;
+                else {                                /* black, in the old shape */
+                    for (int y = 0; y < last_h; y++)
+                        for (int x = 0; x < last_w; x++) F.picture[y * WIDE_MAX_W + x] = 0xFF000000u;
+                    w = last_w; h = last_h;
                 }
-            w = last_w; h = last_h;
-        } else {
+            }
+        }
+        if (!out && !dark) {
             for (int y = 0; y < h; y++) memcpy(last + y * WIDE_MAX_W, F.picture + y * WIDE_MAX_W, (size_t)w * 4);
             last_w = w; last_h = h;
             if (in) {                                 /* the new one, brighter each frame */
@@ -367,6 +385,15 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     }
     F.width = w;
     F.height = h;
+    {   static int trace = -1;                       /* (test aid NHL94_FRAMELOG: each picture's width and brightness, as shown) */
+        if (trace < 0) trace = getenv("NHL94_FRAMELOG") != NULL;
+        if (trace) {
+            long sum = 0, n = 0;
+            for (int y = 0; y < h; y += 2)
+                for (int x = 0; x < w; x += 3, n++) { uint32_t c = F.picture[y * WIDE_MAX_W + x]; sum += (c >> 16 & 255) + (c >> 8 & 255) + (c & 255); }
+            fprintf(stderr, "present: frame %ld w %d lum %ld\n", native_frames(), w, n ? sum / n : 0);
+        }
+    }
     SDL_AtomicSet(&F.fresh, 1);
     SDL_UnlockMutex(F.lock);
 }
@@ -412,9 +439,11 @@ static int frame_wait(void *user)
     return ending();
 }
 
+void (*frontend_script)(void *m, uint16_t *b);
 static void input(void *user, uint16_t b[MDRT_PADS])
 {
     (void)user;
+    if (frontend_script) { frontend_script(F.m, b); return; }
     for (int p = 0; p < MDRT_PADS; p++) b[p] = (uint16_t)SDL_AtomicGet(&F.buttons[p]);
 }
 

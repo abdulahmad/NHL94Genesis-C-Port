@@ -138,7 +138,10 @@ list_done:
         waitx(0, &d0, &d1, &d2, &d3);
         if ((int16_t)--g.matchuptimer < 0) g.matchuptimer = 0x10E;
         PrintAdvantageMarks();
-        if (d1 & 0x80) break;                             /* Start */
+        if (d1 & 0x80) {                                  /* Start */
+            if (cd_event_hook) cd_event_hook(CD_EV_SCOUT_END, 0);   /* (the disc: his voice stops now, not at the fade's end) */
+            break;
+        }
         int page = 0, timed = 0;
         if (g.matchuptimer == 0x10E) {
             page = 1; timed = 1;                          /* the timer ran out: the next matchup */

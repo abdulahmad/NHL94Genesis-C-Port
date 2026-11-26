@@ -45,7 +45,8 @@ void native_states_wait(void);                       /* at each of the game's vb
 int native_at_game_loop_wait(void);                  /* (lockstep.c: the routines the game is in) */
 void native_track_routines(void);
 void native_tracking_reset(void);
-long native_frames(void);                            /* the game's vblank waits so far (hal_native.c) */
+long native_frames(void);
+extern void (*frontend_script)(void *m, uint16_t *b);   /* (test aid: --input in the window, main.c: the script's pads in place of the window's) */                            /* the game's vblank waits so far (hal_native.c) */
 long native_handshakes(void);                        /* the handshakes this process made */
 size_t native_hal_save(uint8_t *out);                /* the HAL's part of a state */
 int native_hal_load(const uint8_t *in, size_t size);

@@ -354,7 +354,7 @@ void segacd_event(int ev, uint16_t n)
     if (log < 0) log = SDL_getenv("SEGACD_LOG") != NULL;
     if (log && ev != CD_EV_CROWD)
         fprintf(stderr, "segacd: frame %ld %s %02X (track %d)\n", native_frames(),
-                ev == CD_EV_SONG ? "song" : ev == CD_EV_STOP ? "stop" : ev == CD_EV_PARAGRAPH ? "paragraph" : ev == CD_EV_SCREEN ? "screen" : ev == CD_EV_SFX ? "sfx" : "turnoff", n, S.track);
+                ev == CD_EV_SONG ? "song" : ev == CD_EV_STOP ? "stop" : ev == CD_EV_PARAGRAPH ? "paragraph" : ev == CD_EV_SCREEN ? "screen" : ev == CD_EV_SFX ? "sfx" : ev == CD_EV_SCOUT_END ? "scoutend" : "turnoff", n, S.track);
     switch (ev) {
     case CD_EV_SONG: {
         S.song_on_cd = 0;
@@ -382,6 +382,9 @@ void segacd_event(int ev, uint16_t n)
         break;
     case CD_EV_PARAGRAPH:
         paragraph(n);
+        break;
+    case CD_EV_SCOUT_END:                     /* Start on the scouting report: his voice ends now, as the page fades out */
+        voice_stop();
         break;
     case CD_EV_SFX: {                         /* the disc's effect in place of the cartridge's (its slot's notes dropped) */
         int id = n & 0xFF, slot = n >> 8 & 15, disc = !SDL_AtomicGet(&S.session) && segacd_disc() && segacd_sfx_on(id);
