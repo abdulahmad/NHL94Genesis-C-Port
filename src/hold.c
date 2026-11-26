@@ -22,6 +22,8 @@ static int anth_pose, anth_len, anth_lock;
 #define ANTH_VPOS (-18)                                 /* (the PC shows centre ice half way down its rink view) */                        /* the anthem's line up (1 once the spots are taken); the anthem's own frames */
 static uint16_t anth_t0;
 static struct { int16_t x, y; } spot[12];
+static int16_t spot_face[12];
+static int face_set;                         /* the way each faced at his spot as the game set him up */
 
 /* a goal's speech held back until its song has ended */
 static struct { int on, started; uint16_t limit; int frames; struct Team *tm; int player, a1, a2; } sg;
@@ -115,7 +117,8 @@ static void anthem_pose(void)
     int16_t t = (int16_t)(g.Vcount - anth_t0);
     if (!anth_pose) {                                   /* (the face off set up has just placed them: remember the spots) */
         struct SortObj *pl = sortobj(0);
-        for (int i = 0; i < 12; i++, pl++) { spot[i].x = pl->Xpos; spot[i].y = pl->Ypos; }
+        for (int i = 0; i < 12; i++, pl++) { spot[i].x = pl->Xpos; spot[i].y = pl->Ypos; spot_face[i] = pl->facedir; }
+        face_set = 1;
         anth_pose = 1;
         if (getenv("HOLDLOG")) for (int i = 0; i < 12; i++) fprintf(stderr, "hold: anthem player %d pos %d asn %d facedir %d\n", i, sortobj(i)->position, sortobj(i)->asslist[sortobj(i)->assnum & 7], sortobj(i)->facedir);
     }
@@ -134,7 +137,7 @@ static void anthem_pose(void)
             x = lx + (spot[i].x - lx) * k / ANTH_SKATE;
             y = ly + (spot[i].y - ly) * k / ANTH_SKATE;
             if (k < ANTH_SKATE) pl->facedir = (int16_t)vtoa((int16_t)(spot[i].x - lx), (int16_t)(spot[i].y - ly));
-            else pl->facedir = (int16_t)vtoa((int16_t)((int16_t)g.puckx[0] - x), (int16_t)((int16_t)g.pucky - y));
+            else pl->facedir = spot_face[i];
         } else {
             pl->facedir = (int16_t)vtoa(0, 100);                /* (all face the viewer: facedir 4, as the PC's skaters) */
         }
@@ -159,6 +162,7 @@ static int sk_cap, sk_on, sk_dur;
 static uint16_t sk_t0;
 static struct { int16_t x, y; } sk_from[12], sk_to[12], sk_via[12];
 static int8_t sk_pnum[12];
+static int16_t sk_face[12];                              /* the way each skater faces at his spot, as the game's own set up has it */
 static int16_t sk_puckx, sk_pucky;                       /* where the puck lay when the whistle blew: the referee picks it up there */
 #define SK_PICKUP 96                                    /* (of 256 along the referee's way: he reaches the puck, then carries it to the dot) */
 static uint8_t sk_gate[12];                             /* 1: this place has a new player: the old one leaves by the gate to the bench, the new one comes in by it */
@@ -185,7 +189,7 @@ void hold_skate_arm(void)
     int far = 0;
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) {
-        sk_to[i].x = pl->Xpos; sk_to[i].y = pl->Ypos;
+        sk_to[i].x = pl->Xpos; sk_to[i].y = pl->Ypos; sk_face[i] = pl->facedir; spot_face[i] = pl->facedir; face_set = 1;
         int fx = sk_from[i].x, fy = sk_from[i].y;
         sk_gate[i] = 0;
         if (pl->position <= 0 || fx < -300 || fx > 300 || fy < -300 || fy > 300) { sk_from[i] = sk_to[i]; continue; }
@@ -226,7 +230,7 @@ static void skate_pose(void)
         if (run >= d || t >= sk_dur) {                  /* (there: face the puck, glide) */
             if (pl->Xpos != sk_to[i].x || pl->Ypos != sk_to[i].y) {
                 pl->Xpos = sk_to[i].x; pl->Ypos = sk_to[i].y;
-                pl->facedir = (int16_t)vtoa((int16_t)((int16_t)g.puckx[0] - pl->Xpos), (int16_t)((int16_t)g.pucky - pl->Ypos));
+                pl->facedir = sk_face[i];
                 SetSPA(pl, SPAglide);
             }
         } else {
@@ -279,6 +283,15 @@ void hold_tick(void)
     }
     if (sk_on) skate_pose();
     if (anth && pending) anthem_pose();
+    if (face_set && !sk_on && !(anth && pending)) {      /* (the wings wait for the draw facing the way the game set them; the face off's own code turns them away) */
+        const struct SortObj *pk = sortobj(puckscnum);
+        int asn = pk->asslist[pk->assnum & 7];
+        if (asn == pfaceoff || asn == pfaceoff2) {
+            struct SortObj *q = sortobj(0);
+            for (int i = 0; i < 12; i++, q++)
+                if (q->position > 0 && q->position != 4 && q->asslist[q->assnum & 7] == afaceoff) q->facedir = spot_face[i];
+        } else face_set = 0;
+    }
     if (!sg.on) return;
     int playing = goal_sound_busy();
     if (playing) sg.started = 1;
