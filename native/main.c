@@ -797,8 +797,11 @@ static void wav_header(uint32_t rate)
 static void make_parent(const char *path)
 {
     char d[1024];
-    snprintf(d, sizeof d, "%s", path);
-    char *slash = strrchr(d, '/');
+    size_t n = strlen(path);
+    if (n >= sizeof d) return;                            /* (too long to hold: leave it to the open to fail) */
+    memcpy(d, path, n + 1);
+    char *slash = strrchr(d, '/'), *bs = strrchr(d, '\\');
+    if (bs > slash) slash = bs;                           /* (a Windows path from the exe's folder) */
     if (!slash || slash == d) return;
     *slash = 0;
     make_dir(d);                                          /* (fails harmlessly when it exists) */
