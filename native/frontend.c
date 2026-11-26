@@ -591,7 +591,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_CROWD_CDVOL (CD_ROWS + 27)
 #define CD_CROWD_PC (CD_ROWS + 28)
 #define CD_CROWD_PCVOL (CD_ROWS + 29)
-#define CD_OPTS (CD_ROWS + 30)
+#define CD_SPLIT (CD_ROWS + 30)                          /* (the movie's 50/50 demo: the disc's own left, the enhanced right) */
+#define CD_OPTS (CD_ROWS + 31)
 #define CROWD_VOLS 40                                     /* (the crowd volumes: 5% to 200% in steps of 5%) */
 #define CROWD_VOL_100 19                                  /* (the choice for 100%) */
 static int crowd_vol_of(int idx) { int v = ob_game_get(&host, idx); return 5 * ((v < 0 ? 0 : v >= CROWD_VOLS ? CROWD_VOLS - 1 : v) + 1); }
@@ -617,7 +618,7 @@ static void wide_rows_sync(void)
     movie_seen = host.movie_own;
 }
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
-static SDL_atomic_t cd_smooth, cd_colour;
+static SDL_atomic_t cd_smooth, cd_colour, cd_split;
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
 /* the option of the rules page with this key, or -1 */
@@ -640,6 +641,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_DEDITHER) { SDL_AtomicSet(&cd_dedither, value); return; }
     if (index == CD_SMOOTH) { SDL_AtomicSet(&cd_smooth, value); return; }
     if (index == CD_COLOUR) { SDL_AtomicSet(&cd_colour, value); return; }
+    if (index == CD_SPLIT) { SDL_AtomicSet(&cd_split, value); return; }
     if (index == CD_MOVIELOOK) { host.movie_own = value != 0; return; }   /* (hook_frame keeps the two rows alike) */
     if (index == CD_PHOTOS) { segacd_set_photos(value); return; }
     if (index == CD_CAREER) { segacd_set_career(value, ending); return; }
@@ -700,7 +702,7 @@ static void intro_tick(void)
     char intro_base[1100];                               /* (the made files: segacd-intro.dedither, .smooth, .colour) */
     snprintf(intro_base, sizeof intro_base, "%s", beside("segacd-intro"));
     if (st == 1) SDL_AtomicSet(&intro_state, segacd_movie_start(segacd_disc(), "HOCKEY.SEG", F.dev, F.rate, SDL_AtomicGet(&cd_dedither),
-                                                                        SDL_AtomicGet(&cd_smooth), SDL_AtomicGet(&cd_colour), intro_base,
+                                                                        SDL_AtomicGet(&cd_smooth), SDL_AtomicGet(&cd_colour), SDL_AtomicGet(&cd_split), intro_base,
                                                                         beside("rife-v4.6")) ? 2 : 0);
     else if (st == 2 && !segacd_movie_tick()) SDL_AtomicSet(&intro_state, 0);
     if (st && !SDL_AtomicGet(&intro_state)) {           /* (over or skipped: black until the game's next frame, not the screen before the movie) */
@@ -830,6 +832,8 @@ static void game_page_init(void)
     static const char *const smooth[2] = { "original", "30 fps" }, *const colour[2] = { "original", "enhanced" };
     cd_opts[CD_SMOOTH] = (ob_game_opt){ "cd_smooth", "Movie frame rate", smooth, 2, 0, 0, 3 };
     cd_opts[CD_COLOUR] = (ob_game_opt){ "cd_colour", "Movie colour", colour, 2, 0, 0, 3 };
+    static const char *const split[2] = { "off", "50/50 split" };
+    cd_opts[CD_SPLIT] = (ob_game_opt){ "cd_movie_split", "Movie 50/50 demo", split, 2, 0, 0, 3 };   /* (left the disc's own, right de-dithered, coloured, 30 fps) */
     static const char *const movie_scaling[2] = { "same as the game", "its own" };
     host.has_movie = 1;                                   /* (the overlay lists Scaling (Movie): the intro movie's own look) */
     cd_opts[CD_MOVIELOOK] = (ob_game_opt){ "movie_scaling", "Movie scaling", movie_scaling, 2, host.movie_own ? 1 : 0, 0, 3 };   /* (its own: the overlay's Scaling (Movie) page) */
@@ -860,6 +864,7 @@ static void game_page_init(void)
         game_help[CD_SCREENS] = "The opening screens: the cartridge's or the disc's.";
         game_help[CD_TITLE] = "The title page: the cartridge's or the disc's.";
         game_help[CD_INTRO] = "The disc's opening movie before the title.";
+        game_help[CD_SPLIT] = "A side by side demo of the intro movie: the left half as the disc plays it, the right half de-dithered, colour enhanced and at 30 fps.";
         game_help[CD_SFX] = "Sound effects: the cartridge's or the disc's.";
     }
     ob_game_set_help(game_help);
@@ -898,6 +903,7 @@ static void game_page_init(void)
     static signed char pv[3][CD_OPTS];
     for (int p = 0; p < 3; p++) for (int k = 0; k < CD_OPTS; k++) pv[p][k] = p == 1 ? 1 : 0;   /* Cartridge 0, Sega CD 1 */
     pv[1][CD_DEDITHER] = pv[1][CD_SMOOTH] = pv[1][CD_COLOUR] = pv[1][CD_MOVIELOOK] = 0;            /* (the movie as the disc has it) */
+    pv[1][CD_SPLIT] = 0;                                                       /* (the 50/50 demo: off in every preset) */
     pv[1][CD_VOICE] = 1;
     pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
     pv[1][CD_ANNOUNCER] = 0;                                                  /* (95 PC's voice: not the Sega CD's) */
