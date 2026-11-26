@@ -115,7 +115,7 @@ static int team_picture(int k, picture *p)
     const uint8_t *r = segacd_graph2_record(C.cd, 68 + C.team, &len);
     if (!r || len < 12) return 0;
     long off = (long)be32(r + 4 * k);
-    return off < len && picture_at(r + off, len - off, p);
+    return off >= 0 && off < len && picture_at(r + off, len - off, p);   /* (off >= 0: Windows' long is 32 bits) */
 }
 
 /* (PrintTextLine) a string at a cell in the disc's font, white (palette 2's colour 1) */

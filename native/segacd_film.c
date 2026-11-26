@@ -18,28 +18,31 @@ int segacd_sm_decode(const uint8_t *c, long n, uint8_t *tiles, int *w, int *h, u
     if (n < 12 || c[0] != 'S' || c[1] != 'M') return 0;
     unsigned lines = (be16(c + 2) & 3) + 1, tw = be16(c + 8), th = be16(c + 10), nt = tw * th;
     if (!tw || !th || (int)nt > max_tiles) return 0;
-    long d6 = (long)((((2 * nt + 0x1F) & 0xFFFF) >> 5) * 4), pos = 12;
-    if (pos + 32 * (long)lines > n) return 0;
+    /* (offsets in 64 bits: Windows' long is 32, and a length read from the file near 2^31 wrapped them below the buffer) */
+    int64_t d6 = (int64_t)(((2 * nt + 0x1F) >> 5) * 4), pos = 12, N = n;
+    if (pos + 32 * (int64_t)lines > N) return 0;
     for (unsigned i = 0; i < 64; i++) cram[i] = i < lines * 16 ? (uint16_t)be16(c + pos + 2 * i) : 0;
     pos += 32 * lines;
     const uint8_t *map = NULL;
-    if (lines > 1) { if (pos + d6 > n) return 0; map = c + pos; pos += d6; }
+    if (lines > 1) { if (pos + d6 > N) return 0; map = c + pos; pos += d6; }
     for (unsigned t = 0; t < nt; t++)
         line[t] = map ? (uint8_t)((be32(map + (t >> 4) * 4) >> (30 - 2 * (t & 15))) & 3) : 0;
-    if (pos + 4 > n) return 0;
-    long l1 = (long)be32(c + pos); pos += 4;
-    long a2 = pos; pos += l1;
-    if (pos + 4 > n) return 0;
-    long l2 = (long)be32(c + pos); pos += 4;
-    long a3 = pos; pos += l2;
-    long a4 = pos; pos += d6;
-    long a1 = pos;
-    if (a2 + 1024 > n || a3 + 512 > n || a4 + d6 > n) return 0;
+    if (pos + 4 > N) return 0;
+    int64_t l1 = be32(c + pos); pos += 4;
+    if (l1 > N - pos) return 0;
+    int64_t a2 = pos; pos += l1;
+    if (pos + 4 > N) return 0;
+    int64_t l2 = be32(c + pos); pos += 4;
+    if (l2 > N - pos) return 0;
+    int64_t a3 = pos; pos += l2;
+    int64_t a4 = pos; pos += d6;
+    int64_t a1 = pos;
+    if (a2 + 1024 > N || a3 + 512 > N || a4 + d6 > N) return 0;
     uint32_t d1 = 0, d2 = 0, d5 = 0;
     int d3 = 1;
     uint8_t *o = tiles;
 #define BIT() (d5 & 0x80000000u ? (d5 <<= 1, 1) : (d5 <<= 1, 0))
-#define NEED(k) do { if (a1 + (k) > n) return 0; } while (0)
+#define NEED(k) do { if (a1 + (k) > N) return 0; } while (0)
     for (unsigned t = 0; t < nt; t++, o += 32) {
         if (--d3 == 0) { d5 = be32(c + a4); a4 += 4; d3 = 16; }
         if (!BIT()) {
@@ -124,6 +127,7 @@ segacd_film *segacd_film_open(ob_cd *cd, const char *name)
     if (!f) goto bad;
     f->file = b;
     f->size = size;
+    if (be32(b + 4) > (uint32_t)size || be32(b + 48) > (uint32_t)(size - 0x34) / 16) goto bad;
     f->data = (long)be32(b + 4);
     f->h = (int)be32(b + 28) / 8;
     f->w = (int)be32(b + 32) / 8;
@@ -138,15 +142,15 @@ segacd_film *segacd_film_open(ob_cd *cd, const char *name)
     if (!f->tiles || !f->line || !f->idx) goto bad;
     for (unsigned i = 0; i < f->count; i++) {
         const uint8_t *r = film_rec(f, i);
-        if (be32(r + 8) == 0xFFFFFFFFu) samples += (long)be32(r + 4);
+        if (be32(r + 8) == 0xFFFFFFFFu && be32(r + 4) <= (uint32_t)size) samples += (long)be32(r + 4);   /* (no record is longer than the file) */
     }
     f->pcm = malloc((size_t)(samples ? samples : 1) * sizeof *f->pcm);
     if (!f->pcm) goto bad;
     for (unsigned i = 0; i < f->count; i++) {
         const uint8_t *r = film_rec(f, i);
-        long at = f->data + (long)be32(r), len = (long)be32(r + 4);
-        if (be32(r + 8) != 0xFFFFFFFFu || at < 0 || len < 0 || at + len > size) continue;
-        for (long k = 0; k < len; k++) {
+        int64_t at = (int64_t)f->data + be32(r), len = be32(r + 4);   /* (64 bits: Windows' long is 32) */
+        if (be32(r + 8) != 0xFFFFFFFFu || at < 0 || len < 0 || at + len > size || f->pcm_len + len > samples) continue;
+        for (int64_t k = 0; k < len; k++) {
             uint8_t s = b[at + k];
             int v = (s & 0x7F) << 8;
             f->pcm[f->pcm_len++] = (int16_t)(s & 0x80 ? v : -v);
@@ -175,7 +179,7 @@ double segacd_film_next(segacd_film *f, const uint8_t **idx, const uint32_t **ar
     while (f->next < f->count) {
         const uint8_t *r = film_rec(f, f->next++);
         uint32_t t = be32(r + 8);
-        long at = f->data + (long)be32(r), len = (long)be32(r + 4);
+        int64_t at = (int64_t)f->data + be32(r), len = be32(r + 4);   /* (64 bits: Windows' long is 32) */
         if (t == 0xFFFFFFFFu || at < 0 || len < 12 || at + len > f->size) continue;
         int w, h;
         if (!segacd_sm_decode(f->file + at, len, f->tiles, &w, &h, f->cram, f->line, f->w * f->h) || w != f->w || h != f->h) continue;
