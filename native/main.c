@@ -90,6 +90,7 @@
 #include "whiteice.h"
 #include "hats.h"
 #include "pcspr.h"
+#include "fight93.h"
 #include "pcsong.h"
 #include "cardcolor.h"
 #include "wide.h"
@@ -231,6 +232,7 @@ static uint8_t read68k(void *user, uint32_t addr)
             }
         }
     }
+    { uint8_t v; if (fight93_bus(addr, &v)) return v; }   /* (NHL 93's fight frames' tiles: fight93.c) */
     return m8(addr);
 }
 
@@ -973,6 +975,7 @@ int main(int argc, char **argv)
     c.fm_model = fm_model;
     c.audio_rate = 48000;
     c.sram_size = 0x2000;
+    fight93_start();                                      /* (NHL 93's fight frames, when its cartridge is beside the program) */
     c.read68k = read68k;
     if (!headless) {
         mdrt_sdl_options o = { .title = "NHL '94", .scale = scale, .aspect = aspect, .sram_path = sram, .app = "ninety-four",

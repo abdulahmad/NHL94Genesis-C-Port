@@ -193,7 +193,10 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   players' aggression plus how hard the hit was, so any hard hit between aggressive players can start one. *Hybrid*: 92's aggression roll, but only
   between players whose fighting rating is at least 2. When a fight starts both drop their gloves, throw high and low punches or grab (human
   players punch with the buttons, on any of the four pads), one goes down, maybe injured, and play restarts at a face off. A game rule (the host's
-  choice holds for everyone online), off in every preset. Headless: `--rule fighting=off|"NHL 93"|"NHL 92"|hybrid`.
+  choice holds for everyone online), off in every preset. Headless: `--rule fighting=off|"NHL 93"|"NHL 92"|hybrid`. The 94 cartridge has no
+  fight art (its fight frames are blank): put your own NHLPA Hockey 93 cartridge (512 KB, a name with "93" in it, .bin/.md/.gen) beside the
+  program, or name it with `NHL93_ROM`, and the fighters are drawn with 93's own fight frames (also with PC sprites on: NHL 95 PC has no
+  fights). Without it they are drawn with the 94 cartridge's holding, hooking and falling frames. `HOLDTEST=fight:FRAME` forces a fight.
 - Headless test: `HOLDTEST=goal:FRAME,pen:FRAME` (with `--announcer FILE`, optional `HOLDPEN=30` for hooking) forces a goal or a penalty at that vblank and logs each change of the stoppage wait (`ANNOUNCER_LOG=1` the clips); the frames are the game's own vblanks, a 30 second period lasts about 1000.
 - Headless: `--announcer FILE` plays the announcer from that `XBRUCE2.VIV` into `--wav`; `ANNOUNCER_LOG=1` prints each clip said.
 
