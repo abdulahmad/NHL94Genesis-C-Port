@@ -459,7 +459,7 @@ void setplayercolors(void)
         uint16_t c[16];
         uint16_t team = team_struct(away)->tmteam;
         memcpy(c, rosters_team(team)->colours[away], sizeof c);
-        if (rules[RULE_CD_COLOURS]) cd_colours(rosters_art(team), away, c);   /* (rules: the Sega CD's HFD and OTW) */
+        if (RULE(RULE_CD_COLOURS)) cd_colours(rosters_art(team), away, c);   /* (rules: the Sega CD's HFD and OTW) */
         pal_load_w(0x20 + 0x10 * away, c, 0x10);
     }
 }
@@ -488,7 +488,7 @@ void PeriodOver(void)
 void PeriodOver_sp(void)
 {
     ResetClock();
-    if (!rules[RULE_CD_PERIOD_END]) {                    /* (rules: the Sega CD goes straight to the song) */
+    if (!RULE(RULE_CD_PERIOD_END)) {                    /* (rules: the Sega CD goes straight to the song) */
         uint16_t v = g.Vcount;
         while (g.Vcount == v) hal_wait_vblank();
         p_turnoff();
@@ -1013,7 +1013,7 @@ void ContinuePlayoffs(void)
     MakeTree();
     uint16_t d0 = g.FourWayPlay ? 0xB : 7;
     if (!g.FourWayPlay) {
-        if ((int16_t)g.pojoy >= (rules[RULE_CD_PASSWORD] ? 3 : 2)) g.pojoy -= 2;   /* (rules: the Sega CD's ble, above 2) */
+        if ((int16_t)g.pojoy >= (RULE(RULE_CD_PASSWORD) ? 3 : 2)) g.pojoy -= 2;   /* (rules: the Sega CD's ble, above 2) */
     } else if (g.pojoy == 1) {
         g.pojoy = 3;
     } else if (g.pojoy == 2) {
@@ -1191,7 +1191,7 @@ void ReadPassBits(uint8_t *bits)
     }
     g.WinBits = SuperDiv(bits, 0x4000);
     g.pojoy = SuperDiv(bits, 8);
-    if (rules[RULE_CD_PASSWORD]) {                        /* (rules: the Sega CD's, only with the adaptor: 1 becomes 3, 2 becomes 4) */
+    if (RULE(RULE_CD_PASSWORD)) {                        /* (rules: the Sega CD's, only with the adaptor: 1 becomes 3, 2 becomes 4) */
         if (g.FourWayPlay && g.pojoy == 1) g.pojoy = 3;
         else if (g.FourWayPlay && g.pojoy == 2) g.pojoy = 4;
     } else if (!g.FourWayPlay && (g.pojoy == 1 || g.pojoy == 2)) g.pojoy = 4;
@@ -1573,7 +1573,7 @@ void ShowGoalBox(void)
             if (!(e[5] & 0x80)) { a2 = e[5]; assists = 2; }
         }
         int frames = 222 + (assists ? 156 : 0) + (assists > 1 ? 120 : 0);
-        if (rules[RULE_ANNOUNCE] == 2) hold_goal_after_song(frames, tm, scorer, a1, a2);   /* (the siren and the song first, home goal or away) */
+        if (RULE(RULE_ANNOUNCE) == 2) hold_goal_after_song(frames, tm, scorer, a1, a2);   /* (the siren and the song first, home goal or away) */
         else {
             if (pa_hook) pa_hook(PA_GOAL, tm, scorer, a1, a2);           /* (the rink announcer) */
             hold_for(frames);

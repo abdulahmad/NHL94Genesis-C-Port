@@ -48,6 +48,13 @@ enum {
 #define RULES_CLASSIC { 0 }
 extern const uint8_t rule_classic[RULE_COUNT];
 extern uint8_t rules[RULE_COUNT];   /* each rule's value now (Classic until the platform sets them) */
+/* src/ reads a rule only as RULE(r). The vanilla build (make VANILLA=1, -DNHL94_VANILLA on src/) makes every one the
+ * cartridge's 0, so each customized branch in the game's code is compiled out and src/ is the cartridge's path alone. */
+#ifdef NHL94_VANILLA
+#define RULE(r) ((void)(r), 0)
+#else
+#define RULE(r) (rules[r])
+#endif
 
 /* RULE_HOLD (src/hold.c): the stoppage's pause (NHL 95 PC's between-play time; RULE_ANNOUNCE also uses it, for the speech). hold_for makes the next face off wait
  * until frames vblanks have passed since now (a later call adds to what is left); hold_wait is 1 while it

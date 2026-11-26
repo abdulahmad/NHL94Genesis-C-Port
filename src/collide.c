@@ -89,7 +89,7 @@ void checkplcoll(int16_t x, int16_t y, struct SortObj *o)
         checkcx(nxt, x, dy, o);
         pos--;
     }
-    if (rules[RULE_REFEREE]) referee_cx(x, y, o);           /* (native: NHL 95 PC's referee, mods/referee.c) */
+    if (RULE(RULE_REFEREE)) referee_cx(x, y, o);           /* (native: NHL 95 PC's referee, mods/referee.c) */
 }
 
 /* collide94.asm:checkcx. d4 = other object number * 2, d2 = x, d5 = delta y, a3 = moving object.
@@ -219,7 +219,7 @@ void checkcheck(struct SortObj *a2, struct SortObj *a3, int16_t impact)
  * light pad player wraps round to a small number, and falls easily), or in full by the rules */
 uint16_t CheckWeightOdds(uint16_t d0, const struct SortObj *a2, const struct SortObj *a3)
 {
-    if (rules[RULE_WEIGHT_FIX]) return (uint16_t)(d0 - a3->weight + a2->weight);
+    if (RULE(RULE_WEIGHT_FIX)) return (uint16_t)(d0 - a3->weight + a2->weight);
     return (uint16_t)((d0 & 0xFF00) | (uint8_t)((uint8_t)d0 - a3->weight + a2->weight));
 }
 
@@ -726,7 +726,7 @@ goal:
         g.HmTeam = g.HomeTeam;
         g.SongIndex = 3;
         ChooseSong();
-        if (rules[RULE_CD_SONGS]) song((int16_t)g.SongNum);   /* (rules: the Sega CD plays it now) */
+        if (RULE(RULE_CD_SONGS)) song((int16_t)g.SongNum);   /* (rules: the Sega CD plays it now) */
         else {
             g.songdelay = 0x78;
             g.delayedsong = g.SongNum;
@@ -1043,7 +1043,7 @@ void checkpuckcoll(struct SortObj *puck)
         ccx(nxt, puck);
         pos--;
     }
-    if (rules[RULE_REFEREE]) referee_puck(puck);            /* (native: NHL 95 PC's referee, mods/referee.c) */
+    if (RULE(RULE_REFEREE)) referee_puck(puck);            /* (native: NHL 95 PC's referee, mods/referee.c) */
 }
 
 /* collide94.asm:puckstick. a2 = player, a3 = puck, d0 = distance squared. A stick on the puck

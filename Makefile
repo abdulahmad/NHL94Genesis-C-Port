@@ -82,6 +82,7 @@ NATIVE := $(wildcard native/*.c)
 ifeq ($(VANILLA),1)
 NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c romsrc.c art.c banner.c ratings.c state.c net.c),$(NATIVE)) native/vanilla/stubs.c native/vanilla/mods.c
 SRC    := $(wildcard src/*.c)
+VFLAGS := -DNHL94_VANILLA                                # (src/rules.h: every RULE() the cartridge's 0)
 BIN    ?= build/nhl94-vanilla$(EXE)
 OBJ    ?= build/obj-vanilla
 endif
@@ -120,7 +121,7 @@ MDRTHDR := $(wildcard $(MDRT)/include/mdrt/*.h)
 nhl94: $(BIN)
 $(OBJ)/src/%.o: src/%.c $(HDR) $(MDRTHDR)
 	@mkdir -p $(dir $@)
-	$(CC) $(NFLAGS) -finstrument-functions -c $< -o $@
+	$(CC) $(NFLAGS) $(VFLAGS) -finstrument-functions -c $< -o $@
 $(OBJ)/mods/%.o: mods/%.c $(HDR) $(MDRTHDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -finstrument-functions -c $< -o $@

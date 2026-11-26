@@ -13,7 +13,7 @@
 #define VIEW_SHIFT 32
 #define VIEW_HPOS 0x20
 
-static inline int view_wide(void) { return rules[RULE_VIEW] != 0; }
+static inline int view_wide(void) { return RULE(RULE_VIEW) != 0; }
 /* the extra room each side, for what counts as on screen */
 static inline int16_t view_more(void) { return view_wide() ? VIEW_SHIFT : 0; }
 /* the camera's reach either way (Hpos) */

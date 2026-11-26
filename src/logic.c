@@ -389,7 +389,7 @@ void updateplayers(void)
         }
         o->limpact = o->impact;
     }
-    if (rules[RULE_REFEREE]) referee_update();              /* (native: NHL 95 PC's referee, mods/referee.c) */
+    if (RULE(RULE_REFEREE)) referee_update();              /* (native: NHL 95 PC's referee, mods/referee.c) */
 }
 
 /* logic94.asm:updateanim. Frame switch control on object a3: step SPAcnt by the elapsed frames,
@@ -536,7 +536,7 @@ void doinput(uint16_t d0, uint16_t d1, uint16_t d2, uint16_t d3, int16_t d4, str
             }
         }
     }
-    if ((g.gmode2 & HI(7)) && rules[RULE_CD_PSBOX]) {     /* (rules: the Sega CD's penalty-shot box takes the pad) */
+    if ((g.gmode2 & HI(7)) && RULE(RULE_CD_PSBOX)) {     /* (rules: the Sega CD's penalty-shot box takes the pad) */
         d0 &= (uint16_t)~0x40;                            /* (bclr #6 on d0-d3: the A button) */
         d1 &= (uint16_t)~BUT_A;
         d2 &= (uint16_t)~BUT_A;
@@ -1045,7 +1045,7 @@ void dopass(struct SortObj *o)
     o->pflags |= 1 << pfalock;
     uint16_t snd = (uint16_t)(uint8_t)(0xC - (uint8_t)(g.puckvz[0] >> 8));
     snd = (uint16_t)(((snd >> 2) & 3) + 0x10);            /* SFXpass, by the puck's hop */
-    if (rules[RULE_CD_SOUNDS]) snd = 0x10;                /* (rules: the Sega CD's move.w #$10 for addi.w #$10) */
+    if (RULE(RULE_CD_SOUNDS)) snd = 0x10;                /* (rules: the Sega CD's move.w #$10 for addi.w #$10) */
     sfx((int16_t)snd);
 }
 
@@ -2281,7 +2281,7 @@ int breakaway(struct SortObj *o)
     g.sflags5 |= 4;
     if (PFLAG(o, pfna)) {
         o->pflags &= (uint8_t)~(1 << pfna);
-        sfx(rules[RULE_CD_SOUNDS] ? 2 : SYM_SFXbeep1);   /* (rules: the Sega CD's "ding", SFXbeep2) */
+        sfx(RULE(RULE_CD_SOUNDS) ? 2 : SYM_SFXbeep1);   /* (rules: the Sega CD's "ding", SFXbeep2) */
         breakaway_crowd(o);
     }
     if (o->Yvel == 0) return 1;
@@ -2348,7 +2348,7 @@ void asspuckc(struct Team *tm, struct SortObj *o)
     if (PFLAG(o, pfjoycon)) { assexit(o); return; }
     if (PFLAG(o, pfna)) {
         o->pflags &= (uint8_t)~(1 << pfna);
-        if (o->pflags3 & (1 << pf3break)) sfx(rules[RULE_CD_SOUNDS] ? 2 : SYM_SFXbeep1);   /* (rules: the Sega CD's SFXbeep2) */
+        if (o->pflags3 & (1 << pf3break)) sfx(RULE(RULE_CD_SOUNDS) ? 2 : SYM_SFXbeep1);   /* (rules: the Sega CD's SFXbeep2) */
         if (o->pflags3 & (1 << pf3break)) breakaway_crowd(o);
         o->temp1 = 0;
         o->temp2 = 8;
@@ -2619,7 +2619,7 @@ void assnearest(struct Team *tm, struct SortObj *o)
         assreplace(abreakaway, o);
     if (PFLAG(o, pfna)) {
         o->pflags &= (uint8_t)~(1 << pfna);
-        if (o->pflags3 & (1 << pf3break)) sfx(rules[RULE_CD_SOUNDS] ? 2 : SYM_SFXbeep1);   /* (rules: the Sega CD's SFXbeep2) */
+        if (o->pflags3 & (1 << pf3break)) sfx(RULE(RULE_CD_SOUNDS) ? 2 : SYM_SFXbeep1);   /* (rules: the Sega CD's SFXbeep2) */
         if (o->pflags3 & (1 << pf3break)) breakaway_crowd(o);
         o->temp3 = 0;
         o->temp2 = 8;
@@ -3118,12 +3118,12 @@ void puckfaceoff(struct Team *tm, struct SortObj *o)
     {
         uint16_t half = (uint16_t)((int16_t)g.PerTimeTotal >> 1);
         if (!(half <= g.gameclock) && !((int16_t)g.gameclock < 0x3C) && (g.sflags3 & 0x80)) {
-            if (!rules[RULE_CD_SONGS]) g.sflags3 &= (uint8_t)~0x80;   /* once in the second half of a period */
+            if (!RULE(RULE_CD_SONGS)) g.sflags3 &= (uint8_t)~0x80;   /* once in the second half of a period */
             if ((g.gmode & (1 << gmclock)) && !(g.sflags8 & 0x40)) {
                 g.HmTeam = g.HomeTeam;
                 g.SongIndex = 2;
                 ChooseSong();
-                if (rules[RULE_CD_SONGS]) {              /* (rules: the Sega CD clears the flag only here and plays the song now) */
+                if (RULE(RULE_CD_SONGS)) {              /* (rules: the Sega CD clears the flag only here and plays the song now) */
                     g.sflags3 &= (uint8_t)~0x80;
                     song((int16_t)g.SongNum);
                 } else
@@ -3394,10 +3394,10 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
         return;
     }
     o->pflags &= (uint8_t)~(1 << pfna);
-    if (rules[RULE_ANTHEM] && g.demoflag && g.gsp == 0 && g.gameclock == g.PerTimeTotal && !(g.gmode2 & 1)) {   /* (the first face off of the game: the anthem) */
+    if (RULE(RULE_ANTHEM) && g.demoflag && g.gsp == 0 && g.gameclock == g.PerTimeTotal && !(g.gmode2 & 1)) {   /* (the first face off of the game: the anthem) */
         int home = rosters_art(team_struct(0)->tmteam);
         if (anthem_hook_fn) anthem_hook_fn(home, rosters_art(team_struct(1)->tmteam));   /* (the host plays it, when it has the PC game's files) */
-        hold_anthem(hold_anthem_frames(rules[RULE_ANTHEM], home));   /* (the wait is the rule's: the same on every machine) */
+        hold_anthem(hold_anthem_frames(RULE(RULE_ANTHEM), home));   /* (the wait is the rule's: the same on every machine) */
     }
     hold_skate_begin();                                      /* (RULE_HOLD: where the skaters were) */
     int nofade = hold_nofade();
@@ -4209,7 +4209,7 @@ void playeracc(int16_t dir, struct SortObj *o)
     d2 = (int16_t)((d2 & 0xFF00) | ((d2 + o->legstr) & 0xFF));
     if ((g.sflags8 & 2) || (g.sflags7 & 0x40)) {
         d2 = (int16_t)((d2 & 0xFF00) | ((d2 + 2) & 0xFF));   /* crowd meter boost */
-        if (rules[RULE_CD_SKATING]) d2 = (int16_t)((d2 & 0xFF00) | ((d2 + 2) & 0xFF));   /* (rules: the Sega CD adds it twice) */
+        if (RULE(RULE_CD_SKATING)) d2 = (int16_t)((d2 & 0xFF00) | ((d2 + 2) & 0xFF));   /* (rules: the Sega CD adds it twice) */
     }
     if (o->position == 0) {
         d2 = (int16_t)((d2 & 0xFF00) | ((d2 + o->legstr) & 0xFF));   /* goalie gets double agility */
