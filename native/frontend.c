@@ -450,11 +450,13 @@ static int start_game(void)
 static void wide_rows_sync(void);
 static void ref_row_sync(void);
 static void anthem_rule_sync(int row_changed);
+static void siren_rule_sync(int row_changed);
 static const uint32_t *hook_frame(int *w, int *h)
 {
     wide_rows_sync();
     ref_row_sync();
     anthem_rule_sync(0);
+    siren_rule_sync(0);
     SDL_LockMutex(F.lock);
     memcpy(F.shown, F.picture, sizeof F.shown);
     *w = F.width > 0 ? F.width : 320;
@@ -690,7 +692,7 @@ static void cd_changed(void *ctx, int index, int value)
         if (value && ob_game_get(&host, CD_ANNOUNCE) == 0) ob_game_set(&host, CD_ANNOUNCE, 1);
         return;
     }
-    if (index == CD_PCSIREN) { pcsfx_set_goal(value); return; }
+    if (index == CD_PCSIREN) { pcsfx_set_goal(value); siren_rule_sync(1); return; }
     if (index == CD_PCHORN) { pcsfx_set_horn(value); return; }
     if (index == CD_WHITEICE) { whiteice_set(value); return; }
     if (index == CD_HATS) { hats_set(value); return; }
@@ -775,6 +777,28 @@ static void anthem_rule_sync(int row_changed)
     if (!pcsong_searched()) return;                       /* (the files are still being looked for: the rule as it is) */
     int want = anthem_rule_of(row);
     if (want != rule) rule_from_row("anthems", RULE_ANTHEM, want);
+    last = F.opt_values[i];
+}
+
+/* the PC goal siren's row and RULE_SIREN (the announcer's wait for the siren, RULE_ANNOUNCE 2, so every machine of a session
+ * waits the same): the rule is on while the row is and this machine has the PC's file; a change on the Game rules page shows on
+ * the row */
+static void siren_rule_sync(int row_changed)
+{
+    static int last = -1;
+    if (!host.game_ready || !F.opt_values) return;
+    int i = option_index("rules.goal_siren");
+    if (i < 0) return;
+    int rule = F.opt_values[i], row = ob_game_get(&host, CD_PCSIREN);
+    if (!row_changed && last >= 0 && rule != last) {       /* (the Game rules page changed it) */
+        last = rule;
+        if (row != rule) ob_game_set(&host, CD_PCSIREN, rule);
+        pcsfx_set_goal(rule);
+        return;
+    }
+    if (!pcsfx_searched()) return;                        /* (the file is still being looked for: the rule as it is) */
+    int want = row && pcsfx_found();
+    if (want != rule) rule_from_row("goal_siren", RULE_SIREN, want);
     last = F.opt_values[i];
 }
 

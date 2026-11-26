@@ -25,6 +25,7 @@
 #include "rosters.h"
 #include "native.h"
 #include "segacd.h"
+#include "pcsfx.h"
 #include "cardcolor.h"
 #include "overbar/cdimage.h"
 
@@ -266,10 +267,18 @@ static const uint8_t *scout_text(int n)
 {
     return scout_load() && n >= 0 && n < ST.n ? ST.text + ST.at[n] : NULL;
 }
-/* (cd_scout_hook) the disc's scouting report: with Ron Barr's voice and the disc's text; not in a session (the machines keep step) */
+static int clip_name(int n, char *name, size_t size);
+/* (cd_scout_hook) the disc's scouting report: with Ron Barr's voice and the disc's text; not in a session (the machines keep step).
+ * CD_SCOUT_FRAMES + n: paragraph n's clip (as paragraph() plays it) in frames of the game: its RF5C164 bytes at VOICE_RATE */
 static int scout_hook(int what)
 {
-    if (what == CD_SCOUT_BUSY) return S.clip != NULL || S.nqueue > 0;
+    if (what >= CD_SCOUT_FRAMES) {
+        char name[24];
+        long size;
+        if (!SDL_AtomicGet(&S.voice) || !segacd_disc() || !clip_name(what - CD_SCOUT_FRAMES, name, sizeof name)) return 0;
+        size = ob_cd_file_size(S.cd, name);
+        return size > 0 ? (int)((size * 60 + VOICE_RATE - 1) / VOICE_RATE) : 0;
+    }
     return SDL_AtomicGet(&S.voice) && segacd_disc() && !SDL_AtomicGet(&S.session) && scout_load() && ST.n > 0xEA + 0x1B;
 }
 
@@ -418,7 +427,7 @@ static int song_track(void)
         if (first <= (int32_t)g.fm_slots[i].stream) return 7 - i;
     return -1;
 }
-/* output channel out (0-2, 4-6; 6 the PCM one too) is playing the disc's song's notes, or a disc effect's */
+/* output channel out (0-2, 4-6; 6 the PCM one too) is playing the disc's song's notes, a disc effect's, or a cartridge sound the PC's plays in place of */
 static int owned(int out, int pcm)
 {
     int t = song_track();
@@ -427,6 +436,7 @@ static int owned(int out, int pcm)
         if ((!pcm && ch->out != out) || ch->key == 0xFF) continue;
         int slot = ch->key & 7;
         if (slot == t ? S.song_on_cd : S.fx_slot[slot]) return 1;
+        if (pcsfx_mutes(g.fm_slots[7 - slot].stream)) return 1;   /* (the PC's siren or horn plays in its place: native/pcsfx.c) */
     }
     return 0;
 }

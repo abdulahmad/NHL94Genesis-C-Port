@@ -247,6 +247,40 @@ static void hold(void)
     classic_rules();
 }
 
+/* RULE_SIREN: the announcer's wait after the goal (RULE_ANNOUNCE 2) is the PC siren's fixed 420 frames from the siren, the game's
+ * alone (no host, no mixer); its start goes through the state's bytes, and bytes that are not a siren's are refused */
+static void siren(void)
+{
+    classic_rules();
+    hold_state_load(NULL);
+    for (int i = 0; i < 8; i++) g.fm_slots[i].stream = 0xFFFFFFFF;   /* (no song, no cartridge siren in a slot) */
+    g.songdelay = 0;
+    g.demoflag = 1;
+    rules[RULE_ANNOUNCE] = 2;
+    rules[RULE_SIREN] = 1;
+    g.Vcount = 2000;
+    hold_siren();
+    g.Vcount = 2100;
+    hold_goal_after_song(222, team_struct(0), 3, -1, -1);
+    uint8_t a[HOLD_SIREN_SIZE], b[HOLD_SIREN_SIZE];
+    CHECK(hold_siren_save(a) == HOLD_SIREN_SIZE && a[0] == 1);
+    int t = 2100;
+    for (; t < 3000 && hold_wait(); t++) { g.Vcount = (uint16_t)t; hold_tick(); if (t == 2300) { hold_siren_load(NULL); CHECK(hold_siren_load(a) == 0); } }
+    CHECK(t == 2000 + 420 + 222 + 1);                      /* (the speech from the siren's end, then its 222 frames) */
+    hold_siren_save(b);
+    CHECK(!memcmp(a, b, sizeof a));
+    memcpy(b, a, sizeof b); b[0] = 2; CHECK(hold_siren_load(b) < 0);
+    rules[RULE_SIREN] = 0;                                  /* (the cartridge's siren: none in a slot, so the speech at once) */
+    g.Vcount = 4000;
+    hold_siren();
+    hold_goal_after_song(222, team_struct(0), 3, -1, -1);
+    for (t = 4000; t < 5000 && hold_wait(); t++) { g.Vcount = (uint16_t)t; hold_tick(); }
+    CHECK(t == 4000 + 222 + 1);
+    hold_state_load(NULL);
+    hold_siren_load(NULL);
+    classic_rules();
+}
+
 int main(void)
 {
     const char *rom = getenv("NHL94_ROM");
@@ -258,6 +292,7 @@ int main(void)
     sega_cd();
     referee();
     hold();
+    siren();
     printf("rulestest: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

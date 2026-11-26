@@ -760,7 +760,7 @@ void UpdateScoutingDisplay(void)
         if (scout_disc) {                                 /* (scout94cd.asm: the next waits for his voice, the blank lines too) */
             static int waited;
             uint16_t nx = g.TestList[g.SelectedPlayerIdx / 2];
-            if (nx != 0x1D && cd_scout_hook(CD_SCOUT_BUSY) && ++waited < 60 * 30) return;
+            if (nx != 0x1D && (int16_t)(scout_voice_end - g.Vcount) > 0 && ++waited < 60 * 30) return;
             waited = 0;
         }
         g.DispAttribCtr = 0;
@@ -784,6 +784,13 @@ void UpdateScoutingDisplay(void)
         if (scout_disc && d0 == 0x21) scout_last = 1;
         ScrollDisplayUp();
         if (cd_event_hook) cd_event_hook(CD_EV_PARAGRAPH, (uint16_t)d0);
+        if (scout_disc) {                                 /* (his voice for it, after the one still going: the game's count of its length) */
+            int f = cd_scout_hook(CD_SCOUT_FRAMES + (uint16_t)d0);
+            if (f < 0) f = 0;
+            if (f > 60 * 30) f = 60 * 30;
+            if ((int16_t)(scout_voice_end - g.Vcount) < 0) scout_voice_end = g.Vcount;
+            scout_voice_end = (uint16_t)(scout_voice_end + f);
+        }
         if (scout_disc) d0 = 0;                           /* (the disc's paragraph: from its start) */
         else {
             const uint8_t *p = rom_ptr(a1);

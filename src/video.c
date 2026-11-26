@@ -154,7 +154,7 @@ void VBlank(void)
                     g.disflags |= HI(dfclock);
                     g.gameclock--;
                     if ((int16_t)g.gameclock <= 0x3D && (int16_t)g.gameclock >= 0x3C)
-                        { if (!(sfx_hook && sfx_hook(SFX_ONEMIN))) sfx(SYM_SFXbeep2); }   /* one minute left (the PC says it or sounds its horn: pcsfx.c) */
+                        { if (sfx_hook) sfx_hook(SFX_ONEMIN); sfx(SYM_SFXbeep2); }   /* one minute left (the host may say it or sound its horn in its place: pcsfx.c) */
                     if (g.gameclock == 0x3C && pa_hook) pa_hook(PA_ONEMIN, NULL, 0, 0, 0);
                 }
             }
