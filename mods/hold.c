@@ -25,6 +25,8 @@ static uint16_t anth_t0;
  * rink units a game frame at 60 a second: 16 x speed / 65536); its rink is 0.89 times the cartridge's along (264 against 298
  * to the end boards), so 1.5 to 2.3 of the cartridge's pixels, about its own top speed (velocity 8000: 17 x 8000 / 65536) */
 #define SKATE_SPEED 2
+static int ez_frames(const struct SortObj *pl, int ax, int ay, int bx, int by, int f);   /* (the PC's skate to a spot: below) */
+static int ez_pose(struct SortObj *pl, int ax, int ay, int bx, int by, int f, int r);
 static struct { int16_t x, y; } spot[12];
 static int16_t spot_face[12];
 static int face_set;                         /* the way each faced at his spot as the game set him up */
@@ -99,17 +101,18 @@ static void anth_line(int lx[12], int ly[12])
     }
 }
 
-/* the frames from the end of the song until all (the referee too) stand at their spots, each skating at SKATE_SPEED */
+/* the frames from the end of the song until all stand in place at their spots (the PC's skate there: ez_pose) and the referee
+ * (at SKATE_SPEED) at his */
 static int anth_skate(void)
 {
-    int lx[12], ly[12], far = anth_way(108, 0, (int16_t)g.fox > 0 ? (int16_t)g.fox + 15 : (int16_t)g.fox - 15, (int16_t)g.foy);
+    int lx[12], ly[12], far = anth_way(108, 0, (int16_t)g.fox > 0 ? (int16_t)g.fox + 15 : (int16_t)g.fox - 15, (int16_t)g.foy) / SKATE_SPEED;
     anth_line(lx, ly);
     for (int i = 0; i < 12; i++) {
         if (sortobj(i)->position <= 0) continue;
-        int d = anth_way(lx[i], ly[i], spot[i].x, spot[i].y);
+        int d = ez_frames(sortobj(i), lx[i], ly[i], spot[i].x, spot[i].y, spot_face[i]);
         if (d > far) far = d;
     }
-    return far / SKATE_SPEED + 2;
+    return far + 2;
 }
 
 /* the referee stands at the side while the song plays, then goes to the face off spot with the players */
@@ -203,19 +206,11 @@ static void anthem_pose(void)
         if (pl->position <= 0) continue;                /* (goalies stay in their nets) */
         int lx = lxs[i], ly = lys[i];
         int x = lx, y = ly;
-        if (skating) {
-            int dx = spot[i].x - lx, dy = spot[i].y - ly, d = anth_way(lx, ly, spot[i].x, spot[i].y);
-            int run = (t - anth_len) * SKATE_SPEED;
-            if (run < d) {                              /* (on his way, at the skate's pace) */
-                pl->Xpos = (int16_t)(lx + dx * run / d);
-                pl->Ypos = (int16_t)(ly + dy * run / d);
-                stride(pl, dx, dy, SKATE_SPEED);
-                continue;
-            }
+        if (skating) {                              /* (on his way as the PC's skate to a spot: speeding up, the scrape stop, turning; then in place) */
+            if (ez_pose(pl, lx, ly, spot[i].x, spot[i].y, spot_face[i], t - anth_len) || (pl->Xpos == spot[i].x && pl->Ypos == spot[i].y)) continue;
             x = spot[i].x;
             y = spot[i].y;
             pl->facedir = spot_face[i];
-            if (run - SKATE_SPEED < d) SetSPA(pl, SPAglide);   /* (there: he stops, the skating stride ended whatever its step; the face off's own code gives the stance) */
         } else {
             pl->facedir = (int16_t)vtoa(0, 100);                /* (all face the viewer: facedir 4, as the PC's skaters) */
         }
@@ -277,7 +272,114 @@ void hold_skate_begin(void)
 }
 
 static int plen(int ax, int ay, int bx, int by) { double dx = bx - ax, dy = by - ay; return (int)sqrt(dx * dx + dy * dy); }
-static int pframes(int ax, int ay, int bx, int by) { return (plen(ax, ay, bx, by) + SKATE_SPEED - 1) / SKATE_SPEED; }
+/* NHL 95 PC's skate to a spot between plays. Its face off set up (puckfaceoff 516E1: PenShotStart 511B4) gives each skater on the
+ * ice asstakeposition (52720, asstab 27h), and the drop waits until all are in place (puckfaceoff2 51BDB: AllInPlace 51440). Nobody
+ * is moved there: each skates with the game's own skating, from rest at the face off's set up, so he speeds up and stops.
+ *  - Speeding up: skateto (5E93B) aims him at the spot, doplayeracc (5E16D) / noturn0 strides (SPAskate) and playeracc (5EDAD) adds
+ *    his acceleration every frame (dirtab 200 times his agility and weight; the cartridge's: 200 x ((40h - weight / 4 + legstr) / 2)
+ *    / 32) as long as his speed stays under MaxSpeed for his speed rating (the cartridge's (20 + legspd / 2) x 275, an odd rating
+ *    half a step more). updateplayers (5C40F) takes 1/64 of it off every frame, as the cartridge's does.
+ *  - Stopping: skateto leads the aim by his velocity's high byte and calls him close enough within 0Ch of the spot; doplayeracc's
+ *    direction 9 is dostop (5F745): over 1000h it plays the scrape stop SPAstop (the snow spray, SPFstop: the cartridge's frames 145
+ *    to 160, two a direction, 4 frames each and looping; the PC's 144 to 159, native/pcspr.c's pc_frame), and stopna (5F82A) takes
+ *    a step off every frame (the cartridge's 96h). Within 20 of the spot asstakeposition uses SkateToSpot (4E292): within 19h a
+ *    speed over 9C4h loses a quarter a frame, under 640h he is given 640h toward the spot (gliding in), and within 8 he is put on it.
+ *  - In place: on the spot asstakeposition turns him a step toward the dot every 8 frames (SPAglide), then he is in place.
+ *  - The stride is not paced by his speed in either game: SPAskate's steps are 10 frames each (the cartridge's and the PC's frames
+ *    tables), updateanim (5CAEF) counts them down a frame at a time.
+ * Here the same steps in one dimension along his way (the game's state alone decides them: his ratings and the frames since he set
+ * off; nothing is kept). Two changes: skateto's aim is looked at every frame, not every 12th (the stop starts where it should, not
+ * up to 12 frames early or late), and the last 8 pixels are glided, not jumped (SkateToSpot's snap is a visible jump of up to 8). */
+#define EZ_SLOW 0x640                                  /* (SkateToSpot's least speed: gliding in) */
+#define EZ_CAP 400                                      /* (frames: the walk's own cap, sk_dur) */
+enum { EZ_SKATE, EZ_STOP, EZ_CREEP, EZ_THERE };
+struct ez { int32_t pos; int v, ph, k; };               /* (pos: 16.16 pixels along the way; v: the game's velocity units, 17 x v / 65536 a frame) */
+
+static int ez_acc(const struct SortObj *pl)
+{
+    int d2 = ((0x40 - (pl->weight >> 2)) + pl->legstr) & 0xFF;
+    int a = 200 * (d2 >> 1) >> 5;
+    return a < 40 ? 40 : a;
+}
+
+static int ez_top(const struct SortObj *pl)
+{
+    int s = pl->legspd > 0x1E ? 0x1E : pl->legspd, idx = (s >> 1) & 0xF;
+    return (20 + idx) * 275 + ((s & 1) && idx < 15 ? 137 : 0);
+}
+
+/* r frames along a way of d pixels (stop 0: he goes straight on at the end, the bench gate's glide follows) */
+static struct ez ez_run(const struct SortObj *pl, int d, int r, int stop)
+{
+    struct ez s = { 0, 0, EZ_SKATE, 0 };
+    int32_t D = (int32_t)d << 16;
+    int a = ez_acc(pl), top = ez_top(pl);
+    if (d < 2) { s.ph = EZ_THERE; s.pos = D; return s; }
+    for (; s.k < r && s.k < EZ_CAP; s.k++) {
+        int rem = (int)((D - s.pos) >> 16);
+        if (stop && s.ph == EZ_SKATE && rem - (s.v >> 8) <= 0xC) s.ph = EZ_STOP;   /* (skateto: close enough, dostop) */
+        if (s.ph == EZ_SKATE) { if (s.v + a <= top) s.v += a; }                /* (playeracc: under his top speed) */
+        else {
+            if (s.ph == EZ_STOP) {
+                s.v = s.v > 0x96 ? s.v - 0x96 : 0;                                /* (stopna) */
+                if (rem < 0x19 && s.v > 0x9C4) s.v -= s.v / 4;                    /* (SkateToSpot) */
+                if (s.v < EZ_SLOW) s.ph = EZ_CREEP;
+            }
+            if (s.ph == EZ_CREEP && s.v < EZ_SLOW) s.v = EZ_SLOW;
+        }
+        if (s.v > 0) s.v -= (s.v >> 6) ? (s.v >> 6) : 1;                         /* (updateplayers' drag) */
+        s.pos += (int32_t)s.v * 17;
+        if (s.pos >= D || (stop && D - s.pos < (1 << 16))) { s.pos = D; s.ph = EZ_THERE; s.k++; break; }   /* (the PC puts him on it within 8: here he glides in, no jump) */
+    }
+    return s;
+}
+
+/* the turns (8 frames each) from the way he came to facing f, the shorter way round */
+static int ez_turns(int dx, int dy, int f)
+{
+    int d = (f - (vtoa((int16_t)dx, (int16_t)dy) & 7)) & 7;
+    return d > 4 ? 8 - d : d;
+}
+
+/* the frames from setting off until he is in place: there, and turned to face f (asstakeposition) */
+static int ez_frames(const struct SortObj *pl, int ax, int ay, int bx, int by, int f)
+{
+    int d = plen(ax, ay, bx, by);
+    if (d < 2) return 0;
+    struct ez s = ez_run(pl, d, EZ_CAP, 1);
+    return s.k + ez_turns(bx - ax, by - ay, f) * 8;
+}
+
+/* a skater r frames after he set off from a to b, facing f once there: placed and posed as the PC's would be. 0 once in place */
+static int ez_pose(struct SortObj *pl, int ax, int ay, int bx, int by, int f, int r)
+{
+    int dx = bx - ax, dy = by - ay, d = plen(ax, ay, bx, by);
+    struct ez s = ez_run(pl, d, r, 1);
+    if (s.ph != EZ_THERE) {
+        int run = (int)(s.pos >> 8), l = d * 256;                           /* (256ths of a pixel) */
+        pl->Xpos = (int16_t)(ax + (int)((int64_t)dx * run / l));
+        pl->Ypos = (int16_t)(ay + (int)((int64_t)dy * run / l));
+        pl->facedir = (int16_t)vtoa((int16_t)dx, (int16_t)dy);
+        pl->Xvel = (int16_t)(dx * s.v / d);
+        pl->Yvel = (int16_t)(dy * s.v / d);
+        pl->pflags &= (uint8_t)~(1 << pfalock);
+        if (s.ph == EZ_SKATE) SetSPA(pl, SPAskate);
+        else if (s.ph == EZ_STOP) SetSPA(pl, pl->SPA == SPAstop || abs(pl->Xvel) > 0x1000 || abs(pl->Yvel) > 0x1000 ? SPAstop : SPAskate);   /* (dostop: the scrape over 1000h) */
+        else SetSPA(pl, SPAglide);                       /* (gliding in: the PC keeps the stop's or the stride's steps, the glide reads better slow) */
+        return 1;
+    }
+    int n = ez_turns(dx, dy, f), k = (r - s.k) / 8 + 1, f0 = vtoa((int16_t)dx, (int16_t)dy) & 7;
+    if (d < 2) { n = 0; f0 = f; }
+    if (r > s.k + n * 8 && pl->Xpos == bx && pl->Ypos == by) return 0;   /* (in place: left to the face off's own code) */
+    if (k > n) k = n;
+    int way = ((f - f0) & 7) <= 4 ? 1 : -1;
+    pl->Xpos = (int16_t)bx; pl->Ypos = (int16_t)by;
+    pl->Xvel = 0; pl->Yvel = 0;
+    pl->facedir = (int16_t)((f0 + way * k) & 7);
+    if (r == s.k) { pl->pflags &= (uint8_t)~(1 << pfalock); SetSPA(pl, SPAglide); }   /* (on the spot: the glide, whatever the stop's step) */
+    return r < s.k + n * 8;
+}
+
 
 /* an animation's frames in a direction (updateanim: each step lasts its time + 1) */
 static int anim_len(uint16_t spa, int dir)
@@ -308,7 +410,7 @@ static struct benchway bench_way(int i)
 {
     struct benchway w = { 0, 0, 0, 0, 0 };
     if (!sk_pstart) {
-        w.skate = pframes(sk_from[i].x, sk_from[i].y, DOOR_X + DOOR_GLIDE, DOOR_Y(sortobj(i)));
+        w.skate = ez_run(sortobj(i), plen(sk_from[i].x, sk_from[i].y, DOOR_X + DOOR_GLIDE, DOOR_Y(sortobj(i))), EZ_CAP, 0).k;   /* (speeding up, on into the glide)*/
         w.turn = (door_turns(i) > 0 ? door_turns(i) : 1) * 8;
         w.off = anim_len(SPAwallleft, 2);
         w.gap = BENCH_GAP;
@@ -320,9 +422,10 @@ static struct benchway bench_way(int i)
 /* the frames from the end of his wait to his spot */
 static int walk_frames(int i)
 {
-    if (!sk_gate[i]) return pframes(sk_from[i].x, sk_from[i].y, sk_to[i].x, sk_to[i].y);
+    const struct SortObj *pl = sortobj(i);
+    if (!sk_gate[i]) return ez_frames(pl, sk_from[i].x, sk_from[i].y, sk_to[i].x, sk_to[i].y, sk_face[i]);
     struct benchway w = bench_way(i);
-    return w.skate + w.turn + w.off + w.gap + w.on + pframes(sk_via[i].x, sk_via[i].y, sk_to[i].x, sk_to[i].y);
+    return w.skate + w.turn + w.off + w.gap + w.on + ez_frames(pl, sk_via[i].x, sk_via[i].y, sk_to[i].x, sk_to[i].y, sk_face[i]);
 }
 
 void hold_skate_arm(void)
@@ -452,11 +555,12 @@ static int bench_pose(int i, struct SortObj *pl, int r)
     if (r < 0) goto benched;                            /* (the start of a period: on the bench, his turn to come) */
     if (r < w.skate) {                                  /* (to the gate) */
         int ax = sk_from[i].x, ay = sk_from[i].y, bx = DOOR_X + DOOR_GLIDE, l = plen(ax, ay, bx, dy);
-        int run = r * SKATE_SPEED;
         if (l < 1) l = 1;
-        pl->Xpos = (int16_t)(ax + (bx - ax) * run / l);
-        pl->Ypos = (int16_t)(ay + (dy - ay) * run / l);
-        stride(pl, bx - ax, dy - ay, SKATE_SPEED);
+        struct ez s = ez_run(pl, l, r, 0);                /* (speeding up from rest as the PC's skateto does) */
+        int run = (int)(s.pos >> 8);
+        pl->Xpos = (int16_t)(ax + (int)((int64_t)(bx - ax) * run / (l * 256)));
+        pl->Ypos = (int16_t)(ay + (int)((int64_t)(dy - ay) * run / (l * 256)));
+        stride(pl, bx - ax, dy - ay, s.v * 17.0 / 65536);
         return 1;
     }
     r -= w.skate;
@@ -511,22 +615,16 @@ static void skate_players(int t)
             ax = sk_via[i].x; ay = sk_via[i].y;
             d = plen(ax, ay, sk_to[i].x, sk_to[i].y);
         }
-        int run = r * SKATE_SPEED;
-        if (run >= d || t >= sk_dur) {                  /* (there: face the puck, glide) */
-            /* (the frame he gets there, or the walk's last: the stride stops whatever its step, as the PC's asstakeposition
-             * sets its glide at the spot; the face off men's stance comes once all are there, src/logic.c) */
-            if (run - SKATE_SPEED < d || t == sk_dur || pl->Xpos != sk_to[i].x || pl->Ypos != sk_to[i].y) {
-                pl->Xpos = sk_to[i].x; pl->Ypos = sk_to[i].y;
-                pl->facedir = sk_face[i];
-                pl->pflags &= (uint8_t)~(1 << pfalock);
-                SetSPA(pl, SPAglide);
-            }
-        } else {
-            int bx = sk_to[i].x, by = sk_to[i].y, l = d < 1 ? 1 : d;
-            pl->Xpos = (int16_t)(ax + (bx - ax) * run / l);
-            pl->Ypos = (int16_t)(ay + (by - ay) * run / l);
-            stride(pl, bx - ax, by - ay, SKATE_SPEED);   /* (whatever the set up gave him: a face off man's stance waits for the dot) */
+        if (t < sk_dur) {                               /* (on his way: speeding up, the scrape stop, gliding in, turning to face the puck) */
+            ez_pose(pl, ax, ay, sk_to[i].x, sk_to[i].y, sk_face[i], r);   /* (whatever the set up gave him: a face off man's stance waits for the dot) */
             continue;
+        }
+        /* (the walk's last frame: the face off men's stance comes once all are there, src/logic.c) */
+        if (t == sk_dur || pl->Xpos != sk_to[i].x || pl->Ypos != sk_to[i].y) {
+            pl->Xpos = sk_to[i].x; pl->Ypos = sk_to[i].y;
+            pl->facedir = sk_face[i];
+            pl->pflags &= (uint8_t)~(1 << pfalock);
+            SetSPA(pl, SPAglide);
         }
         pl->Xvel = 0;
         pl->Yvel = 0;
