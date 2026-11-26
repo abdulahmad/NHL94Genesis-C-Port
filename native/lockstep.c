@@ -425,7 +425,7 @@ int native_menu_rows(int rect[][4], int max, int *n, int *sel, int *lr)
         return 1;
     }
     if (k == 2) {
-        int first = (int16_t)g.setupfirstline, lines = 9 - first;
+        int first = (int16_t)g.setupfirstline, lines = 9 - (setup_no_players ? 1 : 0) - first;
         if (setup_d7 < 0) return 0;
         if (lines > 6) lines = 6;
         *n = lines < max ? lines : max;

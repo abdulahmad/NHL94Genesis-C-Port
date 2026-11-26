@@ -18,6 +18,10 @@
 #define CARD(n) HI(n)                                    /* setupcardflags bits (btst on the word's high byte) */
 static uint16_t option(uint16_t line) { return g.options[line / 2]; }   /* (line: the option's byte offset) */
 
+/* The host's: 1 leaves the Players line out of the menu (the select-sides screen says who plays). 0 is the cartridge's menu, which every check plays. */
+uint8_t setup_no_players;
+static int vis(uint16_t line) { return (int16_t)line / 2 - (setup_no_players && (int16_t)line > 2); }   /* (the line's place in the menu) */
+
 /* optsetup94.asm:GameSetUp. The setup screen: the line data and the saved playoff state, the
  * modes' start changes undone (SetupStart), the screen (setoptions), random teams after a demo,
  * the playoff tree, then the menu until Start (SetupStart) or six minutes (SetupDemo). From
@@ -28,6 +32,7 @@ void GameSetUp(void)
     ReadPassBits(pass_bits(RAM(passbits)));
     g.OptLine = g.TmpOptLine2;
     g.OptPlayMode = g.TempOptPlayMode;
+    if (setup_no_players && g.OptNOP == 0) g.OptNOP = 1;       /* (no Demo from a menu line that is not there) */
     g.sflags7 &= (uint8_t)~2;
     ClearGameStats();
     ReadNameLog();
@@ -138,20 +143,21 @@ uint16_t MoveMenuFrame(uint16_t d7, int16_t d0)
 {
     for (;;) {
         g.sflags5 &= (uint8_t)~4;
-        if (d0 < 0 && (int16_t)d7 >> 1 == (int16_t)g.setupfirstline) {   /* up past the first line shown */
+        if (d0 < 0 && vis(d7) == (int16_t)g.setupfirstline) {   /* up past the first line shown */
             g.setupprevline = g.setupfirstline;
             g.sflags5 |= 4;
             if ((int16_t)--g.setupfirstline < 0) g.setupfirstline = 0;
         }
         g.TempWord1 = d7;
         d7 = (uint16_t)(d7 + d0);
+        if (setup_no_players && d7 == 2 && d0 != 0) d7 = (uint16_t)(d7 + d0);   /* (the Players line is not there) */
         if ((int16_t)d7 < 0) d7 = 0;
-        if (d0 >= 0 && ((int16_t)d7 >> 1) - (int16_t)g.setupfirstline > 5) {   /* down past the last */
+        if (d0 >= 0 && vis(d7) - (int16_t)g.setupfirstline > 5) {   /* down past the last */
             g.setupprevline = g.setupfirstline;
             g.sflags5 |= 4;
             g.setupfirstline++;
-            if (((int16_t)d7 >> 1) - (int16_t)g.setupfirstline > 5) g.setupfirstline++;
-            if ((int16_t)g.setupfirstline > 3) g.setupfirstline = 3;
+            if (vis(d7) - (int16_t)g.setupfirstline > 5) g.setupfirstline++;
+            if ((int16_t)g.setupfirstline > 3 - (setup_no_players ? 1 : 0)) g.setupfirstline = (uint16_t)(3 - (setup_no_players ? 1 : 0));
         }
         if (!(g.sflags5 & 4)) g.setupprevline = g.setupfirstline;
         if ((int16_t)d7 >= 0x12) d7 = (uint16_t)(d7 - d0);   /* past Line Changes */
@@ -185,6 +191,7 @@ void SetFrameRect(uint16_t line, uint16_t *w, uint16_t *h)
 {
     printz(str_SetFrameRect_1, sizeof str_SetFrameRect_1);
     g.printy += line;
+    if (setup_no_players && line > 2) g.printy -= 2;
     g.printy -= (uint16_t)(g.setupfirstline * 2);
     *w = 0x17;
     *h = 3;
@@ -288,7 +295,7 @@ void PrintOptions(uint16_t d7)
 {
     for (uint16_t line = 0;; line += 2) {
         ChangeOption(line, 0);
-        if ((int16_t)line >> 1 >= (int16_t)g.setupfirstline) PrintOptionValue(line);
+        if (vis(line) >= (int16_t)g.setupfirstline && !(setup_no_players && line == 2)) PrintOptionValue(line);
         if (line == 0x10) break;
     }
     PrintScrollMarks();
@@ -304,6 +311,7 @@ void PrintOptionValue(uint16_t line)
     printz(str_PrintOptionValue_1, sizeof str_PrintOptionValue_1);
     g.printy -= (uint16_t)(g.setupfirstline * 2);
     g.printy += line;
+    if (setup_no_players && line > 2) g.printy -= 2;
     if ((int16_t)g.printy > 0x1B) return;
     g.printy--;
     g.printx = 0x11;
@@ -322,7 +330,7 @@ void PrintScrollMarks(void)
 {
     g.printy = 0x19;
     uint32_t a1 = SYM_ScrollClearTxt;
-    if (g.setupfirstline != 3 && g.OptPlayMode != 4) a1 = SYM_ScrollDownTxt;
+    if ((int16_t)g.setupfirstline != 3 - (setup_no_players ? 1 : 0) && g.OptPlayMode != 4) a1 = SYM_ScrollDownTxt;
     g.printx = 2;
     print(a1);
     a1 = SYM_ScrollClearTxt;
@@ -356,7 +364,8 @@ void PrintOptionNames(void)
     g.sflags6 |= HI(3);
     uint32_t a1 = SYM_OptionNames;
     g.printy = (uint16_t)(0xF - g.setupfirstline * 2);
-    for (;; g.printy += 2) {
+    for (int name = 0;; g.printy += 2, name++) {
+        if (setup_no_players && name == 1) { a1 += (uint32_t)(int16_t)rd16(rom_ptr(a1)); g.printy -= 2; continue; }   /* (no Players line: its name is passed over) */
         if ((int16_t)g.printy < 0xF) { a1 += (uint32_t)(int16_t)rd16(rom_ptr(a1)); continue; }
         if ((int16_t)g.printy > 0x19) break;
         g.printx = 3;
