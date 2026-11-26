@@ -11,6 +11,11 @@ out/, and nhl94 runs headless there (the disc is looked for in the working folde
   2. Each next paragraph waits for the voice before it, no longer: the gap is the clip's length
      (the game counts it in its own frames, not by Vcount, which waitx sets each frame).
   3. Start leaves while he talks: the game's next song comes up promptly (the fade out is over).
+  4. The window's own path (the program copied to out/scouttest/prog, SDL's dummy video and audio, 16:9 as
+     Abdul plays, --input as its pads, NHL94_FRAMELOG each picture's brightness as shown): Start while he
+     talks stops his voice that frame and the picture fades out once, never brighter again, until the
+     game's next song (the wide rink's new width faded the old picture out, then flashed it back, over and
+     over: 0.3.x builds before this test).
 """
 import os
 import re
@@ -101,6 +106,29 @@ def run(script, frames):
             for m in re.finditer(r'segacd: frame (\d+) (\w+) ([0-9A-F]+)', r.stderr)]
 
 
+def window(script, seconds):
+    """the window's own path, from out/scouttest/prog: its events and each picture's (frame, width, brightness)"""
+    prog = os.path.join(OUT, 'prog')
+    os.makedirs(prog, exist_ok=True)
+    shutil.copy2(NHL94, prog)
+    shutil.copy2(os.path.join(OUT, 'scout.iso'), prog)
+    with open(os.path.join(prog, 'settings.ini'), 'w') as f:
+        f.write('sides.at_start = 0\n')              # (no select-sides screen: the script's pad is the game's)
+    with open(os.path.join(prog, 'overbar.ini'), 'w') as f:
+        f.write('[overbar]\nwidescreen=16:9\ngame_cd_voice=speech and music\n')
+    with open(os.path.join(prog, 'input.txt'), 'w') as f:
+        f.write(script + '\n')
+    env = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy', SEGACD_LOG='1', NHL94_FRAMELOG='1',
+               NHL94_QUIT_AFTER=str(seconds))
+    r = subprocess.run([os.path.join(prog, 'nhl94' + EXE), '--rom', ROM, '--input', 'input.txt'], cwd=prog, env=env,
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=seconds + 60)
+    if r.returncode:
+        sys.exit('the window failed (%d):\n%s' % (r.returncode, r.stderr[-2000:]))
+    ev = [(int(m.group(1)), m.group(2), int(m.group(3), 16)) for m in re.finditer(r'segacd: frame (\d+) (\w+) ([0-9A-F]+)', r.stderr)]
+    pics = [(int(m.group(1)), int(m.group(2)), int(m.group(3))) for m in re.finditer(r'present: frame (\d+) w (\d+) lum (\d+)', r.stderr)]
+    return ev, pics
+
+
 def main():
     for p in (NHL94, ROM):
         if not os.path.exists(p):
@@ -132,6 +160,15 @@ def main():
     song = [f for f, e, n in ev if e == 'song' and f > 1700]
     check(off and off[0] - 1700 < 60, 'Start while he talks: the report left %s frames later' % (off[0] - 1700 if off else None))
     check(song and song[0] - 1700 < 120, 'and the next song %s frames later' % (song[0] - 1700 if song else None))
+    ev, pics = window('1200:START,1206:,1320:START,1326:,1700:START,1706:', 34)
+    end = [f for f, e, n in ev if e == 'scoutend']
+    song = [f for f, e, n in ev if e == 'song' and n == 0x79 and f > 1700]
+    check(end and end[0] - 1700 <= 3, 'the window: Start while he talks stops his voice %s frames later' % (end[0] - 1700 if end else None))
+    lums = [(f, w, l) for f, w, l in pics if 1700 <= f <= (song[0] if song else 1800)]
+    up = [(a, b) for a, b in zip(lums, lums[1:]) if b[2] > a[2] + 2]
+    check(song and len(lums) > 20 and lums[0][2] > 60 and lums[-1][2] <= 2 and not up,
+          'and the picture fades out once, never brighter, to the next song (%d frames, %s to %s%s)'
+          % (len(lums), lums[0][2] if lums else None, lums[-1][2] if lums else None, ': brighter at %s' % (up[:3],) if up else ''))
     print('scouttest: %s' % ('ok' if not fails else '%d failed' % fails))
     return 1 if fails else 0
 

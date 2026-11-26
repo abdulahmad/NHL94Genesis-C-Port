@@ -243,7 +243,8 @@ void stop_current_song(uint16_t d0);       /* d0 = the caller's d0 (its high byt
  * nothing in the game. */
 enum { CD_EV_SONG, CD_EV_STOP, CD_EV_TURNOFF, CD_EV_CROWD, CD_EV_PARAGRAPH /* the scouting report's, its number */,
        CD_EV_SCREEN /* an opening screen: 0 none, 1 High Score Productions, 2 the title, 3 its credits, 4 EA SPORTS, 5 the Sega CD's license page */,
-       CD_EV_SFX /* a sound effect: its id, and its track slot in bits 8-11 (8: none was free) */ };
+       CD_EV_SFX /* a sound effect: its id, and its track slot in bits 8-11 (8: none was free) */,
+       CD_EV_SCOUT_END /* Start on the scouting report: Ron Barr stops at once */ };
 extern void (*cd_event_hook)(int ev, uint16_t n);
 /* the rink announcer (native/announcer.c): what the cartridge's boxes show, said aloud; it only reads, the game is unchanged. NULL: nobody listens.
  * PA_GOAL: tm the scorer's team, player him, a and b his assists (-1 none); PA_PENALTY: tm the penalized team, player him, a the penalty (its
