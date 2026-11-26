@@ -293,6 +293,7 @@ extern void (*cd_career_hook)(uint16_t team, uint16_t player);
  * are in VRAM from that char, its map on screen. Nothing of the game's changes. */
 extern void (*picture_drawn_hook)(uint32_t tiles, uint32_t map, uint16_t start, uint16_t attr);
 extern uint32_t picture_unpacked;          /* (the host's: the tile data UnpackPicture last read, 0 once drawn) */
+extern uint32_t picture_who;               /* (the host's: team << 16 | roster slot + 1 of the last DrawPlayerPicture, 0 none) */
 void ReadJoyData(void);
 uint8_t ReadPad4Way1(void);                /* -> d0 */
 uint8_t ReadPad4Way2(void);

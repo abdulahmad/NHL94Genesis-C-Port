@@ -36,6 +36,7 @@ int (*cd_picture_hook)(uint16_t team, uint16_t player, uint8_t *buf, uint8_t col
 void (*cd_career_hook)(uint16_t team, uint16_t player);
 void (*picture_drawn_hook)(uint32_t tiles, uint32_t map, uint16_t start, uint16_t attr);
 uint32_t picture_unpacked;
+uint32_t picture_who;
 
 static void bset(uint8_t *p, unsigned bit) { *p |= (uint8_t)(1u << (bit & 7)); }
 static void needs_update(void) { g.music_needs_z80_update = 0xFF; }
