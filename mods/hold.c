@@ -77,8 +77,10 @@ int hold_anthem_frames(int set, int home_art) { return set >= 1 && set <= 2 ? an
 int hold_anthem_song(void) { return anth && pending && (int16_t)(g.Vcount - anth_t0) < anth_len; }
 
 /* RULE_HOLD: a face off in the middle of play comes with no fade to black (the PC game has none: the players skate to their dots with the
- * rink in view). The start of a period keeps the cartridge's. */
-int hold_nofade(void) { return RULE(RULE_HOLD) && !anth && g.gameclock != g.PerTimeTotal; }
+ * rink in view). The start of a period keeps the cartridge's, and so does the way back from the penalty screen: the horizontal view is
+ * still up there, and the cartridge's forceblack, its set up in the dark and the fade in are the way back to the rink (without them the
+ * half set up rink showed for a frame, the face off window over the penalty screen's tiles, then a cut). */
+int hold_nofade(void) { return RULE(RULE_HOLD) && !anth && g.gameclock != g.PerTimeTotal && !(g.sflags & HI(sfhor)); }
 
 /* the frames into the anthem's song (-1 when no song is on: before it, after it, or no anthem) */
 int hold_anthem_time(void)
@@ -268,6 +270,7 @@ void hold_skate_begin(void)
 {
     sk_cap = 0;
     if (!RULE(RULE_HOLD)) return;
+    if ((g.sflags & HI(sfhor)) && g.gameclock != g.PerTimeTotal) return;   /* (back from the penalty screen: the cartridge's fade, the skaters at the spots, the window as the face off starts) */
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) { sk_from[i].x = pl->Xpos; sk_from[i].y = pl->Ypos; sk_pnum[i] = (int8_t)pl->pnum; sk_delay[i] = 0; sk_frame[i] = pl->frame; sk_f0[i] = (int16_t)(pl->facedir & 7); }
     sk_pick = SK_PICKUP;
