@@ -15,7 +15,7 @@
  *              [--extract-rom HACK DIR] [--pack-rosters DIR FILE.zip] [--art-check | --art-map]
  *              [--hashes FILE] [--host [PORT] | --join ADDR[:PORT] | --peer ADDR[:PORT]] [--port PORT]
  *              [--delay N] [--name NAME] [--here N] [--players N] [--net-sim MS,MS,%,%]
- *              [--smooth | --original | --speed smooth|original]
+ *              [--smooth | --original | --speed smooth|original] [--setup-options FILE]
  *
  * --art-check (headless) counts every byte the VDP takes by DMA from the game's data and those in
  * no piece of the art map (art.c: every piece of art the game reads by number, the cartridge's
@@ -62,6 +62,9 @@
  * again included (tools/netplay_check.py compares the last of each with a solo run's).
  * Headless, the save RAM is a new cartridge's unless --sram FILE names one (read at power on and
  * written back if the game changed it); a player's out/nhl94.srm is never touched otherwise.
+ * The setup screen's options (period length, penalties, line changes ...) are kept between runs in the
+ * window, in out/setup.ini beside the program (native/menuopts.c); headless only with --setup-options FILE,
+ * and never in a netplay session (the session's are the host's).
  * --smooth (the default) is one vblank a game-loop pass. --original / --slowdown / --speed original
  * is the cartridge's slowdown (a 68k cost model: a pass can take extra vblanks, elapsed > 1). The
  * window's Speed page and settings.ini game.speed keep the same choice (Smooth until changed).
@@ -417,6 +420,7 @@ void native_game(mdrt *m, void *user)
     native_net_power_on(m);
     rules_power_on();                                     /* (this game's rules and roster set; a state loaded brings its own) */
     rosters_power_on();
+    menuopts_power_on();                                  /* (the setup screen's options from the last run: the window's, never a session's) */
     if (setjmp(out)) { lockstep_report(); clock_report(); record(m, -1); return; }
     if (!load_state_path) record(m, MDRT_TRACE_SOUND);    /* (from the first frame: the chips' every write) */
     if (boot) { record(m, MDRT_TRACE_VDP); record(m, MDRT_TRACE_PADS); }
@@ -815,6 +819,7 @@ int main(int argc, char **argv)
     const char *rom = "NHL 94 (UE) [!].gen", *rom_given = NULL, *sram = "out/nhl94.srm", *rosters_arg = NULL;
     const char *export_dir = NULL, *check_dir = NULL, *extract_rom = NULL, *extract_dir = NULL, *pack_dir = NULL, *pack_zip = NULL;
     int sram_given = 0, state_given = 0;
+    const char *setup_opts = NULL;                       /* --setup-options FILE: the setup screen's options kept there (the window: out/setup.ini beside it) */
     int scale = 0, aspect = 0, headless = 0;
     const char *hashes_path = NULL;
     mdrt_net_options netopt;
@@ -879,6 +884,7 @@ int main(int argc, char **argv)
             if (why) { fprintf(stderr, "--rule %s: %s\n", argv[i], why); return 2; }
         }
         else if (!strcmp(argv[i], "--hashes") && i + 1 < argc) hashes_path = argv[++i];
+        else if (!strcmp(argv[i], "--setup-options") && i + 1 < argc) setup_opts = argv[++i];
         else if (!strcmp(argv[i], "--state") && i + 1 < argc) { state_file = argv[++i]; state_given = 1; }
         else if (!strcmp(argv[i], "--record") && i + 1 < argc) record_dir = argv[++i];
         else if (!strcmp(argv[i], "--watch") && i + 1 < argc) {
@@ -946,6 +952,9 @@ int main(int argc, char **argv)
     static char sram_beside[1100], state_beside[1100];
     if (!headless && sram && !sram_given) { sram_rel = sram; sram = beside_program(sram, sram_beside, sizeof sram_beside); }
     if (!headless && state_file && !state_given) state_file = beside_program(state_file, state_beside, sizeof state_beside);
+    static char opts_beside[1100];
+    if (!headless && !setup_opts) setup_opts = beside_program("out/setup.ini", opts_beside, sizeof opts_beside);
+    if (setup_opts) { make_parent(setup_opts); menuopts_use(setup_opts); }   /* (headless: only when --setup-options names a file) */
     if (sram) make_parent(sram);                          /* (a copy run outside the repository has no out/) */
     if (state_file) make_parent(state_file);
     int inputs = 0;

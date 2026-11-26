@@ -259,6 +259,11 @@ extern void (*sfx_hook)(int ev);
 extern void (*crowd_level_hook)(int meter);              /* each frame of play: the crowd meter in decibels (65 and up), for the host's own crowd bed */
 extern int (*anthem_hook_fn)(int home_art, int away_art);   /* RULE_ANTHEM, the first face off of a game: the host plays the anthem (the wait is the game's: hold_anthem_frames) */
 extern void (*stoppage_hook)(int pen);                      /* a whistle stops play (src/penalty.c Stop4Pen): the stoppage's penalty number, for the host's own sound; -1 the face off's drop */
+/* The setup screen's options kept between runs (native/menuopts.c): SETUP_OPTS_POWER_ON after DefaultMenus (the host may put
+ * back the options a player chose last time), SETUP_OPTS_MENU at each pass of the setup menu (the host keeps them). NULL in
+ * the game, in tests and in netplay; only the window sets it. */
+enum { SETUP_OPTS_POWER_ON, SETUP_OPTS_MENU };
+extern void (*setup_options_hook)(int when);
 
 /* The hat trick hats (native/hats.c): a home skater's third goal starts them (HAT_START), the next face off
  * ends them (HAT_END), and each game frame steps them (HAT_FRAME, arg = the frames since the last). NULL in
