@@ -3346,7 +3346,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
         if (o->temp1 < 0 && hold_wait()) o->temp1 = 0;       /* (RULE_HOLD: the announcer is still on) */
         if (fo_deferred && o->temp1 < 0) {                   /* (the anthem is over: the window, and the usual time to the drop) */
             fo_deferred = 0;
-            for (int i = 0; i < fo_defer_n; i++) assinsert(fo_defer_as[i], fo_defer_pl[i]);   /* (now they take the face off) */
+            for (int i = 0; i < fo_defer_n; i++) assreplace(fo_defer_as[i], fo_defer_pl[i]);   /* (now they take the face off: in place of the standing one, so the old assignment resumes after it as ever) */
             fo_defer_n = 0;
             g.disflags |= HI(4);
             o->temp1 = (int16_t)(randomd0(0x78) + 0xB4);
