@@ -503,6 +503,7 @@ void assfaceoffpl(struct Team *tm, struct SortObj *o);
 void assfight(struct Team *tm, struct SortObj *o);
 void fightinput(uint16_t d0, uint16_t d1, struct SortObj *o);   /* fight.c: a human fighter (d0 = direction, d1 = new buttons) */
 void checkfight(struct SortObj *a2, struct SortObj *a3);        /* fight.c: two players collided: do they fight? */
+uint16_t fight_frame_shown(uint16_t fr, int facedir);           /* fight.c: the cartridge frame a fight frame is drawn with (the 94 cartridge has no fight art) */
 const uint8_t *spa_table(uint16_t spa);                         /* fight.c: the animation table of a SPA (the fight animations are built there) */
 void setd0player(uint16_t d0);                                  /* collide.c */
 void assfwatch(struct Team *tm, struct SortObj *o);

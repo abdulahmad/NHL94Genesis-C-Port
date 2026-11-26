@@ -559,7 +559,7 @@ void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
     o->attribute ^= (uint16_t)(d4 & 0xF800);
     uint16_t fr = (uint16_t)(o->frame & 0x7FF);
     const uint8_t *a2 = rom_ptr(ART(Sprites) + rd32(rom_ptr(ART(Sprites)) + 4));
-    unsigned idx = fr * 2;
+    unsigned idx = (spr_sc >= 0 && spr_sc < 12 ? fight_frame_shown(fr, sortobj((uint16_t)spr_sc)->facedir) : fr) * 2u;   /* (a fighter: the cartridge has no fight art, fight.c) */
     if (!((int16_t)idx < (int16_t)rd16(a2 + 2))) { o->attribute = attr_saved; return; }
     int16_t d5 = (int16_t)(((rd16(a2 + idx + 2) - rd16(a2 + idx)) >> 3) - 1);
     a2 += rd16(a2 + idx);

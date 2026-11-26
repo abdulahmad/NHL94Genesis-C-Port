@@ -520,10 +520,11 @@ static uint16_t script_buttons(int pad, long frame)
 }
 static long script_reset = -1;          /* alone: the frame a script's RESET was given for (the console powers on again at its wait) */
 
-/* HOLDTEST=goal:FRAME,pen:FRAME (a headless run): at that vblank in a game in play the puck is put into a net (",away": the other), or a penalty queued on
- * a home skater, and every change of the stoppage wait is logged with its frame: tests the announcer and the face off wait
+/* HOLDTEST=goal:FRAME,pen:FRAME,fight:FRAME (a headless run): at that vblank in a game in play the puck is put into a net (",away": the other), a penalty queued on
+ * a home skater, or a home and a visiting skater put together for a fight (checkfight; with --rule fighting=2 it always starts),
+ * and every change of the stoppage wait is logged with its frame: tests the announcer and the face off wait
  * (src/hold.c) at the game's own call sites. */
-static int holdtest_goal = -1, holdtest_pen = -1, holdtest_last = -1;
+static int holdtest_goal = -1, holdtest_pen = -1, holdtest_fight = -1, holdtest_last = -1;
 static long holdtest_fired = -1;                          /* (the console frame the goal was forced at) */
 static void holdtest_frame(void)
 {
@@ -540,6 +541,14 @@ static void holdtest_frame(void)
         fprintf(stderr, "holdtest: frame %d goal forced (puck at %d,%d)\n", now, o->Xpos, o->Ypos);
         int dir = strstr(getenv("HOLDTEST"), "away") ? -1 : 1;
         o->Xpos = 0; o->OldXpos = 0; o->Ypos = (int16_t)(dir * 0x108); o->OldYpos = (int16_t)(dir * 0x100); o->Zpos = 2; o->OldZpos = 2; o->Yvel = (int16_t)(dir * 0x300); o->Xvel = 0; o->Zvel = 0;
+    }
+    if (holdtest_fight >= 0 && now >= holdtest_fight && g.gmode == 0) {      /* (fight:FRAME: a home and a visiting skater collide hard (with --rule fighting=2, NHL 92's roll, always a fight)) */
+        struct SortObj *a = sortobj_at(team_struct(0)->tmsort) + 2, *b = sortobj_at(team_struct(1)->tmsort) + 2;
+        holdtest_fight = -1;
+        b->Xpos = (int16_t)(a->Xpos + 12); b->Ypos = a->Ypos;
+        a->impact = b->impact = 0x7FFF;
+        fprintf(stderr, "holdtest: frame %d fight forced (%d against %d)\n", now, a->SCnum, b->SCnum);
+        checkfight(a, b);
     }
     if (holdtest_pen >= 0 && now >= holdtest_pen && g.gmode == 0) {
         holdtest_pen = -1;
@@ -966,6 +975,7 @@ int main(int argc, char **argv)
         const char *h = getenv("HOLDTEST"), *q;
         if ((q = strstr(h, "goal:"))) holdtest_goal = atoi(q + 5);
         if ((q = strstr(h, "pen:"))) holdtest_pen = atoi(q + 4);
+        if ((q = strstr(h, "fight:"))) holdtest_fight = atoi(q + 6);
         test_frame_hook = holdtest_frame;
     }
     if (announcer_find) { announcer_start(); announcer_wait(); fprintf(stderr, "announcer found: %d\n", announcer_found()); return !announcer_found(); }
