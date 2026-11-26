@@ -535,6 +535,11 @@ static void ref_tick(void)
     } else if (fo) {
         int tx = (fx > 0 ? fx + 15 : fx - 15) * 256, ty = fy * 256;
         int pr = hold_skate_ref();                                           /* (the between-play pause: he skates to the dot with the players) */
+        if (pr >= 0 && pr < 256 && hold_skate_pstart() && (!R.init || !R.wasfo)) {   /* (the start of a period: he comes on with the puck from where the PC starts him) */
+            int sx0, sy0, pk0;
+            hold_skate_puck(&sx0, &sy0, &pk0);
+            R.x = sx0 * 256; R.y = sy0 * 256; R.vx = R.vy = 0; R.init = 1; R.wasfo = 0;
+        }
         if (pr >= 0 && pr < 256 && R.init) {
             static int fx0, fy0, started;
             if (!started || !R.wasfo) { fx0 = R.x; fy0 = R.y; started = 1; }

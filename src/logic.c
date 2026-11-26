@@ -3342,6 +3342,7 @@ static void fo_window(void)
 void puckfaceoff2(struct Team *tm, struct SortObj *o)
 {
     if (!PFLAG(o, pfna)) {
+        if (hold_skating()) return;                          /* (RULE_HOLD: the drop's time starts once all are at the spots, as the PC's AllInPlace) */
         o->temp1 = (int16_t)(o->temp1 - 1);
         if (o->temp1 < 0 && hold_wait()) o->temp1 = 0;       /* (RULE_HOLD: the announcer is still on) */
         if (fo_deferred && o->temp1 < 0) {                   /* (the anthem is over: the window, and the usual time to the drop) */
