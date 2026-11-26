@@ -577,7 +577,7 @@ static int ref_bump(void)
 
 /* where the referee stands, from the PC's assreffollow (the puck's zone picks a spot beside the boards; the view's middle gives the y)
  * and assrefatdot (at the face off spot, facing the dot) */
-static void ref_tick(void)
+static void ref_live(void)
 {
     struct referee_view gv;
     R.valid = 0;
@@ -678,14 +678,74 @@ static void ref_tick(void)
     if (getenv("PCREF_LOG") && (!(g.Vcount & 63) || getenv("PCREF_ALL"))) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos);
 }
 
+/* The instant replay: the cartridge has no referee in its recorded frames, so the picture keeps its own beside them. Each tick of the game
+ * puts the referee as he is into the slot of the frame being recorded (g.recbpr, one of the game's replay frames); in the replay the frame
+ * on show is found by its skaters' places (RestoreReplayFrame put them there from it) and its referee drawn, turned with the reverse angle.
+ * Paused, the same frame shows: he stands still. A frame recorded without him has none. Leaving, he is back as he was at the record point. */
+#define REP_FRAME 0x62
+#define REP_END 0xFFFFAF54u
+#define REP_N ((REP_END - RAM_BASE) / REP_FRAME)
+static struct { int8_t have, fo; int8_t dir; int16_t fall, drop; int32_t x, y, t; } REP[REP_N];
+static struct { int on, slot, fo; } RPL = { 0, -1, 0 };
+static __typeof__(R) R_before;                                   /* (the referee at the record point, while the replay is on) */
+
+static int rep_slot(uint32_t a) { return a >= RAM_BASE && a < REP_END && (a - RAM_BASE) % REP_FRAME == 0 ? (int)((a - RAM_BASE) / REP_FRAME) : -1; }
+static int rep_matches(int slot, int rev)
+{
+    const struct ReplayFrame *f = RAM_AT(struct ReplayFrame, ram_at(RAM_BASE + (uint32_t)slot * REP_FRAME));
+    for (int i = 0; i < 12; i++) {
+        uint32_t l = f->obj[i];
+        int x = (int)(l & 0x3FF), y = (int)((l >> 10) & 0x3FF);
+        if (x & 0x200) x -= 0x400;
+        if (y & 0x200) y -= 0x400;
+        if (rev) { x = -x; y = -y; }
+        if (sortobj(i)->Xpos != x || sortobj(i)->Ypos != y) return 0;
+    }
+    return 1;
+}
+static void ref_tick(void)
+{
+    if (!(g.sflags2 & HI(sf2replay))) {
+        if (RPL.on) { R = R_before; RPL.on = 0; RPL.slot = -1; }
+        ref_live();
+        int k = rep_slot(g.recbpr);
+        if (k >= 0) {
+            const struct SortObj *pk = sortobj(puckscnum);
+            int asn = pk->asslist[pk->assnum & 7];
+            REP[k].have = (int8_t)R.valid; REP[k].x = R.x; REP[k].y = R.y; REP[k].dir = (int8_t)R.dir; REP[k].t = R.t;
+            REP[k].fall = (int16_t)R.fall; REP[k].drop = (int16_t)R.drop; REP[k].fo = (int8_t)(asn == pfaceoff || asn == pfaceoff2);
+        }
+        return;
+    }
+    if (!RPL.on) { R_before = R; RPL.on = 1; RPL.slot = -1; }
+    R.valid = 0;
+    if (!ref_on() || !SDL_AtomicGet(&P.found)) return;
+    int rev = (g.sflags4 & HI(4)) != 0, k = -1;
+    if (RPL.slot >= 0) for (int d = 0; d <= 8 && k < 0; d++)          /* (near the last one first: the replay steps a frame or a few) */
+        for (int sg = -1; sg <= 1 && k < 0; sg += 2) { int j = ((RPL.slot + sg * d) % (int)REP_N + (int)REP_N) % (int)REP_N; if (rep_matches(j, rev)) k = j; }
+    for (int j = 0; j < (int)REP_N && k < 0; j++) if (rep_matches(j, rev)) k = j;
+    if (k < 0 || !REP[k].have) { RPL.slot = k; return; }
+    RPL.slot = k;
+    R.x = rev ? -REP[k].x : REP[k].x; R.y = rev ? -REP[k].y : REP[k].y;
+    R.dir = rev ? (REP[k].dir + 4) & 7 : REP[k].dir; R.t = REP[k].t; R.fall = REP[k].fall; R.drop = REP[k].drop; RPL.fo = REP[k].fo;
+    int16_t x = (int16_t)(R.x / 256), y = (int16_t)(R.y / 256);
+    find3d(&x, &y, 0);
+    if (y == 0x4E20) return;
+    R.sx = x + view_shift();
+    R.sy = y;
+    R.valid = 1;
+    if (getenv("PCREF_REPLAY")) fprintf(stderr, "replay ref: slot %d at %d,%d screen %d,%d dir %d t %d\n", k, R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t);
+}
+
 /* the frame the referee shows */
 static int ref_frame(void)
 {
     const struct SortObj *pk = sortobj(puckscnum);
     int asn = pk->asslist[pk->assnum & 7];
     int d = R.dir & 7;
-    if (hold_anthem_time() >= 0) return idle_ref(hold_anthem_time());                                             /* (the anthem: the referee's standing picture) */
-    if ((asn == pfaceoff || asn == pfaceoff2) && R.t == 0) return (d >= 3 && d <= 6) ? 711 : 703;       /* (still: skating to the dot, he is not) */       /* (SPAreffowait) */
+    int fo = RPL.on ? RPL.fo : asn == pfaceoff || asn == pfaceoff2;   /* (the replay: as he was in the frame on show) */
+    if (hold_anthem_time() >= 0 && !RPL.on) return idle_ref(hold_anthem_time());                                  /* (the anthem: the referee's standing picture) */
+    if (fo && R.t == 0) return (d >= 3 && d <= 6) ? 711 : 703;       /* (still: skating to the dot, he is not) */       /* (SPAreffowait) */
     if (R.fall >= 0) return 787 + 3 * d + (R.fall < 10 ? 0 : R.fall < 38 ? 1 : 2);     /* (SPAreffallback: 10, 28, 10 ticks) */
     if (R.drop > 0) {                                                                    /* (SPArefdrop: 8 ticks each) */
         int k = (24 - R.drop) / 8;
