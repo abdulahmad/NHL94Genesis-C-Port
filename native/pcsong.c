@@ -24,14 +24,29 @@
 #define NOTE_OFFSET 24
 #define MAXSEC 90
 
+#define RATE96 22050
+
 static struct {
-    SDL_atomic_t on, found, searched;
+    SDL_atomic_t on, found, searched;         /* on: 0 off, 1 NHL 95 PC's, 2 NHL 96 PC's; found: NHL 95 PC's */
+    SDL_atomic_t found96;
     SDL_mutex *lock;
     int16_t *pcm[2];                          /* USA, CANADA: stereo 16 bit at RATE */
     long len[2];                              /* in frames */
-    int playing, which;
+    int16_t *p96[2];                          /* NHL 96 PC's: the same at RATE96 */
+    long l96[2];
+    int playing, which, cur;                  /* cur: the set playing, 0 NHL 95 PC's, 1 NHL 96 PC's */
     double at;
 } S;
+
+/* the set an anthem plays from: the one asked for, else the other one found (-1: none) */
+static int choose(void)
+{
+    int on = SDL_AtomicGet(&S.on), f95 = SDL_AtomicGet(&S.found), f96 = SDL_AtomicGet(&S.found96);
+    if (!on) return -1;
+    if (on == 2 && f96) return 1;
+    if (f95) return 0;
+    return f96 ? 1 : -1;
+}
 
 /* ---- the patch map and the FM timbres ----------------------------------------------------------- */
 
@@ -361,9 +376,117 @@ static int load(const char *dir, ob_cd *cd)
     return ok;
 }
 
+/* ---- NHL 96 PC's anthems: DATA/ANTHUS.ASF and DATA/ANTHCAN.ASF, recordings in EA's 1SNh / EACS stream ----------------
+ * A "1SNh" chunk holds the EACS header (sample rate, bits, channels, codec 2: IMA ADPCM, the sample count); each "1SNd"
+ * chunk: its samples a channel, then for each channel the IMA step index and the last sample, then a byte a sample with
+ * the left channel in the high nibble. (Each chunk's header is the state the one before it ends in.) "1SNe" ends it. */
+
+static const int16_t IMA_STEP[89] = { 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80,
+    88, 97, 107, 118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658, 724, 796, 876, 963,
+    1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327, 3660, 4026, 4428, 4871, 5358, 5894, 6484, 7132,
+    7845, 8630, 9493, 10442, 11487, 12635, 13899, 15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767 };
+static const int8_t IMA_INDEX[8] = { -1, -1, -1, -1, 2, 4, 6, 8 };
+
+static void ima(int nib, int32_t *h, int32_t *ix)
+{
+    int st = IMA_STEP[*ix], d = st >> 3;
+    if (nib & 1) d += st >> 2;
+    if (nib & 2) d += st >> 1;
+    if (nib & 4) d += st;
+    if (nib & 8) d = -d;
+    *h += d;
+    if (*h > 32767) *h = 32767;
+    if (*h < -32768) *h = -32768;
+    *ix += IMA_INDEX[nib & 7];
+    if (*ix < 0) *ix = 0;
+    if (*ix > 88) *ix = 88;
+}
+
+/* an ASF decoded whole: stereo 16 bit at RATE96, its length in frames (NULL: not a stereo IMA stream at 22050 Hz) */
+static int16_t *asf_decode(const uint8_t *d, long n, long *frames)
+{
+    if (n < 0x20 || memcmp(d, "1SNh", 4) || memcmp(d + 8, "EACS", 4)) return NULL;
+    if ((long)le32(d + 12) != RATE96 || d[17] != 2 || d[18] != 2) return NULL;          /* (22050 Hz, two channels, IMA) */
+    long cap = (long)le32(d + 20) + 4096, k = 0;
+    if (cap > (long)MAXSEC * RATE96) cap = (long)MAXSEC * RATE96;
+    int16_t *out = malloc((size_t)cap * 2 * sizeof *out);
+    if (!out) return NULL;
+    for (long p = 0; p + 8 <= n; ) {
+        long len = (long)le32(d + p + 4);
+        if (len < 8 || len > n - p) break;
+        if (!memcmp(d + p, "1SNe", 4)) break;
+        if (!memcmp(d + p, "1SNd", 4) && len >= 28) {
+            long ns = (long)le32(d + p + 8);
+            int32_t ix[2] = { (int32_t)le32(d + p + 12), (int32_t)le32(d + p + 16) }, h[2] = { (int32_t)le32(d + p + 20), (int32_t)le32(d + p + 24) };
+            if (ns > len - 28) ns = len - 28;
+            for (int c = 0; c < 2; c++) { if (ix[c] < 0 || ix[c] > 88) ix[c] = 0; if (h[c] > 32767) h[c] = 32767; if (h[c] < -32768) h[c] = -32768; }
+            for (long i = 0; i < ns && k < cap; i++, k++) {
+                int b = d[p + 28 + i];
+                ima(b >> 4, &h[0], &ix[0]);
+                ima(b & 15, &h[1], &ix[1]);
+                out[2 * k] = (int16_t)h[0];
+                out[2 * k + 1] = (int16_t)h[1];
+            }
+        }
+        p += len;
+    }
+    if (!k) { free(out); return NULL; }
+    *frames = k;
+    return out;
+}
+
+static int load96(const char *dir, ob_cd *cd)
+{
+    static const char *const name[2][2] = { { "DATA/ANTHUS.ASF", "ANTHUS.ASF" }, { "DATA/ANTHCAN.ASF", "ANTHCAN.ASF" } };
+    int16_t *pcm[2] = { NULL, NULL };
+    long len[2] = { 0, 0 };
+    for (int w = 0; w < 2; w++) {
+        long n = 0;
+        uint8_t *b = get(dir, cd, name[w][0], &n);
+        if (!b) b = get(dir, cd, name[w][1], &n);
+        if (b) pcm[w] = asf_decode(b, n, &len[w]);
+        free(b);
+    }
+    if (!pcm[0] || !pcm[1]) { free(pcm[0]); free(pcm[1]); return 0; }
+    for (int w = 0; w < 2; w++) { S.p96[w] = pcm[w]; S.l96[w] = len[w]; }
+    if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsong: NHL 96 PC USA %.1f s, CANADA %.1f s\n", (double)len[0] / RATE96, (double)len[1] / RATE96);
+    return 1;
+}
+
+/* NHL 96 PC's disc: an image named as the game is first, then any image beside the program with the anthems on it */
+static int find96(const char *base)
+{
+    static const char *const cand[] = { "NHL96.iso", "NHL96.cue", "nhl96.iso", "nhl96.cue", "NHL 96.iso", "NHL 96.cue", "NHL96.bin", "NHL96.img", "NHLHOCKEY96.iso" };
+    static const char *const need[2] = { "DATA/ANTHUS.ASF", "DATA/ANTHCAN.ASF" };
+    const char *dirs[2] = { base, "." };
+    for (int k = 0; k < 2; k++) if (load96(dirs[k], NULL)) return 1;
+    for (int k = 0; k < 2; k++)
+        for (size_t i = 0; i < sizeof cand / sizeof *cand; i++) {
+            char p[1100];
+            snprintf(p, sizeof p, "%s/%s", dirs[k], cand[i]);
+            ob_cd *cd = ob_cd_open(p, need, 2);
+            if (!cd) continue;
+            int ok = load96(NULL, cd);
+            if (ok) fprintf(stderr, "PC anthems: NHL 96 PC anthems from %s\n", ob_cd_path(cd));
+            ob_cd_close(cd);
+            if (ok) return 1;
+        }
+    for (int k = 0; k < 2; k++) {
+        ob_cd *cd = ob_cd_find(dirs[k], need, 2, NULL, 0);
+        if (!cd) continue;
+        int ok = load96(NULL, cd);
+        if (ok) fprintf(stderr, "PC anthems: NHL 96 PC anthems from %s\n", ob_cd_path(cd));
+        ob_cd_close(cd);
+        if (ok) return 1;
+    }
+    return 0;
+}
+
 static int finder(void *arg)
 {
     char *base = arg;
+    int ok96 = find96(base);
+    if (!ok96) fprintf(stderr, "PC anthems: no NHL 96 PC disc image found beside the program\n");
     int ok = load(base, NULL) || load(".", NULL);
     if (!ok) {
         static const char *const need[1] = { "USA.KMS" };
@@ -377,6 +500,7 @@ static int finder(void *arg)
     }
     if (!ok) fprintf(stderr, "PC anthems: no NHL 95 PC disc image found beside the program\n");
     SDL_MemoryBarrierRelease();
+    SDL_AtomicSet(&S.found96, ok96);
     SDL_AtomicSet(&S.found, ok);
     SDL_AtomicSet(&S.searched, 1);
     SDL_free(arg);
@@ -393,34 +517,40 @@ static int playing_hook(void) { return S.playing; }
 /* the first face off's anthem: the home team's. Its length in frames of the game (60 a second) */
 static int anthem_hook(int home_art, int away_art)
 {
-    if (!SDL_AtomicGet(&S.on) || !SDL_AtomicGet(&S.found) || !g.demoflag) return 0;
+    if (!SDL_AtomicGet(&S.searched) || !g.demoflag) return 0;
     SDL_MemoryBarrierAcquire();
+    int set = choose();
+    if (set < 0) return 0;
     int first = canadian(home_art) ? 1 : 0, second = first;           /* (the home team's anthem only) */
     SDL_LockMutex(S.lock);
+    S.cur = set;
     S.which = first | (first != second ? (second + 1) << 1 : 0);     /* (bit 0 the first anthem; bits 1-2: the second, +1) */
     S.playing = 1;
     S.at = 0;
-    long total = S.len[first] + (first != second ? S.len[second] : 0);
+    const long *len = set ? S.l96 : S.len;
+    long total = len[first] + (first != second ? len[second] : 0);
     SDL_UnlockMutex(S.lock);
-    return (int)(total * 60 / RATE) + 30;
+    return (int)(total * 60 / (set ? RATE96 : RATE)) + 30;
 }
 
 /* the flag of the anthem playing at a frame of the game since it began (0 USA, 1 Canada; -1 none) */
 int pcsong_flag_at(int frame)
 {
-    if (!SDL_AtomicGet(&S.on) || !SDL_AtomicGet(&S.found) || !S.playing) return -1;
+    if (!SDL_AtomicGet(&S.on) || !S.playing) return -1;
     int first = S.which & 1, second = (S.which >> 1) - 1;
-    if (second >= 0 && (long)frame * RATE / 60 >= S.len[first]) return second;
+    const long *len = S.cur ? S.l96 : S.len;
+    if (second >= 0 && (long)frame * (S.cur ? RATE96 : RATE) / 60 >= len[first]) return second;
     return first;
 }
 
-/* NHL 95 PC's crowd at the end of the anthem: the referee's countdown (assintroline, temp5 from RockTuneIds by the home team's
- * teamrocktune) runs out 1FEh game frames into "O Canada", 23Ah into the "Star Spangled Banner", and sets Crowdlevel to 320h:
- * the crowd cheers over the last bars. The frame of the anthem playing (-1 when none) */
+/* the crowd at the end of the anthem: NHL 95 PC's referee counts down (assintroline, temp5 from RockTuneIds by the home team's
+ * teamrocktune) 1FEh game frames into "O Canada", 23Ah into the "Star Spangled Banner", then sets Crowdlevel to 320h: the
+ * crowd cheers over the last bars. NHL 96 PC's (RunPreGameSkate) counts 23Ah for either recording. The frame of the anthem
+ * playing (-1 when none) */
 int pcsong_cheer_frame(void)
 {
-    if (!SDL_AtomicGet(&S.on) || !SDL_AtomicGet(&S.found) || !S.playing) return -1;
-    return (S.which & 1) ? 0x1FE : 0x23A;
+    if (!SDL_AtomicGet(&S.on) || !S.playing) return -1;
+    return S.cur ? 0x23A : (S.which & 1) ? 0x1FE : 0x23A;
 }
 
 void pcsong_start(void)
@@ -438,42 +568,57 @@ void pcsong_start(void)
 }
 void pcsong_wait(void) { while (!SDL_AtomicGet(&S.searched)) SDL_Delay(5); }
 int pcsong_searched(void) { return SDL_AtomicGet(&S.searched); }
-int pcsong_found(void) { return SDL_AtomicGet(&S.searched) && SDL_AtomicGet(&S.found); }
-void pcsong_set(int on) { SDL_AtomicSet(&S.on, on ? 1 : 0); }
+int pcsong_found(void) { return SDL_AtomicGet(&S.searched) && (SDL_AtomicGet(&S.found) || SDL_AtomicGet(&S.found96)); }
+int pcsong_found95(void) { return SDL_AtomicGet(&S.searched) && SDL_AtomicGet(&S.found); }
+int pcsong_found96(void) { return SDL_AtomicGet(&S.searched) && SDL_AtomicGet(&S.found96); }
+void pcsong_set(int on) { SDL_AtomicSet(&S.on, on < 0 ? 0 : on > 2 ? 2 : on); }
 void pcsong_stop(void) { S.playing = 0; }
+
+#define GAIN96 0.5f                         /* (NHL 96 PC's recordings run near full scale; the 95 FM songs about half of it) */
 
 /* the anthems into a frame of sound (out: stereo 16 bit at rate, mixed in) */
 void pcsong_mix(int16_t *out, int frames, unsigned rate)
 {
-    if (!S.playing || !S.lock) return;
+    if (!S.playing || !S.lock || !rate) return;
     SDL_LockMutex(S.lock);
     int first = S.which & 1, second = S.which >> 1 ? (S.which >> 1) - 1 : -1;
-    long l0 = S.len[first], total = l0 + (second >= 0 ? S.len[second] : 0);
-    double step = (double)RATE / rate;
+    int16_t *const *pcm = S.cur ? S.p96 : S.pcm;
+    const long *len = S.cur ? S.l96 : S.len;
+    long l0 = len[first], total = l0 + (second >= 0 ? len[second] : 0);
+    double step = (double)(S.cur ? RATE96 : RATE) / rate;
     for (int i = 0; i < frames; i++) {
         long k = (long)S.at;
         if (k >= total) { S.playing = 0; break; }
-        const int16_t *p = k < l0 ? S.pcm[first] + 2 * k : S.pcm[second] + 2 * (k - l0);
+        const int16_t *p = k < l0 ? pcm[first] + 2 * k : pcm[second] + 2 * (k - l0);
         for (int c = 0; c < 2; c++) {
-            int v = out[2 * i + c] + p[c];
-            out[2 * i + c] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+            float v;
+            if (S.cur) {                                        /* (22050 Hz: between two samples) */
+                float fr = (float)(S.at - (double)k), b = k + 1 < total && k + 1 != l0 ? p[2 + c] : p[c];
+                v = (p[c] + (b - p[c]) * fr) * GAIN96;
+            } else v = p[c];
+            float x = out[2 * i + c] + v;
+            out[2 * i + c] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
         }
         S.at += step;
     }
     SDL_UnlockMutex(S.lock);
 }
 
-/* testing: both anthems, USA then CANADA, as a wav (--pc-anthem-wav FILE) */
+/* testing: both anthems, USA then CANADA, as a wav (--pc-anthem-wav FILE; with --pc-anthems-96, NHL 96 PC's) */
 int pcsong_write_wav(const char *path)
 {
-    if (!pcsong_found()) return 0;
+    int set = choose();
+    if (!pcsong_found() || set < 0) return 0;
     FILE *f = fopen(path, "wb");
     if (!f) return 0;
-    long frames = S.len[0] + S.len[1];
-    uint32_t data = (uint32_t)(frames * 4), hdr[11] = { 0x46464952u, 36 + data, 0x45564157u, 0x20746D66u, 16, 0x00020001u, RATE, RATE * 4, 0x00100004u, 0x61746164u, data };
+    int16_t *const *pcm = set ? S.p96 : S.pcm;
+    const long *len = set ? S.l96 : S.len;
+    uint32_t r = set ? RATE96 : RATE;
+    long frames = len[0] + len[1];
+    uint32_t data = (uint32_t)(frames * 4), hdr[11] = { 0x46464952u, 36 + data, 0x45564157u, 0x20746D66u, 16, 0x00020001u, r, r * 4, 0x00100004u, 0x61746164u, data };
     fwrite(hdr, 4, 11, f);
-    fwrite(S.pcm[0], 4, (size_t)S.len[0], f);
-    fwrite(S.pcm[1], 4, (size_t)S.len[1], f);
+    fwrite(pcm[0], 4, (size_t)len[0], f);
+    fwrite(pcm[1], 4, (size_t)len[1], f);
     fclose(f);
     return 1;
 }

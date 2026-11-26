@@ -696,7 +696,7 @@ void native_frame_done(long frame, int wait)
 static FILE *wav;
 static int segacd_on;                                     /* --segacd-music / --segacd-crowd */
 static int announcer_find;
-static int pcsong_cli;                                   /* --pc-anthems: NHL 95 PC's anthems before the first face off (their sound joins the --wav) */
+static int pcsong_cli;                                   /* --pc-anthems: NHL 95 PC's anthems before the first face off (their sound joins the --wav); --pc-anthems-96 (2): NHL 96 PC's */
 static const char *pcsong_wav;                           /* --pc-anthem-wav FILE: both anthems written as a wav, then exit */
 static int pclogo_cli;                                   /* --pc-logos: NHL 95 PC's centre ice logos */
 static int pcref_cli;                                    /* --pc-ref: the referee on the ice (needs the PC files as --pc-sprites does) */
@@ -795,6 +795,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--pc-logos")) pclogo_cli = 1;
         else if (!strcmp(argv[i], "--pc-logos94")) pclogo_cli = 2;
         else if (!strcmp(argv[i], "--pc-anthems")) pcsong_cli = 1;
+        else if (!strcmp(argv[i], "--pc-anthems-96")) pcsong_cli = 2;
         else if (!strcmp(argv[i], "--pc-anthem-wav") && i + 1 < argc) pcsong_wav = argv[++i];
         else if (!strcmp(argv[i], "--announcer") && i + 1 < argc) announcer_file = argv[++i];
         else if (!strcmp(argv[i], "--pc-sfx") && i + 1 < argc) pcsfx_file = argv[++i];
@@ -947,8 +948,9 @@ int main(int argc, char **argv)
     if (pcsong_cli || pcsong_wav) {
         pcsong_start(); pcsong_wait();
         if (!pcsong_found()) { fprintf(stderr, "--pc-anthems: no NHL 95 PC files found\n"); return 2; }
+        pcsong_set(pcsong_cli ? pcsong_cli : 1);
         if (pcsong_wav) { int ok = pcsong_write_wav(pcsong_wav); return ok ? 0 : 2; }
-        pcsong_set(1);
+        if (pcsong_cli == 2 && !pcsong_found96()) fprintf(stderr, "--pc-anthems-96: no NHL 96 PC disc image found: NHL 95 PC's anthems\n");
     }
     if (pclogo_cli) { if (!pcspr_cli && !pcref_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-logos: no NHL 95 PC files found\n"); return 2; } } pcspr_logo_set(pclogo_cli); }
     if (pcref_cli) { if (!pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-ref: no NHL 95 PC sprite files found\n"); return 2; } } pcspr_ref_set(1); }
