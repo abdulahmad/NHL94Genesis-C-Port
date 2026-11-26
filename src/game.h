@@ -248,8 +248,8 @@ extern void (*cd_event_hook)(int ev, uint16_t n);
 /* the rink announcer (native/announcer.c): what the cartridge's boxes show, said aloud; it only reads, the game is unchanged. NULL: nobody listens.
  * PA_GOAL: tm the scorer's team, player him, a and b his assists (-1 none); PA_PENALTY: tm the penalized team, player him, a the penalty (its
  * Penaltylist offset), b its minutes | the penalties still to come << 8 | 1 << 16 when the next is this team's; PA_PENSHOT: tm the shooter's team,
- * player him; PA_ONEMIN: the clock reached one minute; PA_STAR: tm and player the star, a which (0-2) */
-enum { PA_GOAL, PA_PENALTY, PA_PENSHOT, PA_ONEMIN, PA_STAR };
+ * player him; PA_ONEMIN: the clock reached one minute; PA_STAR: tm and player the star, a which (0-2); PA_HIGHLIGHT: a the home team, b the away team (cartridge team numbers) */
+enum { PA_GOAL, PA_PENALTY, PA_PENSHOT, PA_ONEMIN, PA_STAR, PA_HIGHLIGHT };
 extern void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
 /* the goal siren and the horn at a period's end (native/pcsfx.c): the hook returns 1 when the host plays its own and the cartridge's is left out */
 enum { SFX_GOAL, SFX_HORN, SFX_ONEMIN };

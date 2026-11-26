@@ -63,15 +63,58 @@ static int clip_cmp(const void *a, const void *b) { return strcmp(((const struct
 /* word_D7414: the 4-bit deltas the mixer expands a rink clip with (low nibble, then high; the sum starts at 0) */
 static const int8_t fib[16] = { -34, -21, -13, -8, -5, -3, -2, -1, 1, 2, 3, 5, 8, 13, 21, 34 };
 
-/* the archive's rink clips into A.clips; the number of them */
+/* A speech clip (Ron Barr's: 47 FB): byte pair coding (UnpackBytePair of NHL 95 PC) of a delta coded 8 bit signed sample (a 5 byte
+ * header, then each byte the running sum so far, as ReadSpeechSample undoes it). Out: the samples, their number; NULL when it is not one. */
+struct bp { uint8_t st[256], src[256], dst[256]; uint8_t *out; long n, cap; };
+static void bp_put(struct bp *b, uint8_t c) { if (b->n < b->cap) b->out[b->n++] = c; }
+static void bp_expand(struct bp *b, uint8_t c, int depth)
+{
+    while (b->st[c] && depth < 300) { bp_expand(b, b->src[c], depth + 1); c = b->dst[c]; depth++; }
+    bp_put(b, c);
+}
+static int8_t *speech_clip(const uint8_t *s, long n, long *count)
+{
+    if (n < 16 || s[0] != 0x47 || s[1] != 0xFB) return NULL;
+    long p = 5;
+    long total = (long)be24(s + p);
+    p += 3;
+    if (total < 6 || total > 1 << 22) return NULL;
+    struct bp *b = calloc(1, sizeof *b);
+    if (!b) return NULL;
+    b->out = malloc((size_t)total + 8);
+    b->cap = total;
+    if (!b->out) { free(b); return NULL; }
+    b->st[s[p++]] = 1;
+    int pairs = s[p++];
+    for (int i = 0; i < pairs && p + 3 <= n; i++, p += 3) { b->src[s[p]] = s[p + 1]; b->dst[s[p]] = s[p + 2]; b->st[s[p]] = 0xFF; }
+    while (p < n && b->n < total) {
+        uint8_t c = s[p++];
+        if (!b->st[c]) bp_put(b, c);
+        else if (b->st[c] == 1) { if (p >= n || !s[p]) break; bp_put(b, s[p++]); }
+        else { bp_expand(b, b->src[c], 0); bp_expand(b, b->dst[c], 0); }
+    }
+    int8_t *pcm = NULL;
+    if (b->n > 5) {
+        pcm = malloc((size_t)b->n - 5);
+        uint8_t acc = 0;
+        for (long i = 0; pcm && i < b->n - 5; i++) { uint8_t v = b->out[i + 5]; pcm[i] = (int8_t)(uint8_t)(v + acc); acc = (uint8_t)(acc + v); }
+        *count = b->n - 5;
+    }
+    free(b->out);
+    free(b);
+    return pcm;
+}
+
+/* the archive's clips into A.clips (more than one archive adds up); the number of them */
 static int parse(const uint8_t *d, long n)
 {
     if (n < 12) return 0;
     int count = d[0] == 0xC0 && d[1] == 0xFB ? be16(d + 4) : be16(d + 2);
     if (count < 1 || count > 1000) return 0;
-    struct clip *cl = calloc((size_t)count, sizeof *cl);
+    struct clip *cl = calloc((size_t)count + (size_t)A.nclips, sizeof *cl);
     if (!cl) return 0;
     int k = 0;
+    if (A.nclips) { memcpy(cl, A.clips, (size_t)A.nclips * sizeof *cl); k = A.nclips; free(A.clips); A.clips = NULL; A.nclips = 0; }
     long o = 6;
     for (int i = 0; i < count && o + 7 <= n; i++) {
         uint32_t off = be24(d + o), size = be24(d + o + 3);
@@ -82,7 +125,21 @@ static int parse(const uint8_t *d, long n)
         if (o >= n || d[o]) break;                       /* (a name too long, or cut) */
         name[len] = 0;
         o++;
-        if (!size || off >= (uint32_t)n || size > (uint32_t)n - off || d[off] == 0x47) continue;   /* 'G' (47 FB): a speech clip, packed */
+        if (!size || off >= (uint32_t)n || size > (uint32_t)n - off) continue;
+        if (d[off] == 0x47) {                              /* 'G' (47 FB): a speech clip, packed */
+            long sn = 0;
+            int8_t *sp = speech_clip(d + off, size, &sn);
+            if (!sp) continue;
+            int16_t *sc = malloc((size_t)sn * sizeof *sc);
+            if (!sc) { free(sp); continue; }
+            for (long j = 0; j < sn; j++) sc[j] = (int16_t)(sp[j] * 256);
+            free(sp);
+            memcpy(cl[k].name, name, (size_t)len + 1);
+            cl[k].pcm = sc;
+            cl[k].len = sn;
+            k++;
+            continue;
+        }
         int16_t *pcm = malloc((size_t)size * 2 * sizeof *pcm);
         if (!pcm) continue;
         int acc = 0;
@@ -172,7 +229,19 @@ static int find_in(const char *dir)
             uint8_t *b = slurp(list[i], &size);
             int ok = b && parse(b, size);
             free(b);
-            if (ok) { fprintf(stderr, "Rink announcer: %s (%d clips)\n", list[i], A.nclips); return 1; }
+            if (ok) {
+                char *bar = strdup(list[i]);                   /* (Ron Barr's, beside it, for the highlight lines) */
+                if (bar) {
+                    char *nm = (char *)base_name(bar);
+                    memcpy(nm, "XRBARR2.VIV", 12);
+                    uint8_t *rb = slurp(bar, &size);
+                    if (rb) parse(rb, size);
+                    free(rb);
+                    free(bar);
+                }
+                fprintf(stderr, "Rink announcer: %s (%d clips)\n", list[i], A.nclips);
+                return 1;
+            }
         }
     static const char *const kinds[3][5] = { { ".cue" }, { ".ccd" }, { ".iso", ".bin", ".img", ".mdf", ".raw" } };
     for (int k = 0; k < 3; k++)
@@ -188,6 +257,15 @@ static int find_in(const char *dir)
                     long size = ob_cd_read_file(cd, ob_cd_file_name(cd, f), &b);
                     int ok = size > 0 && parse(b, size);
                     free(b);
+                    if (ok)
+                        for (int f2 = 0; ob_cd_file_name(cd, f2); f2++)
+                            if (ieq(base_name(ob_cd_file_name(cd, f2)), "XRBARR2.VIV")) {
+                                uint8_t *rb;
+                                long rs = ob_cd_read_file(cd, ob_cd_file_name(cd, f2), &rb);
+                                if (rs > 0) parse(rb, rs);
+                                free(rb);
+                                break;
+                            }
                     ob_cd_close(cd);
                     if (ok) { fprintf(stderr, "Rink announcer: %s (%d clips)\n", list[i], A.nclips); return 1; }
                     cd = NULL;
@@ -198,6 +276,8 @@ static int find_in(const char *dir)
     return 0;
 }
 
+static void hook(int ev, struct Team *tm, int player, int a, int b);
+
 static int finder(void *dir)
 {
     if (SDL_AtomicGet(&A.searched)) { SDL_free(dir); return 0; }   /* (a file given on the command line) */
@@ -205,6 +285,7 @@ static int finder(void *dir)
     SDL_MemoryBarrierRelease();
     SDL_AtomicSet(&A.found, A.nclips > 0);
     SDL_AtomicSet(&A.searched, 1);
+    if (SDL_getenv("ANNOUNCER_HLTEST") && A.nclips) { SDL_AtomicSet(&A.on, 1); hook(PA_HIGHLIGHT, NULL, 0, 11, 1); }   /* (a test: the highlight line at once) */
     SDL_free(dir);
     return 0;
 }
@@ -215,12 +296,22 @@ int announcer_load_file(const char *path)
     uint8_t *b = slurp(path, &size);
     int ok = b && parse(b, size);
     free(b);
+    if (ok) {                                           /* (Ron Barr's, beside it, for the highlight lines) */
+        char *bar = strdup(path);
+        if (bar && strlen(bar) >= 11 && ieq(bar + strlen(bar) - 11, "XBRUCE2.VIV")) {
+            memcpy(bar + strlen(bar) - 11, "XRBARR2.VIV", 11);
+            uint8_t *rb = slurp(bar, &size);
+            if (rb) parse(rb, size);
+            free(rb);
+        }
+        free(bar);
+    }
     SDL_AtomicSet(&A.found, ok);
     SDL_AtomicSet(&A.searched, 1);
+    if (ok && SDL_getenv("ANNOUNCER_HLTEST")) { SDL_AtomicSet(&A.on, 1); hook(PA_HIGHLIGHT, NULL, 0, 11, 1); }   /* (a test: the highlight line at once) */
     return ok;
 }
 
-static void hook(int ev, struct Team *tm, int player, int a, int b);
 
 void announcer_start(void)
 {
@@ -343,7 +434,7 @@ static int begin(int interrupt, int drop_if_busy)
 static void hook(int ev, struct Team *tm, int player, int a, int b)
 {
     if (A.log) fprintf(stderr, "announcer: event %d (on %d, found %d, demo %d)\n", ev, SDL_AtomicGet(&A.on), SDL_AtomicGet(&A.found), g.demoflag);
-    if (!SDL_AtomicGet(&A.on) || !SDL_AtomicGet(&A.found) || !g.demoflag) return;                 /* (a demo game is silent: demoflag is clear then) */
+    if (!SDL_AtomicGet(&A.on) || !SDL_AtomicGet(&A.found) || (!g.demoflag && ev != PA_HIGHLIGHT)) return;                 /* (a demo game is silent: demoflag is clear then) */
     SDL_MemoryBarrierAcquire();
     SDL_LockMutex(A.lock);
     const char *abbr = tm ? team_abbr(tm) : NULL;
@@ -389,6 +480,19 @@ static void hook(int ev, struct Team *tm, int player, int a, int b)
         if (!begin(0, 1)) break;
         add("oneleft.cor");
         break;
+    case PA_HIGHLIGHT: {                                /* a the home team, b the away team: PaHighlightIntro's eight clips */
+        uint16_t h = rosters_art((uint16_t)a), v = rosters_art((uint16_t)b);
+        if (h >= 28 || v >= 28 || !begin(1, 0)) break;
+        add("takeynow.bar");
+        add("%s.rnk", abbr95[h]);
+        add("highlite.bar");
+        add("of.bar");
+        add("gamebtwn.bar");
+        add("%s.awa", abbr95[v]);
+        add("and.bar");
+        add("%s.hom", abbr95[h]);
+        break;
+    }
     case PA_STAR:                                       /* a the star, 0-2: "first star", "<team> number <n>" */
         if (!abbr) break;
         add("%s", a == 0 ? "1ststar.cor" : a == 1 ? "2ndstar.cor" : "3rdstar.cor");
