@@ -557,6 +557,7 @@ static int ref_frame(void)
     const struct SortObj *pk = sortobj(puckscnum);
     int asn = pk->asslist[pk->assnum & 7];
     int d = R.dir & 7;
+    if (hold_anthem_time() >= 0) return 649;                                             /* (the anthem: the referee's standing picture) */
     if ((asn == pfaceoff || asn == pfaceoff2) && R.t == 0) return (d >= 3 && d <= 6) ? 711 : 703;       /* (still: skating to the dot, he is not) */       /* (SPAreffowait) */
     if (R.drop > 0) {                                                                    /* (SPArefdrop: 8 ticks each) */
         int k = (24 - R.drop) / 8;
@@ -592,6 +593,7 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
     if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || sc > 13 || P.nshow >= 16) return 0;
     if ((int16_t)g.palcount >= 0) return 0;               /* (a fade: the cartridge's sprites fade with the screen) */
     int pf = pc_frame(o->frame & 0x7FF);
+    if (hold_anthem_time() >= 0 && sc < 12 && sortobj(sc)->position > 0) pf = 368;      /* (the anthem: the PC's standing picture, number 369) */
     if (pf < 0 || pf >= NFRAMES || !P.f[pf].px) return 0;   /* (no such PC frame: the cartridge's sprite stays) */
     P.show[P.nshow].pc = (int16_t)pf;
     P.show[P.nshow].x = x;
@@ -804,11 +806,26 @@ static void flag_draw(uint32_t *pic, int w, int h, int pitch)
     if (k < 0) return;
     const spr *f = &FLG[k][(t * 100 / 60 / 12 / 2) % nflag[k]];
     if (!f->px) return;
-    int x0 = (w - f->w) / 2, y0 = 40;
-    for (int y = 0; y < f->h; y++)
+    /* the PC's overlay box (DrawTextOverlay): top left at 12,12, 123 x 75, a 4 pixel black frame; it grows from its middle
+     * (74,50) over the first 16 steps; the picture is drawn at the box's corner */
+    int bx = 12, by = 12, bw = 0x7B, bh = 0x4B;
+    int k16 = t < 16 ? t : 16;
+    int gx0 = bx, gx1 = bx + bw, gy0 = by, gy1 = by + bh;
+    if (k16 < 16) {
+        int hw = k16 * 0x42 / 16, hh = k16 * 0x2A / 16;
+        gx0 = 74 - hw; gx1 = 74 + hw; gy0 = 50 - hh; gy1 = 50 + hh;
+    }
+    for (int y = gy0 - 4; y < gy1 + 4; y++)
+        for (int x = gx0 - 4; x < gx1 + 4; x++) {
+            if (x < 0 || x >= w || y < 0 || y >= h) continue;
+            int in = x >= gx0 && x < gx1 && y >= gy0 && y < gy1;
+            if (in && k16 < 16) { uint32_t c = pic[(long)y * pitch + x]; pic[(long)y * pitch + x] = 0xFF000000u | ((c >> 1) & 0x7F7F7Fu); }
+            else if (!in) pic[(long)y * pitch + x] = 0xFF000000u;
+        }
+    for (int y = 0; y < f->h && k16 >= 16; y++)
         for (int x = 0; x < f->w; x++) {
             int v = f->px[y * f->w + x];
-            int px_ = x0 + x, py = y0 + y;
+            int px_ = bx + x, py = by + y;
             if (v == 255 || px_ < 0 || px_ >= w || py < 0 || py >= h) continue;
             pic[(long)py * pitch + px_] = 0xFF000000u | (uint32_t)P.pal[v][0] << 16 | (uint32_t)P.pal[v][1] << 8 | P.pal[v][2];
         }

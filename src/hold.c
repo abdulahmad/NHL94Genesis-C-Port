@@ -108,7 +108,7 @@ static void anthem_pose(void)
         if (pl->position <= 0) continue;                /* (goalies stay in their nets) */
         int team = PFLAG(pl, pfteam) ? 1 : 0;
         int n = slot[team]++;
-        int lx = n * 40 - 80 + (team ? 4 : -4), ly = team ? 14 : -60;
+        int lx = n * 40 - 80 + (team ? 4 : -4), ly = team ? 0x30 : -0x3A;   /* (the PC's lines: x lane * 28h - 50h, y +30h / -3Ah) */
         int x = lx, y = ly;
         if (skating) {
             int k = t - anth_len;
