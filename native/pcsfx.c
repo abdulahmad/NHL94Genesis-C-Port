@@ -13,6 +13,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <math.h>
 #include "game.h"
 #include "native.h"
 #include "pcsfx.h"
@@ -38,7 +39,7 @@ static struct {
     int playing[NSND];
     double at[NSND];
     SDL_atomic_t crowd_on, crowd_vol, crowd_live;        /* the Game page's row, its volume (percent), frames the game's crowd is still on */
-    SDL_atomic_t v8, v7, pan7;                           /* the PC's voices: volume 0-127 and (voice 7) the pan */
+    SDL_atomic_t v8, v7, pan7, bend8;                           /* the PC's voices: volume 0-127 and (voice 7) the pan */
     float g8, g7;                                        /* (the mixer's smoothed gains) */
     int smooth;                                          /* Crowd_Noise's crowdsmooth */
 } S;
@@ -235,7 +236,8 @@ static void crowd_hook(int meter)
     if (st > 0x7F) st = 0x7F;
     SDL_AtomicSet(&S.v8, v8);
     SDL_AtomicSet(&S.v7, st);
-    SDL_AtomicSet(&S.pan7, st / 3 + 0x20);
+    SDL_AtomicSet(&S.pan7, st / 3 + 0x20 + (st == 0x0A ? (int)(SDL_GetTicks() % 6) : 0));   /* (voice 7's MidiPitchBend, a little jitter at its floor) */
+    SDL_AtomicSet(&S.bend8, 0x40 - (v8 >= 0x7F ? (int)(SDL_GetTicks() % 6) : 0));   /* (voice 8's, jittering at full volume) */
     SDL_AtomicSet(&S.crowd_live, 30);
 }
 
@@ -271,8 +273,10 @@ void pcsfx_mix(int16_t *out, int frames, unsigned rate)
     if (!on) { S.g8 = S.g7 = 0; SDL_AtomicAdd(&S.crowd_live, 0); }
     float vol = (float)SDL_AtomicGet(&S.crowd_vol) / 100.0f;
     float t8 = on ? SDL_AtomicGet(&S.v8) / 127.0f * vol : 0, t7 = on ? SDL_AtomicGet(&S.v7) / 127.0f * vol : 0;
-    float pan = (float)(SDL_AtomicGet(&S.pan7) - 0x40) / 64.0f;
-    float l7 = 1.0f - (pan > 0 ? pan : 0), r7 = 1.0f + (pan < 0 ? pan : 0);
+    /* MidiPitchBend: 0x40 is level, a range of two semitones either way */
+    double bs[NSND] = { 0 };
+    bs[CROWD8] = step * pow(2.0, (SDL_AtomicGet(&S.bend8) - 0x40) / 64.0 * 2.0 / 12.0);
+    bs[CROWD7] = step * pow(2.0, (SDL_AtomicGet(&S.pan7) - 0x40) / 64.0 * 2.0 / 12.0);
     for (int s = CROWD8; s <= CROWD7; s++) {
         if (!S.pcm[s] || (!on && S.g8 == 0 && S.g7 == 0)) continue;
         for (int i = 0; i < frames; i++) {
@@ -283,11 +287,10 @@ void pcsfx_mix(int16_t *out, int frames, unsigned rate)
             double frac = S.at[s] - (double)j;
             float v = (float)(S.pcm[s][j] + (S.pcm[s][j + 1] - S.pcm[s][j]) * frac) * *gp * 0.8f;
             for (int c = 0; c < 2; c++) {
-                float pg = s == CROWD7 ? (c ? r7 : l7) : 1.0f;
-                float x = v * pg + out[2 * i + c];
+                float x = v + out[2 * i + c];
                 out[2 * i + c] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
             }
-            S.at[s] += step;
+            S.at[s] += bs[s];
         }
     }
     int live = SDL_AtomicGet(&S.crowd_live);
