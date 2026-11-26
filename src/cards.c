@@ -914,6 +914,7 @@ void PrintSaves(uint16_t player, uint16_t x, uint16_t y)
 uint32_t DrawPlayerPicture(uint16_t player, uint16_t team)
 {
     const struct RosterTeam *T = rosters_team(team);
+    picture_who = (uint32_t)team << 16 | (uint16_t)(player + 1);   /* (for a host's picture_drawn_hook) */
     for (int k = 0; k < T->pictures; k++)
         if (T->picture[k].slot == player) return T->picture[k].pic;
     int pic1 = T->player[player].rating[LR_HANDED_FIGHTING] & 1;

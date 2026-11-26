@@ -14,6 +14,8 @@
  * NHL94_COLORED_FACES names (the PNGs in it or in its faces/). A card with its face there shows that face, pixel for pixel; the others
  * are made from the PC files as above. The folder's SegaCD_*.png colour the Sega CD's own photos of
  * players the cartridge has none of (segacd.c's, drawn with no ROM picture). cardcolor_faces.inc only says which picture is CardNNN.
+ * Its Player_TEAM_Name.png are faces of players the game shows a stock picture for (on the cartridge or the
+ * disc): the player is found by his name in the roster, so they follow him to any team.
  *
  * How it is shown: the game draws a picture as it always does (its tiles, its map, its grey palette).
  * picture_drawn_hook notes which picture went where (its tiles' first char, its 36 map entries); each
@@ -48,7 +50,8 @@ static const struct { uint32_t hash; const char *name; } cdfaces[] = {   /* the 
     { 0x57321F39u, "SegaCD_PIT_RickTocchet" },     /* 36 tiles): only these two are faces the cartridge lacks */
 };
 #define NCD ((int)(sizeof cdfaces / sizeof cdfaces[0]))
-#define NALL (NFACES + NCD)                        /* faces: the cartridge's CardNNN - 1, then the Sega CD's */
+#define NNAMED 64                                  /* Player_TEAM_FullName.png: faces of players with only a stock picture */
+#define NALL (NFACES + NCD + NNAMED)               /* faces: the cartridge's CardNNN - 1, then the Sega CD's, then the named */
 #define FACES_DIR "NHL94-colored-faces"
 #define SHOWN 4                                    /* pictures on one screen (the scouting report has two) */
 #define QFS_FILES 24
@@ -62,6 +65,8 @@ static struct {
     long nsh_n;
     uint8_t made[NALL];                            /* 0 not yet, 1 made (or a face read), 2 could not be */
     uint8_t rgb[NALL][CC_N * CC_N * 3];
+    char named[NNAMED][40];                        /* the named faces' players: their names, letters and digits, lower case */
+    int nnamed;
     struct shown {
         int used, card;
         uint16_t start, count, attr;               /* its first char, its tiles, the map's attribute bits */
@@ -116,7 +121,19 @@ static int find95_in(const char *dir)
     return got;
 }
 
-/* the faces in dir (CardNNN....png, SegaCD_....png): how many */
+/* s's letters and digits, lower case, to out (cap bytes) */
+static void squash(const char *s, size_t n, char *out, int cap)
+{
+    int k = 0;
+    for (size_t i = 0; i < n && s[i] && k < cap - 1; i++) {
+        char c = s[i];
+        if (c >= 'A' && c <= 'Z') c = (char)(c + 32);
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) out[k++] = c;
+    }
+    out[k] = 0;
+}
+
+/* the faces in dir (CardNNN....png, SegaCD_....png, Player_TEAM_Name.png): how many */
 static int faces_in_one(const char *dir)
 {
     DIR *d = opendir(dir);
@@ -129,6 +146,17 @@ static int faces_in_one(const char *dir)
         int k = -1;
         for (int i = 0; i < NCD; i++)
             if (len == strlen(cdfaces[i].name) + 4 && !SDL_strncasecmp(n, cdfaces[i].name, len - 4) && !SDL_strcasecmp(n + len - 4, ".png")) k = NFACES + i;
+        if (k < 0 && len > 11 && !SDL_strncasecmp(n, "player_", 7) && !SDL_strcasecmp(n + len - 4, ".png")) {   /* Player_TEAM_Name.png */
+            const char *u = strchr(n + 7, '_');
+            if (!u || C.nnamed >= NNAMED) continue;
+            char key[40];
+            squash(u + 1, (size_t)(n + len - 4 - (u + 1)), key, sizeof key);
+            int dup = 0;
+            for (int i = 0; i < C.nnamed; i++) dup |= !strcmp(C.named[i], key);
+            if (!key[0] || dup) continue;
+            k = NFACES + NCD + C.nnamed;
+            strcpy(C.named[C.nnamed++], key);
+        }
         if (k < 0) {                                       /* CardNNN_Name.png */
             if (len < 11 || SDL_strncasecmp(n, "card", 4) || SDL_strcasecmp(n + len - 4, ".png")) continue;
             if (n[4] < '0' || n[4] > '9' || n[5] < '0' || n[5] > '9' || n[6] < '0' || n[6] > '9') continue;
@@ -144,7 +172,7 @@ static int faces_in_one(const char *dir)
         int w, h, ch;
         uint8_t *px = b ? stbi_load_from_memory(b, (int)size, &w, &h, &ch, 3) : NULL;
         if (px && w == CC_N && h == CC_N) { memcpy(C.rgb[k], px, sizeof C.rgb[k]); C.made[k] = 1; got++; }
-        else fprintf(stderr, "Colour photos: %s is not a 48 x 48 picture\n", path);
+        else { fprintf(stderr, "Colour photos: %s is not a 48 x 48 picture\n", path); C.made[k] = 2; }
         stbi_image_free(px);
         free(b);
     }
@@ -269,13 +297,41 @@ static int cd_of(void)
     return -1;
 }
 
+/* the named face (Player_TEAM_Name.png) of team's roster player slot, -1 none: his name as the roster
+ * has it, or cut short there (John Vanbiesbrk: the file's name has every letter of it, in order, and
+ * the same first five) */
+static int named_of(uint16_t team, uint16_t player)
+{
+    if (!SDL_AtomicGet(&C.found) || team >= ROSTERS_MAX) return -1;
+    SDL_MemoryBarrierAcquire();
+    const struct RosterTeam *T = rosters_team(team);
+    if (player >= T->players) return -1;
+    const struct RosterText *t = &T->player[player].name;
+    char key[40];
+    int len = (t->s[0] << 8 | t->s[1]) - 2;
+    if (len < 0) len = 0;
+    if (len > RS_TEXT - 2) len = RS_TEXT - 2;
+    squash((const char *)t->s + 2, (size_t)len, key, sizeof key);
+    if (strlen(key) < 5) return -1;
+    for (int i = 0; i < C.nnamed; i++) {
+        const char *f = C.named[i], *r = key;
+        if (strncmp(f, key, 5)) continue;
+        for (; *f && *r; f++) if (*f == *r) r++;
+        if (!*r && C.made[NFACES + NCD + i] == 1) return NFACES + NCD + i;
+    }
+    return -1;
+}
+
 static void drawn(uint32_t tiles, uint32_t map, uint16_t start, uint16_t attr)
 {
+    uint32_t who = picture_who;
+    picture_who = 0;
     for (int i = 0; i < SHOWN; i++) if (C.shown[i].used && C.shown[i].start == start) C.shown[i].used = 0;   /* (its chars hold this one now) */
     if (!SDL_AtomicGet(&C.on) || !cardcolor_found() || map + 4u + 72u > rom_limit) return;
     int k = tiles ? card_of(tiles) : cd_of();
+    if (k < 0 && who) k = named_of((uint16_t)(who >> 16), (uint16_t)((who & 0xFFFF) - 1));   /* (a stock picture: his own face, if named) */
     if (k < 0 || rd16(rom_ptr(map)) != 6 || rd16(rom_ptr(map + 2)) != 6) return;
-    if (tiles ? !make(k, tiles, map) : C.made[k] != 1) return;
+    if (tiles && k < NFACES ? !make(k, tiles, map) : C.made[k] != 1) return;
     uint16_t count = rd16(g.picturebuf);
     struct shown *s = NULL;
     for (int i = 0; i < SHOWN && !s; i++) if (!C.shown[i].used) s = &C.shown[i];
@@ -309,7 +365,7 @@ int cardcolor_covers(uint16_t team, uint16_t player)
         const cc_card *c = pc_of(k);
         return c && (have & (c->src == CC_PC95 ? 1 : 2));
     }
-    return 0;
+    return named_of(team, player) >= 0;                    /* (a stock picture, his face named: the cartridge's, in colour) */
 }
 
 void cardcolor_start(void)
