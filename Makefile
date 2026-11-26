@@ -14,6 +14,7 @@
 #   make rosterstest     roster sets: the cartridge's exported and built again, a 32-team one, broken ones,
 #                       hacks on the 32-team template (../roms or HACKS=) extracted
 #   make scouttest      the Sega CD scouting report: Ron Barr's paragraphs paced by his clips (a made-up disc)
+#   make replaymousetest  the instant replay's mouse gestures (test/replaymouse_test.c, no window)
 #   make sramtest       the window's save RAM beside the program, kept between runs from other folders
 #   make setupoptstest  the setup screen's options kept between runs (out/setup.ini beside the program; never in a session)
 #   make oracle         the hooked oracle core (build/nhl_oracle.so)
@@ -42,6 +43,11 @@ build/rulestest: $(SRC) $(HDR) test/rules_test.c test/hal_null.c native/ratings.
 	$(CC) $(CFLAGS) -Isrc -Itest -Inative -I$(MDRT)/include -o $@ $(SRC) test/rules_test.c test/hal_null.c native/ratings.c
 rulestest: build/rulestest
 	./build/rulestest
+build/replaymousetest: test/replaymouse_test.c native/replaymouse.c native/replaymouse.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Inative test/replaymouse_test.c native/replaymouse.c -o $@
+replaymousetest: build/replaymousetest
+	./build/replaymousetest
 
 # roster sets: the cartridge's exported and built again (byte for byte), a 32-team one, broken ones
 # (tools/rosterstest.py; the ROM as for make nhl94)
@@ -301,5 +307,5 @@ gen-pin:
 
 clean:
 	rm -rf build/captest build/oracle_shim.o build/nhl94 build/obj build/cross build/relaytest
-.PHONY: rulestest rosterstest scouttest sramtest setupoptstest test oracle clean nhl94 relaytest mdrt vectors lockstep lockstep-vanilla runtime-check runtime-selfcheck golden golden-check \
+.PHONY: rulestest replaymousetest rosterstest scouttest sramtest setupoptstest test oracle clean nhl94 relaytest mdrt vectors lockstep lockstep-vanilla runtime-check runtime-selfcheck golden golden-check \
 	golden-cross golden-ubsan netplay-check gen gen-pin release FORCE
