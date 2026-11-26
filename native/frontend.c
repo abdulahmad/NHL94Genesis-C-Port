@@ -759,6 +759,7 @@ static void pcspr_no_file(void)
     if (pcspr_found()) {                                  /* (the sprites are there: are the centre ice logos?) */
         static char lg[96];
         if (!pcspr_logos()) { snprintf(lg, sizeof lg, "%s (no logos in the NHL 95 PC files found)", cd_opts[CD_PCLOGO].label); cd_opts[CD_PCLOGO].label = lg; }
+        else if (pcspr_logos() == 1) { snprintf(lg, sizeof lg, "%s (no NHL94PC folder found)", cd_opts[CD_PCLOGO].label); cd_opts[CD_PCLOGO].label = lg; }   /* (NHL 94 PC then shows NHL 95 PC's) */
         return;
     }
     snprintf(label, sizeof label, "%s (no NHL 95 PC disc image found)", cd_opts[CD_PCSPR].label);
