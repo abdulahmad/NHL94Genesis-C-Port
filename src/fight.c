@@ -91,6 +91,29 @@ const uint8_t *spa_table(uint16_t spa)
     return rom_ptr(SYM_SPAlist + spa);
 }
 
+/* The picture of a fight frame. The 94 cartridge kept the fight frames' numbers (SPFgloves 353 to SPFfinjury+5 376) but not their
+ * art: each is one 8 x 8 sprite of tile 3749 (nothing to see), so a fighter was invisible. NHL 95 PC has no fights either (it gave
+ * those numbers to its face off, anthem and goalie wall pictures). The fight's frames stay what the game counts (chkhit reads
+ * them); only the picture is taken from the cartridge's own frames nearest each, in the fighter's facing (facedir 0-2 the right
+ * hand list of the 93 tables, 3-7 the left): holding (SPFHold) for the gloves off, the stance, the grab and being held; hooking
+ * (SPFhook) for the punches; stumbling (SPFstumble) for being hit; falling backward (SPFfallback) for the fall; injured on the ice
+ * (SPFinjury1) for the injury. Any other frame is itself. */
+#define SPFHold_ (SPFduck + 8)
+uint16_t fight_frame_shown(uint16_t fr, int facedir)
+{
+    if (fr < SPFfight || fr >= SPFPen) return fr;
+    int right = (facedir & 7) <= 2;
+    int k = fr - SPFfight;                                /* 0-2 gloves off, 3 stance, 4 grab, 5-7 punch (wind up, high, low) ... */
+    if (k >= 3 && k <= 7) right = 1;                      /* (A to A+4: the right hand list's own) */
+    else if (k >= 8 && k <= 12) { right = 0; k -= 5; }    /* (A+5 to A+9: the left hand list's) */
+    int d = right ? 2 : 6;
+    if (k <= 4) return (uint16_t)(SPFHold_ + d);
+    if (k <= 7) return (uint16_t)(SPFhook + d * 2 + (k == 5 ? 0 : 1));
+    if (k == 13) return (uint16_t)(SPFstumble + d * 3 + 1);                    /* (A+10: hit low) */
+    if (k <= 16) return (uint16_t)(k == 14 ? SPFstumble + d * 3 + 2 : SPFfallback + d * 4 + (k - 14));   /* (A+11 = FA: hit high or the fall's start; FA+1, FA+2 down) */
+    return (uint16_t)(SPFinjury1 + (right ? 0 : 6) + (fr - SPFfinjury));       /* (FB: lying injured) */
+}
+
 /* ---- ui94.asm / logic: the fight's own state ---- */
 #define pf2pen 4
 #define pf2unav 2

@@ -23,6 +23,7 @@
 #include "rosters.h"
 #include "native.h"
 #include "pcspr.h"
+#include "anim_gen.h"
 #include "pcsong.h"
 #include "rules.h"
 #include "cardcolor_xfer.h"
@@ -506,9 +507,14 @@ static void fade_update(const mdrt_vdp *vdp)
     fade256 = ref > 0 ? (cur >= ref ? 256 : cur * 256 / ref) : 256;
 }
 
+/* The fight frames, SPFgloves 353 to SPFfinjury+5 376 (NHL 93's fights: src/fight.c), have no PC frames: NHL 95 PC has no fights and
+ * gave those numbers (352-375) to other pictures (frames.asm: the face off stances 360-368, the anthem's standing 369-371, the goalie's
+ * wall jump 372-375, the cup 357-358), so a fighter was drawn as a face off or anthem man. The hook takes a fighter's frame through
+ * fight_frame_shown first (the cartridge frame he is drawn with: holding, hooking, falling), whose PC frame is the real one. */
 static int pc_frame(int fr)
 {
     if (fr < 1 || fr > 657) return -1;
+    if (fr >= SPFgloves && fr < SPFPen) return -1;      /* (the fight frames: fight_frame_shown leaves only the gloves, 353) */
     if (fr <= 554) return fr - 1;
     if (fr <= 562) return -1;                          /* (the cartridge's extra goalie ready frames) */
     return fr - 9;
@@ -706,7 +712,7 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
         return 0;
     }
     if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || sc > 13 || P.nshow >= 16) return 0;
-    int pf = pc_frame(o->frame & 0x7FF);
+    int pf = pc_frame(sc < 12 ? fight_frame_shown(o->frame & 0x7FF, sortobj(sc)->facedir) : (o->frame & 0x7FF));   /* (a fighter: the cartridge frame his is drawn with, fight.c) */
     if (hold_anthem_time() >= 0 && sc < 12 && sortobj(sc)->position > 0) pf = idle_skater(sc, hold_anthem_time());      /* (the anthem: the PC's standing picture, number 369) */
     if (pf < 0 || pf >= NFRAMES || !P.f[pf].px) return 0;   /* (no such PC frame: the cartridge's sprite stays) */
     P.show[P.nshow].pc = (int16_t)pf;
