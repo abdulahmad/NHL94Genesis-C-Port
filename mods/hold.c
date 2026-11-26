@@ -18,10 +18,13 @@
 static uint16_t until;                                /* the vblank (g.Vcount) the wait ends at */
 static int pending;
 static int anth;                                      /* the wait is the anthems' */
-#define ANTH_SKATE 90                                  /* frames the skaters take from their lines to the face off spot after the anthem */
 static int anth_pose, anth_len, anth_lock;
 #define ANTH_VPOS (-18)                                 /* (the PC shows centre ice half way down its rink view) */                        /* the anthem's line up (1 once the spots are taken); the anthem's own frames */
 static uint16_t anth_t0;
+/* the pace of the skate to the spots, pixels a frame: NHL 95 PC's skaters skate there at their top speed (5400 to 8400, 1.3 to 2.05
+ * rink units a game frame at 60 a second: 16 x speed / 65536); its rink is 0.89 times the cartridge's along (264 against 298
+ * to the end boards), so 1.5 to 2.3 of the cartridge's pixels, about its own top speed (velocity 8000: 17 x 8000 / 65536) */
+#define SKATE_SPEED 2
 static struct { int16_t x, y; } spot[12];
 static int16_t spot_face[12];
 static int face_set;                         /* the way each faced at his spot as the game set him up */
@@ -48,17 +51,22 @@ void hold_anthem(int frames)
     if (getenv("HOLDLOG")) fprintf(stderr, "hold: anthem %d frames at %d\n", frames, g.Vcount);
     anth_t0 = g.Vcount;
     anth_pose = 0;
-    until = (uint16_t)(g.Vcount + frames + ANTH_SKATE);
+    until = (uint16_t)(g.Vcount + frames + 300);        /* (until the spots are known: anthem_pose sets the skate's own time) */
     pending = 1;
     anth = 1;
 }
 
 int hold_anthem_pending(void) { return anth; }
 
-/* RULE_ANTHEM: the anthems' lengths in frames (60 a second), half a second after each: NHL 95 PC's USA.KMS and CANADA.KMS as
- * native/pcsong.c renders them, NHL 96 PC's ANTHUS.ASF and ANTHCAN.ASF. Fixed here: the game must not depend on whether a
- * machine has the files, or which of them */
-static const int16_t anthem_len[2][2] = { { 795, 723 }, { 990, 909 } };
+/* RULE_ANTHEM: the frame of each anthem's last note (60 a second; the sound fades out to its 25% level there), when the crowd
+ * cheers and the skaters leave their lines for the face off spots. NHL 95 PC's USA.KMS and CANADA.KMS as native/pcsong.c
+ * renders them (12.76 s and 11.56 s long: the music ends at 12.25 s and 11.10 s); NHL 96 PC's ANTHUS.ASF and ANTHCAN.ASF
+ * (352981 and 323384 samples at 22050 Hz, 16.01 s and 14.67 s: the last note fades out by 13.05 s and 10.05 s, the rest is
+ * the hall's echo). The PC games cheer and send the players off a countdown after the song starts (95 PC assintroline:
+ * 1FEh / 23Ah game frames at 60 a second; 96 PC RunPreGameSkate: 23Ah at 62.5 a second, 9.1 s) and resume play once all
+ * stand at their spots (96 PC: at most 334h frames, 13.1 s); 96 PC's 9.1 s is at the end of O Canada. Fixed here: the
+ * game must not depend on whether a machine has the files, or which of them */
+static const int16_t anthem_len[2][2] = { { 735, 666 }, { 783, 603 } };
 static int canadian(int art) { return art == 3 || art == 7 || art == 11 || art == 15 || art == 18 || art == 22 || art == 23 || art == 25; }
 int hold_anthem_frames(int set, int home_art) { return set >= 1 && set <= 2 ? anthem_len[set - 1][canadian(home_art)] : 0; }
 
@@ -76,6 +84,34 @@ int hold_anthem_time(void)
     return t >= 0 && t < anth_len ? t : -1;
 }
 
+static int anth_way(int ax, int ay, int bx, int by) { double dx = bx - ax, dy = by - ay; return (int)sqrt(dx * dx + dy * dy); }
+
+/* the anthem's line of each skater (the PC's lines: x lane * 28h - 50h, y +30h / -3Ah; goalies have none: 0) */
+static void anth_line(int lx[12], int ly[12])
+{
+    int slot[2] = {0, 0};
+    const struct SortObj *pl = sortobj(0);
+    for (int i = 0; i < 12; i++, pl++) {
+        if (pl->position <= 0) { lx[i] = ly[i] = 0; continue; }
+        int team = PFLAG(pl, pfteam) ? 1 : 0, n = slot[team]++;
+        lx[i] = n * 40 - 80 + (team ? 4 : -4);
+        ly[i] = team ? 0x30 : -0x3A;
+    }
+}
+
+/* the frames from the end of the song until all (the referee too) stand at their spots, each skating at SKATE_SPEED */
+static int anth_skate(void)
+{
+    int lx[12], ly[12], far = anth_way(108, 0, (int16_t)g.fox > 0 ? (int16_t)g.fox + 15 : (int16_t)g.fox - 15, (int16_t)g.foy);
+    anth_line(lx, ly);
+    for (int i = 0; i < 12; i++) {
+        if (sortobj(i)->position <= 0) continue;
+        int d = anth_way(lx[i], ly[i], spot[i].x, spot[i].y);
+        if (d > far) far = d;
+    }
+    return far / SKATE_SPEED + 2;
+}
+
 /* the referee stands at the side while the song plays, then goes to the face off spot with the players */
 int hold_anthem_ref(int *x, int *y, int *dir, int *moving)
 {
@@ -83,11 +119,12 @@ int hold_anthem_ref(int *x, int *y, int *dir, int *moving)
     int t = (int16_t)(g.Vcount - anth_t0) - anth_len;
     int fx = (int16_t)g.fox, fy = (int16_t)g.foy;
     int tx = (fx > 0 ? fx + 15 : fx - 15), ty = fy;
-    int k = t < 0 ? 0 : t > ANTH_SKATE ? ANTH_SKATE : t;
-    *x = 108 + (tx - 108) * k / ANTH_SKATE;
-    *y = 0 + (ty - 0) * k / ANTH_SKATE;
+    int d = anth_way(108, 0, tx, ty), run = t < 0 ? 0 : t * SKATE_SPEED;
+    if (run > d) run = d;
+    *x = 108 + (d ? (tx - 108) * run / d : 0);
+    *y = 0 + (d ? (ty - 0) * run / d : 0);
     *dir = 6;                                           /* (he stands on the right: facing the rink, the lines of players) */
-    *moving = k > 0 && k < ANTH_SKATE;
+    *moving = run > 0 && run < d;
     if (*moving) *dir = tx > 108 ? 2 : 6;
     return 1;
 }
@@ -154,28 +191,31 @@ static void anthem_pose(void)
         for (int i = 0; i < 12; i++, pl++) { spot[i].x = pl->Xpos; spot[i].y = pl->Ypos; spot_face[i] = pl->facedir; }
         face_set = 1;
         anth_pose = 1;
+        until = (uint16_t)(anth_t0 + anth_len + anth_skate());   /* (the drop: once the last of them is at his spot) */
         if (getenv("HOLDLOG")) for (int i = 0; i < 12; i++) fprintf(stderr, "hold: anthem player %d pos %d asn %d facedir %d\n", i, sortobj(i)->position, sortobj(i)->asslist[sortobj(i)->assnum & 7], sortobj(i)->facedir);
+        if (getenv("HOLDLOG")) fprintf(stderr, "hold: anthem skate %d frames after the song's %d\n", anth_skate(), anth_len);
     }
     int skating = t >= anth_len;
-    int slot[2] = {0, 0};
+    int lxs[12], lys[12];
+    anth_line(lxs, lys);
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) {
         if (pl->position <= 0) continue;                /* (goalies stay in their nets) */
-        int team = PFLAG(pl, pfteam) ? 1 : 0;
-        int n = slot[team]++;
-        int lx = n * 40 - 80 + (team ? 4 : -4), ly = team ? 0x30 : -0x3A;   /* (the PC's lines: x lane * 28h - 50h, y +30h / -3Ah) */
+        int lx = lxs[i], ly = lys[i];
         int x = lx, y = ly;
         if (skating) {
-            int k = t - anth_len;
-            if (k > ANTH_SKATE) k = ANTH_SKATE;
-            x = lx + (spot[i].x - lx) * k / ANTH_SKATE;
-            y = ly + (spot[i].y - ly) * k / ANTH_SKATE;
-            pl->Xpos = (int16_t)x;
-            pl->Ypos = (int16_t)y;
-            int dx = spot[i].x - lx, dy = spot[i].y - ly;
-            if (k < ANTH_SKATE && (abs(dx) > 1 || abs(dy) > 1)) { stride(pl, dx, dy, sqrt((double)dx * dx + (double)dy * dy) / ANTH_SKATE); continue; }
+            int dx = spot[i].x - lx, dy = spot[i].y - ly, d = anth_way(lx, ly, spot[i].x, spot[i].y);
+            int run = (t - anth_len) * SKATE_SPEED;
+            if (run < d) {                              /* (on his way, at the skate's pace) */
+                pl->Xpos = (int16_t)(lx + dx * run / d);
+                pl->Ypos = (int16_t)(ly + dy * run / d);
+                stride(pl, dx, dy, SKATE_SPEED);
+                continue;
+            }
+            x = spot[i].x;
+            y = spot[i].y;
             pl->facedir = spot_face[i];
-            if (pl->SPA == SPAskate) SetSPA(pl, SPAglide);      /* (there: he stops; the face off's own code gives the stance) */
+            if (run - SKATE_SPEED < d) SetSPA(pl, SPAglide);   /* (there: he stops, the skating stride ended whatever its step; the face off's own code gives the stance) */
         } else {
             pl->facedir = (int16_t)vtoa(0, 100);                /* (all face the viewer: facedir 4, as the PC's skaters) */
         }
@@ -195,7 +235,6 @@ static void anthem_pose(void)
 /* NHL 95 PC's between-play: the skaters do not appear at the face off spots; each skates there from where he was when
  * the whistle blew (the referee too: native/pcspr.c asks hold_skate_ref). The game's own setup has already placed them, so
  * every copy of the game agrees; this only walks them there over the wait. Only with RULE_HOLD. */
-#define SKATE_SPEED 2                                   /* pixels a frame (a skater's top speed in the game is about 2: velocity 8000) */
 static int sk_cap, sk_on, sk_dur;
 static uint16_t sk_t0;
 static struct { int16_t x, y; } sk_from[12], sk_to[12], sk_via[12];
@@ -352,7 +391,9 @@ static void skate_pose(void)
             continue;
         }
         if (run >= d || t >= sk_dur) {                  /* (there: face the puck, glide) */
-            if (pl->Xpos != sk_to[i].x || pl->Ypos != sk_to[i].y) {
+            /* (the frame he gets there, or the walk's last: the stride stops whatever its step, as the PC's asstakeposition
+             * sets its glide at the spot; the face off men's stance comes once all are there, src/logic.c) */
+            if (run - SKATE_SPEED < d || t == sk_dur || pl->Xpos != sk_to[i].x || pl->Ypos != sk_to[i].y) {
                 pl->Xpos = sk_to[i].x; pl->Ypos = sk_to[i].y;
                 pl->facedir = sk_face[i];
                 SetSPA(pl, SPAglide);
