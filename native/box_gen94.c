@@ -7,8 +7,10 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <time.h>
 
-enum { S_CLOSED, S_OPEN, S_DESK, S_PACK, S_POSTER, S_CARDS };
+enum { S_CLOSED, S_OPEN, S_DESK, S_PACK, S_POSTER, S_CARDS, S_LOOK };
 static int st, ready;
 static int caseG, cart, tv, tvScreen, tvKnob, con, tap, cspine, ccover, cmanual, cseat, nslot, nsw, nled, nseat;
 static float opn;
@@ -387,11 +389,13 @@ static int count_pads(void)
 }
 static void set_open(float t) { bx_n(cspine)->rot[1] = -PI_F / 2 * t; bx_n(ccover)->rot[1] = -PI_F / 2 * t; }
 
+static void look_caption(void);
 static void caption(void)
 {
     if (st == S_POSTER) { snprintf(BX.title, sizeof BX.title, "The poster"); bx_say("<b>The poster, unfolded.</b> Drag to spin it, flip it over for the catalog, or pick it for a close look."); return; }
-    if (st == S_CARDS) { snprintf(BX.title, sizeof BX.title, "Hint cards"); bx_say("<b>The hint cards from the pack.</b> Drag a card to spin it, pick it for a close look."); return; }
-    if (st == S_PACK) { snprintf(BX.title, sizeof BX.title, "In the box"); bx_say(G.out ? "<b>Everything that came in the box.</b> Drag an item to spin it, pick it to look closer." : "<b>Everything that came in the box.</b> Drag an item to spin it. To play, pick the cartridge."); return; }
+    if (st == S_LOOK) { look_caption(); return; }
+    if (st == S_CARDS) { snprintf(BX.title, sizeof BX.title, "Hint cards"); bx_say("<b>The hint cards from the pack.</b> Drag a card to spin it, pick it to hold it up."); return; }
+    if (st == S_PACK) { snprintf(BX.title, sizeof BX.title, "In the box"); bx_say(G.out ? "<b>Everything that came in the box.</b> Drag an item to spin it, pick it to hold it up." : "<b>Everything that came in the box.</b> Pick an item to hold it up. To play, pick the cartridge."); return; }
     snprintf(BX.title, sizeof BX.title, "%s", st == S_DESK ? "Set up the system" : "Box");
     if (st == S_CLOSED) bx_say("<b>The box.</b> Drag to spin it, pick it to open.");
     else if (st == S_OPEN) bx_say(G.out ? "<b>Your box.</b> Pick the bundle to lay everything out." : "<b>Manual and pack-ins on the left, cartridge on the right.</b> Pick anything in the box to lay it all out.");
@@ -439,7 +443,7 @@ static void stack_pose(void)
     for (int i = 0; i < NPK; i++) {
         if (pk[i] < 0) continue;
         r3_node *n;
-        if (i == 7) { bx_parent(pk[i], -1); bx_n(pk[i])->vis = 0; continue; }
+        if (i == 7 || i == 6) { bx_parent(pk[i], -1); bx_n(pk[i])->vis = 0; continue; }   /* (the order card is in the pack) */
         bx_parent(pk[i], bx_n(cmanual)->parent);
         n = bx_n(pk[i]);
         /* seen from inside the lid (its -z side): turned about y to face that way, so across runs the other way */
@@ -453,10 +457,11 @@ static void stack_pose(void)
 /* back in the case at once (the desk's Back, a new opening) */
 static void poster_away(void);
 static void cards_away(void);
+static void look_forget(void);
 static void lay_restore(void)
 {
-    poster_away(); cards_away();
-    for (int i = 0; i < NIT; i++) if (it_saved[i]) { bx_parent(it_node[i], it_par[i]); pose_set(it_node[i], it_l[i]); it_saved[i] = 0; }
+    poster_away(); cards_away(); look_forget();
+    for (int i = 0; i < NIT; i++) if (it_saved[i]) { bx_parent(it_node[i], it_par[i]); pose_set(it_node[i], it_l[i]); bx_n(it_node[i])->vis = 1; it_saved[i] = 0; }
     if (laid) bx_set3(bx_n(caseG)->pos, case_home[0], case_home[1], case_home[2]);
     laid = 0;
 }
@@ -467,7 +472,7 @@ static void lay_out(void)
 {
     if (st != S_OPEN || laid) return;
     st = S_PACK; laid = 1; bx_sfx(SFX_SLIDE, 0);
-    static const int row[2][6] = { { 9, 10, 0, 1, 2, 3 }, { 4, 5, 6, 8, -1, -1 } };
+    static const int row[2][6] = { { 9, 10, 0, 1, 2, 3 }, { 4, 5, 8, -1, -1, -1 } };
     const float sc = .6f, gap = .42f, ry[2] = { 1.85f, -2.8f };
     float *cm = BX_S->cam;
     r3_update(BX_S);
@@ -654,7 +659,6 @@ static void poster_open(void)
     st = S_POSTER; post_flip = 0; post_busy = 1; bx_sfx(SFX_SLIDE, 0);
     hide_items(-1);
     pose_get(pk[2], post_home);
-    if (post_home[2] > LAY_Z) post_home[2] = LAY_Z;
     post_home[7] *= PH_CARD / PH;                     /* folded, it is the size of the panel in the box */
     pose_set(ppiv, post_home);
     poster_cols(1, 0, 0); poster_rows(1, 0, 0);
@@ -672,10 +676,10 @@ static void poster_open(void)
 static void poster_away(void)
 {
     if (ppiv >= 0) bx_n(ppiv)->vis = 0;
-    for (int i = 0; i < NIT; i++) if (it_saved[i]) bx_n(it_node[i])->vis = 1;
     post_busy = 0;
 }
-static void poster_closed(int a) { (void)a; if (st != S_POSTER) return; poster_away(); st = S_PACK; caption(); }
+static void look_again(void);
+static void poster_closed(int a) { (void)a; if (st != S_POSTER) return; poster_away(); look_again(); }
 static void poster_close(void)
 {
     if (post_busy) return;
@@ -701,88 +705,141 @@ static void poster_look(void)
     bx_view_open_keys("EA SPORTS poster", k, 2, 0, NULL);
 }
 
-/* ---- the hint cards: the sealed pack opens and the cards in it come out in a row beside it: the sample card that came in the
- * box (front and back), and the cards there are scans of (pkHc1F..: fronts only, so their backs are left plain) ---- */
+/* ---- the hint cards: the sealed pack opens and a hand of cards comes out of it, all upright as they lie in the pack, then
+ * along to a row beside it (a wide card turns on its side as it goes). Each opening deals a new hand at random from the scans
+ * in the art folder: the sample card that came in the box (pkCardF/B) and pkHc1F, pkHc2F, ... (with pkHc1B ... for backs
+ * where there are scans of them; a card without one has a plain back). The hint cards order card is in the pack too ---- */
 #define NHC 4
-static int hc[NHC] = { -1, -1, -1, -1 }, hc_tex[NHC] = { -1, -1, -1, -1 }, hc_on[NHC], hc_have, hc_busy;
+#define NPOOL 600
+#define CARD_W 2.5f
+#define CARD_H 3.5f
+static int hc[NHC] = { -1, -1, -1, -1 }, hc_tex[NHC] = { -1, -1, -1, -1 }, hb_tex[NHC] = { -1, -1, -1, -1 }, hc_on[NHC], hc_land[NHC], hc_pick[NHC], hc_busy;
 static float pack_home[9];
-static const char *hc_key[NHC] = { "pkCardF", "pkHc1F", "pkHc2F", "pkHc3F" };
-static const char *hc_name[NHC] = { "Hint card: Brad Shaw", "Hint card: Mathieu Schneider", "Hint card: Eric Desjardins", "Hint card: Boston Bruins" };
-static const float hc_w[NHC] = { 2.5f, 2.5f, 2.5f, 3.5f }, hc_h[NHC] = { 3.5f, 3.5f, 3.5f, 2.47f };
+static char pool_k[NPOOL][12];
+static int npool = -1;
+static void pool_scan(void)
+{
+    if (npool >= 0) return;
+    npool = 0;
+    char k[24];
+    if (bx_art_exists("pkCardF")) snprintf(pool_k[npool++], sizeof pool_k[0], "pkCard");
+    for (int n = 1, miss = 0; n < 5000 && miss < 25 && npool < NPOOL; n++) {
+        snprintf(k, sizeof k, "pkHc%dF", n);
+        if (!bx_art_exists(k)) { miss++; continue; }
+        miss = 0; snprintf(pool_k[npool++], sizeof pool_k[0], "pkHc%d", n);
+    }
+}
+static const char *card_name(int k)
+{
+    static const char *known[][2] = { { "pkCard", "Hint card: Brad Shaw" }, { "pkHc1", "Hint card: Mathieu Schneider" }, { "pkHc2", "Hint card: Eric Desjardins" }, { "pkHc3", "Hint card: Boston Bruins" } };
+    if (k == NHC) return pk_name[6];
+    for (int i = 0; i < 4; i++) if (!strcmp(pool_k[hc_pick[k]], known[i][0])) return known[i][1];
+    return "Hint card";
+}
+static int card_node(int k) { return k < NHC ? hc[k] : pk[6]; }
+static int card_on(int k) { return k < NHC ? hc[k] >= 0 && hc_on[k] : pk[6] >= 0; }
 static void cards_make(void)
 {
-    hc[0] = pk[7];
-    int src = -1;                                        /* a pack-in's printed face: the new cards are the same stock */
+    int src = -1;                                        /* a pack-in's printed face: the cards are the same stock */
     for (int i = 0; i < BX_S->nmeshes && src < 0; i++) { int m = BX_S->meshes[i].mat; if (pk[7] >= 0 && r3_is_under(BX_S, BX_S->meshes[i].node, pk[7]) && m >= 0 && BX_S->mats[m].map >= 0) src = m; }
     if (src < 0) return;
-    for (int k = 1; k < NHC; k++) {
-        uint32_t *px = (uint32_t *)malloc(4 * sizeof(uint32_t));
+    for (int k = 0; k < NHC; k++) {
+        uint32_t *px = (uint32_t *)malloc(4 * sizeof(uint32_t)), *pb = (uint32_t *)malloc(4 * sizeof(uint32_t));
         if (px) for (int i = 0; i < 4; i++) px[i] = 0xffd8d4ccu;
-        hc_tex[k] = r3_tex_add(BX_S, px, 2, 2);
+        if (pb) for (int i = 0; i < 4; i++) pb[i] = 0xffa8a59fu;
+        hc_tex[k] = r3_tex_add(BX_S, px, 2, 2); hb_tex[k] = r3_tex_add(BX_S, pb, 2, 2);
         r3_mat m = BX_S->mats[src]; m.map = hc_tex[k]; m.side = 0;
         int mf = r3_mat_add(BX_S, &m);
-        m.map = -1; m.col[0] = m.col[1] = m.col[2] = .78f;
+        m.map = hb_tex[k];
         int mb = r3_mat_add(BX_S, &m);
         hc[k] = r3_node_add(BX_S, -1, "hintCard");
         if (hc[k] < 0) continue;
-        r3_mesh_quad(BX_S, hc[k], mf, -hc_w[k] / 2, hc_w[k] / 2, -hc_h[k] / 2, hc_h[k] / 2, .007f, 1, 0);
-        r3_mesh_quad(BX_S, hc[k], mb, -hc_w[k] / 2, hc_w[k] / 2, -hc_h[k] / 2, hc_h[k] / 2, -.007f, -1, 0);
+        /* upright, as the cards lie in the pack: a wide card's picture is put on its side */
+        r3_mesh_quad(BX_S, hc[k], mf, -CARD_W / 2, CARD_W / 2, -CARD_H / 2, CARD_H / 2, .007f, 1, 0);
+        r3_mesh_quad(BX_S, hc[k], mb, -CARD_W / 2, CARD_W / 2, -CARD_H / 2, CARD_H / 2, -.007f, -1, 1);
         bx_n(hc[k])->vis = 0;
     }
 }
-static void cards_load(void)
+/* a scan onto a card's face; a wide one goes on its side (a quarter turn clockwise). 1 when it was wide */
+static int card_tex(int tex, const char *key, uint32_t plain)
 {
-    if (hc_have) return;
-    hc_have = 1;
-    hc_on[0] = hc[0] >= 0;
-    for (int k = 1; k < NHC; k++) {
-        r3_tex *t = hc[k] >= 0 && bx_art_exists(hc_key[k]) ? bx_art(hc_key[k]) : NULL;
-        if (!t || !t->nlv || t->w < 1 || t->h < 1) continue;
-        uint32_t *px = (uint32_t *)malloc((size_t)t->w * t->h * 4);
-        if (!px) continue;
-        memcpy(px, t->lv[0], (size_t)t->w * t->h * 4);
-        r3_tex_set(&BX_S->texs[hc_tex[k]], px, t->w, t->h);
-        hc_on[k] = 1;
+    int w = 0, h = 0, wide = 0;
+    uint32_t *px = bx_art_exists(key) ? bx_art_pixels(key, &w, &h) : NULL;
+    if (px && w > h) {
+        uint32_t *r = (uint32_t *)malloc((size_t)w * h * 4);
+        if (r) {
+            for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) r[(size_t)x * h + (h - 1 - y)] = px[(size_t)y * w + x];
+            free(px); px = r; int t = w; w = h; h = t; wide = 1;
+        }
+    }
+    if (!px) { px = (uint32_t *)malloc(4 * sizeof(uint32_t)); if (px) for (int i = 0; i < 4; i++) px[i] = plain; w = h = 2; }
+    r3_tex_set(&BX_S->texs[tex], px, w, h);
+    return wide;
+}
+static void cards_deal(void)
+{
+    static int seeded;
+    if (!seeded) { srand((unsigned)time(NULL)); seeded = 1; }
+    pool_scan();
+    int order[NPOOL], n = npool;
+    for (int i = 0; i < n; i++) order[i] = i;
+    for (int i = n - 1; i > 0; i--) { int j = rand() % (i + 1), t = order[i]; order[i] = order[j]; order[j] = t; }
+    char kf[24];
+    for (int k = 0; k < NHC; k++) {
+        hc_on[k] = hc[k] >= 0 && k < n;
+        if (!hc_on[k]) continue;
+        hc_pick[k] = order[k];
+        snprintf(kf, sizeof kf, "%sF", pool_k[order[k]]); hc_land[k] = card_tex(hc_tex[k], kf, 0xffd8d4ccu);
+        snprintf(kf, sizeof kf, "%sB", pool_k[order[k]]); card_tex(hb_tex[k], kf, 0xffa8a59fu);
     }
 }
 static void cards_ready(int a) { (void)a; hc_busy = 0; }
-static float hc_to[NHC][3];
+static float hc_to[NHC + 1][3], hc_sc = 1;
 static void card_place(int k)
 {
-    r3_node *c = bx_n(hc[k]);
+    r3_node *c = bx_n(card_node(k));
     bx_tw3(c->pos, hc_to[k][0], hc_to[k][1], hc_to[k][2], 650, 0);
-    bx_tw3(c->scale, 1, 1, 1, 650, 0);
+    bx_tw3(c->scale, hc_sc, hc_sc, hc_sc, 650, 0);
+    if (k < NHC && hc_land[k]) bx_tw3(c->rot, 0, 0, PI_F / 2, 650, 0);     /* the wide card turns to lie as it was printed */
 }
+static void cards_show(int vis) { for (int k = 0; k <= NHC; k++) if (card_on(k)) bx_n(card_node(k))->vis = vis; }
 static void pack_open(void)
 {
     if (hc_busy) return;
-    cards_load();
+    cards_deal();
     st = S_CARDS; hc_busy = 1; bx_sfx(SFX_SLIDE, 0);
     hide_items(3);
     pose_get(pk[3], pack_home);
-    if (pack_home[2] > LAY_Z) pack_home[2] = LAY_Z;
-    const float gap = .45f, psc = .95f, y = -.5f;
+    float gap = .45f, psc = .95f, y = -.5f;
     float tw = 2.7f * psc;
     int n = 0;
-    for (int k = 0; k < NHC; k++) if (hc_on[k]) { tw += gap + hc_w[k]; n++; }
+    for (int k = 0; k <= NHC; k++) if (card_on(k)) { tw += gap + (k < NHC && hc_land[k] ? CARD_H : CARD_W); n++; }
+    {   /* the row fits across the picture */
+        float d = BX_S->cam[2] - LAY_Z, vw = 2 * d * tanf(BX_S->fov * PI_F / 360) * BX_C.w / (float)(BX_C.h > 0 ? BX_C.h : 1);
+        hc_sc = fminf(1, vw * .9f / tw);
+        gap *= hc_sc; psc *= hc_sc; tw *= hc_sc;
+    }
     float x = BX_S->cam[0] - tw / 2;
     r3_node *p = bx_n(pk[3]);
     float px = x + 2.7f * psc / 2;
     bx_tw3(p->pos, px, y, LAY_Z, 600, 0); bx_tw3(p->rot, 0, 0, 0, 600, 0); bx_tw3(p->scale, psc, psc, psc, 600, 0);
     x += 2.7f * psc + gap;
     n = 0;
-    for (int k = 0; k < NHC; k++) {
-        if (!hc_on[k]) continue;
-        bx_parent(hc[k], -1);
-        r3_node *c = bx_n(hc[k]);
-        bx_set3(c->pos, pack_home[0], pack_home[1], pack_home[2] - .12f); bx_set3(c->rot, 0, 0, 0); bx_set3(c->scale, pack_home[6], pack_home[6], pack_home[6]);
+    for (int k = 0; k <= NHC; k++) {
+        if (!card_on(k)) continue;
+        int nd = card_node(k);
+        bx_parent(nd, -1);
+        r3_node *c = bx_n(nd);
+        float cs = pack_home[6] * .9f;
+        bx_set3(c->pos, pack_home[0], pack_home[1], pack_home[2] - .12f); bx_set3(c->rot, 0, 0, 0); bx_set3(c->scale, cs, cs, cs);
         c->vis = 1;
         /* with the pack to its place, then out of it and along to its own */
         bx_tw3(c->pos, px, y, LAY_Z - .12f, 600, 0);
-        bx_tw3(c->scale, .9f, .9f, .9f, 600, 0);
-        bx_set3(hc_to[k], x + hc_w[k] / 2, y, LAY_Z);
+        bx_tw3(c->scale, .9f * hc_sc, .9f * hc_sc, .9f * hc_sc, 600, 0);
+        float w = (k < NHC && hc_land[k] ? CARD_H : CARD_W) * hc_sc;
+        bx_set3(hc_to[k], x + w / 2, y, LAY_Z);
         bx_after(650 + n * 140, card_place, k);
-        x += hc_w[k] + gap; n++;
+        x += w + gap; n++;
     }
     bx_after(650 + n * 140 + 700, cards_ready, 0);
     caption();
@@ -790,24 +847,25 @@ static void pack_open(void)
 static void cards_away(void)
 {
     for (int k = 0; k < NHC; k++) if (hc[k] >= 0) bx_n(hc[k])->vis = 0;
+    if (pk[6] >= 0) bx_n(pk[6])->vis = 0;
     hc_busy = 0;
 }
+static void look_again(void);
 static void pack_closed(int a)
 {
     (void)a;
     if (st != S_CARDS) return;
     cards_away();
-    for (int i = 0; i < NIT; i++) if (it_saved[i]) bx_n(it_node[i])->vis = 1;
-    st = S_PACK; caption();
+    look_again();                                        /* back to the pack in the hand */
 }
 static void pack_close(void)
 {
     if (hc_busy) return;
     hc_busy = 1; bx_sfx(SFX_SLIDE, 0);
     r3_node *p = bx_n(pk[3]);
-    for (int k = 0; k < NHC; k++) if (hc_on[k]) {
-        r3_node *c = bx_n(hc[k]);
-        bx_tw3(c->pos, p->pos[0], p->pos[1], LAY_Z - .12f, 500, 0); bx_tw3(c->rot, 0, 0, 0, 500, 0); bx_tw3(c->scale, .9f, .9f, .9f, 500, 0);
+    for (int k = 0; k <= NHC; k++) if (card_on(k)) {
+        r3_node *c = bx_n(card_node(k));
+        bx_tw3(c->pos, p->pos[0], p->pos[1], LAY_Z - .12f, 500, 0); bx_tw3(c->rot, 0, 0, 0, 500, 0); bx_tw3(c->scale, .9f * hc_sc, .9f * hc_sc, .9f * hc_sc, 500, 0);
     }
     bx_tw3(p->rot, 0, 0, 0, 400, 0);
     bx_tw3(p->pos, pack_home[0], pack_home[1], pack_home[2], 500, 450);
@@ -816,11 +874,10 @@ static void pack_close(void)
 }
 static void card_read(int k)
 {
-    static const char *shaw[2] = { "pkCardF", "pkCardB" };
-    static const char *one[1];
-    if (k == 0) { bx_view_open_keys(hc_name[0], shaw, 1 + (bx_art_exists("pkCardB") ? 1 : 0), 0, NULL); return; }
-    one[0] = hc_key[k];
-    bx_view_open_keys(hc_name[k], one, 1, 0, NULL);
+    static char kf[24], kb[24]; const char *keys[2] = { kf, kb };
+    if (k == NHC) { pk_read(6); return; }
+    snprintf(kf, sizeof kf, "%sF", pool_k[hc_pick[k]]); snprintf(kb, sizeof kb, "%sB", pool_k[hc_pick[k]]);
+    bx_view_open_keys(card_name(k), keys, 1 + (bx_art_exists(kb) ? 1 : 0), 0, NULL);
 }
 static void pk_read(int i)
 {
@@ -829,6 +886,131 @@ static void pk_read(int i)
     int n = bx_art_exists(kf) + (bx_art_exists(kb) ? 1 : 0);
     if (!bx_art_exists(kf)) { bx_say("<b>No scan of this pack-in.</b> Put it in the box art folder."); return; }
     bx_view_open_keys(pk_name[i], k, n, n > 1, NULL);
+}
+
+/* ---- a close look: the picked thing comes up to the middle of the picture, big, to be turned in the hand (drag). Picked
+ * again it does its job (the cartridge to the system, the manual open, the poster unfolded, the pack opened, a card or
+ * paper to read); Back (or the right button) puts it down again ---- */
+#define LOOK_Z 11.0f
+static struct lk_t { int node, ret, item; float home[9]; } hold = { -1, 0, 0, { 0 } }, lk_out;
+static int lk_busy, lk_has_out;
+static void look_forget(void) { hold.node = -1; lk_has_out = 0; lk_busy = 0; }
+/* the size of a thing on the screen's axes as it lies now (its meshes' corners in the world) */
+static void look_size(int node, float *w, float *h, float c[2])
+{
+    float lo[2] = { 1e9f, 1e9f }, hi[2] = { -1e9f, -1e9f };
+    r3_update(BX_S);
+    for (int i = 0; i < BX_S->nmeshes; i++) {
+        r3_mesh *m = &BX_S->meshes[i];
+        if (!r3_is_under(BX_S, m->node, node) || !BX_S->nodes[m->node].vis) continue;
+        const float *W = r3_world(BX_S, m->node);
+        for (int v = 0; v < m->nv; v++) {
+            const float *p = m->v + v * 8;
+            for (int a = 0; a < 2; a++) {
+                float q = W[a * 4] * p[0] + W[a * 4 + 1] * p[1] + W[a * 4 + 2] * p[2] + W[a * 4 + 3];
+                if (q < lo[a]) lo[a] = q;
+                if (q > hi[a]) hi[a] = q;
+            }
+        }
+    }
+    *w = hi[0] > lo[0] ? hi[0] - lo[0] : 1; *h = hi[1] > lo[1] ? hi[1] - lo[1] : 1;
+    c[0] = (lo[0] + hi[0]) / 2; c[1] = (lo[1] + hi[1]) / 2;
+}
+static const char *look_name(void)
+{
+    if (hold.ret == S_CARDS) return hold.node == pk[3] ? pk_name[3] : card_name(hold.item);
+    return hold.item == NPK ? "The manual" : hold.item == NPK + 1 ? "The cartridge" : pk_name[hold.item];
+}
+static const char *look_does(void)
+{
+    if (hold.ret == S_CARDS) return hold.node == pk[3] || hold.item == NHC ? "read it" : "look closer";
+    if (hold.item == NPK + 1) return G.out ? NULL : "put it in the system";
+    if (hold.item == NPK) return "read it";
+    if (hold.item == 2) return "unfold it";
+    if (hold.item == 3) return "open it";
+    return "read it";
+}
+static void look_hide(void)
+{
+    if (hold.ret == S_PACK) { hide_items(hold.item); return; }
+    bx_n(pk[3])->vis = hold.node == pk[3];
+    for (int k = 0; k <= NHC; k++) if (card_on(k)) bx_n(card_node(k))->vis = card_node(k) == hold.node;
+}
+static void look_caption(void)
+{
+    static char t[200];
+    const char *does = look_does();
+    snprintf(BX.title, sizeof BX.title, "%s", look_name());
+    if (does) snprintf(t, sizeof t, "<b>%s.</b> Drag to turn it. Pick again to %s; Back puts it down.", look_name(), does);
+    else snprintf(t, sizeof t, "<b>%s.</b> Drag to turn it. Back puts it down.", look_name());
+    bx_say(t);
+}
+static void look_ready(int a) { (void)a; lk_busy = 0; }
+static float round_to(float a, float q) { return q * roundf(a / q); }
+static void look_at(int node, int item)
+{
+    if (lk_busy || node < 0) return;
+    if (st == S_CARDS) { lk_out = hold; lk_has_out = 1; }
+    hold.ret = st; hold.node = node; hold.item = item;
+    r3_node *n = bx_n(node);
+    if (hold.ret == S_PACK && item == NPK && fabsf(n->rot[0]) > 2) bx_set3(n->rot, 0, PI_F, 0);   /* the manual's half turn, spelled about y */
+    pose_get(node, hold.home);
+    if (hold.ret == S_PACK && hold.home[2] > LAY_Z) hold.home[2] = LAY_Z;     /* (it was lifted under the pointer) */
+    float rot[3] = { round_to(n->rot[0], PI_F), round_to(n->rot[1], PI_F), round_to(n->rot[2], PI_F / 2) };
+    float keep[3]; memcpy(keep, n->rot, 12);
+    memcpy(n->rot, rot, 12);
+    float w, h, c[2]; look_size(node, &w, &h, c);        /* squared up, as it will be seen (and where its middle is) */
+    float off[2] = { c[0] - n->pos[0], c[1] - n->pos[1] };
+    memcpy(n->rot, keep, 12);
+    const float *cm = BX_S->cam;
+    float z = fminf(LOOK_Z, cm[2] - 8), t = (cm[2] - z) / fmaxf(cm[2] - bx_look[2], 1);
+    float d = cm[2] - z, vh = 2 * d * tanf(BX_S->fov * PI_F / 360), vw = vh * BX_C.w / (float)(BX_C.h > 0 ? BX_C.h : 1);
+    float k = fminf(vh * .66f / h, vw * .55f / w), sc = n->scale[0] * k;
+    lk_busy = 1; st = S_LOOK; bx_sfx(SFX_SLIDE, 0);
+    look_hide();
+    bx_tw3(n->pos, cm[0] + (bx_look[0] - cm[0]) * t - off[0] * k, cm[1] + (bx_look[1] - cm[1]) * t - off[1] * k, z, 600, 0);
+    bx_tw3(n->rot, rot[0], rot[1], rot[2], 600, 0);
+    bx_tw3(n->scale, sc, sc, sc, 600, 0);
+    bx_after(620, look_ready, 0);
+    caption();
+}
+/* back to the look after the poster or the pack has been put away */
+static void look_again(void)
+{
+    st = S_LOOK; lk_busy = 0;
+    if (hold.node >= 0) bx_n(hold.node)->vis = 1;
+    look_hide();
+    caption();
+}
+static void look_down(int a)
+{
+    (void)a;
+    if (st != S_LOOK) return;
+    lk_busy = 0; st = hold.ret;
+    if (st == S_PACK) { for (int i = 0; i < NIT; i++) if (it_saved[i]) bx_n(it_node[i])->vis = 1; hold.node = -1; }
+    else { bx_n(pk[3])->vis = 1; cards_show(1); if (lk_has_out) { hold = lk_out; lk_has_out = 0; } }
+    caption();
+}
+static void look_close(void)
+{
+    if (lk_busy || hold.node < 0) return;
+    lk_busy = 1; bx_sfx(SFX_SLIDE, 0);
+    r3_node *n = bx_n(hold.node); const float *o = hold.home;
+    bx_tw3(n->pos, o[0], o[1], o[2], 550, 0); bx_tw3(n->rot, o[3], o[4], o[5], 550, 0); bx_tw3(n->scale, o[6], o[7], o[8], 550, 0);
+    bx_after(570, look_down, 0);
+}
+static void open_manual(void);
+static void to_desk(int a);
+static void look_use(void)
+{
+    if (lk_busy) return;
+    if (hold.ret == S_CARDS) { if (hold.node == pk[3]) pk_read(3); else card_read(hold.item); return; }
+    int i = hold.item;
+    if (i == NPK + 1) { if (!G.out) bx_fade_ms(to_desk, 0, 350); else bx_say("The cartridge is already in the system. Back returns to the game."); return; }   /* (twice as quick as the other fades) */
+    if (i == NPK) { open_manual(); return; }
+    if (i == 2) { poster_open(); return; }
+    if (i == 3) { pack_open(); return; }
+    pk_read(i);
 }
 
 /* where the cartridge sits when it is pushed home: the commercial's seated cartridge shows about 2.2 in above the console
@@ -946,9 +1128,9 @@ static void frame(float dt)
     }
     if (st == S_PACK) {
         int hv = bx_hovered_node();
-        if (it_saved[NPK]) bx_hot_node(cmanual, "Manual: pick to read");
-        if (it_saved[NPK + 1]) bx_hot_node(cart, G.out ? "Cartridge" : "Cartridge: pick to put it in the system");
-        for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_hot_node(pk[i], pk_name[i]);
+        if (it_saved[NPK]) bx_hot_node(cmanual, "Manual");
+        if (it_saved[NPK + 1]) bx_hot_node(cart, "Cartridge");
+        for (int i = 0; i < NPK; i++) if (pk[i] >= 0 && i != 6 && i != 7) bx_hot_node(pk[i], pk_name[i]);
         for (int i = 0; i < NIT; i++) if (it_saved[i]) {           /* the one under the pointer lifts a little */
             float *z = &bx_n(it_node[i])->pos[2];
             if (it_node[i] == hv && *z >= LAY_Z - .01f) *z = LAY_Z + .5f;
@@ -958,10 +1140,11 @@ static void frame(float dt)
     if (st == S_POSTER && !post_busy) bx_hot_node(ppiv, "Poster: drag to spin, pick for a close look");
     if (st == S_CARDS && !hc_busy) {
         bx_hot_node(pk[3], "Hint Cards pack");
-        for (int k = 0; k < NHC; k++) if (hc_on[k]) bx_hot_node(hc[k], hc_name[k]);
+        for (int k = 0; k <= NHC; k++) if (card_on(k)) bx_hot_node(card_node(k), card_name(k));
     }
+    if (st == S_LOOK && !lk_busy && hold.node >= 0) { static char h[96]; const char *d = look_does(); snprintf(h, sizeof h, "%s%s%s", look_name(), d ? ": pick to " : "", d ? d : ""); bx_hot_node(hold.node, h); }
     /* closed, nothing of the bundle shows (it is inside the case) */
-    if (!laid && st <= S_OPEN) for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_n(pk[i])->vis = i != 7 && opn > .04f;
+    if (!laid && st <= S_OPEN) for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_n(pk[i])->vis = i != 7 && i != 6 && opn > .04f;
     if (st == S_DESK) {
         if (!G.cart) { bx_hot_node(cart, "Insert the cartridge"); bx_hot_node(nslot, "Insert the cartridge"); }
         bx_hot_node(tvKnob, "TV power"); if (tvRemote >= 0) bx_hot_node(tvRemote, "TV power (remote)"); bx_hot_node(nsw, "System power");
@@ -975,6 +1158,7 @@ static void back(void)
 {
     if (st == S_DESK) { bx_fade(to_case, 0); return; }
     if (st == S_POSTER) { poster_close(); return; }
+    if (st == S_LOOK) { look_close(); return; }
     if (st == S_CARDS) { pack_close(); return; }
     if (st == S_PACK) { lay_in(); caption(); return; }
     if ((st == S_OPEN && G.out) || (st == S_CLOSED && !BX.first)) { bx_done(); return; }
@@ -997,18 +1181,18 @@ static void activate(int node, float sx, float sy)
         for (int i = 0; i < NPK; i++) if (node == pk[i]) in = 1;
         if (in) { lay_out(); caption(); return; }
     }
-    if (node == cmanual) { open_manual(); return; }
+    if (st == S_LOOK) { if (node >= 0 && hold.node >= 0 && r3_is_under(BX_S, node, hold.node)) look_use(); return; }
+    if (st == S_PACK) { for (int i = 0; i < NIT; i++) if (it_saved[i] && node == it_node[i]) { look_at(node, i); return; } }
+    if (node == cmanual && st != S_PACK) { open_manual(); return; }
     if (st == S_POSTER) { if (!post_busy && r3_is_under(BX_S, node, ppiv)) poster_look(); return; }
     if (st == S_CARDS) {
         if (hc_busy) return;
-        if (node == pk[3]) { pk_read(3); return; }
-        for (int k = 0; k < NHC; k++) if (node == hc[k]) { card_read(k); return; }
+        if (node == pk[3]) { look_at(node, 3); return; }
+        for (int k = 0; k <= NHC; k++) if (card_on(k) && node == card_node(k)) { look_at(node, k); return; }
         return;
     }
-    for (int i = 0; i < NPK; i++) if (st == S_PACK && node == pk[i]) { if (i == 2) poster_open(); else if (i == 3) pack_open(); else pk_read(i); return; }
     if (node == cart) {
-        if (st == S_PACK && !G.out) bx_fade_ms(to_desk, 0, 350);   /* twice as quick as the other fades */
-        else if (st == S_DESK) insert_cart();
+        if (st == S_DESK) insert_cart();
         else bx_say("The cartridge is already in the system. Back returns to the game.");
         return;
     }
@@ -1027,14 +1211,20 @@ static void drag(int node, float dx, float dy)
 {
     if (st >= S_PACK) {                                     /* laid out: the item under the pointer turns in the hand */
         int ok = 0;
-        if (node < 0) return;
+        if (node < 0 && st != S_LOOK) return;
         if (st == S_PACK) for (int i = 0; i < NIT; i++) if (it_saved[i] && it_node[i] == node) {
             ok = 1;
             r3_node *m = bx_n(node);
             if (i == NPK && fabsf(m->rot[0]) > 2) bx_set3(m->rot, 0, PI_F, 0);      /* the manual's half turn, spelled about y */
         }
         if (st == S_POSTER && node == ppiv && !post_busy) ok = 1;
-        if (st == S_CARDS && !hc_busy) { if (node == pk[3]) ok = 1; for (int k = 0; k < NHC; k++) if (node == hc[k]) ok = 1; }
+        if (st == S_CARDS && !hc_busy) { if (node == pk[3]) ok = 1; for (int k = 0; k <= NHC; k++) if (card_on(k) && node == card_node(k)) ok = 1; }
+        if (st == S_LOOK) {                                 /* held up: any drag turns it, all the way round either way */
+            if (lk_busy || hold.node < 0) return;
+            r3_node *m = bx_n(hold.node);
+            m->rot[1] += dx * .012f; m->rot[0] += dy * .012f;
+            return;
+        }
         if (!ok) return;
         r3_node *m = bx_n(node);
         m->rot[1] += dx * .012f; m->rot[0] += dy * .012f;

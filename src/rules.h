@@ -52,6 +52,8 @@ int hold_skate_ref(void);                           /* the referee's progress al
 int hold_anthem_time(void);                         /* the frames into the anthem's song; -1 when it is not playing */
 int hold_anthem_pending(void);                      /* 1 once the anthem has been asked for, until the face off drops */
 void hold_skate_puck(int *x, int *y, int *pickup);  /* the puck's whistle place, and when (of 256) the referee has it */
+int hold_skate_pstart(void);                         /* 1 while the skaters (and the referee) come on at the start of a period */
+int hold_skating(void);                             /* 1 while the skaters walk to the spots (the drop's time waits for them) */
 int hold_nofade(void);                             /* RULE_HOLD, a face off in the middle of play: no fade to black */
 int hold_anthem_ref(int *x, int *y, int *dir, int *moving);   /* the anthem's referee: its place on the rink (1 while the anthem and the skate to the spots last) */
 /* RULE_ANNOUNCE 2: a goal's speech (pa_hook PA_GOAL with these arguments) starts when the goal song has ended; the face off waits for

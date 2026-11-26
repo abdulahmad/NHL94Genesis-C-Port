@@ -101,8 +101,11 @@ void PlayerCardScreen(void)
     g.printy = 6;
     uint16_t chars = g.homepicchars, d3 = (uint16_t)(g.featuredplayer * 6);
     const struct RosterTeam *T = rosters_team(team);
-    g.cardroster = T->picture[d3 / 6].slot;
-    uint32_t pic = T->picture[d3 / 6].pic;
+    uint16_t fp = d3 / 6;
+    if (T->pictures && fp >= T->pictures) fp %= T->pictures;   /* (a roster set with fewer than 6: the Sega CD's NYR; the cartridge reads past its list) */
+    g.cardroster = T->picture[fp].slot;
+    picture_who = (uint32_t)team << 16 | (uint16_t)(g.cardroster + 1);   /* (for a host's picture_drawn_hook) */
+    uint32_t pic = T->picture[fp].pic;
     uint32_t pal = ART(PicturePalette) + rd32(rom_ptr(ART(PicturePalette))), map;
     if (rd32(rom_ptr(pic + 4)) == 0) map = ART(PicturePalette) + rd32(rom_ptr(ART(PicturePalette) + 4));   /* no map: the common one */
     else map = pic + rd32(rom_ptr(pic + 4));

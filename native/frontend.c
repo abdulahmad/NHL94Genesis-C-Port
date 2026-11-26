@@ -623,9 +623,11 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_CROWD_CDVOL (CD_ROWS + 27)
 #define CD_CROWD_PC (CD_ROWS + 28)
 #define CD_CROWD_PCVOL (CD_ROWS + 29)
-#define CD_OPTS (CD_ROWS + 30)
-static const int crowd_pct[7] = { 25, 50, 75, 100, 125, 150, 200 };
-static int crowd_vol_of(int idx) { int v = ob_game_get(&host, idx); return crowd_pct[v < 0 ? 0 : v > 6 ? 6 : v]; }
+#define CD_SPLIT (CD_ROWS + 30)                          /* (the movie's 50/50 demo: the disc's own left, the enhanced right) */
+#define CD_OPTS (CD_ROWS + 31)
+#define CROWD_VOLS 40                                     /* (the crowd volumes: 5% to 200% in steps of 5%) */
+#define CROWD_VOL_100 19                                  /* (the choice for 100%) */
+static int crowd_vol_of(int idx) { int v = ob_game_get(&host, idx); return 5 * ((v < 0 ? 0 : v >= CROWD_VOLS ? CROWD_VOLS - 1 : v) + 1); }
 static void crowd_apply(void)
 {
     segacd_set_crowd((ob_game_get(&host, CD_CROWD) ? 1 : 0) | (ob_game_get(&host, CD_CROWD_CD) ? 2 : 0));
@@ -648,7 +650,7 @@ static void wide_rows_sync(void)
     movie_seen = host.movie_own;
 }
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
-static SDL_atomic_t cd_smooth, cd_colour;
+static SDL_atomic_t cd_smooth, cd_colour, cd_split;
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
 /* the option of the rules page with this key, or -1 */
@@ -671,6 +673,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_DEDITHER) { SDL_AtomicSet(&cd_dedither, value); return; }
     if (index == CD_SMOOTH) { SDL_AtomicSet(&cd_smooth, value); return; }
     if (index == CD_COLOUR) { SDL_AtomicSet(&cd_colour, value); return; }
+    if (index == CD_SPLIT) { SDL_AtomicSet(&cd_split, value); return; }
     if (index == CD_MOVIELOOK) { host.movie_own = value != 0; return; }   /* (hook_frame keeps the two rows alike) */
     if (index == CD_PHOTOS) { segacd_set_photos(value); return; }
     if (index == CD_CAREER) { segacd_set_career(value, ending); return; }
@@ -731,7 +734,7 @@ static void intro_tick(void)
     char intro_base[1100];                               /* (the made files: segacd-intro.dedither, .smooth, .colour) */
     snprintf(intro_base, sizeof intro_base, "%s", beside("segacd-intro"));
     if (st == 1) SDL_AtomicSet(&intro_state, segacd_movie_start(segacd_disc(), "HOCKEY.SEG", F.dev, F.rate, SDL_AtomicGet(&cd_dedither),
-                                                                        SDL_AtomicGet(&cd_smooth), SDL_AtomicGet(&cd_colour), intro_base,
+                                                                        SDL_AtomicGet(&cd_smooth), SDL_AtomicGet(&cd_colour), SDL_AtomicGet(&cd_split), intro_base,
                                                                         beside("rife-v4.6")) ? 2 : 0);
     else if (st == 2 && !segacd_movie_tick()) SDL_AtomicSet(&intro_state, 0);
     if (st && !SDL_AtomicGet(&intro_state)) {           /* (over or skipped: black until the game's next frame, not the screen before the movie) */
@@ -843,13 +846,15 @@ static void game_page_init(void)
     static const char *const music[2] = { "cartridge", "Sega CD" }, *const crowd[3] = { "cartridge", "Sega CD", "both" };
     cd_opts[CD_MUSIC] = (ob_game_opt){ "cd_music", "Music", music, 2, 0, 0, 3 };
     (void)crowd;
-    static const char *const vols[7] = { "25%", "50%", "75%", "100%", "125%", "150%", "200%" };
+    static char vol_names[CROWD_VOLS][8];                /* (saved by name: an older ini's "25%" .. "200%" still reads) */
+    static const char *vols[CROWD_VOLS];
+    for (int k = 0; k < CROWD_VOLS; k++) { snprintf(vol_names[k], sizeof vol_names[k], "%d%%", 5 * (k + 1)); vols[k] = vol_names[k]; }
     cd_opts[CD_CROWD] = (ob_game_opt){ "crowd_cart", "Cartridge crowd bed", cd_off_on, 2, 1, 0, 3 };   /* (the cartridge's own noise, following the crowd meter) */
-    cd_opts[CD_CROWD_CARTVOL] = (ob_game_opt){ "crowd_cart_vol", "Cartridge crowd volume", vols, 7, 3, 0, 3 };
+    cd_opts[CD_CROWD_CARTVOL] = (ob_game_opt){ "crowd_cart_vol", "Cartridge crowd volume", (const char *const *)vols, CROWD_VOLS, CROWD_VOL_100, 0, 3 };
     cd_opts[CD_CROWD_CD] = (ob_game_opt){ "crowd_cd", "Sega CD crowd bed", cd_off_on, 2, 0, 0, 3 };     /* (the disc's track 2) */
-    cd_opts[CD_CROWD_CDVOL] = (ob_game_opt){ "crowd_cd_vol", "Sega CD crowd volume", vols, 7, 3, 0, 3 };
+    cd_opts[CD_CROWD_CDVOL] = (ob_game_opt){ "crowd_cd_vol", "Sega CD crowd volume", (const char *const *)vols, CROWD_VOLS, CROWD_VOL_100, 0, 3 };
     cd_opts[CD_CROWD_PC] = (ob_game_opt){ "crowd_pc", "PC crowd bed", cd_off_on, 2, 0, 0, 4 };         /* (NHL 95 PC's two crowd voices, on the same crowd meter) */
-    cd_opts[CD_CROWD_PCVOL] = (ob_game_opt){ "crowd_pc_vol", "PC crowd volume", vols, 7, 3, 0, 4 };
+    cd_opts[CD_CROWD_PCVOL] = (ob_game_opt){ "crowd_pc_vol", "PC crowd volume", (const char *const *)vols, CROWD_VOLS, CROWD_VOL_100, 0, 4 };
     static const char *const voice[3] = { "off", "speech only", "speech and music" };   /* (speech only: Ron Barr alone as on the disc) */
     cd_opts[CD_VOICE] = (ob_game_opt){ "cd_voice", "Ron Barr scouting voice", voice, 3, 0, 0, 3 };
     cd_opts[CD_SCREENS] = (ob_game_opt){ "cd_screens", "Opening screens", music, 2, 0, 0, 3 };
@@ -859,6 +864,8 @@ static void game_page_init(void)
     static const char *const smooth[2] = { "original", "30 fps" }, *const colour[2] = { "original", "enhanced" };
     cd_opts[CD_SMOOTH] = (ob_game_opt){ "cd_smooth", "Movie frame rate", smooth, 2, 0, 0, 3 };
     cd_opts[CD_COLOUR] = (ob_game_opt){ "cd_colour", "Movie colour", colour, 2, 0, 0, 3 };
+    static const char *const split[2] = { "off", "50/50 split" };
+    cd_opts[CD_SPLIT] = (ob_game_opt){ "cd_movie_split", "Movie 50/50 demo", split, 2, 0, 0, 3 };   /* (left the disc's own, right de-dithered, coloured, 30 fps) */
     static const char *const movie_scaling[2] = { "same as the game", "its own" };
     host.has_movie = 1;                                   /* (the overlay lists Scaling (Movie): the intro movie's own look) */
     cd_opts[CD_MOVIELOOK] = (ob_game_opt){ "movie_scaling", "Movie scaling", movie_scaling, 2, host.movie_own ? 1 : 0, 0, 3 };   /* (its own: the overlay's Scaling (Movie) page) */
@@ -889,6 +896,7 @@ static void game_page_init(void)
         game_help[CD_SCREENS] = "The opening screens: the cartridge's or the disc's.";
         game_help[CD_TITLE] = "The title page: the cartridge's or the disc's.";
         game_help[CD_INTRO] = "The disc's opening movie before the title.";
+        game_help[CD_SPLIT] = "A side by side demo of the intro movie: the left half as the disc plays it, the right half de-dithered, colour enhanced and at 30 fps.";
         game_help[CD_SFX] = "Sound effects: the cartridge's or the disc's.";
     }
     ob_game_set_help(game_help);
@@ -927,6 +935,7 @@ static void game_page_init(void)
     static signed char pv[3][CD_OPTS];
     for (int p = 0; p < 3; p++) for (int k = 0; k < CD_OPTS; k++) pv[p][k] = p == 1 ? 1 : 0;   /* Cartridge 0, Sega CD 1 */
     pv[1][CD_DEDITHER] = pv[1][CD_SMOOTH] = pv[1][CD_COLOUR] = pv[1][CD_MOVIELOOK] = 0;            /* (the movie as the disc has it) */
+    pv[1][CD_SPLIT] = 0;                                                       /* (the 50/50 demo: off in every preset) */
     pv[1][CD_VOICE] = 1;
     pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
     pv[1][CD_ANNOUNCER] = 0;                                                  /* (95 PC's voice: not the Sega CD's) */
@@ -955,7 +964,7 @@ static void game_page_init(void)
     for (size_t k = 0; k < sizeof disc_look / sizeof *disc_look; k++) pv[2][disc_look[k]] = 1;
     pv[0][CD_CROWD] = pv[2][CD_CROWD] = 1; pv[1][CD_CROWD] = 0;                 /* (the cartridge's bed: on in Cartridge and Recommended, off on the Sega CD) */
     pv[0][CD_CROWD_CD] = 0; pv[1][CD_CROWD_CD] = 1; pv[2][CD_CROWD_CD] = 1;     /* (the disc's: on in Sega CD and Recommended) */
-    for (int p = 0; p < 3; p++) { pv[p][CD_CROWD_CARTVOL] = pv[p][CD_CROWD_CDVOL] = pv[p][CD_CROWD_PCVOL] = 3; pv[p][CD_CROWD_PC] = 0; }   /* (100%; the PC's off in all) */
+    for (int p = 0; p < 3; p++) { pv[p][CD_CROWD_CARTVOL] = pv[p][CD_CROWD_CDVOL] = pv[p][CD_CROWD_PCVOL] = CROWD_VOL_100; pv[p][CD_CROWD_PC] = 0; }   /* (100%; the PC's off in all) */
     pv[2][CD_DEDITHER] = OB_POSTFX_LIVE;                                       /* (the movie without the dither) */
     pv[2][CD_MOVIELOOK] = 1;                                                   /* (its own look: soft CRT unless changed on Scaling (Movie)) */
     for (int k = 0; k < CD_ROWS; k++) if (!strcmp(cd_rows[k].key, "cd_clear_shots")) pv[2][k] = 1;   /* (the one fix) */

@@ -12,6 +12,8 @@
  *              cached de-dither's pictures: <base>.smooth. A cut between two shots is held, not blended.
  *              It needs the de-dither on (live or cached); until it is made the movie plays at its own rate.
  *   colour     each shot's own correction (overbar/grade.h): <base>.colour, a few bytes a shot, applied live.
+ * The 50/50 demo shows both at once: the left half the disc's own picture at its own 10 a second, the right half with all
+ * three (the cached de-dither, the colour, 30 fps), a line between them and their names at the top.
  * The movie and its decoder are native/segacd_film.c's. */
 #include <SDL.h>
 #include <stdio.h>
@@ -49,7 +51,7 @@ static struct {
     SDL_atomic_t skip;
     uint32_t label_at;                      /* SDL_GetTicks of the last change (0 none) */
     char cache[1100], base[1100], model[1100];
-    int smooth, colour;                     /* the options: 30 fps, the shots' colour */
+    int smooth, colour, split;              /* the options: 30 fps, the shots' colour, the 50/50 demo */
     ob_ddcache *mids;                       /* the 30 fps pictures: 2 between each pair, 2x */
     int sub;                                /* which of the three the picture is (0 the disc's own) */
     ob_grade_scene *scenes;
@@ -232,6 +234,11 @@ static void show(void)
         if (i != M.lut_scene) { ob_grade_prepare(&sc->p, &M.lut); M.lut_scene = i; }
         ob_grade_apply(&M.lut, M.pic, M.pic, (long)w * h);
     }
+    if (M.split)                                           /* (the 50/50 demo: the left half the disc's own picture as it came, its own pixels larger) */
+        for (int y = 0; y < h; y++) {
+            const uint32_t *src = M.raw + (size_t)(y * M.fh / h) * M.fw;
+            for (int x = 0; x < w / 2; x++) M.pic[(size_t)y * w + x] = src[x * M.fw / w];
+        }
     const char *dump = getenv("SEGACD_MOVIE_DUMP");          /* (tests: each picture shown, as a PPM) */
     if (dump) {
         static int n;
@@ -262,6 +269,13 @@ static void draw(void *ud, uint32_t *px, int w, int h, int pitch)
     if (bh > h) { bh = h; bw = h * 4 / 3; }
     int x0 = (w - bw) / 2, y0 = (h - bh) / 2;
     float size = h / 24.0f;
+    if (M.split) {                                         /* (the 50/50 demo: the line between and the halves' names) */
+        int lx = x0 + bw / 2, lw = w >= 1200 ? 2 : 1;
+        for (int y = y0; y < y0 + bh; y++) for (int k = 0; k < lw; k++) px[(size_t)y * pitch + lx - lw / 2 + k] = 0xFFFFFFFFu;
+        float ls = size * 0.7f;
+        ob_vf_draw(px, w, h, pitch, x0 + bw / 4 - ob_vf_width(OB_VF_SEMIBOLD, ls, "Original", 0) / 2, y0 + ls * 1.4f, OB_VF_SEMIBOLD, ls, 0xFFFFFF, 230, "Original", 0, 2);
+        ob_vf_draw(px, w, h, pitch, x0 + bw * 3 / 4 - ob_vf_width(OB_VF_SEMIBOLD, ls, "Enhanced", 0) / 2, y0 + ls * 1.4f, OB_VF_SEMIBOLD, ls, 0xFFFFFF, 230, "Enhanced", 0, 2);
+    }
     if (M.smooth && !M.mids && SDL_AtomicGet(&making)) {
         char text[80];
         snprintf(text, sizeof text, "30 fps: being made (%d%%)", SDL_AtomicGet(&made_pct));
@@ -292,7 +306,7 @@ static void input(void *ud, const ob_screen_ev *e)
     }
 }
 
-int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate, int dedither, int smooth, int colour, const char *base,
+int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate, int dedither, int smooth, int colour, int split, const char *base,
                        const char *model)
 {
     if (M.film || !(M.film = segacd_film_open(cd, name))) return 0;
@@ -301,6 +315,8 @@ int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate,
     snprintf(M.model, sizeof M.model, "%s", model ? model : "");
     if (M.base[0]) path_of(M.cache, sizeof M.cache, M.base, ".dedither");
     else M.cache[0] = 0;
+    M.split = split && base && base[0];                    /* (the demo's right half: everything on) */
+    if (M.split) { smooth = colour = 1; dedither = OB_POSTFX_CACHED; }
     M.smooth = smooth;
     M.colour = colour;
     M.sub = 0;
