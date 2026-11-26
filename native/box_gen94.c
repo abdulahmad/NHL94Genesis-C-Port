@@ -401,10 +401,10 @@ static void open_case(int instant)
 {
     st = S_OPEN;
     bx_n(cart)->vis = !G.out;
-    float ms = instant ? 1 : 900;
+    float ms = instant ? 1 : 690;                         /* (900 / 1.3: Abdul wanted it 30% quicker) */
     bx_tw3(bx_n(caseG)->rot, 0, -.05f, 0, ms, 0);
     bx_tw3(bx_n(caseG)->pos, 3.4f, 0, 0, ms, 0);
-    bx_tw1(&opn, 1, instant ? 1 : 1400, 0);
+    bx_tw1(&opn, 1, instant ? 1 : 1080, 0);
     bx_cam_to(0, 1.2f, 23, ms);
     if (!instant) bx_sfx(SFX_CLICK, 0);
     caption();
@@ -858,10 +858,10 @@ static void to_case(int a)
     if (bx_n(cart)->parent != cseat) { bx_parent(cart, cseat); bx_set3(bx_n(cart)->pos, 0, 0, 0); bx_set3(bx_n(cart)->rot, 0, 0, 0); bx_set3(bx_n(cart)->scale, 1, 1, 1); }
     caption();
 }
-static void check_done(int a) { (void)a; bx_done(); }
+static void check_done(int a) { (void)a; bx_done_now(); }
 static void check(void)
 {
-    if (G.cart && G.tv && G.sys) { bx_say("<b>Power on.</b>"); tv_on(); bx_after(3200, check_done, 0); }
+    if (G.cart && G.tv && G.sys) { bx_say("<b>Power on.</b>"); tv_on(); bx_after(3200, check_done, 0); }   /* (the license on the TV, then a cut to the game) */
 }
 static void sys_on(int a) { (void)a; G.sys = 1; bx_sfx(SFX_KEY, 0); set_power(1); tv_on(); check(); }
 static void tv_turn_on(int a) { (void)a; G.tv = 1; bx_sfx(SFX_KEY, 0); tv_switch(); tv_on(); bx_after(1500, sys_on, 0); }
@@ -938,7 +938,7 @@ static void frame(float dt)
     else if (tv_off_t >= 0) { tv_off_t += dt / 420; if (tv_off_t >= 1) tv_off_t = -1; tv_on(); }
     else if (tv_mode == 1 && (snow_t += dt) > 70) { snow_t = 0; tv_on(); }
     G.pads = count_pads();
-    bx_n(tap)->opacity = G.pads > 2 ? 1 : .28f;
+    bx_n(tap)->vis = 0;                                     /* (no multitap on the desk) */
     if (st == S_CLOSED || st == S_OPEN) {
         /* open, before the things are laid out: the case and everything in it are one selection (they sit under the case,
            so a pick anywhere on them lands here) */
@@ -965,7 +965,6 @@ static void frame(float dt)
     if (st == S_DESK) {
         if (!G.cart) { bx_hot_node(cart, "Insert the cartridge"); bx_hot_node(nslot, "Insert the cartridge"); }
         bx_hot_node(tvKnob, "TV power"); if (tvRemote >= 0) bx_hot_node(tvRemote, "TV power (remote)"); bx_hot_node(nsw, "System power");
-        bx_hot_node(tap, G.pads > 2 ? "EA 4 Way Play: multitap enabled" : "Multitap: 2 or fewer input devices detected");
     }
     float *cm = BX_S->cam;
     if (st == S_DESK) { bx_look[0] = lk[0]; bx_look[1] = lk[1]; bx_look[2] = lk[2]; }
@@ -987,20 +986,6 @@ static void draw2d(void)
     if (!(st == S_CLOSED && BX.first) && !(st == S_OPEN && BX.first)) bx_button(BX_C.sx + 2 * u, top, st >= S_DESK ? "< Back" : "< Back to the game", back_btn, 0, -1);
     bx_text(BX_C.sx + BX_C.sw - 2 * u, top + 2.0f * u, 1.5f * u, 0xb5a58f, 255, BX.title, 0, 1);
     if (st == S_POSTER) bx_button(BX_C.sx + 11 * u, top, post_flip ? "Flip to the front" : "Flip over", poster_flip, 0, -1);
-    if (st == S_DESK) {
-        const char *s[3] = { "Put the cartridge in the system", "Turn on the TV", "Turn on the system" };
-        int d[3] = { G.cart, G.tv, G.sys };
-        for (int i = 0; i < 3; i++) {
-            float y = BX_C.sy + BX_C.sh * .93f - (2 - i) * 2.1f * u - 4 * u;
-            uint32_t c = d[i] ? 0x5bbf7a : 0xf4ecdf;
-            ob_vf_disc(BX_C.px, BX_C.w, BX_C.h, BX_C.pitch, BX_C.sx + 3.5f * u, y - .5f * u, .45f * u, d[i] ? 0xff000000u | c : 0, 0xff000000u | c, .15f * u);
-            bx_text(BX_C.sx + 4.4f * u, y, 1.5f * u, c, 255, s[i], 0, -1);
-        }
-        const char *t = G.pads > 2 ? "Multitap enabled: more than 2 input devices" : "Multitap off: 2 or fewer input devices detected";
-        float w = bx_text_w(1.4f * u, t, 0) + 2.8f * u;
-        bx_rrect(BX_C.sx + BX_C.sw - 2 * u - w, BX_C.sy + 7 * u, w, 2.8f * u, .6f * u, G.pads > 2 ? 0xff143a22 : 0xff2a2a2e, G.pads > 2 ? 0xff2f7a4a : 0xff44444a, 1);
-        bx_text(BX_C.sx + BX_C.sw - 2 * u - w / 2, BX_C.sy + 8.85f * u, 1.4f * u, G.pads > 2 ? 0xbff3cf : 0x8d8d95, 255, t, 0, 0);
-    }
     if (BX.cap[0]) bx_rich(BX_C.sx + BX_C.sw / 2, BX_C.sy + BX_C.sh - 1.6f * u, 1.6f * u, BX.cap, 0xb5a58f, 0xf4ecdf);
 }
 static void activate(int node, float sx, float sy)
@@ -1022,7 +1007,7 @@ static void activate(int node, float sx, float sy)
     }
     for (int i = 0; i < NPK; i++) if (st == S_PACK && node == pk[i]) { if (i == 2) poster_open(); else if (i == 3) pack_open(); else pk_read(i); return; }
     if (node == cart) {
-        if (st == S_PACK && !G.out) bx_fade(to_desk, 0);
+        if (st == S_PACK && !G.out) bx_fade_ms(to_desk, 0, 350);   /* twice as quick as the other fades */
         else if (st == S_DESK) insert_cart();
         else bx_say("The cartridge is already in the system. Back returns to the game.");
         return;
@@ -1030,7 +1015,6 @@ static void activate(int node, float sx, float sy)
     if (node == nslot) { insert_cart(); return; }
     if (node == tvKnob || (tvRemote >= 0 && node == tvRemote)) { tv_power(); return; }
     if (node == nsw) { sys_power(); return; }
-    if (node == tap) bx_say(G.pads > 2 ? "<b>Multitap enabled.</b> EA 4 Way Play is plugged into the second controller port." : "<b>Multitap off.</b> Connect more than 2 controllers to enable it.");
 }
 /* the middle of the spine in the world (case.spine's origin is its back edge; the spine runs 1.3 toward the cover) */
 static void spine_mid(float o[3])
