@@ -92,11 +92,23 @@ int hold_anthem_ref(int *x, int *y, int *dir, int *moving)
     return 1;
 }
 
-/* the goal's own sound: the siren (the cartridge's or the PC's), then the goal song when there is one */
+/* RULE_SIREN: NHL 95 PC's goal siren (sample 564913A7 of PCFF001.DIG, 77078 bytes at 11025 Hz: 7.0 s) in frames of the game. Fixed
+ * here, as the anthems' are: the announcer's wait must not depend on whether a machine has the file, or on its mixer */
+#define PC_SIREN_FRAMES 420
+static struct { int on; uint16_t t0; } siren;
+
+/* the goal's siren starts (src/collide.c): with RULE_SIREN its fixed length counts from now (a demo plays the cartridge's) */
+void hold_siren(void)
+{
+    siren.on = rules[RULE_SIREN] && g.demoflag;
+    siren.t0 = g.Vcount;
+}
+
+/* the goal's own sound: the siren (the cartridge's or, RULE_SIREN, the PC's), then the goal song when there is one */
 static int goal_sound_busy(void)
 {
     if (song_playing() || (int16_t)g.songdelay > 0) return 1;
-    if (siren_busy_hook && siren_busy_hook()) return 1;
+    if (siren.on) return (uint16_t)(g.Vcount - siren.t0) < PC_SIREN_FRAMES;   /* (the cartridge's siren plays, unheard: the PC's length) */
     for (int i = 0; i < 8; i++) {                        /* (the cartridge's siren, sfx_siren_cmdstream, in a track slot) */
         int32_t st = (int32_t)g.fm_slots[i].stream;
         if (st >= 0x2CCCA && st < 0x2CEF2) return 1;
@@ -440,7 +452,7 @@ int hold_wait(void)
     return 0;
 }
 
-void hold_reset(void) { if (sk_lock) { g.sflags &= (uint16_t)~HI(sfslock); sk_lock = 0; } sk_on = 0; sk_cap = 0; pending = 0; anth = 0; anth_pose = 0; sg.on = 0; face_set = 0; }
+void hold_reset(void) { siren.on = 0; if (sk_lock) { g.sflags &= (uint16_t)~HI(sfslock); sk_lock = 0; } sk_on = 0; sk_cap = 0; pending = 0; anth = 0; anth_pose = 0; sg.on = 0; face_set = 0; }
 
 /* The pause's state, kept in every state (native/rules.c's part): a rollback, or a machine that joins, goes on with the wait,
  * the anthem's line up and the walk to the spots where they were (little-endian, the same on every host). Then the face off's
@@ -511,5 +523,23 @@ int hold_state_load(const uint8_t *in)
     sk_puckx = (int16_t)px; sk_pucky = (int16_t)py; sk_pick = pk; sk_pstart = ps; sk_lock = lk;
     for (int k = 0; k < 4; k++) sk_view[k] = (uint16_t)hs_r16(&view);
     faceoff_defer_load(p);
+    return 0;
+}
+
+/* RULE_SIREN's siren in every state: on, the vblank it began at */
+size_t hold_siren_save(uint8_t *out)
+{
+    if (out) { uint8_t *p = hs_w8(out, siren.on); hs_w16(p, siren.t0); }
+    return HOLD_SIREN_SIZE;
+}
+
+int hold_siren_load(const uint8_t *in)
+{
+    if (!in) { siren.on = 0; siren.t0 = 0; return 0; }
+    const uint8_t *p = in;
+    int on = hs_r8(&p), t0 = hs_r16(&p);
+    if (!flag(on)) return -1;
+    siren.on = on;
+    siren.t0 = (uint16_t)t0;
     return 0;
 }

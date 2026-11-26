@@ -3,9 +3,11 @@
  * The PC game's sound effects are programs of a patch map: the goal siren is sound $9C (program 156, the 7 second
  * Sound Blaster sample 564913A7) and the horn at the end of a period $90/$91 (the digital part, sample 1AB7BA4B, 2.6 s),
  * both signed 8-bit mono at 11025 Hz in PCFF001.DIG (the container is documented in NHL94PC docs/SFX_FORMAT.md). The
- * player's own file, found beside the program (loose, or on the NHL 95 PC disc image), never shipped. With a row on, the
- * cartridge's own siren or horn is not played: this plays instead. It only adds sound; the game is unchanged
- * (states, replays and online play are the same). */
+ * player's own file, found beside the program (loose, or on the NHL 95 PC disc image), never shipped. With a row on, this
+ * plays in place of the cartridge's own siren or horn: the cartridge's still plays in the game (its sound RAM, the Z80's), and
+ * only its notes are kept from the chips (pcsfx_mutes, from native/segacd.c's filter). It only changes the sound; the game is
+ * unchanged (states, replays and online play are the same). The announcer's wait for the siren (RULE_ANNOUNCE 2) is the
+ * game's own: RULE_SIREN, the PC siren's fixed length (src/hold.c), which the row sets from the file the host has. */
 #include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +22,8 @@
 #include "announcer.h"
 #include "pcsong.h"
 #include "rules.h"
+#include "rom.h"
+#include "symbols_gen.h"
 #include "overbar/cdimage.h"
 
 #define RATE 11025
@@ -45,6 +49,7 @@ static struct {
     float g8, g7;                                        /* (the mixer's smoothed gains) */
     int smooth;                                          /* Crowd_Noise's crowdsmooth */
     int cheer, cheered;                                  /* the anthem's cheer: its Crowdlevel (PC units), and 1 once raised */
+    int taken[NSND];                                     /* (the game's thread) the cartridge's sound this plays in place of: its notes kept from the chips */
 } S;
 
 static int parse(const uint8_t *d, long n)
@@ -181,26 +186,46 @@ int pcsfx_load_file(const char *path)
     return ok;
 }
 
-/* the game's siren or horn (src/sound.c sfx_hook): 1 when this plays it and the cartridge's is left out */
-static int hook(int ev)
+/* the game's siren, horn or one minute beep is about to start (src/sound.c sfx_hook, the game's thread): this plays its own in
+ * place of the cartridge's when its row is on (the cartridge's sound plays in the game all the same; pcsfx_mutes keeps it quiet) */
+static void hook(int ev)
 {
     int s = ev == SFX_GOAL ? GOAL : ev == SFX_HORN ? HORN : MINUTE;
-    if (ev == SFX_ONEMIN && announcer_active()) return 1;           /* (95 PC: the announcer says it instead of the beep or horn) */
-    if (!SDL_AtomicGet(&S.on[s]) || !SDL_AtomicGet(&S.found) || !g.demoflag) return 0;
+    S.taken[s] = 0;
+    if (ev == SFX_ONEMIN && announcer_active()) { S.taken[s] = 1; return; }   /* (95 PC: the announcer says it instead of the beep or horn) */
+    if (!SDL_AtomicGet(&S.on[s]) || !SDL_AtomicGet(&S.found) || !g.demoflag) return;
     SDL_MemoryBarrierAcquire();
     SDL_LockMutex(S.lock);
     S.playing[s] = 1;
     S.at[s] = 0;
     SDL_UnlockMutex(S.lock);
-    return 1;
+    S.taken[s] = 1;
+}
+
+/* the cartridge's sound n's event stream: from its SoundStreamTable entry to the next stream's start */
+static void stream_of(uint16_t n, uint32_t *from, uint32_t *to)
+{
+    *from = rd32(rom_ptr(SYM_SoundStreamTable + 4u * n));
+    *to = 0xFFFFFFFFu;
+    for (uint16_t k = 0; k <= 0x7A; k++) {
+        uint32_t a = rd32(rom_ptr(SYM_SoundStreamTable + 4u * k));
+        if (a > *from && a < *to) *to = a;
+    }
+}
+
+int pcsfx_mutes(uint32_t stream)
+{
+    static const uint16_t cart[3] = { 0, SYM_SFXhorn, SYM_SFXbeep2 };   /* (SFXsiren, the horn, the one minute beep) */
+    static uint32_t from[3], to[3];
+    if (!from[0]) for (int s = 0; s < 3; s++) stream_of(cart[s], &from[s], &to[s]);
+    for (int s = 0; s < 3; s++) if (S.taken[s] && stream >= from[s] && stream < to[s]) return 1;
+    return 0;
 }
 
 static void crowd_hook(int meter);
-static int siren_busy(void) { return S.lock && S.playing[GOAL]; }
 
 void pcsfx_start(void)
 {
-    siren_busy_hook = siren_busy;
     crowd_level_hook = crowd_hook;
     SDL_AtomicSet(&S.crowd_vol, 100);
     static int started;
