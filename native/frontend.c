@@ -314,6 +314,7 @@ static void sram_load(void)
 }
 
 static ob_host host;                                  /* (Overbar's settings: defined below) */
+static SDL_atomic_t screen_changed;                   /* (present) the picture's width changed: ob_pads_mouse_fresh in the window's loop */
 static void present(void *user, const uint16_t *px, int w, int h, int pitch)
 {
     (void)user;
@@ -346,6 +347,7 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
             for (int y = 0; y < last_h; y += 4)
                 for (int x = 0; x < last_w; x += 4) { uint32_t c = last[y * WIDE_MAX_W + x]; sum += (c >> 16 & 255) + (c >> 8 & 255) + (c & 255); }
             if (sum / ((last_h / 4 + 1) * (last_w / 4 + 1)) > 24) out = FADE, in = FADE;   /* (a picture already black needs no fade) */
+            SDL_AtomicSet(&screen_changed, 1);        /* (another screen: a click held from the last one is not this one's; the window's loop) */
         }
         if (out || dark) {
             long sum = 0, n = 0;                      /* (the game's picture now: dark, or no longer getting darker, ends the black) */
@@ -1489,6 +1491,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         if (cd_restart) { cd_restart = 0; if (!F.session) restart_console(0); }   /* (the Game page's roster set) */
         ob_plat_pump();
         ob_pads_tick();
+        if (SDL_AtomicSet(&screen_changed, 0)) ob_pads_mouse_fresh();
         { extern uint8_t setup_no_players; setup_no_players = (uint8_t)(!native_net_on() && !F.session && atoi(pads_get("sides.at_start", "1")));   /* (controller setup says who plays: no Players line) */ }
         if (SDL_AtomicGet(&sides_state) == 1) { ob_pads_sides_open(); SDL_AtomicSet(&sides_state, 2); }
         else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);
