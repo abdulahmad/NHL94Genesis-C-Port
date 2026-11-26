@@ -73,7 +73,7 @@ static void load(ob_cd *cd)
     for (int t = 0; t < 28; t++) {
         const uint8_t *r = gt + 6 * (FIRST_TEAM_RECORD + t);
         long at = (long)be16(r) * 2048, len = (long)be32(r + 2), k = 0;
-        if (at + len > P.size || len < 8) continue;
+        if (len < 8 || len > P.size || at + len > P.size) continue;   /* (len first: Windows' long is 32 bits, at + len could wrap) */
         const uint8_t *blk = P.graph2 + at;
         while (4 * (k + 1) <= len && !(blk[4 * k] & 0x80)) k++;            /* the offsets, to the $FFFF */
         long cards = k - 4;
@@ -81,13 +81,13 @@ static void load(ob_cd *cd)
         retail(t, 0, P.team[t].abbr, nm);
         for (int c = 0; c < 2 && k >= 4; c++) {                          /* the third and fourth of the four: the careers */
             long from = (long)be32(blk + 4 * (k - 2 + c)), to = c ? len : (long)be32(blk + 4 * (k - 1));
-            if (from + 4 <= len && to <= len && from < to && be32(blk + from) != 0x12345678) { P.team[t].careers[c] = at + from; P.team[t].end[c] = at + to; }
+            if (from >= 0 && from + 4 <= len && to <= len && from < to && be32(blk + from) != 0x12345678) { P.team[t].careers[c] = at + from; P.team[t].end[c] = at + to; }
         }
         const uint8_t *words = blk + 4 * k + 2;
         for (long i = 0; i < cards && P.n < MAX_PHOTOS && (words - blk) + 2 * i + 2 <= len; i++) {
             int d = (int16_t)be16(words + 2 * i);
             long off = (long)be32(blk + 4 * i);
-            if (d < 0 || off + PHOTO_BYTES > len || be16(blk + off) != 0x0808 || be16(blk + off + 2) != 0x24) continue;
+            if (d < 0 || off < 0 || off > len - PHOTO_BYTES || be16(blk + off) != 0x0808 || be16(blk + off + 2) != 0x24) continue;
             int c = d;                                   /* the disc's roster number to the cartridge's: past the players it left out */
             for (int pass = 0; pass < 3; pass++) {
                 int skip = 0;
@@ -106,7 +106,7 @@ const uint8_t *segacd_graph2_record(ob_cd *cd, int rec, long *len)
     if (!P.loaded) load(cd);
     if (!P.graph2 || rec < 0 || 6L * (rec + 1) > P.gsize) return NULL;
     long at = (long)be16(P.gtable + 6 * rec) * 2048, n = (long)be32(P.gtable + 6 * rec + 2);
-    if (n <= 0 || at + n > P.size) return NULL;
+    if (n <= 0 || n > P.size || at + n > P.size) return NULL;   /* (n first: Windows' long is 32 bits) */
     if (len) *len = n;
     return P.graph2 + at;
 }
