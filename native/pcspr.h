@@ -7,6 +7,7 @@ void pcspr_wait(void);                     /* (headless) until the search ends *
 int pcspr_searched(void);
 int pcspr_found(void);                     /* 1 when the sprites were read (after the search) */
 void pcspr_ref_set(int on);               /* the Game page: the referee on the ice (NHL 95 PC's frames) */
+void pcspr_ref_phys_set(int on);              /* the Game page: the referee bumped by skaters (NHL 95 PC's checkcx), only in the picture */
 void pcspr_logo_set(int on);              /* the Game page: NHL 95 PC's centre ice logos in place of the cartridge's */
 int pcspr_logos(void);                    /* 1 when the disc had them (after the search) */
 void pcspr_set(int on);                    /* the Game page: 0 off (the cartridge's sprites), 1 on (the PC's, the cartridge's where the PC has none) */

@@ -64,7 +64,7 @@ static const signed char logo_of_art[28] = { 0, 1, 2, 3, 4, 10, 5, 6, 7, 8, 9, 1
 
 /* the referee: not in the cartridge's game at all, only in this picture (a visual one: nothing in the game knows of it) */
 static struct {
-    SDL_atomic_t on;
+    SDL_atomic_t on, phys;                  /* phys: skaters bump him (ref_bump) */
     int init, x, y, vx, vy;                 /* the rink position and velocity in 1/256 pixels */
     int dir, t, wasfo, drop;
     int sx, sy, valid;                      /* the sprite table position of the last frame */
@@ -516,6 +516,47 @@ static int pc_frame(int fr)
 static int in_game(void) { return g.demoflag && ((g.disflags & HI(dfok)) || (g.sflags & HI(sfpz))); }   /* (the pause screen too: its rink strip has the skaters) */
 
 
+/* NHL 95 PC's referee is SortCords 10h, one of the objects checkplcoll / checkcx collide: a skater (or goalie) within 10h on
+ * both axes and 100h squared, closing on him, trades velocity with him weighted by weight + 8Ch (checkcoll then keeps both where
+ * they were that frame). Here only the referee's side of it, and since the skater does not bounce back the referee is set 12 off
+ * him instead of held: the skaters, the puck and the game are not touched (the PC's puck also
+ * bounces off him, puckbody, and a checker can knock him down, FallDown, every third time for a penalty 16h: all of that is play,
+ * and this referee is only the picture's). 1 when a skater ran into him */
+#define REF_WEIGHT 8                            /* (the PC's object 10h; a skater's weight is 0-15 against the 8Ch both get) */
+static int ref_bump(void)
+{
+    int hit = 0;
+    for (int i = 0; i < 12; i++) {
+        const struct SortObj *q = sortobj(i);
+        if (q->pflags & 4) continue;                                     /* (out of play: no collisions) */
+        int dx = R.x / 256 - q->Xpos, dy = R.y / 256 - q->Ypos;
+        if (dx > 16 || dx < -16 || dy > 16 || dy < -16 || dx * dx + dy * dy > 0x100) continue;
+        int dvx = q->Xvel - R.vx, dvy = q->Yvel - R.vy;
+        int c = dy * dvy + dx * dvx;                                    /* (closing: the gap times the speed between them) */
+        if (c < 0) continue;
+        c >>= 4;
+        int wq = q->weight + 0x8C, wr = REF_WEIGHT + 0x8C;
+        int k = c * wq / (wq + wr);
+        R.vx += dx * k >> 4;
+        R.vy += dy * k >> 4;
+        hit = 1;
+        int d2 = dx * dx + dy * dy;                                     /* (the skater goes on: the referee is put out of his way, 12 off) */
+        if (d2 < 144) {
+            double dl = sqrt((double)d2);
+            double ux = dl > 0.5 ? dx / dl : 0, uy = dl > 0.5 ? dy / dl : 1;
+            R.x = (int)((q->Xpos + ux * 12) * 256);
+            R.y = (int)((q->Ypos + uy * 12) * 256);
+        }
+        if (getenv("PCREF_LOG")) fprintf(stderr, "ref: bumped by %d at %d,%d gap %d,%d vel %d,%d\n", i, R.x / 256, R.y / 256, dx, dy, R.vx, R.vy);
+    }
+    int l = 4 * 256;                                                    /* (at most 4 a frame) */
+    if (R.vx > l) R.vx = l;
+    if (R.vx < -l) R.vx = -l;
+    if (R.vy > l) R.vy = l;
+    if (R.vy < -l) R.vy = -l;
+    return hit;
+}
+
 /* where the referee stands, from the PC's assreffollow (the puck's zone picks a spot beside the boards; the view's middle gives the y)
  * and assrefatdot (at the face off spot, facing the dot) */
 static void ref_tick(void)
@@ -579,6 +620,7 @@ static void ref_tick(void)
         if (l > m) { wx = (int)(wx * m / l); wy = (int)(wy * m / l); }
         R.vx += (wx - R.vx) / 6;
         R.vy += (wy - R.vy) / 6;
+        if (SDL_AtomicGet(&R.phys)) ref_bump();
         R.x += R.vx; R.y += R.vy;
         double sp = sqrt((double)R.vx * R.vx + (double)R.vy * R.vy) / 256.0;
         if (sp > 0.45) {
@@ -678,6 +720,7 @@ int pcspr_searched(void) { return SDL_AtomicGet(&P.searched); }
 int pcspr_found(void) { return SDL_AtomicGet(&P.searched) && SDL_AtomicGet(&P.found); }
 void pcspr_set(int on) { SDL_AtomicSet(&P.on, on ? 1 : 0); }
 void pcspr_ref_set(int on) { SDL_AtomicSet(&R.on, on ? 1 : 0); }
+void pcspr_ref_phys_set(int on) { SDL_AtomicSet(&R.phys, on ? 1 : 0); }
 void pcspr_logo_set(int on) { SDL_AtomicSet(&LGO.on, on < 0 ? 0 : on > 2 ? 2 : on); }
 int pcspr_logos(void) { return LGO.L[0].have || LGO.L[1].have ? 1 + LGO.L[1].have : 0; }
 
