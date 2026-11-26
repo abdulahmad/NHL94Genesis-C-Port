@@ -25,6 +25,11 @@ void Crowd_Noise(void)
     if (g.sflags & HI(sfhor)) return;
     if (g.gmode2 & HI(0)) return;
     if (g.sflags3 & (1 << sf3llcs)) return;
+    if (crowd_level_hook) {                               /* (the host's own crowd bed follows the same excitement) */
+        int32_t lv = (int16_t)g.CwdExciteLvl;
+        if (lv < 0) lv = 0;
+        crowd_level_hook((int)Sroot((uint32_t)(lv << 2)) + 0x41);
+    }
     if (!(g.sflags5 & 0x80)) {
         if (g.crowdnoisedelay != 0) {
             g.crowdnoisedelay--;

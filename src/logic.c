@@ -3348,7 +3348,6 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
             fo_deferred = 0;
             for (int i = 0; i < fo_defer_n; i++) assinsert(fo_defer_as[i], fo_defer_pl[i]);   /* (now they take the face off) */
             fo_defer_n = 0;
-            fo_window();
             g.disflags |= HI(4);
             o->temp1 = (int16_t)(randomd0(0x78) + 0xB4);
         }
@@ -3461,8 +3460,8 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     g.arenaanim = 0xFFFF;
     if ((g.sflags7 & 1) && (int16_t)g.faceoffanim[0] >= 0)
         StartArenaAnim(g.faceoffanim[0]);
-    if (hold_anthem_pending()) { fo_deferred = 1; g.disflags &= (uint16_t)~HI(4); }   /* (the anthem first: the face off window comes after it) */
-    else fo_window();
+    fo_window();
+    if (hold_anthem_pending()) { fo_deferred = 1; g.disflags &= (uint16_t)~HI(4); }   /* (the anthem first: the face off men come after it) */
     int16_t d0 = (int16_t)(randomd0(0x78) + 0xB4);        /* time to the drop */
     {
         uint16_t a = g.arenaanim;

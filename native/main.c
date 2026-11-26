@@ -698,6 +698,7 @@ static int pcsong_cli;                                   /* --pc-anthems: NHL 95
 static const char *pcsong_wav;                           /* --pc-anthem-wav FILE: both anthems written as a wav, then exit */
 static int pclogo_cli;                                   /* --pc-logos: NHL 95 PC's centre ice logos */
 static int pcref_cli;                                    /* --pc-ref: the referee on the ice (needs the PC files as --pc-sprites does) */
+static int pccrowd_cli;                                  /* --pc-crowd (with --pc-sfx FILE): NHL 95 PC's crowd bed */
 static int pcspr_cli;                                    /* --pc-sprites: NHL 95 PC's skater sprites, found beside the program
  */
 static const char *hats_rom;                              /* --hats FILE: the hat trick hats, from this NHL 94 SNES ROM */
@@ -786,6 +787,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--white-ice")) whiteice_set(1);
         else if (!strcmp(argv[i], "--pc-sprites")) pcspr_cli = 1;
         else if (!strcmp(argv[i], "--pc-ref")) pcref_cli = 1;
+        else if (!strcmp(argv[i], "--pc-crowd")) pccrowd_cli = 1;
         else if (!strcmp(argv[i], "--pc-logos")) pclogo_cli = 1;
         else if (!strcmp(argv[i], "--pc-logos94")) pclogo_cli = 2;
         else if (!strcmp(argv[i], "--pc-anthems")) pcsong_cli = 1;
@@ -965,6 +967,7 @@ int main(int argc, char **argv)
         pcsfx_start();
         pcsfx_set_goal(1);
         pcsfx_set_horn(1);
+        if (pccrowd_cli) pcsfx_set_crowd(1);
     }
     if (pc_photos) { cardcolor_start(); cardcolor_wait(); }
     if (segacd_sfx_flag) { segacd_set_sfx(1); segacd_sfx_wait(); }

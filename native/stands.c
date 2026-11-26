@@ -105,8 +105,11 @@ int stands_frame(const mdrt_vdp *v, int M, int h, uint32_t *out, int opitch)
     static uint32_t ls[Y1 - TOP][32], rs[Y1 - TOP][32];
     stack(bg, 1, ls);
     stack(bg, 0, rs);
+    static uint8_t ia[WIDE_MAX_W];
+    static uint32_t a[256];
     for (int y = 0; y < h; y++) {
-        const uint32_t *a = out + (long)y * opitch + M;                             /* the game's picture */
+        wide_line(v, y, vm, WIDE_A, ia);                                            /* the game's picture without its sprites */
+        for (int x = 0; x < w; x++) a[x] = ia[M + x] ? wide_rgb(v, ia[M + x]) : bg[y][x];   /* (the Zamboni at an edge is not carried on) */
         for (int x = 0; x < M; x++) {
             int xl = x - M, xr = w + x;                                             /* screen columns */
             uint32_t L, R;

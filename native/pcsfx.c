@@ -25,8 +25,10 @@
 #define PATHMAX 1024
 #define LISTMAX 2048
 
-enum { GOAL, HORN, MINUTE, NSND };
-static const uint8_t sample_id[NSND][4] = { { 0x56, 0x49, 0x13, 0xA7 }, { 0x1A, 0xB7, 0xBA, 0x4B }, { 0x31, 0xB5, 0x3F, 0x4F } };
+enum { GOAL, HORN, MINUTE, CROWD8, CROWD7, NSND };     /* (the last two: the crowd's looping timbres 16 and 28, programs 7Dh and 7Eh) */
+static const uint8_t sample_id[NSND][4] = { { 0x56, 0x49, 0x13, 0xA7 }, { 0x1A, 0xB7, 0xBA, 0x4B }, { 0x31, 0xB5, 0x3F, 0x4F },
+                                            { 0x49, 0x7B, 0x87, 0x1B }, { 0x78, 0x68, 0xA9, 0xD2 } };
+static const long loop_a[NSND] = { 0, 0, 0, 3856, 595 }, loop_b[NSND] = { 0, 0, 0, 9971, 9041 };   /* (bytes: PCFF001.TIM) */
 
 static struct {
     SDL_atomic_t on[NSND], found, searched;
@@ -35,6 +37,10 @@ static struct {
     long len[NSND];
     int playing[NSND];
     double at[NSND];
+    SDL_atomic_t crowd_on, crowd_vol, crowd_live;        /* the Game page's row, its volume (percent), frames the game's crowd is still on */
+    SDL_atomic_t v8, v7, pan7;                           /* the PC's voices: volume 0-127 and (voice 7) the pan */
+    float g8, g7;                                        /* (the mixer's smoothed gains) */
+    int smooth;                                          /* Crowd_Noise's crowdsmooth */
 } S;
 
 static int parse(const uint8_t *d, long n)
@@ -185,11 +191,14 @@ static int hook(int ev)
     return 1;
 }
 
+static void crowd_hook(int meter);
 static int siren_busy(void) { return S.lock && S.playing[GOAL]; }
 
 void pcsfx_start(void)
 {
     siren_busy_hook = siren_busy;
+    crowd_level_hook = crowd_hook;
+    SDL_AtomicSet(&S.crowd_vol, 100);
     static int started;
     if (started) return;
     started = 1;
@@ -207,6 +216,29 @@ int pcsfx_found(void) { return SDL_AtomicGet(&S.searched) && SDL_AtomicGet(&S.fo
 void pcsfx_set_goal(int on) { SDL_AtomicSet(&S.on[GOAL], on ? 1 : 0); }
 void pcsfx_set_horn(int on) { SDL_AtomicSet(&S.on[HORN], on ? 1 : 0); SDL_AtomicSet(&S.on[MINUTE], on ? 1 : 0); }   /* (and the one minute horn) */
 
+void pcsfx_set_crowd(int on) { SDL_AtomicSet(&S.crowd_on, on ? 1 : 0); }
+void pcsfx_set_crowd_vol(int pct) { SDL_AtomicSet(&S.crowd_vol, pct); }
+
+/* the game's crowd, each frame (src/crowd.c): Crowd_Noise of NHL 95 PC (engine/sound/Crowd_Noise.c) on the PC's own scale:
+ * the cartridge's crowd meter (decibels, 65 up) stands in for its Crowdlevel (0x200 up) */
+static void crowd_hook(int meter)
+{
+    if (!SDL_AtomicGet(&S.found) || !SDL_AtomicGet(&S.crowd_on)) return;
+    int level = 0x200 + (meter - 0x41) * 0x3DC / 60;
+    if (level < 0) level = 0;
+    int d = level - S.smooth;                              /* (eased toward it, at most 30 a frame) */
+    S.smooth = (d < 0 ? -d : d) > 30 ? S.smooth + (d < 0 ? -30 : 30) : level;
+    int v = S.smooth;
+    int v8 = v < 0x200 ? 0 : v < 0x390 ? (v - 0x200) / 10 : (v - 0x390) / 4 + 0x28;
+    if (v8 > 0x7F) v8 = 0x7F;
+    int st = S.smooth / 12 + 0x0A;
+    if (st > 0x7F) st = 0x7F;
+    SDL_AtomicSet(&S.v8, v8);
+    SDL_AtomicSet(&S.v7, st);
+    SDL_AtomicSet(&S.pan7, st / 3 + 0x20);
+    SDL_AtomicSet(&S.crowd_live, 30);
+}
+
 void pcsfx_stop(void)
 {
     if (!S.lock) return;
@@ -220,7 +252,7 @@ void pcsfx_mix(int16_t *out, int frames, unsigned rate)
     if (!S.lock || !rate || !SDL_AtomicGet(&S.found)) return;
     SDL_LockMutex(S.lock);
     double step = (double)RATE / rate;
-    for (int s = 0; s < NSND; s++) {
+    for (int s = 0; s < GOAL + 3; s++) {
         if (!S.playing[s]) continue;
         for (int i = 0; i < frames; i++) {
             long j = (long)S.at[s];
@@ -234,5 +266,31 @@ void pcsfx_mix(int16_t *out, int frames, unsigned rate)
             S.at[s] += step;
         }
     }
+    /* the crowd bed: the PC's two looping voices, kept going while the game's crowd is */
+    int on = SDL_AtomicGet(&S.crowd_on) && SDL_AtomicGet(&S.crowd_live) > 0;
+    if (!on) { S.g8 = S.g7 = 0; SDL_AtomicAdd(&S.crowd_live, 0); }
+    float vol = (float)SDL_AtomicGet(&S.crowd_vol) / 100.0f;
+    float t8 = on ? SDL_AtomicGet(&S.v8) / 127.0f * vol : 0, t7 = on ? SDL_AtomicGet(&S.v7) / 127.0f * vol : 0;
+    float pan = (float)(SDL_AtomicGet(&S.pan7) - 0x40) / 64.0f;
+    float l7 = 1.0f - (pan > 0 ? pan : 0), r7 = 1.0f + (pan < 0 ? pan : 0);
+    for (int s = CROWD8; s <= CROWD7; s++) {
+        if (!S.pcm[s] || (!on && S.g8 == 0 && S.g7 == 0)) continue;
+        for (int i = 0; i < frames; i++) {
+            float *gp = s == CROWD8 ? &S.g8 : &S.g7, tg = s == CROWD8 ? t8 : t7;
+            *gp += (tg - *gp) * 0.0005f;
+            long j = (long)S.at[s];
+            if (j + 1 >= loop_b[s]) { S.at[s] -= (double)(loop_b[s] - loop_a[s]); j = (long)S.at[s]; }
+            double frac = S.at[s] - (double)j;
+            float v = (float)(S.pcm[s][j] + (S.pcm[s][j + 1] - S.pcm[s][j]) * frac) * *gp * 0.8f;
+            for (int c = 0; c < 2; c++) {
+                float pg = s == CROWD7 ? (c ? r7 : l7) : 1.0f;
+                float x = v * pg + out[2 * i + c];
+                out[2 * i + c] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
+            }
+            S.at[s] += step;
+        }
+    }
+    int live = SDL_AtomicGet(&S.crowd_live);
+    if (live > 0) SDL_AtomicSet(&S.crowd_live, live - (int)((double)frames * 60.0 / rate) - 0);
     SDL_UnlockMutex(S.lock);
 }
