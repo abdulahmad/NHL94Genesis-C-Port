@@ -751,6 +751,7 @@ uint32_t InitScoutingDisplay(void)
  * (_ + { }). */
 void UpdateScoutingDisplay(void)
 {
+    if (scout_voice_left) scout_voice_left--;             /* (the disc: a frame of his voice played; called once a frame) */
     if ((int16_t)g.ScoutingReportTimer > 0x1000) return;
     if ((int16_t)g.asv >= 0 && (int16_t)--g.ScoutingReportTimer >= 0) return;
     const uint32_t a1 = SYM_ScoutTextScript;
@@ -760,7 +761,7 @@ void UpdateScoutingDisplay(void)
         if (scout_disc) {                                 /* (scout94cd.asm: the next waits for his voice, the blank lines too) */
             static int waited;
             uint16_t nx = g.TestList[g.SelectedPlayerIdx / 2];
-            if (nx != 0x1D && (int16_t)(scout_voice_end - g.Vcount) > 0 && ++waited < 60 * 30) return;
+            if (nx != 0x1D && scout_voice_left && ++waited < 60 * 30) return;
             waited = 0;
         }
         g.DispAttribCtr = 0;
@@ -788,8 +789,8 @@ void UpdateScoutingDisplay(void)
             int f = cd_scout_hook(CD_SCOUT_FRAMES + (uint16_t)d0);
             if (f < 0) f = 0;
             if (f > 60 * 30) f = 60 * 30;
-            if ((int16_t)(scout_voice_end - g.Vcount) < 0) scout_voice_end = g.Vcount;
-            scout_voice_end = (uint16_t)(scout_voice_end + f);
+            f += scout_voice_left;
+            scout_voice_left = (uint16_t)(f > 0xFFFF ? 0xFFFF : f);
         }
         if (scout_disc) d0 = 0;                           /* (the disc's paragraph: from its start) */
         else {
