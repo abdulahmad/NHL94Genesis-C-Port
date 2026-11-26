@@ -16,6 +16,7 @@
 #include "game.h"
 #include "native.h"
 #include "pcsong.h"
+#include "rosters.h"
 #include "nuked_opl3.h"
 #include "overbar/cdimage.h"
 
@@ -356,6 +357,124 @@ static uint8_t *get(const char *dir, ob_cd *cd, const char *name, long *n)
     return slurp(p, n);
 }
 
+/* ---- NHL 95 PC's rink organ and rock cues at the whistle (the Game page's PC crowd) ------------------------------------
+ * LoadRockMusic loads six cues for the home team (teamrockcuetbl, by the PC's team number; 26 and up row 13), three random ones
+ * of an 18 cue pool not on that row, the device's rock tune (SBROCKU with music on) and ROCKDITI, all .KMS songs as the anthems
+ * are. CrowdOnStoppage (at a whistle for an offside, icing, the puck out of play or frozen) plays PlayCrowdSample: once a period,
+ * late in it (clock under half, a minute or more left), the team's cue 2; otherwise one of 8: 1 the rock tune (cue 9), 2-4 a
+ * random cue (6-8), 5 ROCKDITI (11), the rest nothing. A team cue the row lacks (FFh) is a random one. The PC's strength
+ * difference cheer (cues 4 / 1 with the speech on) and its overlays are left out. */
+
+#define NROCK 54
+static const char *const rock_name[NROCK + 1] = { "BOS1", "BOS2", "BOS3", "HART2", "BUF2", "CAL1", "CAL2", "CAL3", "CHIC1", "CHIC2",
+    "CHIC3", "DET1", "DET2", "ED1", "HART1", "HART2", "HART3", "LA1", "LA4", "MON1", "MON2", "MON3", "HART2", "NJER2", "LI2", "LI3",
+    "NY3", "PHIL1", "PHIL2", "CGY2", "PITTS1", "PITTS2", "PITTS3", "PITTS4", "QU1", "SL1", "SL2", "SL3", "SHK1", "SHK2", "MON1",
+    "MON3", "LA4", "SHK7", "SHK8", "BOS2", "TB2", "TOR1", "TOR2", "VAN1", "VAN3", "WASH3", "WINN2", "ROCKDITI", "SBROCKU" };   /* (rockcuefiles; the last: the rock tune) */
+/* teamrockcuetbl: six cues by the PC's team (BOS BUF CGY CHI DET EDM HFD LA DAL MTL NJ NYI NYR OTT PHI PIT QUE STL SJ TB TOR VAN WSH WPG ANA FLA) */
+static const signed char rock_team[26][6] = {
+    { 1, 0, 2, -1, 31, 1 }, { 4, 15, 15, 4, 31, -1 }, { 5, 7, 5, 7, 6, 6 }, { 8, 10, 9, 8, 31, 43 }, { 11, 12, 10, -1, 31, 12 },
+    { 13, 1, 1, -1, 31, -1 }, { 14, 16, 15, 16, 31, 14 }, { 17, 17, 10, 7, -1, 18 }, { 1, 24, 24, -1, 31, -1 }, { 12, 21, 12, 20, 31, 19 },
+    { 15, 23, 15, -1, 31, 11 }, { 15, 24, 15, 25, 31, 25 }, { 1, 26, 15, -1, 31, -1 }, { 15, 52, 12, -1, 31, -1 }, { 27, 28, 27, 6, 31, 6 },
+    { 30, 32, 30, 33, 31, 33 }, { 34, 6, 34, -1, 31, 6 }, { 35, 36, 36, 35, 31, 37 }, { 38, 39, 19, 21, 18, 43 }, { 1, 46, 46, -1, 31, -1 },
+    { 47, 47, 48, -1, 31, -1 }, { 49, 38, 50, -1, 31, -1 }, { 12, 51, 12, -1, 31, 12 }, { 15, 52, 12, -1, 31, -1 }, { 17, 47, 50, -1, 6, 43 },
+    { 15, 32, 50, -1, 31, 19 } };
+static const signed char rock_pool[18] = { 0x10, 0x19, 0x21, 0x2B, 0x2C, 0x35, 0x11, 0x12, 0x13, 0x15, 0x1C, 0x1E, 0x20, 0x25, 0x2E, 0x2F, 0x32, 0x34 };
+/* the PC's team number of the cartridge's art number (ANA BOS BUF CGY CHI DAL DET EDM FLA HFD LA MTL NJ NYI NYR OTT PHI PIT QUE SJ STL TB
+ * TOR VAN WSH WPG ASE ASW); the All-Star teams use row 13 as the PC's 26 and up do */
+static const signed char pc_team_of_art[28] = { 24, 0, 1, 2, 3, 8, 4, 5, 25, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 18, 17, 19, 20, 21, 22, 23, 13, 13 };
+
+static struct {
+    SDL_atomic_t on, ready, busy;         /* the PC crowd row; the cues of team (rendered); a render running */
+    uint8_t *kms[NROCK + 1], *cfg[NROCK + 1];
+    long kn[NROCK + 1], cn[NROCK + 1];
+    int team, late;                       /* the team rendered for (-1 none); the late period cue played this period */
+    int16_t *pcm[12];                     /* the PlayCrowdSample cues: 0-5 the team's, 6-8 random, 9 the rock tune, 11 ROCKDITI */
+    long len[12];
+    int playing, cue, period;
+    double at;
+} K = { .team = -1 };
+
+static void rock_read(const char *dir, ob_cd *cd)
+{
+    for (int i = 0; i <= NROCK; i++) {
+        char nm[24];
+        snprintf(nm, sizeof nm, "%s.KMS", rock_name[i]);
+        K.kms[i] = get(dir, cd, nm, &K.kn[i]);
+        snprintf(nm, sizeof nm, "%s.CFG", rock_name[i]);
+        K.cfg[i] = get(dir, cd, nm, &K.cn[i]);
+    }
+}
+
+static int rock_team_of; /* (the render thread's team) */
+static int rock_render(void *arg)
+{
+    (void)arg;
+    int t = rock_team_of, cues[12];
+    for (int i = 0; i < 12; i++) cues[i] = -1;
+    for (int i = 0; i < 6; i++) cues[i] = rock_team[t][i];
+    for (int i = 0; i < 3; i++) {                                    /* (three random ones: not on the team's row, not twice) */
+        for (int guard = 0; guard < 200; guard++) {
+            int c = rock_pool[rand() % 18], ok = 1;
+            for (int j = 0; j < 6; j++) if (rock_team[t][j] == c) ok = 0;
+            for (int j = 0; j < i; j++) if (cues[6 + j] == c) ok = 0;
+            if (ok) { cues[6 + i] = c; break; }
+        }
+    }
+    cues[9] = NROCK;                                                 /* (SBROCKU) */
+    cues[11] = 53;                                                   /* (ROCKDITI) */
+    SDL_LockMutex(S.lock);
+    K.playing = 0;
+    SDL_UnlockMutex(S.lock);
+    for (int i = 0; i < 12; i++) {
+        free(K.pcm[i]); K.pcm[i] = NULL; K.len[i] = 0;
+        int c = cues[i];
+        if (c < 0 || !K.kms[c]) continue;
+        K.pcm[i] = render(K.kms[c], K.kn[c], K.cfg[c], K.cn[c], &K.len[i]);
+        if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsong: cue %d %s %.1f s\n", i, rock_name[c], (double)K.len[i] / RATE);
+    }
+    K.team = t;
+    SDL_MemoryBarrierRelease();
+    SDL_AtomicSet(&K.ready, 1);
+    SDL_AtomicSet(&K.busy, 0);
+    return 0;
+}
+
+/* the game's whistle (src/penalty.c Stop4Pen, stoppage_hook): the stoppage's penalty number; -1 the drop of the puck, which
+ * ends the cue as the PC's Endfaceoff does */
+static void stoppage(int pen)
+{
+    if (pen < 0 && K.playing && S.lock) { SDL_LockMutex(S.lock); K.playing = 0; SDL_UnlockMutex(S.lock); }   /* (the drop: Endfaceoff's StopDigiSample) */
+    if (!SDL_AtomicGet(&K.on) || !SDL_AtomicGet(&S.found) || !g.demoflag || !S.lock) return;
+    if (pen >= 0 && pen != 0x10 && pen != 0xC && pen != 6 && pen != 8) return;   /* (offside, icing, out of play, frozen: the PC's 1Dh 1Eh 6 8) */
+    int t = pc_team_of_art[rosters_art(team_struct(0)->tmteam) & 31];
+    if (t < 0 || t > 25) t = 13;
+    if (!SDL_AtomicGet(&K.ready) || K.team != t) {                         /* (the home team's cues: rendered on their own thread) */
+        if (!SDL_AtomicGet(&K.busy) && pcsong_searched()) {
+            SDL_AtomicSet(&K.ready, 0);
+            SDL_AtomicSet(&K.busy, 1);
+            rock_team_of = t;
+            SDL_Thread *th = SDL_CreateThread(rock_render, "pcrock", NULL);
+            if (th) SDL_DetachThread(th); else SDL_AtomicSet(&K.busy, 0);
+        }
+        return;
+    }
+    if (pen < 0) return;                                             /* (a drop: only the home team's cues readied, by the first one) */
+    SDL_MemoryBarrierAcquire();
+    if (K.period != (int16_t)g.gsp) { K.period = (int16_t)g.gsp; K.late = 0; }
+    int n = -1, clock = (int16_t)g.gameclock, total = (int16_t)g.PerTimeTotal;
+    if (!K.late && clock < total / 2 && clock >= 60) { K.late = 1; n = 2; }
+    else {
+        int r = rand() % 8;
+        n = r == 1 ? 9 : r >= 2 && r <= 4 ? r + 4 : r == 5 ? 11 : -1;
+    }
+    if (n >= 0 && n < 6 && !K.pcm[n]) n = 6 + rand() % 3;                  /* (no such team cue: a random one) */
+    if (n < 0 || !K.pcm[n]) return;
+    SDL_LockMutex(S.lock);
+    K.cue = n; K.at = 0; K.playing = 1;
+    SDL_UnlockMutex(S.lock);
+    if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsong: whistle %d: cue %d\n", pen, n);
+}
+
 static int load(const char *dir, ob_cd *cd)
 {
     long pn, tn[4], un, ucn, cn, ccn;
@@ -370,6 +489,7 @@ static int load(const char *dir, ob_cd *cd)
         S.pcm[1] = render(can, cn, canc, ccn, &S.len[1]);
         ok = S.pcm[0] && S.pcm[1];
         if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsong: USA %.1f s, CANADA %.1f s\n", (double)S.len[0] / RATE, (double)S.len[1] / RATE);
+        if (ok) rock_read(dir, cd);
     }
     free(pat); free(usa); free(usac); free(can); free(canc);
     for (int b = 0; b < 4; b++) free(tim[b]);
@@ -561,6 +681,7 @@ void pcsong_start(void)
     S.lock = SDL_CreateMutex();
     anthem_hook_fn = anthem_hook;
     song_block_hook = playing_hook;
+    stoppage_hook = stoppage;
     char *base = SDL_GetBasePath();
     SDL_Thread *t = SDL_CreateThread(finder, "pcsong", base ? SDL_strdup(base) : SDL_strdup("."));
     if (base) SDL_free(base);
@@ -572,14 +693,33 @@ int pcsong_found(void) { return SDL_AtomicGet(&S.searched) && (SDL_AtomicGet(&S.
 int pcsong_found95(void) { return SDL_AtomicGet(&S.searched) && SDL_AtomicGet(&S.found); }
 int pcsong_found96(void) { return SDL_AtomicGet(&S.searched) && SDL_AtomicGet(&S.found96); }
 void pcsong_set(int on) { SDL_AtomicSet(&S.on, on < 0 ? 0 : on > 2 ? 2 : on); }
-void pcsong_stop(void) { S.playing = 0; }
+void pcsong_stop(void) { S.playing = 0; K.playing = 0; }
+void pcsong_rock_set(int on) { SDL_AtomicSet(&K.on, on ? 1 : 0); }
 
 #define GAIN96 0.5f                         /* (NHL 96 PC's recordings run near full scale; the 95 FM songs about half of it) */
 
 /* the anthems into a frame of sound (out: stereo 16 bit at rate, mixed in) */
 void pcsong_mix(int16_t *out, int frames, unsigned rate)
 {
-    if (!S.playing || !S.lock || !rate) return;
+    if (!S.lock || !rate) return;
+    if (K.playing) {                                                 /* (a whistle's cue) */
+        SDL_LockMutex(S.lock);
+        const int16_t *p = K.pcm[K.cue];
+        long n = K.len[K.cue];
+        double st = (double)RATE / rate;
+        for (int i = 0; i < frames && p; i++) {
+            long k = (long)K.at;
+            if (k >= n) { K.playing = 0; break; }
+            for (int c = 0; c < 2; c++) {
+                int v = out[2 * i + c] + p[2 * k + c];
+                out[2 * i + c] = (int16_t)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+            }
+            K.at += st;
+        }
+        if (!p) K.playing = 0;
+        SDL_UnlockMutex(S.lock);
+    }
+    if (!S.playing) return;
     SDL_LockMutex(S.lock);
     int first = S.which & 1, second = S.which >> 1 ? (S.which >> 1) - 1 : -1;
     int16_t *const *pcm = S.cur ? S.p96 : S.pcm;

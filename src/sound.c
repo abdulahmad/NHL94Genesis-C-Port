@@ -24,6 +24,7 @@ void (*cd_event_hook)(int ev, uint16_t n);
 void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
 int (*sfx_hook)(int ev);
 int (*anthem_hook_fn)(int home_art, int away_art);
+void (*stoppage_hook)(int pen);
 void (*crowd_level_hook)(int meter);
 int (*siren_busy_hook)(void);                         /* the host's siren is playing (native/pcsfx.c) */
 int (*song_block_hook)(void);

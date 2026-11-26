@@ -634,6 +634,7 @@ static void crowd_apply(void)
     segacd_set_crowd((ob_game_get(&host, CD_CROWD) ? 1 : 0) | (ob_game_get(&host, CD_CROWD_CD) ? 2 : 0));
     segacd_set_crowd_vol(crowd_vol_of(CD_CROWD_CARTVOL), crowd_vol_of(CD_CROWD_CDVOL));
     pcsfx_set_crowd(ob_game_get(&host, CD_CROWD_PC) != 0);
+    pcsong_rock_set(ob_game_get(&host, CD_CROWD_PC) != 0);              /* (and its organ and rock cues at the whistles) */
     pcsfx_set_crowd_vol(crowd_vol_of(CD_CROWD_PCVOL));
 }
 static ob_game_opt cd_opts[CD_OPTS];
@@ -906,7 +907,7 @@ static void game_page_init(void)
         game_help[CD_CROWD_CARTVOL] = "How loud the cartridge's crowd is.";
         game_help[CD_CROWD_CD] = "The Sega CD disc's crowd bed (track 2).";
         game_help[CD_CROWD_CDVOL] = "How loud the Sega CD crowd is.";
-        game_help[CD_CROWD_PC] = "NHL 95 PC's crowd, from your NHL 95 PC files; it follows the crowd meter the way the PC game does.";
+        game_help[CD_CROWD_PC] = "NHL 95 PC's crowd, from your NHL 95 PC files; it follows the crowd meter the way the PC game does, and the rink organ plays the home team's cues at the whistles.";
         game_help[CD_CROWD_PCVOL] = "How loud NHL 95 PC's crowd is.";
         game_help[CD_VOICE] = "Ron Barr's scouting lines from the disc; speech and music plays them over the scouting song.";
         game_help[CD_SCREENS] = "The opening screens: the cartridge's or the disc's.";

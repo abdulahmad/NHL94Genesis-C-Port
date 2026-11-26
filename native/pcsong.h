@@ -11,6 +11,7 @@ void pcsong_set(int on);                     /* the Game page: the anthems befor
 int pcsong_found95(void);                    /* NHL 95 PC's songs were found */
 int pcsong_found96(void);                    /* NHL 96 PC's recordings (DATA/ANTHUS.ASF, ANTHCAN.ASF) were found */
 void pcsong_stop(void);
+void pcsong_rock_set(int on);                /* the Game page's PC crowd: NHL 95 PC's organ and rock cues at the whistles */
 void pcsong_mix(int16_t *out, int frames, unsigned rate);   /* the anthem into a frame of sound */
 int pcsong_cheer_frame(void);              /* the game frame of the anthem playing at which NHL 95 PC's crowd cheers (-1 none) */
 int pcsong_write_wav(const char *path);      /* testing: both anthems as a wav */
