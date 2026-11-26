@@ -13,6 +13,7 @@
 #   make rulestest      the game rules on the game's routines (test/rules_test.c)
 #   make rosterstest     roster sets: the cartridge's exported and built again, a 32-team one, broken ones,
 #                       hacks on the 32-team template (../roms or HACKS=) extracted
+#   make scouttest      the Sega CD scouting report: Ron Barr's paragraphs paced by his clips (a made-up disc)
 #   make oracle         the hooked oracle core (build/nhl_oracle.so)
 #   make gen            regenerate the committed headers from ref/ and the asm rebuild
 #   make release VERSION=0.3.2  the downloads for Linux, Windows and macOS in out/release/v0.3.2,
@@ -46,6 +47,10 @@ build/rosterstest: native/rosters.c native/banner.c native/romsrc.c native/art.c
 	    test/rosters_test.c $(MDRT)/$(MDRTB)/libmdrt.a -lm $(CXXLIB)
 rosterstest: build/rosterstest build/nhl94$(EXE)
 	$(PY) tools/rosterstest.py
+
+# the Sega CD's scouting report: Ron Barr's paragraphs paced by his clips on a made-up disc (tools/scouttest.py)
+scouttest: build/nhl94$(EXE)
+	$(PY) tools/scouttest.py
 
 test: build/captest
 	@test -n "$(CAPS)" || { echo "no captures in out/captures: tools/hybrid/capture_all.sh records them"; exit 1; }
@@ -275,5 +280,5 @@ gen-pin:
 
 clean:
 	rm -rf build/captest build/oracle_shim.o build/nhl94 build/obj build/cross build/relaytest
-.PHONY: rulestest rosterstest test oracle clean nhl94 relaytest mdrt vectors lockstep runtime-check runtime-selfcheck golden golden-check \
+.PHONY: rulestest rosterstest scouttest test oracle clean nhl94 relaytest mdrt vectors lockstep runtime-check runtime-selfcheck golden golden-check \
 	golden-cross golden-ubsan netplay-check gen gen-pin release FORCE

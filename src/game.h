@@ -283,7 +283,7 @@ extern int (*cd_title_hook)(int what);
  * (the disc's report is its own text: every machine would need the disc) */
 enum { CD_SCOUT_ON, CD_SCOUT_FRAMES = 0x10000 };
 extern int (*cd_scout_hook)(int what);
-extern uint16_t scout_voice_end;                          /* (setup.c) the vblank the paragraphs' voice so far ends at */
+extern uint16_t scout_voice_left;                         /* (setup.c) frames of the paragraphs' voice still to play (not Vcount: waitx sets it each frame) */
 extern uint8_t scout_b_back;                  /* (the window) B turns the scouting report's matchups back, as A does */
 extern const uint8_t *(*cd_scout_text)(int n);
 extern int scout_disc;                                    /* (scout.c / setup.c) this scouting report is the disc's */
