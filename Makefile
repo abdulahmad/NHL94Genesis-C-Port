@@ -172,6 +172,10 @@ vectors: build/nhl_oracle.so
 	$(PY) tools/oracle/vectors.py record
 lockstep: build/nhl94
 	$(PY) tools/oracle/vectors.py check
+# the same vectors on the vanilla build (make VANILLA=1 nhl94): the game with every extra left out
+lockstep-vanilla:
+	$(MAKE) VANILLA=1 nhl94
+	NHL94_BIN=build/nhl94-vanilla $(PY) tools/oracle/vectors.py check
 runtime-check:
 	$(MAKE) -C $(MDRT) check MDRT_VECTORS=$(abspath out/vectors) MDRT_REQUIRE_VECTORS=1
 # pulseman's tests on the native game's own traces (nhl94 --record): 600 frames of play, headless
@@ -285,5 +289,5 @@ gen-pin:
 
 clean:
 	rm -rf build/captest build/oracle_shim.o build/nhl94 build/obj build/cross build/relaytest
-.PHONY: rulestest rosterstest scouttest sramtest test oracle clean nhl94 relaytest mdrt vectors lockstep runtime-check runtime-selfcheck golden golden-check \
+.PHONY: rulestest rosterstest scouttest sramtest test oracle clean nhl94 relaytest mdrt vectors lockstep lockstep-vanilla runtime-check runtime-selfcheck golden golden-check \
 	golden-cross golden-ubsan netplay-check gen gen-pin release FORCE
