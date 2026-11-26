@@ -3308,7 +3308,7 @@ static struct SortObj *fo_defer_pl[12];                 /* the face off assignme
 static uint16_t fo_defer_as[12];
 static int fo_defer_n;
 
-/* the anthem's held back face off (native: kept in every state with src/hold.c's pause): deferred, the count, each skater's
+/* the anthem's held back face off (native: kept in every state with mods/hold.c's pause): deferred, the count, each skater's
  * sort object and his assignment */
 size_t faceoff_defer_save(uint8_t *out)
 {

@@ -212,8 +212,8 @@ const char *rules_arg(const char *arg)
  * the roster set: its checksum (8 bytes, 0 the cartridge's) and folder (a length byte, the name;
  * none in a netplay session, whose states stay in memory and whose hash the peers compare), then
  * (version 6) the referee's REFEREE_STATE_SIZE bytes (RULE_REFEREE: mods/referee.c), then (version 7) the
- * pause's HOLD_STATE_SIZE (RULE_HOLD, the anthems: src/hold.c), then (version 8) the goal siren's
- * HOLD_SIREN_SIZE (RULE_SIREN: src/hold.c). The
+ * pause's HOLD_STATE_SIZE (RULE_HOLD, the anthems: mods/hold.c), then (version 8) the goal siren's
+ * HOLD_SIREN_SIZE (RULE_SIREN: mods/hold.c). The
  * roster set's tables are in the ROM the state's RAM points into, so a state loads with its own
  * roster set or not at all. Version 8 is this layout; version 7 is it without the siren (none then); version 6 without the pause (none then),
  * version 5 without the referee too (he starts off the ice). Version 4 (before the game's own extras

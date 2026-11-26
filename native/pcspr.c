@@ -612,7 +612,7 @@ static void ref_tick(void)
             else { sx = pkx; sy = pky; ex = tx; ey = ty; }
             double ddx = ex - sx, ddy = ey - sy;
             if (referee_get(&gv)) { R.x = gv.x / 256; R.y = gv.y / 256; }   /* (RULE_REFEREE: where the game has him on his walk) */
-            else if (hold_skate_carry(&hx, &hy)) { R.x = hx; R.y = hy; }      /* (he has the puck: where the game has it, src/hold.c) */
+            else if (hold_skate_carry(&hx, &hy)) { R.x = hx; R.y = hy; }      /* (he has the puck: where the game has it, mods/hold.c) */
             else if (pr < pick) {                                            /* (on his way to it: the picture's own) */
                 R.x = (int)(sx + ddx * pr / pick);
                 R.y = (int)(sy + ddy * pr / pick);

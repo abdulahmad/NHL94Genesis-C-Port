@@ -9,7 +9,7 @@
 # MOD_FILES are customizations that still live in src/ and are moving out to their own layer; the list only shrinks.
 set -uo pipefail
 cd "$(dirname "$0")/.."
-MOD_FILES='src/hold.c'
+MOD_FILES='mods/hold.c'
 bad=0
 game=$(ls src/*.c src/*.h | grep -vxF -f <(tr ' ' '\n' <<< "$MOD_FILES"))
 if grep -nE '#include *[<"](SDL|native\.h|overbar/|mdrt/|optionsui\.h|announcer\.h|pcspr\.h|pcsfx\.h|segacd\.h|hats\.h|wide\.h|whiteice\.h|stands\.h|cardcolor)' $game; then

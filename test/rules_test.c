@@ -206,7 +206,7 @@ static void referee(void)
     classic_rules();
 }
 
-/* RULE_HOLD (src/hold.c): the walk to the spots and the referee's puck are the game's alone (where the puck lay, the dot, the
+/* RULE_HOLD (mods/hold.c): the walk to the spots and the referee's puck are the game's alone (where the puck lay, the dot, the
  * walk's time); the pause goes through the state's bytes and bytes that are not a pause's are refused. RULE_ANTHEM: the
  * anthem's wait is the rule's, fixed per recording */
 static void hold(void)
