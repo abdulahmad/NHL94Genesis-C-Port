@@ -516,7 +516,7 @@ static int pc_frame(int fr)
     return fr - 9;
 }
 
-static int in_game(void) { return g.demoflag && (g.disflags & HI(dfok)); }
+static int in_game(void) { return g.demoflag && ((g.disflags & HI(dfok)) || (g.sflags & HI(sfpz))); }   /* (the pause screen too: its rink strip has the skaters) */
 
 
 /* where the referee stands, from the PC's assreffollow (the puck's zone picks a spot beside the boards; the view's middle gives the y)
@@ -622,6 +622,7 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
     if (ev == SPR_BEGIN) { P.nshow = 0; return 0; }
     if (ev == SPR_END) {
         ref_tick();
+        if (!P.nshow && (g.sflags & HI(sfpz))) return 0;                   /* (the pause: a pass that took none keeps the last ones) */
         SDL_AtomicLock(&P.lock);
         memmove(&P.ring[1], &P.ring[0], sizeof P.ring - sizeof P.ring[0]);
         memcpy(P.ring[0].l, P.show, sizeof P.show);
