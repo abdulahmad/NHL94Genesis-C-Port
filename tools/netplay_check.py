@@ -39,6 +39,8 @@ the setup screen), EA's 4 Way Play in the ports (the solo run's --four-way).
            records in its save RAM, from a run of records_game_30s.txt), every machine at the frame
            the host's log says; the solo run loads it there (--load-at), so every frame after it is
            the state's game, save RAM and all
+  referee  host and join, 25 ms +-15, 5% lost, delay 1: the host's RULE_REFEREE (NHL 95 PC's referee in play,
+           src/referee.c), his state in every rollback's
 
     tools/netplay_check.py [NAME...]
 """
@@ -68,6 +70,7 @@ SCENARIOS = [
     ('onethree', 6000, [], 'join', 2, '30,10,5,1', None, [1, 3]),
     ('reset', 7000, [], 'join', 2, '30,10,5,1', 4, [1, 1]),
     ('load', 7000, [], 'join', 2, '30,10,5,1', 5, [1, 1]),
+    ('referee', 7000, ['--rule', 'referee_in_play=on'], 'join', 1, '25,15,5,1', 6, [1, 1]),
 ]
 NEEDS = {'rosters': 'out/rosters/thirty-two'}
 RESETS = {'reset': 3600}                                  # (the host's pad 1 resets the console at this frame)

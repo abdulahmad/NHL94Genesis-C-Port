@@ -448,9 +448,11 @@ static int start_game(void)
 /* ---- the window ---- */
 
 static void wide_rows_sync(void);
+static void ref_row_sync(void);
 static const uint32_t *hook_frame(int *w, int *h)
 {
     wide_rows_sync();
+    ref_row_sync();
     SDL_LockMutex(F.lock);
     memcpy(F.shown, F.picture, sizeof F.shown);
     *w = F.width > 0 ? F.width : 320;
@@ -624,7 +626,7 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_CROWD_PC (CD_ROWS + 28)
 #define CD_CROWD_PCVOL (CD_ROWS + 29)
 #define CD_SPLIT (CD_ROWS + 30)                          /* (the movie's 50/50 demo: the disc's own left, the enhanced right) */
-#define CD_PCREFPHYS (CD_ROWS + 31)                        /* (the referee bumped by the skaters, as NHL 95 PC's is: only how he is drawn) */
+#define CD_PCREFPHYS (CD_ROWS + 31)                        /* (the referee and the skaters, as NHL 95 PC's: off, the picture's alone (visual), or in play (RULE_REFEREE)) */
 #define CD_OPTS (CD_ROWS + 32)
 #define CROWD_VOLS 40                                     /* (the crowd volumes: 5% to 200% in steps of 5%) */
 #define CROWD_VOL_100 19                                  /* (the choice for 100%) */
@@ -662,9 +664,9 @@ static int option_index(const char *key)
     return -1;
 }
 
+static void rule_from_row(const char *bare, int rule, int value);
 static void cd_changed(void *ctx, int index, int value)
 {
-    char key[64];
     (void)ctx;
     if (index == CD_MUSIC) { segacd_set_music(value); return; }
     if (index == CD_CROWD || index == CD_CROWD_CARTVOL || index == CD_CROWD_CD || index == CD_CROWD_CDVOL || index == CD_CROWD_PC || index == CD_CROWD_PCVOL) { crowd_apply(); return; }
@@ -692,7 +694,11 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_HATS) { hats_set(value); return; }
     if (index == CD_PCSPR) { pcspr_set(value); return; }
     if (index == CD_PCREF) { pcspr_ref_set(value); return; }
-    if (index == CD_PCREFPHYS) { pcspr_ref_phys_set(value); return; }
+    if (index == CD_PCREFPHYS) {                          /* (Visual only: the picture's; Full: RULE_REFEREE, a game rule) */
+        pcspr_ref_phys_set(value == 1);
+        rule_from_row("referee_in_play", RULE_REFEREE, value == 2);
+        return;
+    }
     if (index == CD_PCLOGO) { pcspr_logo_set(value); return; }
     if (index == CD_PCANTHEM) { pcsong_set(value); return; }
     if (index == CD_WIDESCREEN) { host.widescreen = value != 0; return; }   /* (hook_frame keeps the two rows alike) */
@@ -709,8 +715,16 @@ static void cd_changed(void *ctx, int index, int value)
         cd_restart = F.thread != NULL;
         return;
     }
-    if (index < 0 || index >= CD_ROWS || !F.opt_values) return;
-    snprintf(key, sizeof key, "rules.%s", cd_rows[index].key);
+    if (index < 0 || index >= CD_ROWS) return;
+    rule_from_row(cd_rows[index].key, cd_rows[index].rule, value);
+}
+
+/* a Game page row's rule (rules.<key>) set to value: kept in settings.ini, the next power on's and this game's from now on */
+static void rule_from_row(const char *bare, int rule, int value)
+{
+    char key[64];
+    if (!F.opt_values) return;
+    snprintf(key, sizeof key, "rules.%s", bare);
     int i = option_index(key);
     if (i < 0) return;
     if (F.opt_values[i] == value) return;
@@ -719,7 +733,18 @@ static void cd_changed(void *ctx, int index, int value)
     settings_write();
     if (F.session) return;                              /* (a session plays by the host's rules) */
     if (F.o->options_use) F.o->options_use(F.opt_values, F.user);   /* (the next power on's) */
-    rules[cd_rows[index].rule] = (uint8_t)value;          /* (and this game's, from now on) */
+    rules[rule] = (uint8_t)value;                         /* (and this game's, from now on) */
+}
+
+/* the referee row reads Full while RULE_REFEREE is on (the Game rules page can turn it on and off too) */
+static void ref_row_sync(void)
+{
+    if (!host.game_ready || !F.opt_values) return;
+    int i = option_index("rules.referee_in_play");
+    if (i < 0) return;
+    int row = ob_game_get(&host, CD_PCREFPHYS), on = F.opt_values[i] != 0;
+    if (on && row != 2) ob_game_set(&host, CD_PCREFPHYS, 2);
+    else if (!on && row == 2) { ob_game_set(&host, CD_PCREFPHYS, 1); pcspr_ref_phys_set(1); }
 }
 
 /* the disc's intro movie (segacd_intro_hook, the game's thread): the window's loop plays it, this waits */
@@ -926,7 +951,8 @@ static void game_page_init(void)
     cd_opts[CD_PCHORN] = (ob_game_opt){ "pc_period_horn", "PC end of period horn", cd_off_on, 2, 1, 0, 4 };
     cd_opts[CD_PCSPR] = (ob_game_opt){ "pc_sprites", "PC player sprites", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's skaters and goalies, the cartridge's where the PC has none) */
     cd_opts[CD_PCREF] = (ob_game_opt){ "pc_referee", "Referee on the ice", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's referee skating with the play and dropping the puck) */
-    cd_opts[CD_PCREFPHYS] = (ob_game_opt){ "pc_referee_bumps", "Referee bumped by skaters", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's checkcx for the referee, on his side only) */
+    static const char *const ref_phys[3] = { "off", "visual only", "full" };   /* (an older ini's "on" is not one: the default, visual only) */
+    cd_opts[CD_PCREFPHYS] = (ob_game_opt){ "pc_referee_bumps", "Referee physics", ref_phys, 3, 1, 0, 4 };   /* (NHL 95 PC's checkcx for the referee: his side only, or in play) */
     cd_opts[CD_PCLOGO] = (ob_game_opt){ "pc_centre_logo", "Centre ice logo", cd_logo_pc, 3, 1, 0, 4 };   /* (the cartridge's crest or NHL 95 PC's) */
     static const char *const anthem_of[3] = { "Off", "NHL 95 PC", "NHL 96 PC" };
     cd_opts[CD_PCANTHEM] = (ob_game_opt){ "pc_anthems", "National anthems", anthem_of, 3, 1, 0, 4 };   /* (NHL 95 PC's FM songs or NHL 96 PC's recordings, played before the first face off) */
@@ -940,7 +966,7 @@ static void game_page_init(void)
         game_help[CD_PCHORN] = "NHL 95 PC's horn at the end of a period, from your NHL 95 PC files.";
         game_help[CD_PCSPR] = "NHL 95 PC's skaters and goalies, from your NHL 95 PC files.";
         game_help[CD_PCREF] = "A referee skating on the ice, NHL 95 PC's, from your NHL 95 PC files.";
-        game_help[CD_PCREFPHYS] = "The referee on the ice is bumped aside by skaters who run into him, as in NHL 95 PC. Only the picture: play is unchanged.";
+        game_help[CD_PCREFPHYS] = "The referee on the ice and the play, as in NHL 95 PC. Visual only: skaters who run into him bump him aside, and play is unchanged. Full: he is in play: skaters bounce off him, the puck deflects off him, a pad player's check knocks him down, and every third knock down is a roughing penalty (a game rule: online, the host's).";
         game_help[CD_PCLOGO] = "The logo at centre ice: the cartridge's, NHL 95 PC's, or NHL 94 PC's (NHL 95's where 94 has none) from your PC game files.";
         game_help[CD_PCANTHEM] = "The national anthems before the first face off: NHL 95 PC's songs or NHL 96 PC's recordings, from your PC game discs (the other when one is missing). The crowd cheers over the last bars, as the PC's does.";
         game_help[CD_HATS] = "Hats thrown on the ice after a home skater's third goal.";
@@ -974,7 +1000,7 @@ static void game_page_init(void)
     pv[1][CD_PCREF] = 0;                                                       /* (the PC games' look: not the Sega CD's) */
     pv[2][CD_PCREF] = 1;
     pv[1][CD_PCREFPHYS] = 0;                                                   /* (the PC games' look: not the Sega CD's) */
-    pv[2][CD_PCREFPHYS] = 1;                                                   /* (on in Recommended: it only moves the picture of the referee) */
+    pv[2][CD_PCREFPHYS] = 1;                                                   /* (visual only in Recommended: Full changes play) */
     pv[1][CD_PCSPR] = 0;                                                       /* (the PC games' look: not the Sega CD's; off in Recommended until tried) */
     pv[2][CD_HATS] = 1;                                                        /* (on in Recommended; it does nothing without the SNES ROM) */
     pv[1][CD_WHITEICE] = 0;                                                    /* (the PC games' look: not the Sega CD's; off in Recommended too, it is a taste) */
