@@ -709,12 +709,13 @@ static void poster_look(void)
  * along to a row beside it (a wide card turns on its side as it goes). Each opening deals a new hand at random from the scans
  * in the art folder: the sample card that came in the box (pkCardF/B) and pkHc1F, pkHc2F, ... (with pkHc1B ... for backs
  * where there are scans of them; a card without one has a plain back). The hint cards order card is in the pack too ---- */
+/* what is held up for a close look (below); lk_out: the pack, while a card from it is held */
+static struct lk_t { int node, ret, item; float home[9]; } hold = { -1, 0, 0, { 0 } }, lk_out;
 #define NHC 4
 #define NPOOL 600
 #define CARD_W 2.5f
 #define CARD_H 3.5f
 static int hc[NHC] = { -1, -1, -1, -1 }, hc_tex[NHC] = { -1, -1, -1, -1 }, hb_tex[NHC] = { -1, -1, -1, -1 }, hc_on[NHC], hc_land[NHC], hc_pick[NHC], hc_busy;
-static float pack_home[9];
 static char pool_k[NPOOL][12];
 static int npool = -1;
 static void pool_scan(void)
@@ -738,8 +739,11 @@ static const char *card_name(int k)
 }
 static int card_node(int k) { return k < NHC ? hc[k] : pk[6]; }
 static int card_on(int k) { return k < NHC ? hc[k] >= 0 && hc_on[k] : pk[6] >= 0; }
+static int hcb;
 static void cards_make(void)
 {
+    hcb = r3_node_add(BX_S, -1, "hintBundle");
+    if (hcb >= 0) bx_n(hcb)->vis = 0;
     int src = -1;                                        /* a pack-in's printed face: the cards are the same stock */
     for (int i = 0; i < BX_S->nmeshes && src < 0; i++) { int m = BX_S->meshes[i].mat; if (pk[7] >= 0 && r3_is_under(BX_S, BX_S->meshes[i].node, pk[7]) && m >= 0 && BX_S->mats[m].map >= 0) src = m; }
     if (src < 0) return;
@@ -803,52 +807,89 @@ static void card_place(int k)
     if (k < NHC && hc_land[k]) bx_tw3(c->rot, 0, 0, PI_F / 2, 650, 0);     /* the wide card turns to lie as it was printed */
 }
 static void cards_show(int vis) { for (int k = 0; k <= NHC; k++) if (card_on(k)) bx_n(card_node(k))->vis = vis; }
-static void pack_open(void)
+/* opened, the pack's wrapper is gone: the cards that came out of it stay together as a bundle (hcb), which takes the pack's
+   place in the layout and in the case. Picked, the bundle spreads the cards out; Back gathers them up again */
+static int pack_node = -1, hc_opened;
+static void bundle_take(int k)
 {
-    if (hc_busy) return;
-    cards_deal();
+    int nd = card_node(k);
+    if (nd < 0 || hcb < 0) return;
+    bx_parent(nd, hcb);
+    r3_node *c = bx_n(nd);
+    float i = (float)k - NHC / 2.0f;
+    bx_set3(c->pos, .05f * i, -.04f * i, .022f * (NHC - k));      /* a loose stack, the first card on top */
+    bx_set3(c->rot, 0, 0, .035f * i); bx_set3(c->scale, 1, 1, 1);
+    c->vis = 1;
+}
+static void cards_spread(void)
+{
     st = S_CARDS; hc_busy = 1; bx_sfx(SFX_SLIDE, 0);
-    hide_items(3);
-    pose_get(pk[3], pack_home);
-    float gap = .45f, psc = .95f, y = -.5f;
-    float tw = 2.7f * psc;
+    float gap = .45f, y = -.5f, tw = -gap;
     int n = 0;
     for (int k = 0; k <= NHC; k++) if (card_on(k)) { tw += gap + (k < NHC && hc_land[k] ? CARD_H : CARD_W); n++; }
     {   /* the row fits across the picture */
         float d = BX_S->cam[2] - LAY_Z, vw = 2 * d * tanf(BX_S->fov * PI_F / 360) * BX_C.w / (float)(BX_C.h > 0 ? BX_C.h : 1);
         hc_sc = fminf(1, vw * .9f / tw);
-        gap *= hc_sc; psc *= hc_sc; tw *= hc_sc;
+        gap *= hc_sc; tw *= hc_sc;
     }
     float x = BX_S->cam[0] - tw / 2;
-    r3_node *p = bx_n(pk[3]);
-    float px = x + 2.7f * psc / 2;
-    bx_tw3(p->pos, px, y, LAY_Z, 600, 0); bx_tw3(p->rot, 0, 0, 0, 600, 0); bx_tw3(p->scale, psc, psc, psc, 600, 0);
-    x += 2.7f * psc + gap;
+    r3_update(BX_S);
     n = 0;
     for (int k = 0; k <= NHC; k++) {
         if (!card_on(k)) continue;
         int nd = card_node(k);
-        bx_parent(nd, -1);
+        bx_attach(nd, -1);                                   /* out of the bundle, where it is */
         r3_node *c = bx_n(nd);
-        float cs = pack_home[6] * .9f;
-        bx_set3(c->pos, pack_home[0], pack_home[1], pack_home[2] - .12f); bx_set3(c->rot, 0, 0, 0); bx_set3(c->scale, cs, cs, cs);
         c->vis = 1;
-        /* with the pack to its place, then out of it and along to its own */
-        bx_tw3(c->pos, px, y, LAY_Z - .12f, 600, 0);
-        bx_tw3(c->scale, .9f * hc_sc, .9f * hc_sc, .9f * hc_sc, 600, 0);
+        bx_tw3(c->rot, 0, 0, 0, 300, 0);
         float w = (k < NHC && hc_land[k] ? CARD_H : CARD_W) * hc_sc;
         bx_set3(hc_to[k], x + w / 2, y, LAY_Z);
-        bx_after(650 + n * 140, card_place, k);
+        bx_after(80 + n * 140, card_place, k);
         x += w + gap; n++;
     }
-    bx_after(650 + n * 140 + 700, cards_ready, 0);
+    bx_after(80 + n * 140 + 700, cards_ready, 0);
     caption();
+}
+static void pack_gone(int a) { (void)a; if (pack_node >= 0) bx_n(pack_node)->vis = 0; }
+static void spread_cb(int a) { (void)a; if (st == S_LOOK) cards_spread(); }
+static void pack_open(void)
+{
+    if (hc_busy || st != S_LOOK) return;
+    if (hc_opened) { cards_spread(); return; }
+    /* the first time: a hand is dealt, the wrapper goes and the cards are left in the hand, then spread out */
+    if (hcb < 0) { pk_read(3); return; }
+    cards_deal();
+    hc_opened = 1; hc_busy = 1; bx_sfx(SFX_SLIDE, 0);
+    pack_node = pk[3];
+    r3_node *p = bx_n(pack_node), *b = bx_n(hcb);
+    bx_parent(hcb, -1);
+    float o[9]; pose_get(pack_node, o); pose_set(hcb, o);
+    b->vis = 1;
+    for (int k = 0; k <= NHC; k++) if (card_on(k)) bundle_take(k);
+    bx_tw3(p->scale, p->scale[0] * 1.08f, p->scale[1] * 1.08f, 0, 350, 0);   /* the wrapper comes away */
+    bx_tw3(p->pos, p->pos[0], p->pos[1] + 1.2f, p->pos[2] + 1.5f, 350, 0);
+    bx_after(330, pack_gone, 0);
+    /* from now on the bundle is that thing: in the layout, in the hand, and in the case (in the pack's place there) */
+    pk[3] = hcb; it_node[3] = hcb; hold.node = hcb;
+    bx_after(700, cards_ready, 0);
+    bx_after(720, spread_cb, 0);
 }
 static void cards_away(void)
 {
+    if (hc_opened) { for (int k = 0; k <= NHC; k++) if (card_on(k)) bundle_take(k); hc_busy = 0; return; }
     for (int k = 0; k < NHC; k++) if (hc[k] >= 0) bx_n(hc[k])->vis = 0;
     if (pk[6] >= 0) bx_n(pk[6])->vis = 0;
     hc_busy = 0;
+}
+/* a new showing: the sealed pack is back */
+static void pack_reset(void)
+{
+    if (!hc_opened) return;
+    hc_opened = 0;
+    if (hcb >= 0) { bx_n(hcb)->vis = 0; bx_parent(hcb, -1); }
+    for (int k = 0; k < NHC; k++) if (hc[k] >= 0) { bx_parent(hc[k], -1); bx_n(hc[k])->vis = 0; }
+    if (pk[6] >= 0) { bx_parent(pk[6], -1); bx_n(pk[6])->vis = 0; }
+    if (pack_node >= 0) pk[3] = pack_node;
 }
 static void look_again(void);
 static void pack_closed(int a)
@@ -856,21 +897,19 @@ static void pack_closed(int a)
     (void)a;
     if (st != S_CARDS) return;
     cards_away();
-    look_again();                                        /* back to the pack in the hand */
+    look_again();                                        /* back to the bundle in the hand */
 }
 static void pack_close(void)
 {
     if (hc_busy) return;
     hc_busy = 1; bx_sfx(SFX_SLIDE, 0);
-    r3_node *p = bx_n(pk[3]);
+    r3_node *b = bx_n(hcb);
+    float sc = b->scale[0];
     for (int k = 0; k <= NHC; k++) if (card_on(k)) {
         r3_node *c = bx_n(card_node(k));
-        bx_tw3(c->pos, p->pos[0], p->pos[1], LAY_Z - .12f, 500, 0); bx_tw3(c->rot, 0, 0, 0, 500, 0); bx_tw3(c->scale, .9f * hc_sc, .9f * hc_sc, .9f * hc_sc, 500, 0);
+        bx_tw3(c->pos, b->pos[0], b->pos[1], b->pos[2] + .02f * (NHC - k), 500, 0); bx_tw3(c->rot, 0, 0, 0, 500, 0); bx_tw3(c->scale, sc, sc, sc, 500, 0);
     }
-    bx_tw3(p->rot, 0, 0, 0, 400, 0);
-    bx_tw3(p->pos, pack_home[0], pack_home[1], pack_home[2], 500, 450);
-    bx_tw3(p->scale, pack_home[6], pack_home[7], pack_home[8], 500, 450);
-    bx_after(980, pack_closed, 0);
+    bx_after(520, pack_closed, 0);
 }
 static void card_read(int k)
 {
@@ -892,7 +931,6 @@ static void pk_read(int i)
  * again it does its job (the cartridge to the system, the manual open, the poster unfolded, the pack opened, a card or
  * paper to read); Back (or the right button) puts it down again ---- */
 #define LOOK_Z 11.0f
-static struct lk_t { int node, ret, item; float home[9]; } hold = { -1, 0, 0, { 0 } }, lk_out;
 static int lk_busy, lk_has_out;
 static void look_forget(void) { hold.node = -1; lk_has_out = 0; lk_busy = 0; }
 /* the size of a thing on the screen's axes as it lies now (its meshes' corners in the world) */
@@ -916,10 +954,11 @@ static void look_size(int node, float *w, float *h, float c[2])
     *w = hi[0] > lo[0] ? hi[0] - lo[0] : 1; *h = hi[1] > lo[1] ? hi[1] - lo[1] : 1;
     c[0] = (lo[0] + hi[0]) / 2; c[1] = (lo[1] + hi[1]) / 2;
 }
+static const char *pk_label(int i) { return i == 3 && hc_opened ? "Hint cards (opened pack)" : pk_name[i]; }
 static const char *look_name(void)
 {
     if (hold.ret == S_CARDS) return hold.node == pk[3] ? pk_name[3] : card_name(hold.item);
-    return hold.item == NPK ? "The manual" : hold.item == NPK + 1 ? "The cartridge" : pk_name[hold.item];
+    return hold.item == NPK ? "The manual" : hold.item == NPK + 1 ? "The cartridge" : pk_label(hold.item);
 }
 static const char *look_does(void)
 {
@@ -927,7 +966,7 @@ static const char *look_does(void)
     if (hold.item == NPK + 1) return G.out ? NULL : "put it in the system";
     if (hold.item == NPK) return "read it";
     if (hold.item == 2) return "unfold it";
-    if (hold.item == 3) return "open it";
+    if (hold.item == 3) return hc_opened ? "spread them out" : "open it";
     return "read it";
 }
 static void look_hide(void)
@@ -1104,6 +1143,7 @@ static void enter(int mode)
     bx_parent(cart, cseat); bx_n(cart)->vis = 0; bx_set3(bx_n(cart)->pos, 0, 0, 0); bx_set3(bx_n(cart)->rot, 0, 0, 0); bx_set3(bx_n(cart)->scale, 1, 1, 1);
     tv_on_t = tv_off_t = -1; bx_n(tvKnob)->rot[0] = 0;
     lay_restore(); memset(it_saved, 0, sizeof it_saved); laid = 0;
+    pack_reset();
     stack_pose();
     tv_mode = -1; tv_on(); set_power(0);
     G.pads = count_pads();
@@ -1130,7 +1170,7 @@ static void frame(float dt)
         int hv = bx_hovered_node();
         if (it_saved[NPK]) bx_hot_node(cmanual, "Manual");
         if (it_saved[NPK + 1]) bx_hot_node(cart, "Cartridge");
-        for (int i = 0; i < NPK; i++) if (pk[i] >= 0 && i != 6 && i != 7) bx_hot_node(pk[i], pk_name[i]);
+        for (int i = 0; i < NPK; i++) if (pk[i] >= 0 && i != 6 && i != 7) bx_hot_node(pk[i], pk_label(i));
         for (int i = 0; i < NIT; i++) if (it_saved[i]) {           /* the one under the pointer lifts a little */
             float *z = &bx_n(it_node[i])->pos[2];
             if (it_node[i] == hv && *z >= LAY_Z - .01f) *z = LAY_Z + .5f;
@@ -1139,12 +1179,11 @@ static void frame(float dt)
     }
     if (st == S_POSTER && !post_busy) bx_hot_node(ppiv, "Poster: drag to spin, pick for a close look");
     if (st == S_CARDS && !hc_busy) {
-        bx_hot_node(pk[3], "Hint Cards pack");
         for (int k = 0; k <= NHC; k++) if (card_on(k)) bx_hot_node(card_node(k), card_name(k));
     }
     if (st == S_LOOK && !lk_busy && hold.node >= 0) { static char h[96]; const char *d = look_does(); snprintf(h, sizeof h, "%s%s%s", look_name(), d ? ": pick to " : "", d ? d : ""); bx_hot_node(hold.node, h); }
     /* closed, nothing of the bundle shows (it is inside the case) */
-    if (!laid && st <= S_OPEN) for (int i = 0; i < NPK; i++) if (pk[i] >= 0) bx_n(pk[i])->vis = i != 7 && i != 6 && opn > .04f;
+    if (!laid && st <= S_OPEN) for (int i = 0; i < NPK; i++) if (pk[i] >= 0 && i != 6 && i != 7) bx_n(pk[i])->vis = opn > .04f;   /* (the order card and the sample card are in the pack) */
     if (st == S_DESK) {
         if (!G.cart) { bx_hot_node(cart, "Insert the cartridge"); bx_hot_node(nslot, "Insert the cartridge"); }
         bx_hot_node(tvKnob, "TV power"); if (tvRemote >= 0) bx_hot_node(tvRemote, "TV power (remote)"); bx_hot_node(nsw, "System power");
