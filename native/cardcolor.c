@@ -66,6 +66,7 @@ static struct {
     uint8_t made[NALL];                            /* 0 not yet, 1 made (or a face read), 2 could not be */
     uint8_t rgb[NALL][CC_N * CC_N * 3];
     char named[NNAMED][40];                        /* the named faces' players: their names, letters and digits, lower case */
+    char cardname[NFACES][40];                     /* CardNNN_Name.png's Name, the same way ("" none) */
     int nnamed;
     struct shown {
         int used, card;
@@ -163,6 +164,7 @@ static int faces_in_one(const char *dir)
             if (n[7] != '_' && n[7] != '.') continue;
             k = (n[4] - '0') * 100 + (n[5] - '0') * 10 + (n[6] - '0') - 1;
             if (k < 0 || k >= NFACES) continue;
+            if (n[7] == '_') squash(n + 8, len - 12, C.cardname[k], sizeof C.cardname[k]);
         }
         if (C.made[k]) continue;
         char path[1200];
@@ -318,6 +320,12 @@ static int named_of(uint16_t team, uint16_t player)
         if (strncmp(f, key, 5)) continue;
         for (; *f && *r; f++) if (*f == *r) r++;
         if (!*r && C.made[NFACES + NCD + i] == 1) return NFACES + NCD + i;
+    }
+    for (int i = 0; i < NFACES; i++) {                    /* his cartridge card's face, by its file's name (John Vanbiesbrk on */
+        const char *f = C.cardname[i], *r = key;           /* Florida with the Sega CD's rosters: no Rangers picture of him left) */
+        if (!*f || strncmp(f, key, 5) || C.made[i] != 1) continue;
+        for (; *f && *r; f++) if (*f == *r) r++;
+        if (!*r) return i;
     }
     for (int u = 0; u < ROSTERS_MAX; u++) {               /* his photo on another team (John Vanbiesbrk: NYR's, on Florida) */
         const struct RosterTeam *U = &roster_team[u];
