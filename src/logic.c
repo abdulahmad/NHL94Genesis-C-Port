@@ -3496,6 +3496,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     hold_skate_arm();                                       /* (... and where they are to be: they skate there) */
     SprSort();
     ResetAndSelectPlayers(o);
+    hold_skate_place();                                      /* (RULE_HOLD: shown where they are, not at the spots) */
     uint16_t d4 = DecompressGraphicsPlain(ART(FaceOffMap) + 8, g.ExtraChars);
     g.faceoffvrcset = d4;
     DecompressGraphicsPlain(ART(FaceOffSprites) + 8, d4);
