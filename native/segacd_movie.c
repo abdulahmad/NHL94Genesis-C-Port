@@ -333,6 +333,7 @@ static void make_with(segacd_film *film, const char *base, const char *model, in
         snprintf(j->model, sizeof j->model, "%s", model ? model : "");
         j->id = segacd_film_id(film);
         j->want_dd = want_dd; j->want_colour = want_colour || want_smooth; j->want_smooth = want_smooth;
+        if (!L.lock) L.lock = SDL_CreateMutex();                 /* (made here, before the maker: never two) */
         SDL_Thread *t = SDL_CreateThread(maker, "movie-extras", j);
         if (t) { SDL_DetachThread(t); return; }
     }
