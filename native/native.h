@@ -64,6 +64,7 @@ void native_net_start(mdrt *m);                         /* at power on, the stat
 void native_net_stop_at(long frame);                    /* headless: the session ends at --frames */
 void native_net_wait(void);                             /* at each of the game's waits, before the handshake */
 extern int native_game_teams[2];
+int frontend_sides_shot(const char *path);         /* --sides-shot: the select-sides screen to a PPM (headless) */
 int native_apply_seats(const int team[4], int n);   /* the pads' teams from the select-sides screen (cont1team ...): 0 when it is a demo and nothing was set */
 int native_player_on_screen(int p, int *dx, int *dy);   /* the controlled player of pad p: picture pixels from the picture's middle */
 int native_menu_rows(int rect[][4], int max, int *n, int *sel, int *lr);   /* the game menu being read: rows on the 320x224 picture, the selected one; 0 none */

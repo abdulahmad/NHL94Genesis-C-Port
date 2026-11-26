@@ -96,6 +96,7 @@
 #include "view.h"
 #include "mdrt/platform_sdl2.h"
 
+static const char *sides_shot_path;                       /* --sides-shot FILE: the select-sides screen (frontend.c) at the end */
 static const char *snap, *shot_path, *shots_dir, *wav_path, *lockstep_path, *golden_path, *input_path[MDRT_PADS];
 static int four_way;                    /* --four-way: EA's 4 Way Play in the ports */
 static const char *state_file = "out/nhl94.state", *load_state_path, *save_state_path;
@@ -685,6 +686,7 @@ void native_frame_done(long frame, int wait)
     }
     if (stop_after >= 0 && run >= stop_after && restart_frame < 0 && !native_net_on()) {   /* (netplay: net.c ends it; --restart-at: the game started again) */
         if (shot_path) write_ppm(shot_path);
+        if (sides_shot_path) frontend_sides_shot(sides_shot_path);
         native_quit();
     }
 }
@@ -773,6 +775,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--aspect")) aspect = 1;
         else if (!strcmp(argv[i], "--frames") && i + 1 < argc) stop_after = atol(argv[++i]);
         else if (!strcmp(argv[i], "--shot") && i + 1 < argc) shot_path = argv[++i];
+        else if (!strcmp(argv[i], "--sides-shot") && i + 1 < argc) sides_shot_path = argv[++i];
         else if (!strcmp(argv[i], "--sram") && i + 1 < argc) { sram = argv[++i]; sram_given = 1; }
         else if (!strcmp(argv[i], "--rosters") && i + 1 < argc) rosters_arg = rosters_folder(argv[++i]);
         else if (!strcmp(argv[i], "--export-rosters") && i + 1 < argc) export_dir = argv[++i];
