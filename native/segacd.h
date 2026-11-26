@@ -8,7 +8,8 @@ void segacd_wait(void);                  /* (headless) until the search ends */
 int segacd_searched(void);               /* 1 once the search ended (segacd_disc: what it found, NULL none) */
 ob_cd *segacd_disc(void);                /* the disc, NULL while looking or when there is none */
 void segacd_set_music(int on);           /* the Game page: songs from the disc */
-void segacd_set_crowd(int v);            /* 0 the cartridge's PSG crowd, 1 the disc's track 2, 2 both */
+void segacd_set_crowd(int v);            /* bit 0 the cartridge's PSG crowd, bit 1 the disc's track 2 */
+void segacd_set_crowd_vol(int cart, int cd);   /* each bed's volume, percent */
 void segacd_set_voice(int v);            /* Ron Barr's scouting report: 0 off, 1 on (no song under it), 2 on over the music */
 void segacd_set_screens(int v);          /* the opening screens: 0 the cartridge's, 1 the disc's (EA SPORTS, High Score Productions, the license page) */
 void segacd_set_title(int v);            /* the title page: 0 the cartridge's, 1 the disc's (its credits, then the license page) */
