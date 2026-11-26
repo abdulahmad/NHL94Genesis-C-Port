@@ -883,8 +883,50 @@ static void logo_why(int why, const char *text)
     fprintf(stderr, "Centre ice logo: %s\n", text);
 }
 
+/* a pixel of the tile of plane map entry e: its colour number (0 clear) */
+static int tile_px(const mdrt_vdp *v, uint16_t e, int x, int y)
+{
+    if (e & 0x0800) x = 7 - x;
+    if (e & 0x1000) y = 7 - y;
+    uint8_t b = v->s.vram[((uint32_t)(e & 0x7FF) << 5) + (uint32_t)(y << 2) + (uint32_t)(x >> 1)];
+    return (x & 1) ? (b & 0xF) : (b >> 4);
+}
+
+/* where the crest is in the planes: the cells of plane A (0) or B (1) whose tile is one of the crest's, in plane pixels (x0, y0 the top
+ * left, x1, y1 past the bottom right); 0 when no cell has one */
+struct crest_at { int plane, x0, y0, x1, y1, pw, ph; uint32_t table; };
+static int crest_cells(const mdrt_vdp *v, int crest, struct crest_at *c)
+{
+    static const int cells[4] = { 32, 64, 32, 128 };
+    int w = cells[v->s.reg[16] & 3], h = cells[(v->s.reg[16] >> 4) & 3];
+    for (int plane = 1; plane >= 0; plane--) {
+        uint32_t table = plane ? (uint32_t)(v->s.reg[4] & 7) << 13 : (uint32_t)(v->s.reg[2] & 0x38) << 10;
+        int cx0 = 1 << 20, cy0 = 1 << 20, cx1 = -1, cy1 = -1, cn = 0;
+        for (int r = 0; r < h; r++)
+            for (int k = 0; k < w; k++) {
+                uint32_t a = (table + (uint32_t)((r * w + k) << 1)) & 0xFFFE;
+                int t = (v->s.vram[a] << 8 | v->s.vram[a + 1]) & 0x7FF;
+                if (t < crest || t >= crest + 24) continue;
+                cn++;
+                if (k < cx0) cx0 = k;
+                if (k > cx1) cx1 = k;
+                if (r < cy0) cy0 = r;
+                if (r > cy1) cy1 = r;
+            }
+        if (cn < 12 || cx1 - cx0 >= w / 2 || cy1 - cy0 >= h / 2) continue;   /* (none, a stray tile of another screen, or not one crest: wrapped round the plane) */
+        *c = (struct crest_at){ plane, cx0 * 8, cy0 * 8, (cx1 + 1) * 8, (cy1 + 1) * 8, w * 8, h * 8, table };
+        return 1;
+    }
+    return 0;
+}
+
 /* the cartridge's crest at centre ice taken out of the picture and NHL 95 PC's logo of the home team put in its place, over only the
- * rink: under the windows, the scoreboard and the players as the crest was. Called before the PC's players are drawn. */
+ * rink: under the windows, the scoreboard and the players as the crest was. vdp: the VDP as it drew the picture, less the cartridge
+ * sprites the PC's skaters replace; px its picture (pitch_px apart). Everything is from that VDP state, the same scroll and plane
+ * map the picture was drawn with, so the logo moves with the rink to the pixel: the crest's cells in the plane map, put on the
+ * screen by the plane's scroll. The crest's cells are given the tile left of them in their row (the ice, or the red centre line,
+ * which the crest's tiles bake in) and the picture drawn again: the line runs on under the logo, drawn by the VDP itself. Called
+ * before the PC's players are drawn. */
 static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
     int mode = SDL_AtomicGet(&LGO.on);
@@ -897,59 +939,98 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     const struct lset *LS = (mode == 2 || !LGO.L[0].have) && LGO.L[1].have && LGO.L[1].t[k].idx ? &LGO.L[1] : &LGO.L[0];   /* (94 falls back to 95 where it has no such logo) */
     if (!LS->t[k].idx) { logo_why(3, "the PC files have no logo of the home team: the cartridge's crest shown"); return; }
     if (LGO.crest < 0 || !(g.Vcount & 63) || LGO.seen != team) { LGO.crest = find_crest(vdp, team); LGO.seen = team; }
-    if (getenv("PCLOGO_LOG") && (!(g.Vcount & 63) || getenv("PCLOGO_LOG")[0] == '2')) fprintf(stderr, "logo? team %d art %d crest %d\n", team, art, LGO.crest);
+    int log = getenv("PCLOGO_LOG") && (!(g.Vcount & 63) || getenv("PCLOGO_LOG")[0] == '2');
+    if (log) fprintf(stderr, "logo? team %d art %d crest %d\n", team, art, LGO.crest);
     if (LGO.crest < 0) { if (find3d_visible()) logo_why(4, "the cartridge's crest was not found in the VDP's memory: the cartridge's crest shown"); return; }
+    struct crest_at C;
+    if (!crest_cells(vdp, LGO.crest, &C)) return;                  /* (the crest is in no plane's map: not on the rink in view) */
     static mdrt_vdp sc;
     static uint16_t blank[320 * 240], base[320 * 240], back[320 * 240], front[320 * 240];
     sc = *vdp;
-    for (int t = 0; t < 24; t++) memset(sc.s.vram + (((unsigned)(LGO.crest + t) * 32) & 0xFFFF), 0, 32);
-    mdrt_vdp_render(&sc, blank, 320);
-    int x0 = 1 << 20, y0 = 1 << 20, x1 = -1, y1 = -1;
-    for (int y = 0; y < h; y++)                                      /* (the crest: where taking its tiles out changes the picture) */
-        for (int x = 0; x < w; x++)
-            if (blank[y * 320 + x] != px[y * pitch_px + x]) {
-                pic[(long)y * pitch + x] = 0xFF000000u | mdrt_vdp_rgb(blank[y * 320 + x], MDRT_RGB_GPGX);
-                if (x < x0) x0 = x;
-                if (x > x1) x1 = x;
-                if (y < y0) y0 = y;
-                if (y > y1) y1 = y;
+    int cw = C.pw / 8;
+    for (int r = C.y0 / 8; r < C.y1 / 8; r++)                        /* (each crest cell: the first cell left of it in the row that is not the crest's) */
+        for (int q = C.x0 / 8; q < C.x1 / 8; q++) {
+            uint32_t a = (C.table + (uint32_t)((r * cw + q) << 1)) & 0xFFFE;
+            int t = (vdp->s.vram[a] << 8 | vdp->s.vram[a + 1]) & 0x7FF;
+            if (t < LGO.crest || t >= LGO.crest + 24) continue;
+            uint32_t from = a;
+            for (int l = 1; l <= cw; l++) {
+                uint32_t b2 = (C.table + (uint32_t)((r * cw + ((q - l) & (cw - 1))) << 1)) & 0xFFFE;
+                int t2 = (vdp->s.vram[b2] << 8 | vdp->s.vram[b2 + 1]) & 0x7FF;
+                if (t2 < LGO.crest || t2 >= LGO.crest + 24) { from = b2; break; }
             }
-    int16_t cx = 0, cy = 0;
-    find3d(&cx, &cy, 0);
-    if (getenv("PCLOGO_LOG") && (!(g.Vcount & 63) || getenv("PCLOGO_LOG")[0] == '2')) fprintf(stderr, "logo: art %d crest tile %d bbox %d,%d-%d,%d find3d %d,%d shift %d\n", art, LGO.crest, x0, y0, x1, y1, cx + view_shift(), cy, view_shift());
-    int lw = LS->t[k].w, lh = LS->t[k].h;
-    int lx, ly;
-    if (cy == 0x4E20) return;
-    lx = cx + view_shift() - 128 - lw / 2;
-    ly = cy - 128 - lh / 2;
-    if (x1 >= 0 && x1 - x0 >= 40) { lx = (x0 + x1 + 1) / 2 - lw / 2; ly = (y0 + y1 + 1) / 2 - lh / 2; }   /* (the crest's own place, when it is all in view) */
-    /* the red centre line was part of the crest's tiles: draw it again across the gap in each row, from the 8 columns of it left of the gap (period 8) */
-    if (x1 - x0 >= 40 && x0 >= 48 && x1 + 48 < w)
-        for (int y = y0; y <= y1 && y < h; y++) {
-#define LINERED(xx) ({ uint32_t q_ = pic[(long)y * pitch + (xx)]; int r_ = (q_ >> 16) & 255, g_ = (q_ >> 8) & 255, b_ = q_ & 255; r_ > 190 && r_ - g_ > 60 && r_ - b_ > 60; })
-            int xl = -1, xr = -1;
-            for (int x = x0 + 8; x >= x0 - 40 && xl < 0; x--) if (LINERED(x)) xl = x;
-            for (int x = x1 - 8; x <= x1 + 40 && xr < 0; x++) if (LINERED(x)) xr = x;
-            if (xl < 0 || xr < 0 || xr - xl < 12) continue;
-            int red = 0;
-            for (int x = xl - 7; x <= xl; x++) red += LINERED(x);
-            if (red < 3) continue;
-            for (int x = xl + 1; x < xr; x++) pic[(long)y * pitch + x] = pic[(long)y * pitch + xl - 7 + ((x - xl - 1) & 7)];
-#undef LINERED
+            sc.s.vram[a] = vdp->s.vram[from];
+            sc.s.vram[a + 1] = vdp->s.vram[from + 1];
         }
+    /* the red centre line: the cartridge's stops short of its crest (the crest is over it), the PC's logo is narrower. A row of cells
+     * whose cell 5 left of the crest has the line's red runs it on to 5 right of it, over the cells with no red (the ice and the
+     * crest's); the cells the line has (where the circle crosses it) stay */
+    int ly0 = 1 << 20, ly1 = -1;                                       /* (the line's rows in the plane) */
+    for (int r = C.y0 / 8; r < C.y1 / 8; r++) {
+        uint16_t run = 0;
+        for (int q = C.x0 / 8 - 5; q <= C.x1 / 8 + 4; q++) {
+            uint32_t a = (C.table + (uint32_t)((r * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
+            uint16_t e = (uint16_t)(sc.s.vram[a] << 8 | sc.s.vram[a + 1]);
+            int t = (vdp->s.vram[a] << 8 | vdp->s.vram[a + 1]) & 0x7FF, red = 0;
+            int crest = t >= LGO.crest && t < LGO.crest + 24;
+            for (int i = 0; i < 64 && !crest; i++) {
+                int c = tile_px(&sc, e, i & 7, i >> 3);
+                unsigned v = c ? sc.s.cram[((e >> 13) & 3) * 16 + c] : 0;
+                red += c && (v & 0xE) >= 0xA && (v >> 4 & 0xE) <= 6 && (v >> 8 & 0xE) <= 6;
+            }
+            if (red >= 4 && q == C.x0 / 8 - 5)
+                for (int y = 0; y < 8; y++) {
+                    int n = 0;
+                    for (int x = 0; x < 8; x++) { int c = tile_px(&sc, e, x, y); unsigned v = c ? sc.s.cram[((e >> 13) & 3) * 16 + c] : 0; n += c && (v & 0xE) >= 0xA && (v >> 4 & 0xE) <= 6 && (v >> 8 & 0xE) <= 6; }
+                    if (n >= 2) { if (r * 8 + y < ly0) ly0 = r * 8 + y; if (r * 8 + y > ly1) ly1 = r * 8 + y; }
+                }
+            if (red >= 4) run = e;
+            else if (q == C.x0 / 8 - 5) break;                          /* (not a row of the line) */
+            else { sc.s.vram[a] = (uint8_t)(run >> 8); sc.s.vram[a + 1] = (uint8_t)run; }
+        }
+    }
+    mdrt_vdp_render(&sc, blank, 320);
+    for (int y = 0; y < h; y++)                                      /* (the crest's pixels: where the picture changes) */
+        for (int x = 0; x < w; x++)
+            if (blank[y * 320 + x] != px[y * pitch_px + x]) pic[(long)y * pitch + x] = 0xFF000000u | mdrt_vdp_rgb(blank[y * 320 + x], MDRT_RGB_GPGX);
+    /* the crest's middle on the screen, by the plane's scroll as the VDP draws it (vertical: the whole screen's; horizontal: the
+     * line's, the crest's middle line) */
+    int vs = vdp->s.vsram[C.plane] & 0x7FF;
+    int sy = ((C.y0 + C.y1) / 2 - vs) & (C.ph - 1);
+    if (sy >= h / 2 + C.ph / 2) sy -= C.ph;
+    int hl = sy < 0 ? 0 : sy >= h ? h - 1 : sy;
+    if ((vdp->s.reg[11] & 3) == 2) hl &= ~7;
+    else if ((vdp->s.reg[11] & 3) != 3) hl = 0;
+    uint32_t hs = ((uint32_t)(vdp->s.reg[13] & 0x3F) << 10) + (uint32_t)(hl << 2) + (C.plane ? 2u : 0u);
+    int hsv = (vdp->s.vram[hs & 0xFFFE] << 8 | vdp->s.vram[(hs & 0xFFFE) + 1]) & 0x3FF;
+    if (hsv & 0x200) hsv -= 0x400;
+    int sx = ((C.x0 + C.x1) / 2 + hsv) & (C.pw - 1);
+    if (sx >= w / 2 + C.pw / 2) sx -= C.pw;
+    int lw = LS->t[k].w, lh = LS->t[k].h;
+    int lx = sx - lw / 2, ly = sy - lh / 2;
+    if (ly1 >= 0) {                                                  /* (the logo's own centre line, the rows red at both its edges, on the cartridge's) */
+        int a0 = -1, a1 = -1;
+        const uint8_t (*lp)[3] = LS == &LGO.L[0] && SDL_AtomicGet(&P.found) ? P.pal : LS->pal;
+        for (int y = 0; y < lh; y++) {
+            int c0 = LS->t[k].idx[y * lw], c1 = LS->t[k].idx[y * lw + lw - 1];
+            if (c0 != 255 && c1 != 255 && lp[c0][0] > 150 && lp[c0][1] < 120 && lp[c1][0] > 150 && lp[c1][1] < 120) { if (a0 < 0) a0 = y; a1 = y; }
+        }
+        int ry = sy + (ly0 + ly1 + 1) / 2 - (C.y0 + C.y1) / 2;      /* (the line's middle on the screen: its rows are the crest's) */
+        if (a0 >= 0) ly = ry - (a0 + a1) / 2;
+        if (log) fprintf(stderr, "logo: line plane rows %d-%d, art rows %d-%d, screen %d\n", ly0, ly1, a0, a1, ry);
+    }
+    if (log) fprintf(stderr, "logo: art %d crest tile %d plane %c cells %d,%d-%d,%d scroll %d,%d middle %d,%d\n", art, LGO.crest, C.plane ? 'B' : 'A', C.x0, C.y0, C.x1, C.y1, hsv, vs, sx, sy);
+    if (lx >= w || ly >= h || lx + lw <= 0 || ly + lh <= 0) return;
     int nx = (lw + 31) / 32, ny = (lh + 31) / 32;
     if (nx * ny > 6 || !sprite_masks(&sc, lx, ly, nx, ny, base, back, front, 0)) { if (getenv("PCLOGO_LOG")) fprintf(stderr, "logo: no mask (%dx%d)\n", nx, ny); return; }
-    if (getenv("PCLOGO_LOG")) { int on = 0; for (int y = 0; y < lh; y++) for (int x = 0; x < lw; x++) { int ppx = lx + x, ppy = ly + y; if (ppx >= 0 && ppx < w && ppy >= 0 && ppy < h && back[ppy * 320 + ppx] != base[ppy * 320 + ppx]) on++; } fprintf(stderr, "logo: at %d,%d %dx%d, %d pixels open\n", lx, ly, lw, lh, on); }
     for (int y = 0; y < lh; y++)
         for (int x = 0; x < lw; x++) {
             int c = LS->t[k].idx[y * lw + x];
             if (c == 255) continue;                                                    /* (clear) */
             int ppx = lx + x, ppy = ly + y;
             if (ppx < 0 || ppx >= w || ppy < 0 || ppy >= h || back[ppy * 320 + ppx] == base[ppy * 320 + ppx]) continue;
-            {
-                const uint8_t *pc = LS == &LGO.L[0] && SDL_AtomicGet(&P.found) ? P.pal[c] : LS->pal[c];   /* (the PC's own rink palette: RINK.PAL is a rougher 5 bit copy of it) */
-                pic[(long)ppy * pitch + ppx] = fadec(0xFF000000u | (uint32_t)pc[0] << 16 | (uint32_t)pc[1] << 8 | pc[2]);
-            }
+            const uint8_t *pc = LS == &LGO.L[0] && SDL_AtomicGet(&P.found) ? P.pal[c] : LS->pal[c];   /* (the PC's own rink palette: RINK.PAL is a rougher 5 bit copy of it) */
+            pic[(long)ppy * pitch + ppx] = fadec(0xFF000000u | (uint32_t)pc[0] << 16 | (uint32_t)pc[1] << 8 | pc[2]);
         }
 }
 
@@ -1051,10 +1132,9 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
         fprintf(stderr, "\n");
     }
     if (w > 320 || h > 240) return;
-    logo_draw(vdp, px, pitch_px, pic, w, h, pitch);
-    static mdrt_vdp scratch;
+    static mdrt_vdp scratch, hidden;
     if (!SDL_AtomicGet(&P.on)) n = 0;
-    if (n <= 0) { ref_draw(vdp, pic, w, h, pitch, list, 0); flag_draw(pic, w, h, pitch); return; }
+    if (n <= 0) { logo_draw(vdp, px, pitch_px, pic, w, h, pitch); ref_draw(vdp, pic, w, h, pitch, list, 0); flag_draw(pic, w, h, pitch); return; }
     static uint16_t clean[320 * 240];
     static uint8_t vis[320 * 240];
     scratch = *vdp;
@@ -1068,6 +1148,7 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
             scratch.sat[e * 8] = scratch.sat[e * 8 + 1] = 0;
         }
     mdrt_vdp_render(&scratch, clean, 320);
+    hidden = scratch;                                            /* (the VDP without the cartridge sprites the PC's replace: the logo goes under the PC's, on the rink they uncover) */
     /* Where the listed sprites really are on top, as the VDP sees it (plane priority, other sprites, window): their tiles are
      * filled solid in one exotic colour and the picture drawn once more. The PC sprites may cover only those pixels. */
     static uint16_t solid[320 * 240];
@@ -1098,6 +1179,7 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
                 vis[y * 320 + x] = 1;
                 pic[(long)y * pitch + x] = 0xFF000000u | mdrt_vdp_rgb(clean[y * 320 + x], MDRT_RGB_GPGX);
             }
+    logo_draw(&hidden, clean, 320, pic, w, h, pitch);
     for (int i = n - 1; i >= 0; i--) {                           /* (the sprite table's first is on top: drawn last) */
         const spr *s = &P.f[list[i].pc];
         int team = list[i].away ? (int)rosters_art(team_struct(1)->tmteam) : (int)rosters_art(team_struct(0)->tmteam);
