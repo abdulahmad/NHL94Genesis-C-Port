@@ -31,10 +31,10 @@ enum {
     RULE_CD_PERIOD_END,         /* PeriodOver_sp without the two vblank waits and the p_turnoff between them */
     RULE_HOLD,                  /* play waits between a goal, a penalty or a penalty shot and the next face off for
                                  * about as long as NHL 95 PC's announcer takes to say it (src/hold.c) */
-    RULE_FIGHT,                 /* NHL 93's fighting (src/fight.c): hard checks between opposing skaters can start a fight */
+    RULE_FIGHT,                 /* NHL 93's fighting (mods/fight.c): hard checks between opposing skaters can start a fight */
     RULE_ANNOUNCE,              /* the rink announcer's timing (src/hold.c): 1 the speech starts with the goal or penalty and play waits
                                  * until it is done, 2 a home goal's speech waits for the goal song to end */
-    RULE_REFEREE,               /* 1: NHL 95 PC's referee in play (src/referee.c): skaters bounce off him, the puck deflects
+    RULE_REFEREE,               /* 1: NHL 95 PC's referee in play (mods/referee.c): skaters bounce off him, the puck deflects
                                  * off him, a check knocks him down, every third knock down a penalty */
     RULE_ANTHEM,                /* the national anthem before the first face off (src/hold.c): 1 NHL 95 PC's song, 2 NHL 96 PC's
                                  * recording. The players line up and the drop waits for the anthem's own length, fixed per
@@ -90,7 +90,7 @@ size_t faceoff_defer_save(uint8_t *out);
 int faceoff_defer_check(const uint8_t *in);
 int faceoff_defer_load(const uint8_t *in);
 
-/* RULE_REFEREE (src/referee.c): the referee is the game's own object, kept in every state. referee_update once a pass after
+/* RULE_REFEREE (mods/referee.c): the referee is the game's own object, kept in every state. referee_update once a pass after
  * the skaters; referee_cx in checkplcoll's walk (skater o moved to x, y); referee_puck in checkpuckcoll's. referee_get: where
  * he is for the host's picture (0 while he is off the ice or the rule is off). The state's bytes: REFEREE_STATE_SIZE;
  * referee_state_load(NULL) starts him off the ice (a state from before him), -1 for bytes that are not a referee's. */

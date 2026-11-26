@@ -17,6 +17,19 @@ Speed (decided 2026-11-03): the cartridge's slowdown is an **option, off by defa
 the game loop takes one vblank (Smooth); with it a CPU cost model decides how many vblanks a pass takes, as the
 cartridge does.
 
+## The layers
+
+| Folder | What | In `make VANILLA=1` |
+|---|---|---|
+| `src/` | the cartridge's game, routine for routine (lockstep against the cartridge) | yes |
+| `mods/` | customizations that run inside the game and change play (NHL 93's fights, NHL 95 PC's referee in play) | no: `native/vanilla/mods.c` stands in with the cartridge's own behaviour |
+| `native/` | the host: window, sound, menus, netplay, and the picture and sound extras (PC sprites, announcer, Sega CD extras, box, widescreen) | yes (host), with `native/vanilla/stubs.c` for rules, roster sets, states and netplay |
+
+`src/` reaches `mods/` only through the declarations in `src/game.h` and `src/rules.h`, and every such call is a
+place where the cartridge does nothing or the original thing (`native/vanilla/mods.c` says which). With every option
+off the default build plays as the vanilla one: `make lockstep` and `make lockstep-vanilla` both pass the cartridge's
+vectors.
+
 ## Where this repository stands
 
 * The game code (`src/`) is the original path when the rules are Classic (the default) and the rosters are the

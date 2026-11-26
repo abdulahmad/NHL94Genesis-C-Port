@@ -299,7 +299,7 @@ int hold_skate_carry(int *x, int *y)
 
 /* the referee's place on his walk, in 256ths of a pixel (x, y in: where he is now). The start of a period: from the PC's start
  * of play to his spot; else to the puck where it lay (each call a step: the frames left to SK_PICKUP share what is left of
- * the way), then with it to the dot (hold_skate_carry). For a referee of the game's own (RULE_REFEREE: src/referee.c), whose
+ * the way), then with it to the dot (hold_skate_carry). For a referee of the game's own (RULE_REFEREE: mods/referee.c), whose
  * place is in every state: one call a frame. 0: no walk */
 int hold_skate_ref_step(int *x, int *y)
 {

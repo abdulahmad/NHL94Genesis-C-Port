@@ -135,7 +135,7 @@ static void sega_cd(void)
     classic_rules();
 }
 
-/* RULE_REFEREE (src/referee.c): with the rule off nothing; on, he comes on beside the play, a skater who runs into him
+/* RULE_REFEREE (mods/referee.c): with the rule off nothing; on, he comes on beside the play, a skater who runs into him
  * bounces off (the mover keeps his place: collflag) and pushes him, the puck bounces off him, a pad player's hard check
  * knocks him down and the third such check is a roughing penalty; his state goes through the state's bytes, and bytes
  * that are not a referee's are refused (a state is hostile until checked) */

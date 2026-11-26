@@ -23,8 +23,10 @@ CC      ?= gcc
 WERROR  ?= -Werror
 WARN    := -Wall -Wextra -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wno-unused-parameter $(WERROR)
 CFLAGS  ?= -std=gnu11 -O1 -g $(WARN)
-SRC     := $(wildcard src/*.c)
-HDR     := $(wildcard src/*.h)
+# src/: the cartridge's game. mods/: the customizations that run inside it (fights, the referee in play), called only
+# through src/rules.h; VANILLA=1 leaves mods/ out (docs/VANILLA.md)
+SRC     := $(wildcard src/*.c) $(wildcard mods/*.c)
+HDR     := $(wildcard src/*.h) $(wildcard mods/*.h)
 TESTSRC := test/captest.c test/replay.c test/stubs.c test/ports.c test/hal_replay.c
 CAPS    := $(wildcard out/captures/*.cap)
 PY      := python3 -I
@@ -78,7 +80,8 @@ NATIVE := $(wildcard native/*.c)
 # VANILLA=1: the game without the host extras (game rules, roster sets, states, online play):
 # build/nhl94-vanilla, its own objects (native/vanilla/stubs.c, docs/VANILLA.md)
 ifeq ($(VANILLA),1)
-NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c romsrc.c art.c banner.c ratings.c state.c net.c),$(NATIVE)) native/vanilla/stubs.c
+NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c romsrc.c art.c banner.c ratings.c state.c net.c),$(NATIVE)) native/vanilla/stubs.c native/vanilla/mods.c
+SRC    := $(wildcard src/*.c)
 BIN    ?= build/nhl94-vanilla$(EXE)
 OBJ    ?= build/obj-vanilla
 endif
@@ -116,6 +119,9 @@ NFLAGS  = $(CFLAGS) $(SANITIZE) -O2 -Isrc -Inative -Inative/pulseman/include $(O
 MDRTHDR := $(wildcard $(MDRT)/include/mdrt/*.h)
 nhl94: $(BIN)
 $(OBJ)/src/%.o: src/%.c $(HDR) $(MDRTHDR)
+	@mkdir -p $(dir $@)
+	$(CC) $(NFLAGS) -finstrument-functions -c $< -o $@
+$(OBJ)/mods/%.o: mods/%.c $(HDR) $(MDRTHDR)
 	@mkdir -p $(dir $@)
 	$(CC) $(NFLAGS) -finstrument-functions -c $< -o $@
 $(OBJ)/native/%.o: native/%.c $(wildcard $(OVERBAR_DIR)/include/overbar/*.h) $(HDR) native/native.h native/routines_gen.h $(MDRTHDR)

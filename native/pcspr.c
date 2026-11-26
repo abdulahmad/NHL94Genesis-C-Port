@@ -65,7 +65,7 @@ static const char *const logo_name[NLOGOS] = { "ANH", "BOS", "BUF", "CGY", "CHI"
 static const signed char logo_of_art[28] = { 0, 1, 2, 3, 4, 10, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 24, -1, -1 };
 
 /* the referee: not in the cartridge's game, only in this picture (a visual one: nothing in the game knows of it), unless
- * RULE_REFEREE puts him in play (src/referee.c): then, in play, he is drawn where the game has him */
+ * RULE_REFEREE puts him in play (mods/referee.c): then, in play, he is drawn where the game has him */
 static struct {
     SDL_atomic_t on, phys;                  /* phys: skaters bump him (ref_bump), the picture's alone */
     int init, x, y, vx, vy;                 /* the rink position and velocity in 1/256 pixels */
@@ -514,7 +514,7 @@ static void fade_update(const mdrt_vdp *vdp)
  * standing face on (its anthem's SPAanthem4 / 5 use them too) and only its 382 is one sitting in the box. So 381 and 382 keep the
  * cartridge's sprite and 383 is the PC's 382.
  *
- * The fight frames, SPFgloves 353 to SPFfinjury+5 376 (NHL 93's fights: src/fight.c), have no PC frames: NHL 95 PC has no fights and
+ * The fight frames, SPFgloves 353 to SPFfinjury+5 376 (NHL 93's fights: mods/fight.c), have no PC frames: NHL 95 PC has no fights and
  * gave those numbers (352-375) to other pictures (frames.asm: the face off stances 360-368, the anthem's standing 369-371, the goalie's
  * wall jump 372-375, the cup 357-358), so a fighter was drawn as a face off or anthem man. The hook takes a fighter's frame through
  * fight_frame_shown first (the cartridge frame he is drawn with: holding, hooking, falling), whose PC frame is the real one. */

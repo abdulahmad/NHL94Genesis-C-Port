@@ -89,7 +89,7 @@ void checkplcoll(int16_t x, int16_t y, struct SortObj *o)
         checkcx(nxt, x, dy, o);
         pos--;
     }
-    if (rules[RULE_REFEREE]) referee_cx(x, y, o);           /* (native: NHL 95 PC's referee, src/referee.c) */
+    if (rules[RULE_REFEREE]) referee_cx(x, y, o);           /* (native: NHL 95 PC's referee, mods/referee.c) */
 }
 
 /* collide94.asm:checkcx. d4 = other object number * 2, d2 = x, d5 = delta y, a3 = moving object.
@@ -1043,7 +1043,7 @@ void checkpuckcoll(struct SortObj *puck)
         ccx(nxt, puck);
         pos--;
     }
-    if (rules[RULE_REFEREE]) referee_puck(puck);            /* (native: NHL 95 PC's referee, src/referee.c) */
+    if (rules[RULE_REFEREE]) referee_puck(puck);            /* (native: NHL 95 PC's referee, mods/referee.c) */
 }
 
 /* collide94.asm:puckstick. a2 = player, a3 = puck, d0 = distance squared. A stick on the puck

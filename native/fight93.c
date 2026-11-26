@@ -1,6 +1,6 @@
 /* NHL 93's fight frames from the player's own NHLPA Hockey 93 cartridge (fight93.h).
  *
- * The 94 cartridge kept the fight frames' numbers (SPFgloves 353 to SPFfinjury+5 376, the fights of src/fight.c) but not their
+ * The 94 cartridge kept the fight frames' numbers (SPFgloves 353 to SPFfinjury+5 376, the fights of mods/fight.c) but not their
  * art: each is one 8 x 8 sprite of a blank tile. NHL 93 has them all. Its Sprites.anim is the same format as 94's ($FFFFFFFF, the
  * long offset of the frame table, the tiles from +$A, 8 byte sprite entries), so the frames' sprite entries are read from it and
  * its tiles are served to the VDP's DMA at FIGHT93_BUS (read68k, main.c): the game's own addframe2 draws them, through the
