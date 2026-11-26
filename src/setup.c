@@ -1565,7 +1565,7 @@ void ShowGoalBox(void)
             if (!(e[5] & 0x80)) { a2 = e[5]; assists = 2; }
         }
         int frames = 222 + (assists ? 156 : 0) + (assists > 1 ? 120 : 0);
-        if (rules[RULE_ANNOUNCE] == 2 && tm == team_struct(0)) hold_goal_after_song(frames, tm, scorer, a1, a2);   /* (the home goal's song first) */
+        if (rules[RULE_ANNOUNCE] == 2) hold_goal_after_song(frames, tm, scorer, a1, a2);   /* (the siren and the song first, home goal or away) */
         else {
             if (pa_hook) pa_hook(PA_GOAL, tm, scorer, a1, a2);           /* (the rink announcer) */
             hold_for(frames);

@@ -254,6 +254,7 @@ extern void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
 /* the goal siren and the horn at a period's end (native/pcsfx.c): the hook returns 1 when the host plays its own and the cartridge's is left out */
 enum { SFX_GOAL, SFX_HORN, SFX_ONEMIN };
 extern int (*sfx_hook)(int ev);
+extern int (*siren_busy_hook)(void);                    /* 1 while the host's own goal siren plays */
 extern int (*anthem_hook_fn)(int home_art, int away_art);   /* the first face off of a game: the host plays the anthems and returns the frames to wait (0: none) */
 extern int (*song_block_hook)(void);                         /* 1: the cartridge's songs stay quiet (an anthem plays) */
 

@@ -75,10 +75,22 @@ int hold_anthem_ref(int *x, int *y, int *dir, int *moving)
     return 1;
 }
 
+/* the goal's own sound: the siren (the cartridge's or the PC's), then the goal song when there is one */
+static int goal_sound_busy(void)
+{
+    if (song_playing() || (int16_t)g.songdelay > 0) return 1;
+    if (siren_busy_hook && siren_busy_hook()) return 1;
+    for (int i = 0; i < 8; i++) {                        /* (the cartridge's siren, sfx_siren_cmdstream, in a track slot) */
+        int32_t st = (int32_t)g.fm_slots[i].stream;
+        if (st >= 0x2CCCA && st < 0x2CEF2) return 1;
+    }
+    return 0;
+}
+
 void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a2)
 {
     if (getenv("HOLDLOG")) fprintf(stderr, "hold: frame %d goal, song playing %d, delay %d\n", g.Vcount, song_playing(), (int16_t)g.songdelay);
-    if (!song_playing() && (int16_t)g.songdelay <= 0) {   /* no song coming: the speech now */
+    if (!goal_sound_busy()) {                              /* no siren or song going or coming: the speech now */
         if (pa_hook) pa_hook(PA_GOAL, tm, player, a1, a2);
         hold_for(frames);
         return;
@@ -100,6 +112,7 @@ static void anthem_pose(void)
         struct SortObj *pl = sortobj(0);
         for (int i = 0; i < 12; i++, pl++) { spot[i].x = pl->Xpos; spot[i].y = pl->Ypos; }
         anth_pose = 1;
+        if (getenv("HOLDLOG")) for (int i = 0; i < 12; i++) fprintf(stderr, "hold: anthem player %d pos %d asn %d facedir %d\n", i, sortobj(i)->position, sortobj(i)->asslist[sortobj(i)->assnum & 7], sortobj(i)->facedir);
     }
     int skating = t >= anth_len;
     int slot[2] = {0, 0};
@@ -234,7 +247,7 @@ void hold_tick(void)
     if (sk_on) skate_pose();
     if (anth && pending) anthem_pose();
     if (!sg.on) return;
-    int playing = song_playing() || (int16_t)g.songdelay > 0;
+    int playing = goal_sound_busy();
     if (playing) sg.started = 1;
     if (!(sg.started && !playing) && (int16_t)(sg.limit - g.Vcount) > 0) return;
     if (getenv("HOLDLOG")) fprintf(stderr, "hold: frame %d speech starts (started %d)\n", g.Vcount, sg.started);

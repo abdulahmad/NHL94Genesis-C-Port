@@ -462,6 +462,30 @@ static const uint8_t pc_team[NTEAMS] = {
 };
 
 /* the cartridge's frame number as the PC's (-1: none) */
+/* A fade (between plays, the pause): colour RAM steps toward palfadenew, and the PC's pictures, which are not in colour RAM, are
+ * dimmed by the same amount (0..256) */
+static int fade256 = 256;
+static uint32_t fadec(uint32_t c)
+{
+    if (fade256 >= 256) return c;
+    uint32_t r = (c >> 16 & 255) * (uint32_t)fade256 >> 8, gg = (c >> 8 & 255) * (uint32_t)fade256 >> 8, b = (c & 255) * (uint32_t)fade256 >> 8;
+    return 0xFF000000u | r << 16 | gg << 8 | b;
+}
+static int cram_sum(const uint16_t *cr, int ram)
+{
+    int t = 0;
+    for (int i = 0; i < 64; i++) { unsigned c = ram ? g.palfadenew[i] : cr[i]; t += (c & 0xE) + (c >> 4 & 0xE) + (c >> 8 & 0xE); }
+    return t;
+}
+static void fade_update(const mdrt_vdp *vdp)
+{
+    static int steady;
+    int cur = cram_sum(vdp->s.cram, 0);
+    if ((int16_t)g.palcount < 0) { steady = cur; fade256 = 256; return; }
+    int tgt = cram_sum(0, 1), ref = tgt > 0 ? tgt : steady;
+    fade256 = ref > 0 ? (cur >= ref ? 256 : cur * 256 / ref) : 256;
+}
+
 static int pc_frame(int fr)
 {
     if (fr < 1 || fr > 657) return -1;
@@ -591,7 +615,6 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
         return 0;
     }
     if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || sc > 13 || P.nshow >= 16) return 0;
-    if ((int16_t)g.palcount >= 0) return 0;               /* (a fade: the cartridge's sprites fade with the screen) */
     int pf = pc_frame(o->frame & 0x7FF);
     if (hold_anthem_time() >= 0 && sc < 12 && sortobj(sc)->position > 0) pf = 368;      /* (the anthem: the PC's standing picture, number 369) */
     if (pf < 0 || pf >= NFRAMES || !P.f[pf].px) return 0;   /* (no such PC frame: the cartridge's sprite stays) */
@@ -722,7 +745,7 @@ static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch
             }
             if (!ok) continue;
             int r = v < 0x80 ? rec[192 + v] : rec[320 + v - 0x80];
-            pic[(long)py * pitch + px_] = 0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2];
+            pic[(long)py * pitch + px_] = fadec(0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2]);
         }
 }
 
@@ -788,7 +811,7 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
             if (c == 255) continue;                                                    /* (clear) */
             int ppx = lx + x, ppy = ly + y;
             if (ppx < 0 || ppx >= w || ppy < 0 || ppy >= h || back[ppy * 320 + ppx] == base[ppy * 320 + ppx]) continue;
-            pic[(long)ppy * pitch + ppx] = 0xFF000000u | (uint32_t)LS->pal[c][0] << 16 | (uint32_t)LS->pal[c][1] << 8 | LS->pal[c][2];
+            pic[(long)ppy * pitch + ppx] = fadec(0xFF000000u | (uint32_t)LS->pal[c][0] << 16 | (uint32_t)LS->pal[c][1] << 8 | LS->pal[c][2]);
         }
 }
 
@@ -827,13 +850,14 @@ static void flag_draw(uint32_t *pic, int w, int h, int pitch)
             int v = f->px[y * f->w + x];
             int px_ = bx + x, py = by + y;
             if (v == 255 || px_ < 0 || px_ >= w || py < 0 || py >= h) continue;
-            pic[(long)py * pitch + px_] = 0xFF000000u | (uint32_t)P.pal[v][0] << 16 | (uint32_t)P.pal[v][1] << 8 | P.pal[v][2];
+            pic[(long)py * pitch + px_] = fadec(0xFF000000u | (uint32_t)P.pal[v][0] << 16 | (uint32_t)P.pal[v][1] << 8 | P.pal[v][2]);
         }
 }
 
 void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
-    if ((!SDL_AtomicGet(&P.on) && !SDL_AtomicGet(&R.on) && !SDL_AtomicGet(&LGO.on) && hold_anthem_time() < 0) || !SDL_AtomicGet(&P.found) || !in_game() || (int16_t)g.palcount >= 0) return;
+    if ((!SDL_AtomicGet(&P.on) && !SDL_AtomicGet(&R.on) && !SDL_AtomicGet(&LGO.on) && hold_anthem_time() < 0) || !SDL_AtomicGet(&P.found) || !in_game()) return;
+    fade_update(vdp);
     shown list[16];
     int n = 0;
     unsigned sat0 = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
@@ -916,7 +940,7 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
                 int r = v < 0x80 ? rec[192 + v] : rec[320 + v - 0x80];
                 int px_ = x0 + x, py = y0 + y;
                 if (px_ < 0 || px_ >= w || py < 0 || py >= h || solid[py * 320 + px_] == clean[py * 320 + px_]) continue;
-                pic[(long)py * pitch + px_] = 0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2];
+                pic[(long)py * pitch + px_] = fadec(0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2]);
             }
     }
     ref_draw(vdp, pic, w, h, pitch, list, n);
