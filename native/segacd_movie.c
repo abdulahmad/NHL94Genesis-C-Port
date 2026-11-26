@@ -14,6 +14,9 @@
  *   colour     each shot's own correction (overbar/grade.h): <base>.colour, a few bytes a shot, applied live.
  * The 50/50 demo shows both at once: the left half the disc's own picture at its own 10 a second, the right half with all
  * three (the cached de-dither, the colour, 30 fps), a line between them and their names at the top.
+ * They can be made ahead (segacd_movie_prepare, from the start of the opening once the disc is found). A movie that starts
+ * while they are still being made plays the frames made so far (kept in memory as the files have them): it waits at its
+ * start until the rest will be made before it gets there, and again if it ever catches up, never running ahead of them.
  * The movie and its decoder are native/segacd_film.c's. */
 #include <SDL.h>
 #include <stdio.h>
@@ -27,6 +30,9 @@
 #include "segacd.h"
 
 #define AHEAD_MS 120                       /* sound queued ahead of the speaker */
+#define RAW_FROM 810                       /* HOCKEY.SEG's closing NHL HOCKEY logo, from its first frame: the disc's own dithered
+                                              pictures (Abdul: the de-dither blurs the dither-drawn texture), 30 fps still */
+#define SMOOTH_ID(id) ((id) ^ 0x52415731u) /* the 30 fps file's source: the movie's, marked (its logo from the dithered pictures) */
 #define LABEL_MS 2000                      /* the de-dither's name on screen after a change */
 
 static struct {
@@ -57,11 +63,109 @@ static struct {
     ob_grade_scene *scenes;
     int nscenes, lut_scene, looked;
     ob_grade_lut lut;
+    int held, overlay, was_live;                      /* waiting for frames still being made; the overlay is up (either: the sound paused) */
+    uint32_t held_at;
 } M;
 
 /* the made passes' maker: one at a time, on its own thread; it keeps on after the movie ends. Whatever is
  * missing of: the de-dither cache, the shots' colour, the 30 fps pictures */
 static SDL_atomic_t making, made_pct;   /* (made_pct: the 30 fps pictures, percent) */
+
+/* the frames being made, as the files have them, for a movie playing before the files are done (the maker adds, the
+ * window's loop reads; all under lock) */
+static struct {
+    SDL_mutex *lock;
+    int live;                               /* the maker is at it (its dd and / or mids kept here) */
+    int has_dd, has_mid;                    /* what it keeps */
+    int total, made;                        /* the movie's frames; how many are done (their dd and the mids before them) */
+    uint32_t t0; int made0;                 /* (the pace: made since t0) */
+    uint8_t **dd, **mid;
+    long *ddlen, *midlen;
+    int nd, nm, capd, capm;
+} L;
+
+static void live_lock(void) { if (!L.lock) L.lock = SDL_CreateMutex(); if (L.lock) SDL_LockMutex(L.lock); }
+static void live_unlock(void) { if (L.lock) SDL_UnlockMutex(L.lock); }
+
+/* (the maker) the frame the maker m just took, kept */
+static void live_keep(ob_ddcache_maker *m, int mid)
+{
+    const uint8_t *b;
+    long n = ob_ddcache_last(m, &b);
+    uint8_t *copy = n > 0 ? SDL_malloc((size_t)n) : NULL;
+    if (!copy) return;
+    memcpy(copy, b, (size_t)n);
+    live_lock();
+    uint8_t ***v = mid ? &L.mid : &L.dd;
+    long **len = mid ? &L.midlen : &L.ddlen;
+    int *cnt = mid ? &L.nm : &L.nd, *cap = mid ? &L.capm : &L.capd;
+    if (*cnt == *cap) {
+        int c = *cap ? *cap * 2 : 1024;
+        uint8_t **nv = SDL_realloc(*v, (size_t)c * sizeof *nv);
+        long *nl = nv ? SDL_realloc(*len, (size_t)c * sizeof *nl) : NULL;
+        if (nv) *v = nv;
+        if (nl) { *len = nl; *cap = c; }
+    }
+    if (*cnt < *cap) { (*v)[*cnt] = copy; (*len)[(*cnt)++] = n; copy = NULL; }
+    live_unlock();
+    SDL_free(copy);
+}
+
+static void live_drop(void)                 /* (under lock) */
+{
+    for (int i = 0; i < L.nd; i++) SDL_free(L.dd[i]);
+    for (int i = 0; i < L.nm; i++) SDL_free(L.mid[i]);
+    SDL_free(L.dd); SDL_free(L.mid); SDL_free(L.ddlen); SDL_free(L.midlen);
+    L.dd = L.mid = NULL; L.ddlen = L.midlen = NULL;
+    L.nd = L.nm = L.capd = L.capm = 0;
+    L.live = L.has_dd = L.has_mid = 0;
+}
+
+/* (the window's loop) frame i of the dd (mid 0) or the mids (mid 1) into out (W x H), if it is made; 0 not */
+static int live_get(int mid, int i, int W, int H, uint32_t *out)
+{
+    int ok = 0;
+    live_lock();
+    if (L.live && i >= 0 && i < (mid ? L.nm : L.nd))
+        ok = ob_ddcache_decode(mid ? L.mid[i] : L.dd[i], mid ? L.midlen[i] : L.ddlen[i], W, H, out);
+    live_unlock();
+    return ok;
+}
+
+/* (under lock) the frames the movie needs made before it shows frame i (its dd, and the mids after it) */
+static int live_needed(int i) { return i + 1 + (L.has_mid && M.smooth ? 1 : 0); }
+
+/* the sound paused while the overlay is up or the movie waits for frames */
+static void apply_pause(void)
+{
+    static int was;
+    int on = M.overlay || M.held;
+    if (!M.film || !M.dev || on == was) return;
+    was = on;
+    SDL_PauseAudioDevice(M.dev, on ? 1 : 0);
+}
+
+/* 1 while the movie must wait for frames still being made: at its start until the rest will be made before it gets there
+ * (at the pace so far), then whenever the next one is not made yet */
+static int live_wait(void)
+{
+    int wait = 0;
+    live_lock();
+    if (L.live && (L.has_dd || L.has_mid)) {
+        int next = M.index + 1;
+        if (L.made < live_needed(next) && L.made < L.total) wait = 1;
+        else if (M.index < 0 && L.total > 0) {
+            uint32_t ms = SDL_GetTicks() - L.t0;
+            int done = L.made - L.made0;
+            double pace = done > 0 && ms > 0 ? done * 1000.0 / ms : 0;      /* frames made a second */
+            double left = pace > 0 ? (L.total - L.made) / pace : 1e9, play = L.total / 10.0;   /* (the disc's 10 a second) */
+            wait = left > play * 0.9;
+        }
+    }
+    live_unlock();
+    return wait;
+}
+
 
 typedef struct {
     segacd_film *film;
@@ -69,6 +173,7 @@ typedef struct {
     uint32_t id;
     int want_dd, want_colour, want_smooth;
 } maker_job;
+static void make_with(segacd_film *film, const char *base, const char *model, int want_dd, int want_colour, int want_smooth);
 
 static void path_of(char *out, size_t n, const char *base, const char *ext)
 {
@@ -84,6 +189,12 @@ static void half(const uint32_t *in, int W, int H, uint32_t *out)
         for (int k = 0; k < 24; k += 8) o |= (uint32_t)(((p[0] >> k & 255) + (p[1] >> k & 255) + (p[W] >> k & 255) + (p[W + 1] >> k & 255) + 2) / 4) << k;
         out[y * (W / 2) + x] = o;
     }
+}
+
+/* double size: each pixel four times (the dither kept as it is) */
+static void double2x(const uint32_t *in, int w, int h, uint32_t *out)
+{
+    for (int y = 0; y < 2 * h; y++) for (int x = 0; x < 2 * w; x++) out[(size_t)y * 2 * w + x] = in[(size_t)(y / 2) * w + x / 2];
 }
 
 static int maker(void *ud)
@@ -123,36 +234,57 @@ static int maker(void *ud)
         int W = 2 * w, H = 2 * h, cut_at = 0;
         ob_dedither_hq *q = ob_dedither_hq_new(w, h);
         ob_ddcache_maker *dd = j->want_dd ? ob_ddcache_make_done(j->dd, w, h, j->id) : NULL;
-        ob_ddcache_maker *mid = j->want_smooth ? ob_frames_make(j->smooth, W, H, j->id) : NULL;
+        ob_ddcache_maker *mid = j->want_smooth ? ob_frames_make(j->smooth, W, H, SMOOTH_ID(j->id)) : NULL;
         uint32_t *prev = SDL_malloc((size_t)W * H * 4), *cur = SDL_malloc((size_t)W * H * 4), *out = SDL_malloc((size_t)W * H * 4);
+        uint32_t *rprev = SDL_malloc((size_t)W * H * 4), *rcur = SDL_malloc((size_t)W * H * 4);   /* (the dithered pictures, 2x) */
         uint32_t *p1 = SDL_malloc((size_t)w * h * 4), *c1 = SDL_malloc((size_t)w * h * 4);
         float *flow = SDL_malloc((size_t)w * h * 16), *mask = SDL_malloc((size_t)w * h * 4);
         int total = nscenes > 0 ? scenes[nscenes - 1].end : 0;
-        ok = q && (!j->want_dd || dd) && (!j->want_smooth || mid) && prev && cur && out && p1 && c1 && flow && mask;
+        if (!total) {                                                     /* (the frames, counted: the pace's measure) */
+            segacd_film *f = segacd_film_dup(j->film);
+            while (f && segacd_film_next(f, &idx, &col) >= 0) total++;
+            segacd_film_close(f);
+        }
+        live_lock();
+        L.live = 1; L.has_dd = dd != NULL; L.has_mid = mid != NULL; L.total = total; L.made = 0; L.t0 = SDL_GetTicks(); L.made0 = 0;
+        live_unlock();
+        ok = q && (!j->want_dd || dd) && (!j->want_smooth || mid) && prev && cur && out && rprev && rcur && p1 && c1 && flow && mask;
         while (ok && segacd_film_next(j->film, &idx, &col) >= 0) {
             for (int i = 0; i < w * h; i++) frame[i] = col[idx[i]];
             memcpy(cur, ob_dedither_hq_frame(q, frame), (size_t)W * H * 4);
-            if (dd) ok = ob_ddcache_add(dd, cur);
+            if (dd && (ok = ob_ddcache_add(dd, cur))) live_keep(dd, 0);
+            double2x(frame, w, h, rcur);
+            const uint32_t *pa = n >= RAW_FROM ? rprev : prev, *pb = n >= RAW_FROM ? rcur : cur;   /* (the logo: its own pictures, the motion from the de-dithered) */
             if (ok && mid && n > 0) {
                 while (cut_at < nscenes && scenes[cut_at].start < n) cut_at++;
-                if (cut_at < nscenes && scenes[cut_at].start == n) ok = ob_ddcache_add(mid, prev) && ob_ddcache_add(mid, prev);   /* (a cut: held) */
+                if (cut_at < nscenes && scenes[cut_at].start == n) {   /* (a cut: held) */
+                    for (int k = 0; ok && k < 2; k++) if ((ok = ob_ddcache_add(mid, pa))) live_keep(mid, 1);
+                }
                 else {
                     half(prev, W, H, p1);
                     half(cur, W, H, c1);
                     for (int k = 1; ok && k <= 2; k++) {
                         ok = ob_framegen_motion(g, p1, c1, w, h, k / 3.0f, flow, mask);
-                        if (ok) { ob_framegen_draw(g, prev, cur, W, H, flow, mask, w, h, out); ok = ob_ddcache_add(mid, out); }
+                        if (ok) { ob_framegen_draw(g, pa, pb, W, H, flow, mask, w, h, out); if ((ok = ob_ddcache_add(mid, out))) live_keep(mid, 1); }
                     }
                 }
                 if (total) SDL_AtomicSet(&made_pct, n * 100 / total);
             }
             uint32_t *t = prev; prev = cur; cur = t;
+            t = rprev; rprev = rcur; rcur = t;
             n++;
+            live_lock();
+            L.made = n;
+            if (n == 8) { L.t0 = SDL_GetTicks(); L.made0 = n; }       /* (the pace from here: the first frames are slower) */
+            live_unlock();
         }
         if (dd) ok = ob_ddcache_end(dd, ok) && ok;
         if (mid) ok = ob_ddcache_end(mid, ok) && ok;
+        live_lock();                                                      /* (the files from now on) */
+        live_drop();
+        live_unlock();
         ob_dedither_hq_free(q);
-        SDL_free(prev); SDL_free(cur); SDL_free(out); SDL_free(p1); SDL_free(c1); SDL_free(flow); SDL_free(mask);
+        SDL_free(prev); SDL_free(cur); SDL_free(rprev); SDL_free(rcur); SDL_free(out); SDL_free(p1); SDL_free(c1); SDL_free(flow); SDL_free(mask);
         fprintf(stderr, "movie: %s%s%s, %d frames in %.1f s%s\n", j->want_dd ? j->dd : "", j->want_dd && j->want_smooth ? " and " : "",
                 j->want_smooth ? j->smooth : "", n, (SDL_GetTicks() - t0) / 1000.0, ok ? "" : " (failed)");
     }
@@ -171,7 +303,7 @@ static int has_mids(void)
     if (!M.mids && M.base[0]) {
         char p[1100];
         path_of(p, sizeof p, M.base, ".smooth");
-        M.mids = ob_frames_open(p, 2 * M.fw, 2 * M.fh, segacd_film_id(M.film));
+        M.mids = ob_frames_open(p, 2 * M.fw, 2 * M.fh, SMOOTH_ID(segacd_film_id(M.film)));
     }
     return M.mids != NULL;
 }
@@ -187,6 +319,28 @@ static int has_scenes(void)
     return M.scenes != NULL;
 }
 
+/* starts the maker (one at a time) on film (its own: it closes it) for what is asked for */
+static void make_with(segacd_film *film, const char *base, const char *model, int want_dd, int want_colour, int want_smooth)
+{
+    if (!want_dd && !want_colour && !want_smooth) { segacd_film_close(film); return; }
+    if (!SDL_AtomicCAS(&making, 0, 1)) { segacd_film_close(film); return; }
+    maker_job *j = SDL_calloc(1, sizeof *j);
+    if (j && film) {
+        j->film = film;
+        path_of(j->dd, sizeof j->dd, base, ".dedither");
+        path_of(j->colour, sizeof j->colour, base, ".colour");
+        path_of(j->smooth, sizeof j->smooth, base, ".smooth");
+        snprintf(j->model, sizeof j->model, "%s", model ? model : "");
+        j->id = segacd_film_id(film);
+        j->want_dd = want_dd; j->want_colour = want_colour || want_smooth; j->want_smooth = want_smooth;
+        SDL_Thread *t = SDL_CreateThread(maker, "movie-extras", j);
+        if (t) { SDL_DetachThread(t); return; }
+    }
+    segacd_film_close(film);
+    SDL_free(j);
+    SDL_AtomicSet(&making, 0);
+}
+
 /* starts the maker for whatever the options want that is not made yet */
 static void make_cache(void)
 {
@@ -195,21 +349,35 @@ static void make_cache(void)
     int want_smooth = M.smooth && M.base[0] && !has_mids();
     if (want_smooth && M.cache[0] && !ob_postfx_has_cache(M.pp)) want_dd = 1;   /* (the same pass makes it) */
     if (!want_dd && !want_colour && !want_smooth) return;
-    if (!SDL_AtomicCAS(&making, 0, 1)) return;
-    maker_job *j = SDL_calloc(1, sizeof *j);
-    if (j && (j->film = segacd_film_dup(M.film))) {
-        snprintf(j->dd, sizeof j->dd, "%s", M.cache);
-        path_of(j->colour, sizeof j->colour, M.base, ".colour");
-        path_of(j->smooth, sizeof j->smooth, M.base, ".smooth");
-        snprintf(j->model, sizeof j->model, "%s", M.model);
-        j->id = segacd_film_id(M.film);
-        j->want_dd = want_dd; j->want_colour = want_colour || want_smooth; j->want_smooth = want_smooth;
-        SDL_Thread *t = SDL_CreateThread(maker, "movie-extras", j);
-        if (t) { SDL_DetachThread(t); return; }
-        segacd_film_close(j->film);
-    }
-    SDL_free(j);
-    SDL_AtomicSet(&making, 0);
+    if (SDL_AtomicGet(&making)) return;
+    make_with(segacd_film_dup(M.film), M.base, M.model, want_dd, want_colour, want_smooth);
+}
+
+void segacd_movie_prepare(ob_cd *cd, const char *name, int dedither, int smooth, int colour, int split, const char *base, const char *model)
+{
+    if (!cd || !base || !base[0] || SDL_AtomicGet(&making) || M.film) return;
+    if (split) { smooth = colour = 1; dedither = OB_POSTFX_CACHED; }
+    segacd_film *f = segacd_film_open(cd, name);
+    if (!f) return;
+    int w, h;
+    char p[1100];
+    uint32_t id = segacd_film_id(f);
+    segacd_film_size(f, &w, &h);
+    path_of(p, sizeof p, base, ".dedither");
+    ob_ddcache *c = ob_ddcache_open(p, w, h, id);
+    int want_dd = (dedither == OB_POSTFX_CACHED || smooth) && !c;
+    ob_ddcache_close(c);
+    path_of(p, sizeof p, base, ".smooth");
+    c = ob_frames_open(p, 2 * w, 2 * h, SMOOTH_ID(id));
+    int want_smooth = smooth && !c;
+    ob_ddcache_close(c);
+    ob_grade_scene *sc = NULL;
+    path_of(p, sizeof p, base, ".colour");
+    int want_colour = colour && ob_grade_load(p, id, &sc) <= 0;
+    free(sc);
+    if (want_dd || want_colour || want_smooth)
+        fprintf(stderr, "movie: made ahead from now (%s%s%s)\n", want_dd ? "de-dither " : "", want_colour ? "colour " : "", want_smooth ? "30 fps" : "");
+    make_with(f, base, model, want_dd, want_colour, want_smooth);
 }
 
 /* the picture now: the disc's through the de-dither, or one of the 30 fps pictures between; then its shot's colour */
@@ -217,8 +385,15 @@ static void show(void)
 {
     if (M.index < 0) return;
     const uint32_t *mid = M.sub && M.mids ? ob_ddcache_read(M.mids, 2 * M.index + M.sub - 1) : NULL;
-    if (mid && M.pw == 2 * M.fw) memcpy(M.pic, mid, (size_t)M.pw * M.ph * 4);   /* (the size of the disc's picture before it) */
+    int W = 2 * M.fw, H = 2 * M.fh;
+    if (!mid && M.sub && live_get(1, 2 * M.index + M.sub - 1, W, H, M.pic)) { M.pw = W; M.ph = H; }   /* (being made: kept so far) */
+    else if (mid && M.pw == 2 * M.fw) memcpy(M.pic, mid, (size_t)M.pw * M.ph * 4);   /* (the size of the disc's picture before it) */
     else if (mid) half(mid, 2 * M.fw, 2 * M.fh, M.pic);
+    else if (M.index >= RAW_FROM && SDL_AtomicGet(&M.mode) != OB_POSTFX_OFF) {   /* (the closing logo: its own dithered pictures) */
+        if (SDL_AtomicGet(&M.mode) == OB_POSTFX_CACHED || M.smooth) { double2x(M.raw, M.fw, M.fh, M.pic); M.pw = W; M.ph = H; }   /* (the size of the rest) */
+        else { memcpy(M.pic, M.raw, (size_t)M.fw * M.fh * 4); M.pw = M.fw; M.ph = M.fh; }
+    }
+    else if (SDL_AtomicGet(&M.mode) == OB_POSTFX_CACHED && live_get(0, M.index, W, H, M.pic)) { M.pw = W; M.ph = H; }
     else {
         int w, h;
         const uint32_t *p = ob_postfx_run(M.pp, SDL_AtomicGet(&M.mode), M.index, M.raw, &w, &h);
@@ -276,7 +451,13 @@ static void draw(void *ud, uint32_t *px, int w, int h, int pitch)
         ob_vf_draw(px, w, h, pitch, x0 + bw / 4 - ob_vf_width(OB_VF_SEMIBOLD, ls, "Original", 0) / 2, y0 + ls * 1.4f, OB_VF_SEMIBOLD, ls, 0xFFFFFF, 230, "Original", 0, 2);
         ob_vf_draw(px, w, h, pitch, x0 + bw * 3 / 4 - ob_vf_width(OB_VF_SEMIBOLD, ls, "Enhanced", 0) / 2, y0 + ls * 1.4f, OB_VF_SEMIBOLD, ls, 0xFFFFFF, 230, "Enhanced", 0, 2);
     }
-    if (M.smooth && !M.mids && SDL_AtomicGet(&making)) {
+    if (M.held) {                                         /* (waiting for frames still being made) */
+        int made, total;
+        live_lock(); made = L.made; total = L.total; live_unlock();
+        char text[80];
+        snprintf(text, sizeof text, "Preparing the movie (%d%%)", total > 0 ? made * 100 / total : 0);
+        ob_vf_draw(px, w, h, pitch, x0 + bw / 2 - ob_vf_width(OB_VF_SEMIBOLD, size, text, 0) / 2, y0 + bh / 2, OB_VF_SEMIBOLD, size, 0xFFFFFF, 230, text, 0, 2);
+    } else if (M.smooth && !M.mids && SDL_AtomicGet(&making)) {
         char text[80];
         snprintf(text, sizeof text, "30 fps: being made (%d%%)", SDL_AtomicGet(&made_pct));
         ob_vf_draw(px, w, h, pitch, x0 + size, y0 + size * 1.5f, OB_VF_SEMIBOLD, size * 0.75f, 0xFFFFFF, 160, text, 0, 2);
@@ -331,6 +512,7 @@ int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate,
     M.ph = M.fh;
     M.index = -1;
     M.label_at = 0;
+    M.held = M.overlay = 0;
     SDL_AtomicSet(&M.mode, dedither >= 0 && dedither < OB_POSTFX_MODES ? dedither : OB_POSTFX_OFF);
     make_cache();
     M.pcm_len = segacd_film_sound(M.film, &M.pcm);
@@ -369,10 +551,8 @@ static void stop(void)
 /* the overlay (or another full screen) is up: the intro waits (its clock is the speaker's, so the picture waits too) */
 void segacd_movie_pause(int on)
 {
-    static int was;
-    if (!M.film || !M.dev || on == was) return;
-    was = on;
-    SDL_PauseAudioDevice(M.dev, on ? 1 : 0);
+    M.overlay = on;
+    apply_pause();
 }
 
 /* (the window's loop) the sound topped up and the picture brought to its time; 0 once it has ended */
@@ -380,6 +560,16 @@ int segacd_movie_tick(void)
 {
     if (!M.film) return 0;
     if (SDL_AtomicGet(&M.skip)) { stop(); return 0; }
+    {   int w = live_wait();                            /* (frames still being made: it waits for them) */
+        if (w != M.held) {
+            if (!M.dev && !w) M.t0 += SDL_GetTicks() - M.held_at;   /* (no sound: its clock held) */
+            M.held = w;
+            M.held_at = SDL_GetTicks();
+            fprintf(stderr, "movie: %s at frame %d\n", w ? "waits for the frames being made" : "goes on", M.index + 1);
+            apply_pause();
+        }
+        if (w) return 1;
+    }
     double now;
     if (M.dev) {
         static int16_t buf[2 * 1024];
@@ -411,7 +601,15 @@ int segacd_movie_tick(void)
         if (M.colour) has_scenes();
     }
     int sub = 0;
-    if (M.smooth && M.mids && SDL_AtomicGet(&M.mode) != OB_POSTFX_OFF && M.index >= 0 && M.ntime > M.last) {
+    int live_mid, live_any;
+    live_lock(); live_mid = L.live && L.has_mid; live_any = L.live; live_unlock();
+    if (M.was_live && !live_any) {                      /* (just made: the files from now on, at once) */
+        if (M.smooth) has_mids();
+        if (M.colour) has_scenes();
+        ob_postfx_has_cache(M.pp);
+    }
+    M.was_live = live_any;
+    if (M.smooth && (M.mids || live_mid) && SDL_AtomicGet(&M.mode) != OB_POSTFX_OFF && M.index >= 0 && M.ntime > M.last) {
         sub = (int)((now - M.last) * 3 / (M.ntime - M.last));
         sub = sub < 0 ? 0 : sub > 2 ? 2 : sub;
     }

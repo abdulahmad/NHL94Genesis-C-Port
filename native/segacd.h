@@ -63,6 +63,9 @@ uint32_t segacd_film_id(const segacd_film *f);                   /* a hash of th
 int segacd_movie_start(ob_cd *cd, const char *name, uint32_t dev, unsigned rate, int dedither, int smooth, int colour, int split, const char *base,
                        const char *model);
 /* dedither: an Overbar ob_postfx_mode (off, live, cached); cache_path: where the cached pass is kept (made on the first play) */
+/* the made passes the options want, made from now on (the start of the opening, once the disc is found), so the movie
+ * need not wait for them; the same arguments as segacd_movie_start's */
+void segacd_movie_prepare(ob_cd *cd, const char *name, int dedither, int smooth, int colour, int split, const char *base, const char *model);
 void segacd_movie_pause(int on);            /* the overlay is up: the intro waits */
 int segacd_movie_tick(void);             /* (the window's loop) 0 once it has ended */
 int segacd_movie_playing(void);
