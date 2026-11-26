@@ -251,11 +251,12 @@ extern void (*cd_event_hook)(int ev, uint16_t n);
  * player him; PA_ONEMIN: the clock reached one minute; PA_STAR: tm and player the star, a which (0-2); PA_HIGHLIGHT: a the home team, b the away team (cartridge team numbers) */
 enum { PA_GOAL, PA_PENALTY, PA_PENSHOT, PA_ONEMIN, PA_STAR, PA_HIGHLIGHT };
 extern void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
-/* the goal siren and the horn at a period's end (native/pcsfx.c): the hook returns 1 when the host plays its own and the cartridge's is left out */
+/* the goal siren, the horn at a period's end and the one minute beep (native/pcsfx.c): told just before the cartridge's sound starts.
+ * The cartridge's always plays (its sound RAM and the Z80's are the game's); a host that plays its own instead keeps the
+ * cartridge's notes from the chips (native/segacd.c segacd_ym). It changes nothing in the game. */
 enum { SFX_GOAL, SFX_HORN, SFX_ONEMIN };
-extern int (*sfx_hook)(int ev);
+extern void (*sfx_hook)(int ev);
 extern void (*crowd_level_hook)(int meter);              /* each frame of play: the crowd meter in decibels (65 and up), for the host's own crowd bed */
-extern int (*siren_busy_hook)(void);                    /* 1 while the host's own goal siren plays */
 extern int (*anthem_hook_fn)(int home_art, int away_art);   /* RULE_ANTHEM, the first face off of a game: the host plays the anthem (the wait is the game's: hold_anthem_frames) */
 extern void (*stoppage_hook)(int pen);                      /* a whistle stops play (src/penalty.c Stop4Pen): the stoppage's penalty number, for the host's own sound; -1 the face off's drop */
 
@@ -276,10 +277,13 @@ extern int (*spr_hook)(int ev, int sc, int16_t x, int16_t y, const struct Sprite
 enum { CD_TITLE_LICENSE, CD_TITLE_BEGIN, CD_TITLE_STEP };
 extern int (*cd_title_hook)(int what);
 /* (the same host) the Sega CD's scouting report, Ron Barr's whole spiel as the disc has it: CD_SCOUT_ON 1: the disc's paragraph
- * list and text (its teams' and players' write-ups), each paragraph waiting for his voice; CD_SCOUT_BUSY 1: his voice is still on
- * a paragraph. cd_scout_text: the disc's paragraph n (its own numbering), NULL none. NULL or 0: the cartridge's */
-enum { CD_SCOUT_ON, CD_SCOUT_BUSY };
+ * list and text (its teams' and players' write-ups), each paragraph waiting for his voice; CD_SCOUT_FRAMES + n: the length of
+ * paragraph n's voice in frames of the game (0 none), from the disc's clip, so the wait is the game's own count and not the host's
+ * mixer. cd_scout_text: the disc's paragraph n (its own numbering), NULL none. NULL or 0: the cartridge's. Never on in a session
+ * (the disc's report is its own text: every machine would need the disc) */
+enum { CD_SCOUT_ON, CD_SCOUT_FRAMES = 0x10000 };
 extern int (*cd_scout_hook)(int what);
+extern uint16_t scout_voice_end;                          /* (setup.c) the vblank the paragraphs' voice so far ends at */
 extern uint8_t scout_b_back;                  /* (the window) B turns the scouting report's matchups back, as A does */
 extern const uint8_t *(*cd_scout_text)(int n);
 extern int scout_disc;                                    /* (scout.c / setup.c) this scouting report is the disc's */

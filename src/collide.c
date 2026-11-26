@@ -1,6 +1,7 @@
 /* collide94.asm: collisions. Bounces players off the walls and each other, runs body checks,
  * holds and hooks, and decides when a player falls or is hurt. */
 #include "game.h"
+#include "rules.h"
 #include "anim_gen.h"
 #include "hal.h"
 #include "rom.h"
@@ -697,7 +698,9 @@ goal:
     ChkShotStat();
     stop_current_song(0);                                /* checkgoal's d0 is not followed (a register leak) */
     hal_wait_vblank();
-    if (!(sfx_hook && sfx_hook(SFX_GOAL))) sfx(0);       /* SFXsiren (the PC's: pcsfx.c) */
+    if (sfx_hook) sfx_hook(SFX_GOAL);                    /* (the host's own siren in its place: pcsfx.c) */
+    sfx(0);                                              /* SFXsiren */
+    hold_siren();                                        /* (RULE_SIREN: the PC siren's length, for the announcer's wait) */
     freezewindow();
     g.Crowdlevel += 0x1F4;
     struct Team *a2 = team_struct(0), *a1 = team_struct(1);

@@ -8,6 +8,7 @@ int pcsfx_searched(void);
 int pcsfx_found(void);                       /* 1 when the samples were read (after the search) */
 void pcsfx_set_goal(int on);                 /* the Game page: the goal siren, 0 the cartridge's, 1 NHL 95 PC's */
 void pcsfx_set_horn(int on);                 /* the same for the end of the period */
+int pcsfx_mutes(uint32_t stream);            /* (the game's thread) 1: a track slot at this stream is a cartridge sound this plays in place of */
 void pcsfx_mix(int16_t *out, int frames, unsigned rate);   /* the sounds into a frame of sound */
 void pcsfx_stop(void);
 int pcsfx_load_file(const char *path);       /* testing: a PCFF001.DIG read in place of the search (--pc-sfx FILE) */

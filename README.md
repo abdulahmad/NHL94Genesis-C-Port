@@ -176,11 +176,14 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   speech starts at the goal, penalty or penalty shot as on NHL 95 PC, and play waits until the announcer has had time to say it (fixed lengths, the
   same on every machine: about 6 s for a goal with an assist, 6 s a penalty, 7.5 s a penalty shot, with the time the replay and the face off set
   up already take counted), then the puck drops. *After the goal song*: a home goal's speech waits for the goal song to end, and the face off waits
-  for both; away goals and penalties have no song, so the speech is at once. Headless: `--rule announce_timing="right after the goal"`. "talks over the face off" is the cartridge pace; the celebration then does not wait for the speech.
+  for both (the siren first: the cartridge's, or with the PC goal siren NHL 95 PC's fixed 7 s, the `goal_siren` rule the siren row sets
+  from the file the host has, so every machine of a session waits the same); away goals and penalties have no song, so the speech is after the siren. Headless: `--rule announce_timing="right after the goal"`. "talks over the face off" is the cartridge pace; the celebration then does not wait for the speech.
 - **PC goal siren and PC end of period horn** (host rows, on in Recommended): NHL 95 PC's goal siren (its sound $9C, 7 s) and period end horn
   ($91, 2.6 s) play in place of the cartridge's, from the player's own `PCFF001.DIG` (beside the program or on the NHL 95 PC disc image). The game is
-  untouched, only the sound; without the file the cartridge's sounds stay. At one minute left the PC says "one minute left" with the rink announcer on
-  (the cartridge's beep is left out), else sounds its one minute horn ($97) with the horn row on. Headless: `--pc-sfx PCFF001.DIG --wav out.wav`.
+  untouched, only the sound: the cartridge's sound still plays in the game (its sound RAM), only its notes are kept from the chips; without the file
+  the cartridge's sounds are heard. At one minute left the PC says "one minute left" with the rink announcer on
+  (the cartridge's beep is not heard), else sounds its one minute horn ($97) with the horn row on. Headless: `--pc-sfx PCFF001.DIG --wav out.wav`
+  (and `--rule goal_siren=1`), or `--pc-siren` for the files found beside the program as the window finds them.
 - **PC between-play pause** (a game rule, off in every preset): the same waits after a goal, a penalty or a penalty shot even without the announcer,
   as the PC game stops play. At every whistle the skaters and the referee also skate from where they were to the face off spot (the game's own
   setup has already placed them, so it is the same for every copy of the game) instead of appearing there (a player replaced by a line change leaves by the gate to the bench and the next one comes in by it; the referee carries the puck to the dot), and the drop waits until they have arrived.

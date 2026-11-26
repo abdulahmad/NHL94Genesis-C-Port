@@ -39,6 +39,9 @@ enum {
     RULE_ANTHEM,                /* the national anthem before the first face off (src/hold.c): 1 NHL 95 PC's song, 2 NHL 96 PC's
                                  * recording. The players line up and the drop waits for the anthem's own length, fixed per
                                  * recording: every machine waits the same whether it has the PC game's files or not */
+    RULE_SIREN,                 /* the goal siren the rink announcer waits for (RULE_ANNOUNCE 2, src/hold.c): 1 NHL 95 PC's, its fixed
+                                 * 7 seconds (the Game page's PC goal siren row sets it from the file the host has). The cartridge's
+                                 * siren plays in the game either way; the host that has the PC's file plays that in its place */
     RULE_COUNT
 };
 /* the original's values */
@@ -77,6 +80,11 @@ void hold_reset(void);
 #define HOLD_STATE_SIZE 372
 size_t hold_state_save(uint8_t *out);
 int hold_state_load(const uint8_t *in);
+void hold_siren(void);                              /* the goal siren starts (RULE_SIREN: its fixed length from now) */
+/* the siren's part of a state (HOLD_SIREN_SIZE bytes; NULL: none, a state from before it); -1 for bytes not this game's */
+#define HOLD_SIREN_SIZE 3
+size_t hold_siren_save(uint8_t *out);
+int hold_siren_load(const uint8_t *in);
 #define FACEOFF_DEFER_SIZE 38
 size_t faceoff_defer_save(uint8_t *out);
 int faceoff_defer_check(const uint8_t *in);

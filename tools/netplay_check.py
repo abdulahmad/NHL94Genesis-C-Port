@@ -45,6 +45,10 @@ the setup screen), EA's 4 Way Play in the ports (the solo run's --four-way).
            skate to the dot between plays, src/hold.c), RULE_REFEREE and RULE_ANTHEM (the first face off waits for the
            anthem), the pause's state in every rollback's; the host alone draws the PC referee (--pc-ref: the guest
            does not), which must not move the puck
+  siren    host and join, 25 ms +-15, 5% lost, delay 1: RULE_ANNOUNCE 2 (the speech after the goal's siren and song), RULE_SIREN
+           (the PC siren's fixed length) and RULE_HOLD; the host alone has NHL 95 PC's files (--pc-siren --pc-crowd: its siren,
+           horn and crowd bed from build/NHL95.iso; the guest plays the cartridge's), which must change only the sound. A goal
+           in the away net is forced at vblank 200 on every machine (HOLDTEST, the game's own test aid)
 
     tools/netplay_check.py [NAME...]
 """
@@ -77,8 +81,11 @@ SCENARIOS = [
     ('referee', 7000, ['--rule', 'referee_in_play=on'], 'join', 1, '25,15,5,1', 6, [1, 1]),
     ('hold', 9000, ['--rule', 'hold_play=on', '--rule', 'referee_in_play=on', '--rule', 'anthems=1', '--pc-ref'], 'join', 1,
      '25,15,5,1', 7, [1, 1]),
+    ('siren', 7000, ['--rule', 'announce_timing=2', '--rule', 'goal_siren=1', '--rule', 'hold_play=on', '--pc-siren', '--pc-crowd'],
+     'join', 1, '25,15,5,1', 8, [1, 1]),
 ]
-NEEDS = {'rosters': 'out/rosters/thirty-two'}
+NEEDS = {'rosters': 'out/rosters/thirty-two', 'siren': 'build/NHL95.iso'}
+ENVS = {'siren': {'HOLDTEST': 'goal:200,away'}}           # (every machine's, and the solo run's: the same forced goal)
 RESETS = {'reset': 3600}                                  # (the host's pad 1 resets the console at this frame)
 LOADS = {'load': (4000, 3000)}                            # (the host loads from this frame a state the solo run saved at that)
 
@@ -176,8 +183,9 @@ def free_ports(n):
 
 def scenario(k, s):
     name, frames, opts, how, delay, sim, seed, layout = s
-    if name in NEEDS and not os.path.isdir(os.path.join(ROOT, NEEDS[name])):
-        return name, 'no %s (make golden)' % NEEDS[name], []
+    if name in NEEDS and not os.path.exists(os.path.join(ROOT, NEEDS[name])):
+        return name, 'no %s (%s)' % (NEEDS[name], 'make golden' if name == 'rosters' else 'the NHL 95 PC disc image beside the program'), []
+    env = dict(os.environ, **ENVS.get(name, {}))
     d = os.path.join(OUT, name)
     os.makedirs(d, exist_ok=True)
     for f in os.listdir(d):                               # (the last run's)
@@ -204,7 +212,7 @@ def scenario(k, s):
         start, at = LOADS[name]
         r = subprocess.run([NHL94, '--headless', '--frames', str(at + 100)] + solo_ins +
                            ['--sram', fresh(os.path.join(d, 'records.srm'), RECORDS), '--save-state', '%d:%s' % (at, state)] + opts,
-                           cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=limit)
+                           cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=limit)
         if r.returncode != 0 or not os.path.exists(state):
             return name, 'the state to load was not saved: ' + r.stderr[-200:], []
         load = ['--net-load', '%d:%s' % (start, state)]
@@ -223,11 +231,11 @@ def scenario(k, s):
             role = ['--join', '127.0.0.1:%d' % ports[0]]
             mine = []
         err = open(os.path.join(d, w + '.log'), 'w')
-        procs.append((subprocess.Popen(base + role + here + mine + ['--hashes', os.path.join(d, w + '.hashes')], cwd=ROOT,
+        procs.append((subprocess.Popen(base + role + here + mine + ['--hashes', os.path.join(d, w + '.hashes')], cwd=ROOT, env=env,
                                        stdout=subprocess.DEVNULL, stderr=err), err, w))
     solo_args = [NHL94, '--headless', '--frames', str(frames)] + solo_ins + ['--hashes', os.path.join(d, 'solo.hashes')] + opts + \
         (['--four-way'] if total > 2 else [])
-    solo = None if load else subprocess.Popen(solo_args, cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    solo = None if load else subprocess.Popen(solo_args, cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     bad = []
     for p, err, w in procs:
         try:
@@ -248,7 +256,7 @@ def scenario(k, s):
             return name, 'the host loaded no state: ' + '; '.join(bad), []
         if any(loaded.get(w) != loaded['a'] for w in who):
             bad.append('the machines loaded the state at frames %s' % loaded)
-        solo = subprocess.Popen(solo_args + ['--load-at', '%d:%s' % (loaded['a'], state)], cwd=ROOT, stdout=subprocess.DEVNULL,
+        solo = subprocess.Popen(solo_args + ['--load-at', '%d:%s' % (loaded['a'], state)], cwd=ROOT, env=env, stdout=subprocess.DEVNULL,
                                 stderr=subprocess.PIPE, text=True)
     try:
         solo_err = solo.communicate(timeout=limit)[1]

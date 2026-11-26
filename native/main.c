@@ -520,10 +520,11 @@ static uint16_t script_buttons(int pad, long frame)
 }
 static long script_reset = -1;          /* alone: the frame a script's RESET was given for (the console powers on again at its wait) */
 
-/* HOLDTEST=goal:FRAME,pen:FRAME (a headless run): at that vblank in a game in play the puck is put into a net, or a penalty queued on
+/* HOLDTEST=goal:FRAME,pen:FRAME (a headless run): at that vblank in a game in play the puck is put into a net (",away": the other), or a penalty queued on
  * a home skater, and every change of the stoppage wait is logged with its frame: tests the announcer and the face off wait
  * (src/hold.c) at the game's own call sites. */
 static int holdtest_goal = -1, holdtest_pen = -1, holdtest_last = -1;
+static long holdtest_fired = -1;                          /* (the console frame the goal was forced at) */
 static void holdtest_frame(void)
 {
     int now = (int)g.Vcount;
@@ -531,11 +532,14 @@ static void holdtest_frame(void)
     if (hw != holdtest_last) { fprintf(stderr, "holdtest: frame %d (console %ld) wait %d (score %d-%d, clock %d)\n", now, (long)mdrt_frame_count(native_m), hw, team_struct(0)->tmscore, team_struct(1)->tmscore, g.gameclock); holdtest_last = hw; }
     { static int calls; if (++calls % 500 == 0) fprintf(stderr, "holdtest: call %d frame %d demo %d gmode %x clock %d\n", calls, now, g.demoflag, g.gmode, g.gameclock); }
     if (!g.demoflag) return;
-    if (holdtest_goal >= 0 && now >= holdtest_goal && !(g.gmode & (1 << gmclock))) {
+    long console = (long)mdrt_frame_count(native_m);
+    if (console < holdtest_fired) holdtest_fired = -1; /* (a rollback went back before it: its frames again force it the same) */
+    if (holdtest_goal >= 0 && holdtest_fired < 0 && now >= holdtest_goal && !(g.gmode & (1 << gmclock))) {
         struct SortObj *o = sortobj(puckscnum);
-        holdtest_goal = -1;
+        holdtest_fired = console;
         fprintf(stderr, "holdtest: frame %d goal forced (puck at %d,%d)\n", now, o->Xpos, o->Ypos);
-        o->Xpos = 0; o->OldXpos = 0; o->Ypos = 0x108; o->OldYpos = 0x100; o->Zpos = 2; o->OldZpos = 2; o->Yvel = 0x300; o->Xvel = 0; o->Zvel = 0;
+        int dir = strstr(getenv("HOLDTEST"), "away") ? -1 : 1;
+        o->Xpos = 0; o->OldXpos = 0; o->Ypos = (int16_t)(dir * 0x108); o->OldYpos = (int16_t)(dir * 0x100); o->Zpos = 2; o->OldZpos = 2; o->Yvel = (int16_t)(dir * 0x300); o->Xvel = 0; o->Zvel = 0;
     }
     if (holdtest_pen >= 0 && now >= holdtest_pen && g.gmode == 0) {
         holdtest_pen = -1;
@@ -706,6 +710,7 @@ static int pcspr_cli;                                    /* --pc-sprites: NHL 95
 static const char *hats_rom;                              /* --hats FILE: the hat trick hats, from this NHL 94 SNES ROM */
 static int pcsfx_on;                                      /* the PC sounds join the --wav: --pc-sfx FILE, or --pc-anthems / --pc-crowd (PCFF001.DIG found as the program does) */
 static const char *pcsfx_file;                             /* --pc-sfx FILE: the PC siren and horn from this PCFF001.DIG (their sound joins the --wav) */
+static int pcsiren_cli;                                   /* --pc-siren: the PC siren and horn from the files beside the program, as the Game page's rows (none found: the cartridge's; the announcer's wait is --rule goal_siren's) */
 static const char *announcer_file;                        /* --announcer FILE: the rink announcer, from this XBRUCE2.VIV (its voice joins the --wav) */
 static int segacd_sfx_flag;                               /* --segacd-sfx: the disc's sound effects (rendered before the run starts) */
 static unsigned wav_rate = 48000;
@@ -799,7 +804,8 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--pc-anthems-96")) { pcsong_cli = 2; rules_arg("anthems=2"); }
         else if (!strcmp(argv[i], "--pc-anthem-wav") && i + 1 < argc) pcsong_wav = argv[++i];
         else if (!strcmp(argv[i], "--announcer") && i + 1 < argc) announcer_file = argv[++i];
-        else if (!strcmp(argv[i], "--pc-sfx") && i + 1 < argc) pcsfx_file = argv[++i];
+        else if (!strcmp(argv[i], "--pc-sfx") && i + 1 < argc) { pcsfx_file = argv[++i]; rules_arg("goal_siren=1"); }   /* (RULE_SIREN: the announcer's wait for it) */
+        else if (!strcmp(argv[i], "--pc-siren")) pcsiren_cli = 1;
         else if (!strcmp(argv[i], "--segacd-music")) { segacd_on = 1; segacd_set_music(1); }
         else if (!strcmp(argv[i], "--segacd-crowd") && i + 1 < argc) { segacd_on = 1; segacd_set_crowd(atoi(argv[++i])); }
         else if (!strcmp(argv[i], "--segacd-voice") && i + 1 < argc) { segacd_on = 1; segacd_set_voice(atoi(argv[++i])); }
@@ -977,10 +983,11 @@ int main(int argc, char **argv)
         pcsfx_set_horn(1);
         if (pccrowd_cli) pcsfx_set_crowd(1);
         pcsfx_on = 1;
-    } else if (pcsong_cli || pccrowd_cli) {                /* (the anthem's cheer and the crowd bed: PCFF001.DIG from the disc image, as the Game page finds it) */
+    } else if (pcsong_cli || pccrowd_cli || pcsiren_cli) {   /* (the anthem's cheer, the crowd bed, the siren: PCFF001.DIG from the disc image, as the Game page finds it) */
         wav_rate = c.audio_rate ? c.audio_rate : 48000;
         pcsfx_start(); pcsfx_wait();
         if (pccrowd_cli) pcsfx_set_crowd(1);
+        if (pcsiren_cli) { pcsfx_set_goal(1); pcsfx_set_horn(1); fprintf(stderr, "--pc-siren: %s\n", pcsfx_found() ? "the PC siren and horn" : "no PC files found: the cartridge's"); }
         pcsfx_on = pcsfx_found();
     }
     if (pc_photos) { cardcolor_start(); cardcolor_wait(); }
@@ -995,6 +1002,7 @@ int main(int argc, char **argv)
     if (golden) mdrt_set_hv_source(m, golden_hv, m);
     if (inputs) mdrt_set_pad_source(m, script_source, m);
     if (four_way) mdrt_pads_set_adaptor(mdrt_get_pads(m), MDRT_ADAPTOR_EA4WAY);
+    if (netopt.on) segacd_set_session(1);                 /* (the disc's pages, photos and scouting report: not in a session, as the window's) */
     if (netopt.on) {                                      /* (from power on: the session's pads replace the scripts'; its save RAM a new cartridge's) */
         size_t n;
         const void *set = native_net_settings(&n);

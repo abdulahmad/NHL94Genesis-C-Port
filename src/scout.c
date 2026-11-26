@@ -30,6 +30,7 @@ uint32_t ScoutCrowdRecord(void)
  * C page them (they turn by themselves every $10E frames), down types fast, Start leaves; it ends
  * when the text is done (Demo), else after about ten minutes more. */
 int scout_disc, scout_last;
+uint16_t scout_voice_end;
 
 uint8_t scout_b_back;                                     /* (the window sets it: B turns back a matchup as A does; 0 is the cartridge) */
 
@@ -97,6 +98,7 @@ void ScoutingReport(void)
     #define PARA(n) (g.TestList[k++] = (n))
     scout_disc = cd_scout_hook && cd_scout_text && cd_scout_hook(CD_SCOUT_ON);
     scout_last = 0;
+    scout_voice_end = g.Vcount;
     if (scout_disc) {                                     /* (scout94cd.asm: the disc's list, its teams' write-ups and the matchups' players) */
         uint16_t h = (uint16_t)(rosters_art(g.HomeTeam) * 7 + 0x26), v = (uint16_t)(rosters_art(g.VisTeam) * 7 + 0x26);
         static const uint8_t pos[6] = { 1, 5, 6, 3, 2, 4 };   /* (centre, wings, defence, goalie: the matchups' order) */
