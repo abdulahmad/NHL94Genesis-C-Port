@@ -379,7 +379,9 @@ volatile unsigned native_play_frames;
 volatile unsigned native_menu_calls;                      /* HandleMenuInput / ReadSetupPads calls: the menu is being read */
 static volatile int menu_kind;                            /* 1 the pause menu, 2 the setup screen */
 static volatile int in_readsetup;                       /* inside ReadSetupPads (it waits for a pad press inside) */
+static volatile int in_replay;                            /* inside ReplayMode (the instant replay, run from the pause menu) */
 int native_menu_waiting(void) { return in_readsetup; }
+int native_in_replay(void) { return in_replay > 0; }
 int native_menu_kind(void) { return menu_kind; }
 static int pause_x[4], pause_y[4], pause_n, setup_d7 = -1, in_moveframe;
 
@@ -477,6 +479,7 @@ void NI __cyg_profile_func_enter(void *fn, void *site)
     else if (fn == (void *)LineEditorMenu) { menu_kind = 3; in_readsetup++; native_menu_calls++; }
     else if (fn == (void *)SelectLinePlayer) { menu_kind = 4; in_readsetup++; native_menu_calls++; }
     else if (fn == (void *)PlayoffScreen) { menu_kind = 5; in_readsetup++; native_menu_calls++; }
+    else if (fn == (void *)ReplayMode) in_replay++;
     else if (fn == (void *)Pausemode_Pmenu) pause_n = 0;
     else if (fn == (void *)PrintMenuItem) { if (pause_n < 4) { pause_x[pause_n] = (int16_t)g.printx; pause_y[pause_n] = (int16_t)g.printy; pause_n++; } }
     else if (fn == (void *)MoveMenuFrame) in_moveframe = 1;
@@ -505,6 +508,7 @@ void NI __cyg_profile_func_exit(void *fn, void *site)
     (void)site;
     if (native_in_vblank()) return;
     if ((fn == (void *)ReadSetupPads || fn == (void *)waitxsr || fn == (void *)Pausemode || fn == (void *)LineEditorMenu || fn == (void *)SelectLinePlayer || fn == (void *)PlayoffScreen) && in_readsetup > 0) in_readsetup--;
+    if (fn == (void *)ReplayMode && in_replay > 0) in_replay--;
     if (clock_original()) clock_on_exit(routine_of(fn));
     if (!tracking) return;
     (void)fn;
