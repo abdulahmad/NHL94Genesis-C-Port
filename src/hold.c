@@ -159,6 +159,8 @@ static int sk_cap, sk_on, sk_dur;
 static uint16_t sk_t0;
 static struct { int16_t x, y; } sk_from[12], sk_to[12], sk_via[12];
 static int8_t sk_pnum[12];
+static int16_t sk_puckx, sk_pucky;                       /* where the puck lay when the whistle blew: the referee picks it up there */
+#define SK_PICKUP 96                                    /* (of 256 along the referee's way: he reaches the puck, then carries it to the dot) */
 static uint8_t sk_gate[12];                             /* 1: this place has a new player: the old one leaves by the gate to the bench, the new one comes in by it */
 int (*hold_ref_pos_fn)(int *x, int *y);                 /* the host's referee, on the rink (0: none): he carries the puck to the dot */
 
@@ -168,6 +170,7 @@ void hold_skate_begin(void)
     if (!rules[RULE_HOLD]) return;
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) { sk_from[i].x = pl->Xpos; sk_from[i].y = pl->Ypos; sk_pnum[i] = (int8_t)pl->pnum; }
+    sk_puckx = (int16_t)g.puckx[0]; sk_pucky = (int16_t)g.pucky;
     sk_cap = 1;
 }
 
@@ -200,6 +203,9 @@ void hold_skate_arm(void)
     sk_on = 1;
     if (getenv("HOLDLOG")) fprintf(stderr, "hold: skate to the spots, %d frames, at %d\n", sk_dur, g.Vcount);
 }
+
+/* where the puck lay at the whistle (valid with hold_skate_ref() >= 0); the referee reaches it at SK_PICKUP of the 256 */
+void hold_skate_puck(int *x, int *y, int *pickup) { *x = sk_puckx; *y = sk_pucky; *pickup = SK_PICKUP; }
 
 /* the referee's progress along his way to the dot, 0 to 256 (-1: no walk to the spots) */
 int hold_skate_ref(void)
@@ -247,7 +253,11 @@ static void skate_pose(void)
     if (getenv("HOLDSK") && !(t % 6)) { struct SortObj *q = sortobj(1); fprintf(stderr, "sk t %d dur %d: x %d y %d frame %d spa %d face %d\n", t, sk_dur, q->Xpos, q->Ypos, q->frame, q->SPA, q->facedir); }
     int rx, ry;
     struct SortObj *pk = sortobj(puckscnum);
-    if (t < sk_dur && hold_ref_pos_fn && hold_ref_pos_fn(&rx, &ry)) {   /* the referee carries the puck to the dot */
+    if (t < sk_dur && t * 256 / sk_dur < SK_PICKUP) {      /* (the referee is still on his way to the puck where it lay) */
+        pk->Xpos = sk_puckx; pk->Ypos = sk_pucky;
+        g.puckx[0] = (uint16_t)sk_puckx; g.pucky = (uint16_t)sk_pucky;
+        g.puckz[0] = 0;
+    } else if (t < sk_dur && hold_ref_pos_fn && hold_ref_pos_fn(&rx, &ry)) {   /* the referee carries the puck to the dot */
         pk->Xpos = (int16_t)rx; pk->Ypos = (int16_t)ry;
         g.puckx[0] = (uint16_t)rx; g.pucky = (uint16_t)ry;
         g.puckz[0] = 0;

@@ -541,9 +541,15 @@ static void ref_tick(void)
         if (pr >= 0 && pr < 256 && R.init) {
             static int fx0, fy0, started;
             if (!started || !R.wasfo) { fx0 = R.x; fy0 = R.y; started = 1; }
-            double ddx = tx - fx0, ddy = ty - fy0;
-            R.x = (int)(fx0 + ddx * pr / 256);
-            R.y = (int)(fy0 + ddy * pr / 256);
+            int pkx, pky, pick;
+            hold_skate_puck(&pkx, &pky, &pick);
+            pkx *= 256; pky *= 256;
+            int sx, sy, ex, ey, k, kn;                                       /* (to the puck where it lay, then with it to the dot) */
+            if (pr < pick) { sx = fx0; sy = fy0; ex = pkx; ey = pky; k = pr; kn = pick; }
+            else { sx = pkx; sy = pky; ex = tx; ey = ty; k = pr - pick; kn = 256 - pick; }
+            double ddx = ex - sx, ddy = ey - sy;
+            R.x = (int)(sx + ddx * k / kn);
+            R.y = (int)(sy + ddy * k / kn);
             if (ddx * ddx + ddy * ddy > 256.0 * 256.0 * 16) {
                 int d = (int)floor(atan2(ddx, ddy) / (M_PI / 4) + 0.5);
                 R.dir = ((d % 8) + 8) % 8;
