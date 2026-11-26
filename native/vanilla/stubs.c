@@ -20,9 +20,8 @@ int rules_classic(void) { return 1; }
 void rules_power_on(void) { memcpy(rules, rule_classic, sizeof rules); }
 const mdrt_sdl_option *rules_page(int *count) { *count = 0; return NULL; }
 const mdrt_sdl_page *rules_pages(int *count) { *count = 0; return NULL; }
-void rules_page_text(int page, const int *values, char *text, size_t size, void *user) { (void)page; (void)values; (void)user; if (size) *text = 0; }
-int rules_page_pick(int which, const char *path, char *why, size_t why_size, void *user) { (void)which; (void)path; (void)user; snprintf(why, why_size, "%s", not_here); return -1; }
-void rules_page_detail(int which, int value, char *text, size_t size, void *user) { (void)which; (void)value; (void)user; if (size) *text = 0; }
+void rules_widescreen(int on) { (void)on; }
+int rules_widescreen_on(void) { return 0; }
 void rules_page_use(const int *values, void *user) { (void)values; (void)user; }
 int rules_page_changed(int which, int *values, void *user) { (void)which; (void)values; (void)user; return 0; }
 int rules_page_session(int *values, void *user) { (void)values; (void)user; return 0; }
@@ -40,10 +39,15 @@ int rosters_extract(const struct romsrc *s, const char *dir, const char *name) {
 int romsrc_hack(struct romsrc *s, const uint8_t *rom, uint32_t size, const uint8_t *cart, char *why, size_t why_size)
 { (void)s; (void)rom; (void)size; (void)cart; snprintf(why, why_size, "%s", not_here); return -1; }
 
+uint32_t *rosters_picture(const char *name, int *w, int *h, int clear0) { (void)name; (void)clear0; *w = *h = 0; return NULL; }
+int rosters_banner(int team, uint32_t out[88 * 16]) { (void)team; (void)out; return -1; }
+void romsrc_game(struct romsrc *s) { memset(s, 0, sizeof *s); }
+
 /* the art map (texture packs): none */
 const struct art_piece *art_map(int *n) { *n = 0; return NULL; }
 const struct art_piece *art_piece_at(uint32_t number) { (void)number; return NULL; }
 const char *art_piece_name(const struct art_piece *p, char *out, size_t size) { (void)p; if (size) *out = 0; return out; }
+int art_tiles(const struct romsrc *s, uint32_t a, uint8_t *out, int max) { (void)s; (void)a; (void)out; (void)max; return -1; }
 int art_map_overlaps(void) { return 0; }
 void art_map_report(void) { printf("art map: not in the vanilla build\n"); }
 

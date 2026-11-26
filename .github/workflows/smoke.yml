@@ -19,6 +19,8 @@ jobs:
       - run: sudo apt-get update -q && sudo apt-get install -y -q libsdl2-dev
       - name: build the game C and the rules test (make test itself needs recorded captures, which are retail-derived)
         run: make build/captest build/rulestest
+      - name: the vanilla gate (src/ is the cartridge's game; make VANILLA=1 builds without the extras)
+        run: tools/check_vanilla.sh
   static:
     runs-on: ubuntu-latest
     steps:
