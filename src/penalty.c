@@ -349,6 +349,7 @@ void Stop4Pen(uint32_t a0, struct SortObj *o)
     stop_current_song(leak);
     sfx(SYM_SFXwhistle);
     SetPA(0xA);                                           /* the whistle */
+    if (!was && stoppage_hook) stoppage_hook(m8(a0 - 2)); /* (the host's own sound for it) */
 }
 
 /* penalty94.asm:limitfo. Limit the faceoff to 5-20 feet from the walls, for every player in

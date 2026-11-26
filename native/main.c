@@ -721,12 +721,12 @@ static void wav_audio(void *user, const int16_t *s, int n)
                         (unsigned long long)fnv(FNV0, s, (size_t)n * 4), n);
     if (!wav) return;
     static int16_t mixed[2 * 4096];
-    if ((segacd_on || announcer_file || pcsfx_on || pcsong_cli) && n > 0 && n <= 4096) {   /* (the Sega CD disc's music and crowd, the rink announcer: after the golden line, which is the game's) */
+    if ((segacd_on || announcer_file || pcsfx_on || pcsong_cli || pccrowd_cli) && n > 0 && n <= 4096) {   /* (the Sega CD disc's music and crowd, the rink announcer: after the golden line, which is the game's) */
         memcpy(mixed, s, (size_t)n * 4);
         if (segacd_on) segacd_mix(mixed, n, wav_rate);
         if (announcer_file) announcer_mix(mixed, n, wav_rate);
         if (pcsfx_on) pcsfx_mix(mixed, n, wav_rate);
-        if (pcsong_cli) pcsong_mix(mixed, n, wav_rate);
+        if (pcsong_cli || pccrowd_cli) pcsong_mix(mixed, n, wav_rate);
         s = mixed;
     }
     fwrite(s, 4, (size_t)n, wav);                         /* (a little-endian host) */
@@ -953,6 +953,7 @@ int main(int argc, char **argv)
         if (pcsong_wav) { int ok = pcsong_write_wav(pcsong_wav); return ok ? 0 : 2; }
         if (pcsong_cli == 2 && !pcsong_found96()) fprintf(stderr, "--pc-anthems-96: no NHL 96 PC disc image found: NHL 95 PC's anthems\n");
     }
+    if (pccrowd_cli) { pcsong_start(); pcsong_wait(); pcsong_rock_set(1); }   /* (the PC crowd's organ and rock cues at the whistles) */
     if (pclogo_cli) { if (!pcspr_cli && !pcref_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-logos: no NHL 95 PC files found\n"); return 2; } } pcspr_logo_set(pclogo_cli); }
     if (pcref_cli) { if (!pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-ref: no NHL 95 PC sprite files found\n"); return 2; } } pcspr_ref_set(1); pcspr_ref_phys_set(pcref_cli == 2); }
     if (getenv("HOLDTEST")) {

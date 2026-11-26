@@ -3549,6 +3549,7 @@ void updatefaceoff(struct SortObj *puck)
  * timing (fofdata2), send the puck off in his direction (or a random one) with a hop. */
 void Endfaceoff(struct SortObj *puck)
 {
+    if (stoppage_hook) stoppage_hook(-1);                 /* (the drop: the host's whistle sound ends, as NHL 95 PC's Endfaceoff stops it) */
     sfx(SYM_SFXpuckice + 3);
     g.sflags2 &= (uint16_t)~HI(sf2faceoff);
     g.holdreset = 0x3C;
