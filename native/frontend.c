@@ -748,9 +748,16 @@ static void pcspr_no_file(void)
     static char label[64];
     if (done || !pcspr_searched()) return;
     done = 1;
-    if (pcspr_found()) return;
+    if (pcspr_found()) {                                  /* (the sprites are there: are the centre ice logos?) */
+        static char lg[96];
+        if (!pcspr_logos()) { snprintf(lg, sizeof lg, "%s (no logos in the NHL 95 PC files found)", cd_opts[CD_PCLOGO].label); cd_opts[CD_PCLOGO].label = lg; }
+        return;
+    }
     snprintf(label, sizeof label, "%s (no NHL 95 PC disc image found)", cd_opts[CD_PCSPR].label);
     cd_opts[CD_PCSPR].label = label;
+    static char lg2[96];
+    snprintf(lg2, sizeof lg2, "%s (no NHL 95 PC disc image found)", cd_opts[CD_PCLOGO].label);
+    cd_opts[CD_PCLOGO].label = lg2;
 }
 
 /* the PC siren and horn rows say so when no PCFF001.DIG was found */
@@ -765,6 +772,9 @@ static void pcsfx_no_file(void)
     snprintf(label[1], sizeof label[1], "%s (no NHL 95 PC disc image found)", cd_opts[CD_PCHORN].label);
     cd_opts[CD_PCSIREN].label = label[0];
     cd_opts[CD_PCHORN].label = label[1];
+    static char lg[64];
+    snprintf(lg, sizeof lg, "%s (no NHL 95 PC disc image found)", cd_opts[CD_CROWD_PC].label);
+    cd_opts[CD_CROWD_PC].label = lg;
 }
 
 /* the colour photos' row says so when neither PC game's portraits were found */

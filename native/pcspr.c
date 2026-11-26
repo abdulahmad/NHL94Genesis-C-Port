@@ -461,6 +461,28 @@ static const uint8_t pc_team[NTEAMS] = {
     26, 0, 1, 2, 3, 8, 4, 5, 25, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 18, 17, 19, 20, 21, 22, 23, 24, 27,
 };
 
+/* the anthem's idle pictures (SPAanthem1-3 and SPArefanthem1 of NHL 95 PC: now and then a skater shifts his stance, the referee
+ * glances about). Only what the eye sees: a hash of who and when, so no game state is touched. */
+static unsigned idle_hash(int who, int slot) { unsigned h = (unsigned)who * 2654435761u + (unsigned)slot * 40503u + 12345u; h ^= h >> 13; h *= 1274126177u; return h ^ (h >> 16); }
+static int idle_skater(int who, int t)
+{
+    unsigned h = idle_hash(who, t / 160);
+    if (h % 100 >= 40) return 369;
+    int dt = t % 160 - (int)(h / 100 % 10);
+    static const int a[3][6] = { { 369, 370, 371, 370, 0, 0 }, { 369, 370, 371, 0, 0, 0 }, { 369, 370, 371, 370, 371, 0 } };
+    int k = dt / 30, n = (int)(h / 10000 % 3);
+    return dt >= 0 && k < 5 && a[n][k] ? a[n][k] : 369;
+}
+static int idle_ref(int t)
+{
+    unsigned h = idle_hash(99, t / 300);
+    if (h % 100 >= 60) return 649;
+    int dt = t % 300 - (int)(h / 100 % 10);
+    static const int a[8] = { 649, 705, 706, 707, 706, 707, 705, 649 };
+    int k = dt / 30;
+    return dt >= 0 && k < 8 ? a[k] : 649;
+}
+
 /* the cartridge's frame number as the PC's (-1: none) */
 /* A fade (between plays, the pause): colour RAM steps toward palfadenew, and the PC's pictures, which are not in colour RAM, are
  * dimmed by the same amount (0..256) */
@@ -581,7 +603,7 @@ static int ref_frame(void)
     const struct SortObj *pk = sortobj(puckscnum);
     int asn = pk->asslist[pk->assnum & 7];
     int d = R.dir & 7;
-    if (hold_anthem_time() >= 0) return 649;                                             /* (the anthem: the referee's standing picture) */
+    if (hold_anthem_time() >= 0) return idle_ref(hold_anthem_time());                                             /* (the anthem: the referee's standing picture) */
     if ((asn == pfaceoff || asn == pfaceoff2) && R.t == 0) return (d >= 3 && d <= 6) ? 711 : 703;       /* (still: skating to the dot, he is not) */       /* (SPAreffowait) */
     if (R.drop > 0) {                                                                    /* (SPArefdrop: 8 ticks each) */
         int k = (24 - R.drop) / 8;
@@ -616,7 +638,7 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
     }
     if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || sc > 13 || P.nshow >= 16) return 0;
     int pf = pc_frame(o->frame & 0x7FF);
-    if (hold_anthem_time() >= 0 && sc < 12 && sortobj(sc)->position > 0) pf = 368;      /* (the anthem: the PC's standing picture, number 369) */
+    if (hold_anthem_time() >= 0 && sc < 12 && sortobj(sc)->position > 0) pf = idle_skater(sc, hold_anthem_time()) - 1;      /* (the anthem: the PC's standing picture, number 369) */
     if (pf < 0 || pf >= NFRAMES || !P.f[pf].px) return 0;   /* (no such PC frame: the cartridge's sprite stays) */
     P.show[P.nshow].pc = (int16_t)pf;
     P.show[P.nshow].x = x;
