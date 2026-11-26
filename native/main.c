@@ -77,6 +77,7 @@
 #include <sys/stat.h>
 #define make_dir(d) mkdir(d, 0777)
 #endif
+#include <SDL.h>
 #include "game.h"
 #include "hal.h"
 #include "rom.h"
@@ -255,9 +256,44 @@ static const char *rom_check(const uint8_t *b, size_t n, void *user)
 
 static void rom_use(const uint8_t *b, size_t n, void *user) { (void)n; (void)user; rom_cart = b; rom_art = NULL; rom_limit = ROM_SIZE; }
 
-/* the save RAM's file for the game about to start: the roster set's own (the window's sram_file) */
-static const char *sram_base;
-static const char *sram_for(void *user) { (void)user; return rosters_sram(sram_base); }
+/* (the window) rel, a file of out/, beside the program into buf, as settings.ini and overbar.ini are: not in the
+ * working folder, which a shortcut, a terminal in another folder, a file dropped on the program or the Finder can
+ * make another each start (the save RAM then came back a new cartridge's: the names, lines and records gone) */
+static const char *beside_program(const char *rel, char *buf, size_t size)
+{
+    char *base = SDL_GetBasePath();
+    if (!base) return rel;
+    snprintf(buf, size, "%s%s", base, rel);
+    SDL_free(base);
+    return buf;
+}
+
+/* to missing, from's bytes when it is there (a save RAM kept in the working folder before: beside the program now) */
+static void adopt_file(const char *from, const char *to)
+{
+    FILE *t = fopen(to, "rb"), *f;
+    if (t) { fclose(t); return; }
+    if (!strcmp(from, to) || !(f = fopen(from, "rb"))) return;
+    uint8_t b[0x2000];
+    size_t n = fread(b, 1, sizeof b, f);
+    fclose(f);
+    if (n && (t = fopen(to, "wb"))) {
+        if (fwrite(b, 1, n, t) == n) fprintf(stderr, "save RAM: %s, from %s\n", to, from);
+        fclose(t);
+    }
+}
+
+/* the save RAM's file for the game about to start: the roster set's own (the window's sram_file), beside the
+ * program unless --sram named one (sram_rel: the working folder's name for it, which earlier builds used) */
+static const char *sram_base, *sram_rel;
+static const char *sram_for(void *user)
+{
+    static char path[1200];
+    (void)user;
+    snprintf(path, sizeof path, "%s", rosters_sram(sram_base));
+    if (sram_rel) adopt_file(rosters_sram(sram_rel), path);
+    return path;
+}
 
 /* headless: a console's save RAM from its file (none: blank) and back to it when the game wrote it */
 static void sram_read(mdrt *m, const char *path)
@@ -764,7 +800,7 @@ int main(int argc, char **argv)
     mdrt_sdl_home("ninety-four");                         /* (macOS: the app from the Finder keeps its files in Application Support) */
     const char *rom = "NHL 94 (UE) [!].gen", *rom_given = NULL, *sram = "out/nhl94.srm", *rosters_arg = NULL;
     const char *export_dir = NULL, *check_dir = NULL, *extract_rom = NULL, *extract_dir = NULL, *pack_dir = NULL, *pack_zip = NULL;
-    int sram_given = 0;
+    int sram_given = 0, state_given = 0;
     int scale = 0, aspect = 0, headless = 0;
     const char *hashes_path = NULL;
     mdrt_net_options netopt;
@@ -829,7 +865,7 @@ int main(int argc, char **argv)
             if (why) { fprintf(stderr, "--rule %s: %s\n", argv[i], why); return 2; }
         }
         else if (!strcmp(argv[i], "--hashes") && i + 1 < argc) hashes_path = argv[++i];
-        else if (!strcmp(argv[i], "--state") && i + 1 < argc) state_file = argv[++i];
+        else if (!strcmp(argv[i], "--state") && i + 1 < argc) { state_file = argv[++i]; state_given = 1; }
         else if (!strcmp(argv[i], "--record") && i + 1 < argc) record_dir = argv[++i];
         else if (!strcmp(argv[i], "--watch") && i + 1 < argc) {
             for (char *w = strtok(argv[++i], ","); w && nwatch < 16; w = strtok(NULL, ","))
@@ -893,6 +929,9 @@ int main(int argc, char **argv)
         if (!sram_given) sram = rosters_sram(sram);
     }
     if (headless && !sram_given) sram = NULL;             /* (headless: a player's save RAM only when --sram names it) */
+    static char sram_beside[1100], state_beside[1100];
+    if (!headless && sram && !sram_given) { sram_rel = sram; sram = beside_program(sram, sram_beside, sizeof sram_beside); }
+    if (!headless && state_file && !state_given) state_file = beside_program(state_file, state_beside, sizeof state_beside);
     if (sram) make_parent(sram);                          /* (a copy run outside the repository has no out/) */
     if (state_file) make_parent(state_file);
     int inputs = 0;
