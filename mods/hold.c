@@ -239,6 +239,7 @@ static int sk_cap, sk_on, sk_dur;
 static uint16_t sk_t0;
 static struct { int16_t x, y; } sk_from[12], sk_to[12], sk_via[12];
 static int8_t sk_pnum[12];
+static uint16_t sk_frame[12];                            /* each skater's picture at the whistle: the set up blanks them (frame 0) till his animation's next step */
 static int16_t sk_face[12];                              /* the way each skater faces at his spot, as the game's own set up has it */
 static int16_t sk_puckx, sk_pucky;                       /* where the puck lay when the whistle blew: the referee picks it up there */
 #define SK_PICKUP 96                                    /* (of 256 along the referee's way: he reaches the puck, then carries it to the dot) */
@@ -260,12 +261,14 @@ static uint16_t sk_view[4];                             /* the view at the whist
 #define BENCH_GAP 8                                     /* (frames on the bench between the one going off and the one coming on) */
 #define REF_START_X (-0x78)                             /* (the PC's referee at the start of play: StartHL2, x -78h, y 0) */
 
+static void skate_pose(void);
+
 void hold_skate_begin(void)
 {
     sk_cap = 0;
     if (!RULE(RULE_HOLD)) return;
     struct SortObj *pl = sortobj(0);
-    for (int i = 0; i < 12; i++, pl++) { sk_from[i].x = pl->Xpos; sk_from[i].y = pl->Ypos; sk_pnum[i] = (int8_t)pl->pnum; sk_delay[i] = 0; }
+    for (int i = 0; i < 12; i++, pl++) { sk_from[i].x = pl->Xpos; sk_from[i].y = pl->Ypos; sk_pnum[i] = (int8_t)pl->pnum; sk_delay[i] = 0; sk_frame[i] = pl->frame; }
     sk_pick = SK_PICKUP;
     sk_pstart = 0;
     sk_puckx = (int16_t)g.puckx[0]; sk_pucky = (int16_t)g.pucky;
@@ -366,6 +369,20 @@ void hold_skate_arm(void)
     g.yleader = 0;                                      /* (the PC's drop: the view on the dot, no lead) */
     if (!pstart) { g.Vpos = sk_view[0]; g.Hpos = sk_view[1]; g.yc1 = sk_view[2]; g.xc1 = sk_view[3]; }   /* (no cut to the dot: the view follows the referee's puck there) */
     if (getenv("HOLDLOG")) fprintf(stderr, "hold: skate to the spots, %d frames, at %d (clock %d of %d)\n", sk_dur, g.Vcount, g.gameclock, g.PerTimeTotal);
+}
+
+/* After the face off's set up has picked the controlled players (from the spots, as the cartridge does): the skaters put back where
+ * they are on their way (the walk's first frame) and the sprites sorted again. The set up's own sort showed them at the spots through
+ * its work (unpacking the face off's art), a frame or more, then the walk took them back: the jump cut at the whistle. NHL 95 PC's
+ * players carry on from where they were. (A period's start fades to black: nothing to do.) */
+void hold_skate_place(void)
+{
+    if (!sk_on || sk_pstart || anth) return;
+    skate_pose();                                       /* (the walk's first frame: the skaters, the puck where it lay, the view held) */
+    struct SortObj *pl = sortobj(0);
+    for (int i = 0; i < 12; i++, pl++)                  /* (and as they looked: not blank for a frame) */
+        if (!pl->frame && (int8_t)pl->pnum == sk_pnum[i] && pl->Xpos == sk_from[i].x && pl->Ypos == sk_from[i].y) pl->frame = sk_frame[i];
+    SprSort();
 }
 
 /* where the puck lay at the whistle (valid with hold_skate_ref() >= 0); the referee reaches it at SK_PICKUP of the 256 */
@@ -479,9 +496,8 @@ benched:                                                /* (on the bench: not se
     return 1;
 }
 
-static void skate_pose(void)
+static void skate_players(int t)
 {
-    int t = (int16_t)(g.Vcount - sk_t0);
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) {
         int d = sk_gate[i] ? 2 : plen(sk_from[i].x, sk_from[i].y, sk_to[i].x, sk_to[i].y);
@@ -515,6 +531,12 @@ static void skate_pose(void)
         pl->Xvel = 0;
         pl->Yvel = 0;
     }
+}
+
+static void skate_pose(void)
+{
+    int t = (int16_t)(g.Vcount - sk_t0);
+    skate_players(t);
     if (getenv("HOLDSK") && !(t % 6)) { struct SortObj *q = sortobj(1); fprintf(stderr, "sk t %d dur %d: x %d y %d frame %d spa %d face %d\n", t, sk_dur, q->Xpos, q->Ypos, q->frame, q->SPA, q->facedir); }
     int rx, ry;
     struct SortObj *pk = sortobj(puckscnum);

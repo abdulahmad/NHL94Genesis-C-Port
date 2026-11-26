@@ -35,6 +35,7 @@ void hold_siren(void) {}
 void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a2) { (void)frames; (void)tm; (void)player; (void)a1; (void)a2; }
 void hold_skate_begin(void) {}
 void hold_skate_arm(void) {}
+void hold_skate_place(void) {}
 void hold_skate_puck(int *x, int *y, int *pickup) { *x = *y = 0; *pickup = 0; }
 int hold_skate_pstart(void) { return 0; }
 int hold_skating(void) { return 0; }

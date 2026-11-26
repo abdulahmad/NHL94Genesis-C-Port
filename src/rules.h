@@ -66,6 +66,7 @@ int hold_skate_carry(int *x, int *y);               /* the puck in the referee's
 int hold_skate_ref_step(int *x, int *y);            /* the referee's place on his walk to the dot, 256ths of a pixel, from where he is (0: no walk) */
 void hold_skate_begin(void);                        /* the face off set up: the skaters' places before it moves them ... */
 void hold_skate_arm(void);                          /* ... and after: with RULE_HOLD they skate from the first to the second */
+void hold_skate_place(void);                        /* ... once the controlled players are picked: the skaters shown where they are on their way */
 int hold_skate_ref(void);                           /* the referee's progress along his way to the dot, 0 to 256 (-1: none) */
 int hold_anthem_time(void);                         /* the frames into the anthem's song; -1 when it is not playing */
 int hold_anthem_pending(void);                      /* 1 once the anthem has been asked for, until the face off drops */
