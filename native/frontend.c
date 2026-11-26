@@ -1069,7 +1069,6 @@ static void game_starting(void)
 {
     seat_n = 0;
     if (native_net_on() || !F.o || SDL_AtomicGet(&F.quit) || !atoi(pads_get("sides.at_start", "1"))) return;
-    segacd_event(2 /* CD_EV_TURNOFF */, 0);                    /* the scouting report's voice and song end with the screen: not behind the sides screen */
     sides_team[0] = native_game_teams[0];
     sides_team[1] = native_game_teams[1];
     SDL_AtomicSet(&sides_state, 1);
