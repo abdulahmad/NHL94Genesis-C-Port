@@ -85,7 +85,8 @@ extern volatile unsigned native_play_frames;          /* counts DoGameFrame call
 extern void (*native_game_start_hook)(void);           /* a new game begins (the game's thread; frontend.c sets it: the select-sides screen) */
 void menuopts_use(const char *file);                     /* the setup screen's options kept in file (menuopts.c; NULL or "": not kept) */
 void menuopts_power_on(void);                            /* at power on: the hook for them, none in a session */
-int native_net_on(void);                                /* in a session (headless: from before power on) */
+int native_net_on(void);
+int native_fight_cheat_take(void);                       /* debug: FIGHT was typed (the window, offline): the next check starts a fight; taken once */                                /* in a session (headless: from before power on) */
 /* the session's settings (the host's, sent to the guests before power on): the next game's rules
  * and its roster set as a package (the save RAM is a new cartridge's on every machine). Made by the
  * player who may host (the window's Start, or the command line), applied by all at power on */

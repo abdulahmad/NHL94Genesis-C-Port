@@ -54,6 +54,9 @@ extern uint8_t rules[RULE_COUNT];   /* each rule's value now (Classic until the 
 #define RULE(r) ((void)(r), 0)
 #else
 #define RULE(r) (rules[r])
+/* debug (mods/fight.c's checkfight): the host's "the next check starts a fight" (FIGHT typed, offline); 1 once, then 0. NULL: none */
+extern int (*fight_cheat_hook)(void);
+
 #endif
 
 /* RULE_HOLD (mods/hold.c): the stoppage's pause (NHL 95 PC's between-play time; RULE_ANNOUNCE also uses it, for the speech). hold_for makes the next face off wait

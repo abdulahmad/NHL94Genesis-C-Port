@@ -314,6 +314,7 @@ static void sram_load(void)
 }
 
 static ob_host host;                                  /* (Overbar's settings: defined below) */
+static SDL_atomic_t screen_changed;                   /* (present) the picture's width changed: ob_pads_mouse_fresh in the window's loop */
 static void present(void *user, const uint16_t *px, int w, int h, int pitch)
 {
     (void)user;
@@ -346,6 +347,7 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
             for (int y = 0; y < last_h; y += 4)
                 for (int x = 0; x < last_w; x += 4) { uint32_t c = last[y * WIDE_MAX_W + x]; sum += (c >> 16 & 255) + (c >> 8 & 255) + (c & 255); }
             if (sum / ((last_h / 4 + 1) * (last_w / 4 + 1)) > 24) out = FADE, in = FADE;   /* (a picture already black needs no fade) */
+            SDL_AtomicSet(&screen_changed, 1);        /* (another screen: a click held from the last one is not this one's; the window's loop) */
         }
         if (out || dark) {
             long sum = 0, n = 0;                      /* (the game's picture now: dark, or no longer getting darker, ends the black) */
@@ -523,9 +525,11 @@ static void replay_point(int wx, int wy, int *x, int *y)
     *x = pic_dst.w > 0 ? (int)((long)(wx - pic_dst.x) * w / pic_dst.w) - w / 2 : 0;
     *y = pic_dst.h > 0 ? (int)((long)(wy - pic_dst.y) * h / pic_dst.h) - h / 2 : 0;
 }
+static void fight_cheat_key(const SDL_Event *e);
 static int hook_event(const SDL_Event *e)
 {
     int x, y;
+    fight_cheat_key(e);
     if (!replay_mouse_on()) return 0;
     Uint32 now = SDL_GetTicks();
     int banner = native_replay_banner(), direct = replay_direct();
@@ -758,7 +762,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_CROWD_PCVOL (CD_ROWS + 29)
 #define CD_SPLIT (CD_ROWS + 30)                          /* (the movie's 50/50 demo: the disc's own left, the enhanced right) */
 #define CD_PCREFPHYS (CD_ROWS + 31)                        /* (the referee and the skaters, as NHL 95 PC's: off, the picture's alone (visual), or in play (RULE_REFEREE)) */
-#define CD_OPTS (CD_ROWS + 32)
+#define CD_FIGHTCHEAT (CD_ROWS + 32)                      /* (debug: typing FIGHT makes the next check a fight; offline only) */
+#define CD_OPTS (CD_ROWS + 33)
 #define CROWD_VOLS 40                                     /* (the crowd volumes: 5% to 200% in steps of 5%) */
 #define CROWD_VOL_100 19                                  /* (the choice for 100%) */
 static int crowd_vol_of(int idx) { int v = ob_game_get(&host, idx); return 5 * ((v < 0 ? 0 : v >= CROWD_VOLS ? CROWD_VOLS - 1 : v) + 1); }
@@ -786,6 +791,25 @@ static void wide_rows_sync(void)
 }
 static SDL_atomic_t cd_dedither;                          /* the movie's de-dither (Overbar's ob_postfx_mode) */
 static SDL_atomic_t cd_smooth, cd_colour, cd_split;
+/* debug: FIGHT typed on the keyboard arms the next check to start a fight (native_fight_cheat_take, mods/fight.c's checkfight).
+ * Offline only: a host-side flag is not pad input, so it stays off in a session or online play */
+static SDL_atomic_t fight_cheat_on, fight_cheat_armed;
+int native_fight_cheat_take(void)
+{
+    if (F.session || native_net_on()) return 0;
+    return SDL_AtomicCAS(&fight_cheat_armed, 1, 0);
+}
+static void fight_cheat_key(const SDL_Event *e)
+{
+    static char typed[6];
+    if (e->type != SDL_KEYDOWN || e->key.repeat || !SDL_AtomicGet(&fight_cheat_on) || F.session || native_net_on()) return;
+    SDL_Keycode k = e->key.keysym.sym;
+    if (k < SDLK_a || k > SDLK_z) { typed[0] = 0; return; }
+    size_t n = strlen(typed);
+    if (n == 5) { memmove(typed, typed + 1, 4); n = 4; }
+    typed[n] = (char)k; typed[n + 1] = 0;
+    if (!strcmp(typed, "fight")) { SDL_AtomicSet(&fight_cheat_armed, 1); typed[0] = 0; fprintf(stderr, "debug: the next check starts a fight\n"); }
+}
 static int cd_restart;                                    /* (the roster set changed: the console powers on again) */
 
 /* the option of the rules page with this key, or -1 */
@@ -825,6 +849,7 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_HATS) { hats_set(value); return; }
     if (index == CD_PCSPR) { pcspr_set(value); return; }
     if (index == CD_PCREF) { pcspr_ref_set(value); return; }
+    if (index == CD_FIGHTCHEAT) { SDL_AtomicSet(&fight_cheat_on, value); return; }
     if (index == CD_PCREFPHYS) {                          /* (Visual only: the picture's; Full: RULE_REFEREE, a game rule) */
         pcspr_ref_phys_set(value == 1);
         rule_from_row("referee_in_play", RULE_REFEREE, value == 2);
@@ -1144,6 +1169,8 @@ static void game_page_init(void)
     cd_opts[CD_PCREF] = (ob_game_opt){ "pc_referee", "Referee on the ice", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's referee skating with the play and dropping the puck) */
     static const char *const ref_phys[3] = { "off", "visual only", "full" };   /* (an older ini's "on" is not one: the default, visual only) */
     cd_opts[CD_PCREFPHYS] = (ob_game_opt){ "pc_referee_bumps", "Referee physics", ref_phys, 3, 1, 0, 4 };   /* (NHL 95 PC's checkcx for the referee: his side only, or in play) */
+    static const char *const fight_cheat[2] = { "off", "on" };
+    cd_opts[CD_FIGHTCHEAT] = (ob_game_opt){ "debug_fight_cheat", "Debug: type FIGHT for a fight", fight_cheat, 2, 0, 0, 4 };
     cd_opts[CD_PCLOGO] = (ob_game_opt){ "pc_centre_logo", "Centre ice logo", cd_logo_pc, 3, 1, 0, 4 };   /* (the cartridge's crest or NHL 95 PC's) */
     static const char *const anthem_of[3] = { "Off", "NHL 95 PC", "NHL 96 PC" };
     cd_opts[CD_PCANTHEM] = (ob_game_opt){ "pc_anthems", "National anthems", anthem_of, 3, 1, 0, 4 };   /* (NHL 95 PC's FM songs or NHL 96 PC's recordings, played before the first face off) */
@@ -1157,6 +1184,7 @@ static void game_page_init(void)
         game_help[CD_PCHORN] = "NHL 95 PC's horn at the end of a period, from your NHL 95 PC files.";
         game_help[CD_PCSPR] = "NHL 95 PC's skaters and goalies, from your NHL 95 PC files.";
         game_help[CD_PCREF] = "A referee skating on the ice, NHL 95 PC's, from your NHL 95 PC files.";
+        game_help[CD_FIGHTCHEAT] = "A debug aid: with this on, typing F I G H T on the keyboard during a game makes the next check between two skaters start a fight (Fighting must be on). Off in online play.";
         game_help[CD_PCREFPHYS] = "The referee on the ice and the play, as in NHL 95 PC. Visual only: skaters who run into him bump him aside, and play is unchanged. Full: he is in play: skaters bounce off him, the puck deflects off him, a pad player's check knocks him down, and every third knock down is a roughing penalty (a game rule: online, the host's).";
         game_help[CD_PCLOGO] = "The logo at centre ice: the cartridge's, NHL 95 PC's, or NHL 94 PC's (NHL 95's where 94 has none) from your PC game files.";
         game_help[CD_PCANTHEM] = "The national anthems before the first face off: NHL 95 PC's songs or NHL 96 PC's recordings, from your PC game discs (the other when one is missing). The crowd cheers over the last bars, as the PC's does.";
@@ -1166,6 +1194,7 @@ static void game_page_init(void)
     segacd_start();
     cardcolor_start();
     segacd_intro_hook = intro_hook;
+    fight_cheat_hook = native_fight_cheat_take;           /* (debug: FIGHT typed, mods/fight.c's checkfight) */
     /* the presets: a quick select over the rows below (each row stays free to change; the row then reads Custom).
      * Cartridge = every row at its default; Sega CD = everything the disc gives, as the disc has it; Recommended =
      * the cartridge's game with the disc's presentation. -1 would leave a row alone (a new row starts there). */
@@ -1190,6 +1219,7 @@ static void game_page_init(void)
     pv[2][CD_PCLOGO] = 1;
     pv[1][CD_PCREF] = 0;                                                       /* (the PC games' look: not the Sega CD's) */
     pv[2][CD_PCREF] = 1;
+    pv[1][CD_FIGHTCHEAT] = 0;                                                  /* (the debug aid: off in every preset) */
     pv[1][CD_PCREFPHYS] = 0;                                                   /* (the PC games' look: not the Sega CD's) */
     pv[2][CD_PCREFPHYS] = 1;                                                   /* (visual only in Recommended: Full changes play) */
     pv[1][CD_PCSPR] = 0;                                                       /* (the PC games' look: not the Sega CD's; off in Recommended until tried) */
@@ -1489,6 +1519,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         if (cd_restart) { cd_restart = 0; if (!F.session) restart_console(0); }   /* (the Game page's roster set) */
         ob_plat_pump();
         ob_pads_tick();
+        if (SDL_AtomicSet(&screen_changed, 0)) ob_pads_mouse_fresh();
         { extern uint8_t setup_no_players; setup_no_players = (uint8_t)(!native_net_on() && !F.session && atoi(pads_get("sides.at_start", "1")));   /* (controller setup says who plays: no Players line) */ }
         if (SDL_AtomicGet(&sides_state) == 1) { ob_pads_sides_open(); SDL_AtomicSet(&sides_state, 2); }
         else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);

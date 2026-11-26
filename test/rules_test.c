@@ -213,8 +213,8 @@ static void hold(void)
 {
     classic_rules();
     hold_state_load(NULL);
-    CHECK(hold_anthem_frames(0, 3) == 0 && hold_anthem_frames(1, 0) == 795 && hold_anthem_frames(1, 3) == 723 &&
-          hold_anthem_frames(2, 0) == 990 && hold_anthem_frames(2, 7) == 909);
+    CHECK(hold_anthem_frames(0, 3) == 0 && hold_anthem_frames(1, 0) == 735 && hold_anthem_frames(1, 3) == 666 &&
+          hold_anthem_frames(2, 0) == 783 && hold_anthem_frames(2, 7) == 603);   /* (the songs' last notes: mods/hold.c anthem_len) */
     rules[RULE_HOLD] = 1;
     g.gameclock = 100; g.PerTimeTotal = 300; g.Vcount = 1000;
     for (int i = 0; i < 12; i++) { struct SortObj *o = sortobj(i); memset(o, 0, sizeof *o); o->SCnum = (int16_t)i; o->position = i % 6 ? 1 : 0; o->pnum = (uint8_t)i; }
@@ -225,7 +225,7 @@ static void hold(void)
     hold_skate_arm();
     int x, y, x2, y2;
     CHECK(hold_skating() && !hold_skate_carry(&x, &y));    /* (the referee is on his way to the puck) */
-    g.Vcount = (uint16_t)(g.Vcount + 50);
+    for (int k = 0; k < 400 && hold_skate_ref() < 160; k++) g.Vcount++;   /* (past the pick up: the walk's length is the skaters' own) */
     CHECK(hold_skate_carry(&x, &y) && x > -40 * 256 && x < 115 * 256 && y > 60 * 256 && y < 100 * 256);
     uint8_t a[HOLD_STATE_SIZE], b[HOLD_STATE_SIZE];
     CHECK(hold_state_save(a) == HOLD_STATE_SIZE);
@@ -235,8 +235,8 @@ static void hold(void)
     hold_state_save(b);
     CHECK(!memcmp(a, b, sizeof a));
     static const int flags[] = { 2, 3, 4, 7, 82, 83, 84, 89, 96, 97, 324, 325, 334 };
-    for (size_t k = 0; k < sizeof flags / sizeof flags[0]; k++) { memcpy(b, a, sizeof b); b[flags[k]] = 2; CHECK(hold_state_load(b) < 0); }
-    memcpy(b, a, sizeof b); b[98] = 0x2D; b[99] = 1; CHECK(hold_state_load(b) < 0);   /* (a walk of more than 300 frames) */
+    for (size_t k = 0; k < sizeof flags / sizeof flags[0]; k++) { memcpy(b, a, sizeof b); b[flags[k]] = 2; if (hold_state_load(b) >= 0) printf("  flag byte %d taken\n", flags[k]); CHECK(hold_state_load(b) < 0); }
+    memcpy(b, a, sizeof b); b[98] = 0x91; b[99] = 1; CHECK(hold_state_load(b) < 0);   /* (a walk of more than 400 frames, EZ_CAP) */
     memcpy(b, a, sizeof b); b[322] = 1; CHECK(hold_state_load(b) < 0);                /* (the puck picked up at 1 of 256) */
     memcpy(b, a, sizeof b); b[335] = 13; CHECK(hold_state_load(b) < 0);               /* (13 held back face off men) */
     memcpy(b, a, sizeof b); b[335] = 1; b[336] = 12; b[348] = afaceoff; CHECK(hold_state_load(b) < 0);   /* (not a skater's object) */

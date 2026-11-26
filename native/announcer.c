@@ -520,6 +520,7 @@ void announcer_mix(int16_t *out, int frames, unsigned rate)
             A.ch ^= 1;
             A.v[A.ch].c = c;
             A.v[A.ch].at = 0;
+            if (A.log) fprintf(stderr, "announcer: plays %s at %u Hz\n", c->name, rate);
             long ticks = (long)(c->len / 2) * 100 / 5512 - 26;
             A.wait = ticks > 0 ? (double)ticks * RATE / 100.0 : 0;
         }

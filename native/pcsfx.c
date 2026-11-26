@@ -34,7 +34,10 @@
 
 enum { GOAL, HORN, MINUTE, CROWD8, CROWD7, NSND };     /* (the last two: the crowd's looping timbres 16 and 28, programs 7Dh and 7Eh) */
 static const uint8_t sample_id[NSND][4] = { { 0x56, 0x49, 0x13, 0xA7 }, { 0x1A, 0xB7, 0xBA, 0x4B }, { 0x31, 0xB5, 0x3F, 0x4F },
-                                            { 0x49, 0x7B, 0x87, 0x1B }, { 0x78, 0x68, 0xA9, 0xD2 } };
+                                            { 0x66, 0xE0, 0x4C, 0xE1 }, { 0x5E, 0x28, 0x97, 0xF5 } };   /* (PCFF001.PAT: programs 7Dh and 7Eh are
+ * bank 1 timbres 10h and 1Ch, whose PCFF001.TIM records (32 bytes, the sample id at +2) name these: 15232 and 11457 bytes, looped
+ * at 3856-9971 and 595-9041. Not timbres 8 and 24's 497B871B and 7868A9D2: the first is 7508 bytes, and its loop ran past its end
+ * into whatever the heap held next, on Windows the rink announcer's clips ("twenty" again and again under the anthem's cheer)) */
 static const long loop_a[NSND] = { 0, 0, 0, 3856, 595 }, loop_b[NSND] = { 0, 0, 0, 9971, 9041 };   /* (bytes: PCFF001.TIM) */
 
 static struct {
@@ -320,11 +323,12 @@ void pcsfx_mix(int16_t *out, int frames, unsigned rate)
     bs[CROWD7] = step * pow(2.0, (SDL_AtomicGet(&S.pan7) - 0x40) / 64.0 * 2.0 / 12.0);
     for (int s = CROWD8; s <= CROWD7; s++) {
         if (!S.pcm[s] || (!on && S.g8 == 0 && S.g7 == 0)) continue;
+        long lb = loop_b[s] < S.len[s] ? loop_b[s] : S.len[s], la = loop_a[s] < lb - 1 ? loop_a[s] : 0;   /* (never past the sample) */
         for (int i = 0; i < frames; i++) {
             float *gp = s == CROWD8 ? &S.g8 : &S.g7, tg = s == CROWD8 ? t8 : t7;
             *gp += (tg - *gp) * 0.0005f;
             long j = (long)S.at[s];
-            if (j + 1 >= loop_b[s]) { S.at[s] -= (double)(loop_b[s] - loop_a[s]); j = (long)S.at[s]; }
+            if (j + 1 >= lb) { S.at[s] -= (double)(lb - la); j = (long)S.at[s]; if (j < 0 || j + 1 >= lb) { S.at[s] = (double)la; j = la; } }
             double frac = S.at[s] - (double)j;
             float v = (float)(S.pcm[s][j] + (S.pcm[s][j + 1] - S.pcm[s][j]) * frac) * *gp * 0.8f;
             for (int c = 0; c < 2; c++) {
