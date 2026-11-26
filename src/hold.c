@@ -52,6 +52,10 @@ void hold_anthem(int frames)
 
 int hold_anthem_pending(void) { return anth; }
 
+/* RULE_HOLD: a face off in the middle of play comes with no fade to black (the PC game has none: the players skate to their dots with the
+ * rink in view). The start of a period keeps the cartridge's. */
+int hold_nofade(void) { return rules[RULE_HOLD] && !anth && g.gameclock != g.PerTimeTotal; }
+
 /* the frames into the anthem's song (-1 when no song is on: before it, after it, or no anthem) */
 int hold_anthem_time(void)
 {
@@ -150,7 +154,7 @@ static void anthem_pose(void)
 /* NHL 95 PC's between-play: the skaters do not appear at the face off spots; each skates there from where he was when
  * the whistle blew (the referee too: native/pcspr.c asks hold_skate_ref). The game's own setup has already placed them, so
  * every copy of the game agrees; this only walks them there over the wait. Only with RULE_HOLD. */
-#define SKATE_SPEED 4                                   /* pixels a frame */
+#define SKATE_SPEED 2                                   /* pixels a frame (a skater's top speed in the game is about 2: velocity 8000) */
 static int sk_cap, sk_on, sk_dur;
 static uint16_t sk_t0;
 static struct { int16_t x, y; } sk_from[12], sk_to[12], sk_via[12];
@@ -226,15 +230,21 @@ static void skate_pose(void)
                 if (run < l1) { bx = sk_via[i].x; by = sk_via[i].y; l = l1; }
                 else { ax = sk_via[i].x; ay = sk_via[i].y; r = run - l1; l = d - l1; }
             }
-            if (t == 0) SetSPA(pl, SPAskate);
+            if (t == 0 || pl->SPA == 0 || pl->SPA == SPAglide) SetSPA(pl, SPAskate);
             if (l < 1) l = 1;
             pl->Xpos = (int16_t)(ax + (bx - ax) * r / l);
             pl->Ypos = (int16_t)(ay + (by - ay) * r / l);
             pl->facedir = (int16_t)vtoa((int16_t)(bx - ax), (int16_t)(by - ay));
+            double ll = sqrt((double)(bx - ax) * (bx - ax) + (double)(by - ay) * (by - ay));
+            if (ll < 1) ll = 1;
+            pl->Xvel = (int16_t)((bx - ax) * 8192.0 / ll);       /* (his speed, so the skating animation runs at the pace of the strides) */
+            pl->Yvel = (int16_t)((by - ay) * 8192.0 / ll);
+            continue;
         }
         pl->Xvel = 0;
         pl->Yvel = 0;
     }
+    if (getenv("HOLDSK") && !(t % 6)) { struct SortObj *q = sortobj(1); fprintf(stderr, "sk t %d dur %d: x %d y %d frame %d spa %d face %d\n", t, sk_dur, q->Xpos, q->Ypos, q->frame, q->SPA, q->facedir); }
     int rx, ry;
     struct SortObj *pk = sortobj(puckscnum);
     if (t < sk_dur && hold_ref_pos_fn && hold_ref_pos_fn(&rx, &ry)) {   /* the referee carries the puck to the dot */

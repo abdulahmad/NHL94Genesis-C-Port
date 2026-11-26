@@ -3362,11 +3362,12 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
         if (fr > 0) hold_anthem(fr);
     }
     hold_skate_begin();                                      /* (RULE_HOLD: where the skaters were) */
+    int nofade = hold_nofade();
     if (hat_hook) hat_hook(HAT_END, 0);                      /* (the SNES clears its hats here) */
     g.BA_PS_flags &= (uint16_t)~(HI(2) | HI(5));
     g.sflags4 &= (uint16_t)~(HI(0) | HI(1));
     g.DelayedPen &= (uint8_t)~7;
-    forceblack();
+    if (!nofade) forceblack();
     while (g.disflags & HI(dfok)) hal_wait_vblank();      /* wait for dfok clear */
     uint16_t sr = cpu_get_sr();
     g.holdreset = 0x3C;
