@@ -642,6 +642,7 @@ void StartHL2(struct Matchup *gs, int16_t game)
         g.printx += 1;
         g.printy -= 2;
         printz(str_StartHL2_1, sizeof str_StartHL2_1);
+        if (pa_hook) pa_hook(PA_HIGHLIGHT, NULL, 0, a0->gst1, a0->gst2);   /* (the rink announcer: "we take you now to the highlight...") */
         if (waitxsr(0xB4) & 0x80) { hl_restore(); hl_random_result(a0); g.sflags3 |= 1 << sf3sbut; return; }
         ST_W(g.Zamx);
         g.CwdExciteLvl = 0;
