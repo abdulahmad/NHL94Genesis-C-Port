@@ -820,6 +820,15 @@ static void intro_tick(void)
     int st = SDL_AtomicGet(&intro_state);
     char intro_base[1100];                               /* (the made files: segacd-intro.dedither, .smooth, .colour) */
     snprintf(intro_base, sizeof intro_base, "%s", beside("segacd-intro"));
+    {   /* the movie's made passes, made from the start (once the disc is found and the options are read), so it need not wait */
+        static int prepared;
+        if (!prepared && segacd_searched() && host.game_ready) {
+            prepared = 1;
+            if (segacd_disc() && !F.session && ob_game_get(&host, CD_INTRO))
+                segacd_movie_prepare(segacd_disc(), "HOCKEY.SEG", SDL_AtomicGet(&cd_dedither), SDL_AtomicGet(&cd_smooth), SDL_AtomicGet(&cd_colour),
+                                     SDL_AtomicGet(&cd_split), intro_base, beside("rife-v4.6"));
+        }
+    }
     if (st == 1) SDL_AtomicSet(&intro_state, segacd_movie_start(segacd_disc(), "HOCKEY.SEG", F.dev, F.rate, SDL_AtomicGet(&cd_dedither),
                                                                         SDL_AtomicGet(&cd_smooth), SDL_AtomicGet(&cd_colour), SDL_AtomicGet(&cd_split), intro_base,
                                                                         beside("rife-v4.6")) ? 2 : 0);
