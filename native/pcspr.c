@@ -316,7 +316,7 @@ static void load_logo_set(struct lset *S, const char *dir, ob_cd *cd, int kind)
                 if (cd) { mn = ob_cd_read_file(cd, fm, &mb); tln = ob_cd_read_file(cd, ft, &tb); } else { mb = loose(dir, fm, &mn); tb = loose(dir, ft, &tln); }
                 if (mb && tb && mn >= 6) {
                     int lw = mb[0] | mb[1] << 8, lh = mb[2] | mb[3] << 8;
-                    if (lw > 0 && lh > 0 && lw <= 8 && lh <= 8 && mn >= 6 + 2 * lw * lh) {
+                    if (lw > 0 && lh > 0 && lw <= 12 && lh <= 12 && mn >= 6 + 2 * lw * lh) {
                         uint8_t *ix = malloc((size_t)(lw * 8 * lh * 8));
                         if (ix) {
                             for (int ty = 0; ty < lh; ty++)
@@ -350,9 +350,6 @@ static void load_logo_set(struct lset *S, const char *dir, ob_cd *cd, int kind)
                                     }
                                     free(q);
                                     for (int i = 0; i < fw * fh; i++) if (ix[i] == 254) ix[i] = 255;
-                                    if (kind)                                                      /* (94 bakes the centre line in between its two crests: the game draws its own) */
-                                        for (int y = 0; y < fh; y++)
-                                            if (y >= fh / 2 - 4 && y < fh / 2 + 4) memset(ix + y * fw, 255, (size_t)fw);
                                 }
                             }
                             S->t[k].w = lw * 8; S->t[k].h = lh * 8; S->t[k].idx = ix;
@@ -677,7 +674,7 @@ int pcspr_found(void) { return SDL_AtomicGet(&P.searched) && SDL_AtomicGet(&P.fo
 void pcspr_set(int on) { SDL_AtomicSet(&P.on, on ? 1 : 0); }
 void pcspr_ref_set(int on) { SDL_AtomicSet(&R.on, on ? 1 : 0); }
 void pcspr_logo_set(int on) { SDL_AtomicSet(&LGO.on, on < 0 ? 0 : on > 2 ? 2 : on); }
-int pcspr_logos(void) { return LGO.L[0].have ? 1 + LGO.L[1].have : 0; }
+int pcspr_logos(void) { return LGO.L[0].have || LGO.L[1].have ? 1 + LGO.L[1].have : 0; }
 
 
 /* Masks of where a solid sprite of nx x ny 32 pixel pieces at x0, y0 would show in the picture of vdp: back: put last in the sprite
@@ -797,19 +794,28 @@ static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch
 }
 
 
-/* the first of the 24 crest tiles the cartridge draws at centre ice for team art: found in the VDP's memory by their pixels (the art's
- * own 24 tiles, as the cartridge has them for the team) */
-static int find_crest(const mdrt_vdp *v, int art)
+/* the first of the 24 crest tiles the cartridge draws at centre ice for team t: found in the VDP's memory by their pixels (the 24 tiles
+ * LoadHomeTeamGfx puts there: the team's centre ice by its roster table, the cartridge's or a roster set's own; a roster set has no
+ * TeamGfxList in team order, so not through RS(TeamGfxList)) */
+static int find_crest(const mdrt_vdp *v, int team)
 {
+    static uint8_t tiles[24 * 32];
     struct romsrc rs;
-    static uint8_t px[16 * 8 * 16 * 8], tiles[ART_ICE_BYTES];
-    uint16_t pal[16];
-    int w, h;
     romsrc_game(&rs);
-    if (art_ice(&rs, art, px, &w, &h, pal) < 0 || art_ice_make(&rs, px, w, h, tiles) < 0) return -1;
+    if (team < 0 || team >= ROSTERS_MAX || art_tiles(&rs, rosters_team((uint16_t)team)->ice + 8, tiles, 24) != 24) return -1;
     for (unsigned a = 0; a + 24 * 32 <= 0x10000; a += 32)
-        if (!memcmp(v->s.vram + a, tiles + 10, 24 * 32)) return (int)(a / 32);
+        if (!memcmp(v->s.vram + a, tiles, 24 * 32)) return (int)(a / 32);
     return -1;
+}
+
+static int find3d_visible(void) { int16_t x = 0, y = 0; find3d(&x, &y, 0); return y != 0x4E20; }
+
+static void logo_why(int why, const char *text)
+{
+    static int said;
+    if (said & (1 << why)) return;
+    said |= 1 << why;
+    fprintf(stderr, "Centre ice logo: %s\n", text);
 }
 
 /* the cartridge's crest at centre ice taken out of the picture and NHL 95 PC's logo of the home team put in its place, over only the
@@ -817,15 +823,17 @@ static int find_crest(const mdrt_vdp *v, int art)
 static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
     int mode = SDL_AtomicGet(&LGO.on);
-    if (!mode || !LGO.L[0].have) return;
-    int art = rosters_art(team_struct(0)->tmteam);
-    if (art < 0 || art >= 28 || logo_of_art[art] < 0) return;
+    if (!mode) return;
+    if (!LGO.L[0].have && !LGO.L[1].have) { logo_why(0, "no NHL 95 PC logos (RINK.PAL, <team>.MAP / .TIL) on the disc image or beside the program"); return; }
+    if (mode == 2 && !LGO.L[1].have) logo_why(1, "no NHL 94 PC files (RINKPAL.QPP, <team>.MAP / .TIL) in NHL94PC beside the program or NHL94PC_DIR: NHL 95 PC's shown");
+    int team = team_struct(0)->tmteam, art = rosters_art((uint16_t)team);
+    if (art < 0 || art >= 28 || logo_of_art[art] < 0) { logo_why(2, "the home team has no PC logo (an All-Star team): the cartridge's crest shown"); return; }
     int k = logo_of_art[art];
-    const struct lset *LS = mode == 2 && LGO.L[1].have && LGO.L[1].t[k].idx ? &LGO.L[1] : &LGO.L[0];   /* (94 falls back to 95 where it has no such logo) */
-    if (!LS->t[k].idx) return;
-    if (LGO.crest < 0 || !(g.Vcount & 63) || LGO.seen != art) { LGO.crest = find_crest(vdp, art); LGO.seen = art; }
-    if (getenv("PCLOGO_LOG") && !(g.Vcount & 63)) fprintf(stderr, "logo? art %d crest %d\n", art, LGO.crest);
-    if (LGO.crest < 0) return;
+    const struct lset *LS = (mode == 2 || !LGO.L[0].have) && LGO.L[1].have && LGO.L[1].t[k].idx ? &LGO.L[1] : &LGO.L[0];   /* (94 falls back to 95 where it has no such logo) */
+    if (!LS->t[k].idx) { logo_why(3, "the PC files have no logo of the home team: the cartridge's crest shown"); return; }
+    if (LGO.crest < 0 || !(g.Vcount & 63) || LGO.seen != team) { LGO.crest = find_crest(vdp, team); LGO.seen = team; }
+    if (getenv("PCLOGO_LOG") && (!(g.Vcount & 63) || getenv("PCLOGO_LOG")[0] == '2')) fprintf(stderr, "logo? team %d art %d crest %d\n", team, art, LGO.crest);
+    if (LGO.crest < 0) { if (find3d_visible()) logo_why(4, "the cartridge's crest was not found in the VDP's memory: the cartridge's crest shown"); return; }
     static mdrt_vdp sc;
     static uint16_t blank[320 * 240], base[320 * 240], back[320 * 240], front[320 * 240];
     sc = *vdp;
@@ -843,7 +851,7 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
             }
     int16_t cx = 0, cy = 0;
     find3d(&cx, &cy, 0);
-    if (getenv("PCLOGO_LOG") && !(g.Vcount & 63)) fprintf(stderr, "logo: art %d crest tile %d bbox %d,%d-%d,%d find3d %d,%d shift %d\n", art, LGO.crest, x0, y0, x1, y1, cx + view_shift(), cy, view_shift());
+    if (getenv("PCLOGO_LOG") && (!(g.Vcount & 63) || getenv("PCLOGO_LOG")[0] == '2')) fprintf(stderr, "logo: art %d crest tile %d bbox %d,%d-%d,%d find3d %d,%d shift %d\n", art, LGO.crest, x0, y0, x1, y1, cx + view_shift(), cy, view_shift());
     int lw = LS->t[k].w, lh = LS->t[k].h;
     int lx, ly;
     if (cy == 0x4E20) return;
@@ -865,7 +873,8 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
 #undef LINERED
         }
     int nx = (lw + 31) / 32, ny = (lh + 31) / 32;
-    if (nx * ny > 6 || !sprite_masks(&sc, lx, ly, nx, ny, base, back, front, 0)) return;
+    if (nx * ny > 6 || !sprite_masks(&sc, lx, ly, nx, ny, base, back, front, 0)) { if (getenv("PCLOGO_LOG")) fprintf(stderr, "logo: no mask (%dx%d)\n", nx, ny); return; }
+    if (getenv("PCLOGO_LOG")) { int on = 0; for (int y = 0; y < lh; y++) for (int x = 0; x < lw; x++) { int ppx = lx + x, ppy = ly + y; if (ppx >= 0 && ppx < w && ppy >= 0 && ppy < h && back[ppy * 320 + ppx] != base[ppy * 320 + ppx]) on++; } fprintf(stderr, "logo: at %d,%d %dx%d, %d pixels open\n", lx, ly, lw, lh, on); }
     for (int y = 0; y < lh; y++)
         for (int x = 0; x < lw; x++) {
             int c = LS->t[k].idx[y * lw + x];
