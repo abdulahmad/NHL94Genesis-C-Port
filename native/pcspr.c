@@ -860,6 +860,20 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
             if (ppx < 0 || ppx >= w || ppy < 0 || ppy >= h || back[ppy * 320 + ppx] == base[ppy * 320 + ppx]) continue;
             pic[(long)ppy * pitch + ppx] = fadec(0xFF000000u | (uint32_t)LS->pal[c][0] << 16 | (uint32_t)LS->pal[c][1] << 8 | LS->pal[c][2]);
         }
+    /* the red centre line was part of the crest's tiles: draw it again across the gap in each row, from the 8 columns of it left of the gap (period 8) */
+    if (x1 - x0 >= 40 && x0 >= 48 && x1 + 48 < w)
+        for (int y = y0; y <= y1 && y < h; y++) {
+#define LINERED(xx) ({ uint32_t q_ = pic[(long)y * pitch + (xx)]; int r_ = (q_ >> 16) & 255, g_ = (q_ >> 8) & 255, b_ = q_ & 255; r_ > 190 && r_ - g_ > 60 && r_ - b_ > 60; })
+            int xl = -1, xr = -1;
+            for (int x = x0 + 8; x >= x0 - 40 && xl < 0; x--) if (LINERED(x)) xl = x;
+            for (int x = x1 - 8; x <= x1 + 40 && xr < 0; x++) if (LINERED(x)) xr = x;
+            if (xl < 0 || xr < 0 || xr - xl < 12) continue;
+            int red = 0;
+            for (int x = xl - 7; x <= xl; x++) red += LINERED(x);
+            if (red < 3) continue;
+            for (int x = xl + 1; x < xr; x++) pic[(long)y * pitch + x] = pic[(long)y * pitch + xl - 7 + ((x - xl - 1) & 7)];
+#undef LINERED
+        }
 }
 
 /* Over the picture the game drew (px: its colours, pic: the same as RGB). The cartridge's own sprites of the objects drawn here are
@@ -899,6 +913,41 @@ static void flag_draw(uint32_t *pic, int w, int h, int pitch)
             if (v == 255 || px_ < 0 || px_ >= w || py < 0 || py >= h) continue;
             pic[(long)py * pitch + px_] = fadec(0xFF000000u | (uint32_t)P.pal[v][0] << 16 | (uint32_t)P.pal[v][1] << 8 | P.pal[v][2]);
         }
+}
+
+/* Where the top of each PC skater's picture reaches past the cartridge sprite's own tiles (the PC's heads are taller): solid 32 pixel pieces
+ * over the pictures' top rows are put last in the sprite order of a copy of the VDP; where they show against the real picture they are over
+ * only the ice, with no sprite or priority tile over them. 0 when the sprite table has no room. */
+static int ext_masks(const mdrt_vdp *vdp, const shown *list, int n, uint16_t *back)
+{
+    static mdrt_vdp sc;
+    unsigned sat = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
+    unsigned tile = 0x7E0;
+    while (tile > 0x40 && tile * 32 < sat + 0x280 && sat < tile * 32 + 0x200) tile -= 0x10;
+    int tail = 0;
+    for (int k = 0; k < 80; k++) { int l = vdp->sat[tail * 8 + 3] & 0x7F; if (!l) break; tail = l; }
+    int fb = tail + 1, cnt = 0;
+    sc = *vdp;
+    for (int t = 0; t < 16; t++) memset(sc.s.vram + tile * 32 + t * 32, 0xFF, 32);
+    sc.s.cram[15] = 0x0E0E;
+    for (int i = 0; i < n; i++) {
+        const spr *s = &P.f[list[i].pc];
+        int x0 = list[i].x - 128 - (list[i].flip ? s->w - 1 - s->xo : s->xo), y0 = list[i].y - 128 - s->yo - 2;
+        for (int k = 0; k * 32 < s->w && fb + cnt < 79; k++, cnt++) {
+            int e = fb + cnt, sy = y0 + 128, sx = x0 + 32 * k + 128;
+            uint8_t *a = sc.s.vram + ((sat + (unsigned)e * 8) & 0xFFFF);
+            a[0] = (uint8_t)(sy >> 8); a[1] = (uint8_t)sy; a[2] = 0x0F; a[3] = 0;
+            a[4] = (uint8_t)(tile >> 8); a[5] = (uint8_t)tile;
+            a[6] = (uint8_t)(sx >> 8); a[7] = (uint8_t)sx;
+            memcpy(sc.sat + e * 8, a, 4);
+            if (cnt) { sc.s.vram[(sat + (unsigned)(e - 1) * 8 + 3) & 0xFFFF] = (uint8_t)e; sc.sat[(e - 1) * 8 + 3] = (uint8_t)e; }
+        }
+    }
+    if (!cnt) return 0;
+    sc.sat[tail * 8 + 3] = (uint8_t)fb;
+    sc.s.vram[(sat + (unsigned)tail * 8 + 3) & 0xFFFF] = (uint8_t)fb;
+    mdrt_vdp_render(&sc, back, 320);
+    return 1;
 }
 
 void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
@@ -962,6 +1011,8 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
         }
     for (int l = 0; l < 4; l++) if (lines_used[l]) scratch.s.cram[l * 16 + 15] = exo;
     mdrt_vdp_render(&scratch, solid, 320);
+    static uint16_t extb[320 * 240];
+    int have_ext = ext_masks(vdp, list, n, extb);
     memset(vis, 0, sizeof vis);
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++)
@@ -986,7 +1037,8 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
                 if (v == 255) continue;
                 int r = v < 0x80 ? rec[192 + v] : rec[320 + v - 0x80];
                 int px_ = x0 + x, py = y0 + y;
-                if (px_ < 0 || px_ >= w || py < 0 || py >= h || solid[py * 320 + px_] == clean[py * 320 + px_]) continue;
+                if (px_ < 0 || px_ >= w || py < 0 || py >= h) continue;
+                if (solid[py * 320 + px_] == clean[py * 320 + px_] && !(have_ext && y < 30 && extb[py * 320 + px_] != px[py * pitch_px + px_])) continue;   /* (inside the cartridge sprite's tiles, or over the ice above them) */
                 pic[(long)py * pitch + px_] = fadec(0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2]);
             }
     }
