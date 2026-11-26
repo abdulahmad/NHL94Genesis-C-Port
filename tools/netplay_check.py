@@ -40,9 +40,9 @@ the setup screen), EA's 4 Way Play in the ports (the solo run's --four-way).
            the host's log says; the solo run loads it there (--load-at), so every frame after it is
            the state's game, save RAM and all
   referee  host and join, 25 ms +-15, 5% lost, delay 1: the host's RULE_REFEREE (NHL 95 PC's referee in play,
-           src/referee.c), his state in every rollback's
+           mods/referee.c), his state in every rollback's
   hold     host and join, 25 ms +-15, 5% lost, delay 1: the host's RULE_HOLD (the skaters and the referee with the puck
-           skate to the dot between plays, src/hold.c), RULE_REFEREE and RULE_ANTHEM (the first face off waits for the
+           skate to the dot between plays, mods/hold.c), RULE_REFEREE and RULE_ANTHEM (the first face off waits for the
            anthem), the pause's state in every rollback's; the host alone draws the PC referee (--pc-ref: the guest
            does not), which must not move the puck
   siren    host and join, 25 ms +-15, 5% lost, delay 1: RULE_ANNOUNCE 2 (the speech after the goal's siren and song), RULE_SIREN

@@ -8,7 +8,7 @@
 #include "rules.h"
 
 static const char *const off_on[2] = { "off", "on" };
-static const char *const fight_names[4] = { "off", "NHL 93", "NHL 92", "hybrid" };   /* (fighting: src/fight.c) */
+static const char *const fight_names[4] = { "off", "NHL 93", "NHL 92", "hybrid" };   /* (fighting: mods/fight.c) */
 static const char *const announce_names[3] = { "talks over the face off", "right after the goal", "after the goal song" };
 static const char *const view_names[2] = { "classic", "wide" };
 static const char *const view_labels[2] = { "256 wide", "320 wide" };
@@ -211,9 +211,9 @@ const char *rules_arg(const char *arg)
  * from a build with fewer rules leaves the rest Classic; one with more is not this build's), then
  * the roster set: its checksum (8 bytes, 0 the cartridge's) and folder (a length byte, the name;
  * none in a netplay session, whose states stay in memory and whose hash the peers compare), then
- * (version 6) the referee's REFEREE_STATE_SIZE bytes (RULE_REFEREE: src/referee.c), then (version 7) the
- * pause's HOLD_STATE_SIZE (RULE_HOLD, the anthems: src/hold.c), then (version 8) the goal siren's
- * HOLD_SIREN_SIZE (RULE_SIREN: src/hold.c). The
+ * (version 6) the referee's REFEREE_STATE_SIZE bytes (RULE_REFEREE: mods/referee.c), then (version 7) the
+ * pause's HOLD_STATE_SIZE (RULE_HOLD, the anthems: mods/hold.c), then (version 8) the goal siren's
+ * HOLD_SIREN_SIZE (RULE_SIREN: mods/hold.c). The
  * roster set's tables are in the ROM the state's RAM points into, so a state loads with its own
  * roster set or not at all. Version 8 is this layout; version 7 is it without the siren (none then); version 6 without the pause (none then),
  * version 5 without the referee too (he starts off the ice). Version 4 (before the game's own extras

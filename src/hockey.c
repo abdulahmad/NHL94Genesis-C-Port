@@ -81,7 +81,7 @@ void StartGame(void)
 /* hockey94.asm:ClearShotData. Clear $E4 words at outputbuffer. */
 void ClearShotData(void)
 {
-    ram_fill(RAM(outputbuffer), 0, (rules[RULE_CD_CLEARSHOT] ? 0x72 : 0xE4) * 2);   /* (0xE4 words: outputbuffer and what follows; rules: the Sega CD's $72, the buffer and marker) */
+    ram_fill(RAM(outputbuffer), 0, (RULE(RULE_CD_CLEARSHOT) ? 0x72 : 0xE4) * 2);   /* (0xE4 words: outputbuffer and what follows; rules: the Sega CD's $72, the buffer and marker) */
 }
 
 /* hockey94.asm:restoreteams. Put both teams' rosters on the bench. */

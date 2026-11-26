@@ -7,7 +7,7 @@
  * plays in place of the cartridge's own siren or horn: the cartridge's still plays in the game (its sound RAM, the Z80's), and
  * only its notes are kept from the chips (pcsfx_mutes, from native/segacd.c's filter). It only changes the sound; the game is
  * unchanged (states, replays and online play are the same). The announcer's wait for the siren (RULE_ANNOUNCE 2) is the
- * game's own: RULE_SIREN, the PC siren's fixed length (src/hold.c), which the row sets from the file the host has. */
+ * game's own: RULE_SIREN, the PC siren's fixed length (mods/hold.c), which the row sets from the file the host has. */
 #include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>

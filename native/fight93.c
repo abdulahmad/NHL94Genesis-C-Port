@@ -1,6 +1,6 @@
 /* NHL 93's fight frames from the player's own NHLPA Hockey 93 cartridge (fight93.h).
  *
- * The 94 cartridge kept the fight frames' numbers (SPFgloves 353 to SPFfinjury+5 376, the fights of src/fight.c) but not their
+ * The 94 cartridge kept the fight frames' numbers (SPFgloves 353 to SPFfinjury+5 376, the fights of mods/fight.c) but not their
  * art: each is one 8 x 8 sprite of a blank tile. NHL 93 has them all. Its Sprites.anim is the same format as 94's ($FFFFFFFF, the
  * long offset of the frame table, the tiles from +$A, 8 byte sprite entries), so the frames' sprite entries are read from it and
  * its tiles are served to the VDP's DMA at FIGHT93_BUS (read68k, main.c): the game's own addframe2 draws them, through the
@@ -34,7 +34,7 @@ static uint16_t be16(const uint8_t *p) { return (uint16_t)(p[0] << 8 | p[1]); }
 static int frame_at(uint32_t fr, uint32_t *at, int *n)
 {
     uint32_t t = F.table, i = t + fr * 2;
-    if (i + 4 > F.size || fr * 2 >= be16(F.anim + t + 2)) return 0;
+    if (!F.anim || t + 4 > F.size || i + 4 > F.size || fr * 2 >= be16(F.anim + t + 2)) return 0;
     uint32_t a = t + be16(F.anim + i), b = t + be16(F.anim + i + 2);
     if (b < a || b > F.size || (b - a) % 8) return 0;
     *at = a;
@@ -49,7 +49,7 @@ static int take(const uint8_t *rom, long n, const char *path)
     for (long s = 0x200; s + 12 < n; s += 2) {
         if (rom[s] != 0xFF || rom[s + 1] != 0xFF || rom[s + 2] != 0xFF || rom[s + 3] != 0xFF) continue;
         uint32_t off = (uint32_t)rom[s + 4] << 24 | (uint32_t)rom[s + 5] << 16 | (uint32_t)rom[s + 6] << 8 | rom[s + 7];
-        if (off < 0x10000 || s + (long)off + 0x600 > n) continue;
+        if (off < 0x10000 || off > (uint32_t)(n - s) || (uint32_t)(n - s) - off < 0x600) continue;   /* (unsigned: a long is 32 bits on Windows, so off >= 2 GB went negative and passed) */
         F.anim = (uint8_t *)(uintptr_t)(rom + s);
         F.size = (uint32_t)(n - s);
         F.table = off;
@@ -68,7 +68,8 @@ static int take(const uint8_t *rom, long n, const char *path)
             }
         }
     }
-    F.anim = NULL;
+    F.anim = NULL;                                       /* (none here: nothing left pointing at the file being freed) */
+    F.size = F.table = 0;
     return 0;
 }
 
