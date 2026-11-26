@@ -791,6 +791,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--white-ice")) whiteice_set(1);
         else if (!strcmp(argv[i], "--pc-sprites")) pcspr_cli = 1;
         else if (!strcmp(argv[i], "--pc-ref")) pcref_cli = 1;
+        else if (!strcmp(argv[i], "--pc-ref-bumps")) pcref_cli = 2;
         else if (!strcmp(argv[i], "--pc-crowd")) pccrowd_cli = 1;
         else if (!strcmp(argv[i], "--pc-logos")) pclogo_cli = 1;
         else if (!strcmp(argv[i], "--pc-logos94")) pclogo_cli = 2;
@@ -953,7 +954,7 @@ int main(int argc, char **argv)
         if (pcsong_cli == 2 && !pcsong_found96()) fprintf(stderr, "--pc-anthems-96: no NHL 96 PC disc image found: NHL 95 PC's anthems\n");
     }
     if (pclogo_cli) { if (!pcspr_cli && !pcref_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-logos: no NHL 95 PC files found\n"); return 2; } } pcspr_logo_set(pclogo_cli); }
-    if (pcref_cli) { if (!pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-ref: no NHL 95 PC sprite files found\n"); return 2; } } pcspr_ref_set(1); }
+    if (pcref_cli) { if (!pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-ref: no NHL 95 PC sprite files found\n"); return 2; } } pcspr_ref_set(1); pcspr_ref_phys_set(pcref_cli == 2); }
     if (getenv("HOLDTEST")) {
         const char *h = getenv("HOLDTEST"), *q;
         if ((q = strstr(h, "goal:"))) holdtest_goal = atoi(q + 5);
