@@ -60,6 +60,7 @@ void GameSetUp(void)
     g.palcount = 0x18;
     g.disflags &= (uint16_t)~HI(dfng);                    /* fade the screen in */
     for (;;) {
+        if (setup_options_hook) setup_options_hook(SETUP_OPTS_MENU);   /* (the host's: kept for the next run) */
         if (g.OptPlayMode == 4) {                         /* Shootout: line changes, penalties and user records off */
             g.OptLine = 1;
             g.OptPen = 0;

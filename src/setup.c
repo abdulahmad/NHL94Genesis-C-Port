@@ -986,6 +986,8 @@ void VBlank_SetOptions(void)
     p_music_vblank();
 }
 
+void (*setup_options_hook)(int when);
+
 /* setup94.asm:DefaultMenus. The options at power on (defmenuoptions: regular season, one
  * player, Montreal at Los Angeles, 10 minute periods ...); no demo has run yet. */
 void DefaultMenus(void)

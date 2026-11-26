@@ -132,6 +132,18 @@ void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a
     pending = 1;
 }
 
+/* a skater moved by the wait rather than by his own speed strides (dx, dy: his way; pace: pixels a frame), so the skating
+ * animation runs in step with where he goes, facing it (the game's speed of 4096 is a pixel a frame) */
+static void stride(struct SortObj *pl, int dx, int dy, double pace)
+{
+    double l = sqrt((double)dx * dx + (double)dy * dy);
+    if (l < 1) l = 1;
+    SetSPA(pl, SPAskate);
+    pl->facedir = (int16_t)vtoa((int16_t)dx, (int16_t)dy);
+    pl->Xvel = (int16_t)(dx * 4096.0 * pace / l);
+    pl->Yvel = (int16_t)(dy * 4096.0 * pace / l);
+}
+
 /* NHL 95 PC's anthem: the players stand in two lines facing the flag while the song plays, then skate to the face off spot.
  * The skaters' places are the game's own objects, so every copy of the game agrees. */
 static void anthem_pose(void)
@@ -158,8 +170,12 @@ static void anthem_pose(void)
             if (k > ANTH_SKATE) k = ANTH_SKATE;
             x = lx + (spot[i].x - lx) * k / ANTH_SKATE;
             y = ly + (spot[i].y - ly) * k / ANTH_SKATE;
-            if (k < ANTH_SKATE) pl->facedir = (int16_t)vtoa((int16_t)(spot[i].x - lx), (int16_t)(spot[i].y - ly));
-            else pl->facedir = spot_face[i];
+            pl->Xpos = (int16_t)x;
+            pl->Ypos = (int16_t)y;
+            int dx = spot[i].x - lx, dy = spot[i].y - ly;
+            if (k < ANTH_SKATE && (abs(dx) > 1 || abs(dy) > 1)) { stride(pl, dx, dy, sqrt((double)dx * dx + (double)dy * dy) / ANTH_SKATE); continue; }
+            pl->facedir = spot_face[i];
+            if (pl->SPA == SPAskate) SetSPA(pl, SPAglide);      /* (there: he stops; the face off's own code gives the stance) */
         } else {
             pl->facedir = (int16_t)vtoa(0, 100);                /* (all face the viewer: facedir 4, as the PC's skaters) */
         }
@@ -348,15 +364,10 @@ static void skate_pose(void)
                 if (run < l1) { bx = sk_via[i].x; by = sk_via[i].y; l = l1; }
                 else { ax = sk_via[i].x; ay = sk_via[i].y; r = run - l1; l = d - l1; }
             }
-            if (run == 0 || pl->SPA == 0 || pl->SPA == SPAglide) SetSPA(pl, SPAskate);
             if (l < 1) l = 1;
             pl->Xpos = (int16_t)(ax + (bx - ax) * r / l);
             pl->Ypos = (int16_t)(ay + (by - ay) * r / l);
-            pl->facedir = (int16_t)vtoa((int16_t)(bx - ax), (int16_t)(by - ay));
-            double ll = sqrt((double)(bx - ax) * (bx - ax) + (double)(by - ay) * (by - ay));
-            if (ll < 1) ll = 1;
-            pl->Xvel = (int16_t)((bx - ax) * 8192.0 / ll);       /* (his speed, so the skating animation runs at the pace of the strides) */
-            pl->Yvel = (int16_t)((by - ay) * 8192.0 / ll);
+            stride(pl, bx - ax, by - ay, SKATE_SPEED);   /* (whatever the set up gave him: a face off man's stance waits for the dot) */
             continue;
         }
         pl->Xvel = 0;

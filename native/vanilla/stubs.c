@@ -83,3 +83,7 @@ const void *native_net_settings(size_t *size) { *size = 0; return NULL; }
 void native_net_load_at(long frame, const char *path) { (void)frame; (void)path; }
 void native_net_power_on(mdrt *m) { (void)m; }
 void native_net_close(void) {}
+
+/* the setup screen's options: the cartridge's at every power on, as it has them */
+void menuopts_use(const char *file) { (void)file; }
+void menuopts_power_on(void) { setup_options_hook = NULL; }
