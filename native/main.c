@@ -528,7 +528,7 @@ static void holdtest_frame(void)
 {
     int now = (int)g.Vcount;
     int hw = hold_wait();
-    if (hw != holdtest_last) { fprintf(stderr, "holdtest: frame %d wait %d (score %d-%d, clock %d)\n", now, hw, team_struct(0)->tmscore, team_struct(1)->tmscore, g.gameclock); holdtest_last = hw; }
+    if (hw != holdtest_last) { fprintf(stderr, "holdtest: frame %d (console %ld) wait %d (score %d-%d, clock %d)\n", now, (long)mdrt_frame_count(native_m), hw, team_struct(0)->tmscore, team_struct(1)->tmscore, g.gameclock); holdtest_last = hw; }
     { static int calls; if (++calls % 500 == 0) fprintf(stderr, "holdtest: call %d frame %d demo %d gmode %x clock %d\n", calls, now, g.demoflag, g.gmode, g.gameclock); }
     if (!g.demoflag) return;
     if (holdtest_goal >= 0 && now >= holdtest_goal && !(g.gmode & (1 << gmclock))) {
