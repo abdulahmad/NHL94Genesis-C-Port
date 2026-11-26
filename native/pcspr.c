@@ -819,10 +819,15 @@ int pcspr_logos(void) { return LGO.L[0].have || LGO.L[1].have ? 1 + LGO.L[1].hav
 
 /* Masks of where a solid sprite of nx x ny 32 pixel pieces at x0, y0 would show in the picture of vdp: back: put last in the sprite
  * order (it shows over only the ice: nothing with priority and no sprite is over it); front: put first (it shows over the sprites
- * too). Each a picture against base, the picture with it hidden. 0 when the sprite table has no room for it. */
+ * too). Each is 1 where it shows and base all 0 (callers ask back[p] != base[p]). Each position is drawn twice, its tiles filled with
+ * colour 15 and then 14 of palette 0, and where the two pictures differ the sprite shows: comparing one picture against one without
+ * the sprite missed every pixel where the picture had palette 0's colour 15 itself (the colour the sprite is filled with), the
+ * rink's diagonal sparkle strokes among them, which went through the logo as lines that moved with the camera. 0 when the sprite
+ * table has no room for it. */
 static int sprite_masks(const mdrt_vdp *vdp, int x0, int y0, int nx, int ny, uint16_t *base, uint16_t *back, uint16_t *front, int want_front)
 {
     static mdrt_vdp sc;
+    static uint16_t other[320 * 240];
     unsigned sat = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
     unsigned tile = 0x7E0;
     while (tile > 0x40 && tile * 32 < sat + 0x280 && sat < tile * 32 + 0x200) tile -= 0x10;     /* (the solid tiles: not over the sprite table) */
@@ -830,18 +835,18 @@ static int sprite_masks(const mdrt_vdp *vdp, int x0, int y0, int nx, int ny, uin
     for (int k = 0; k < 80; k++) { int l = vdp->sat[tail * 8 + 3] & 0x7F; if (!l) break; tail = l; }
     int cnt = nx * ny, fb = tail + 1;                               /* the free entries fb ... : the pieces, then the moved first entry */
     if (fb + cnt + 1 > 80) return 0;
-    for (int variant = 0; variant < (want_front ? 3 : 2); variant++) {                /* 0: the copy without it, 1: last, 2: first */
-        sc = *vdp;
-        for (int t = 0; t < 16; t++) memset(sc.s.vram + tile * 32 + t * 32, 0xFF, 32);
-        sc.s.cram[15] = 0x0E0E;
-        if (variant) {
-            int old0 = fb + cnt, first;
+    memset(base, 0, sizeof(uint16_t) * 320 * 240);
+    for (int variant = 1; variant < (want_front ? 3 : 2); variant++)                /* 1: last, 2: first */
+        for (int fill = 0; fill < 2; fill++) {                     /* (the tiles in colour 15, then 14: the two only differ where it shows) */
+            sc = *vdp;
+            for (int t = 0; t < 16; t++) memset(sc.s.vram + tile * 32 + t * 32, fill ? 0xEE : 0xFF, 32);
+            sc.s.cram[15] = 0x0E0E;
+            sc.s.cram[14] = 0x00E0;
+            int old0 = fb + cnt;
             if (variant == 2) {                                    /* the old first entry moves behind the pieces */
                 memcpy(sc.s.vram + ((sat + old0 * 8) & 0xFFFF), vdp->s.vram + ((sat + 0) & 0xFFFF), 8);
                 memcpy(sc.sat + old0 * 8, vdp->sat, 8);
-                first = 0;
             } else {
-                first = fb;
                 sc.sat[tail * 8 + 3] = (uint8_t)fb;
                 sc.s.vram[(sat + tail * 8 + 3) & 0xFFFF] = (uint8_t)fb;
             }
@@ -855,10 +860,10 @@ static int sprite_masks(const mdrt_vdp *vdp, int x0, int y0, int nx, int ny, uin
                 a[6] = (uint8_t)(sx >> 8); a[7] = (uint8_t)sx;
                 memcpy(sc.sat + e * 8, a, 4);
             }
-            (void)first;
+            uint16_t *out = variant == 1 ? back : front;
+            mdrt_vdp_render(&sc, fill ? other : out, 320);
+            if (fill) for (int i = 0; i < 320 * 240; i++) out[i] = out[i] != other[i];
         }
-        mdrt_vdp_render(&sc, variant == 0 ? base : variant == 1 ? back : front, 320);
-    }
     return 1;
 }
 
@@ -1187,8 +1192,24 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
             uint32_t key[160];
             uint16_t slots[160];
             int nslot = free_tiles(&sc, slots, 160), nk = 0, full = 0;
+            /* how far the cartridge's line runs out from the crest: the cells next to each other that have its red or pink in its
+             * rows. It stops at the boards; the boards, the benches and the crowd past them have the line's light colours (its
+             * dashes', its edges') too, and a test by those colours alone ran the PC's line through them to the screen's edges */
+            int q0 = C.x0 / 8 - 5, nearn = C.x1 / 8 + 4 - q0, run_l = 0, run_r = 0;
+            for (int side = 0; side < 2; side++)
+                for (int *run = side ? &run_r : &run_l; nearn + run_l + run_r + 1 < cw; ++*run) {
+                    int q = side ? q0 + nearn + 1 + *run : q0 - 1 - *run, red = 0;
+                    for (int y = b0; y <= b1; y++) {
+                        uint32_t a = (C.table + (uint32_t)((((y >> 3) & (C.ph / 8 - 1)) * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
+                        uint16_t e = (uint16_t)(sc.s.vram[a] << 8 | sc.s.vram[a + 1]);
+                        for (int x = 0; x < 8; x++) red += is_red(&sc, e, x, y & 7) || is_pink(&sc, e, x, y & 7);
+                    }
+                    if (red < 2) break;
+                }
             for (int r = b0 >> 3; r <= b1 >> 3; r++)
                 for (int q = 0; q < cw; q++) {
+                    int off = (q - q0) & (cw - 1);
+                    if (off > nearn + run_r && off < cw - run_l) continue;   /* (past the boards) */
                     int rr = r & (C.ph / 8 - 1);
                     uint32_t a = (C.table + (uint32_t)((rr * cw + q) << 1)) & 0xFFFE;
                     uint16_t e = (uint16_t)(sc.s.vram[a] << 8 | sc.s.vram[a + 1]);
@@ -1221,12 +1242,17 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
                             if (d > bd) { bd = d; bc = i; }
                         }
                         uint8_t *t = sc.s.vram + (uint32_t)slots[slot] * 32, *tm = mk.s.vram + (uint32_t)slots[slot] * 32;
+                        int cols = 0;                           /* (the columns with the line's red or pink: in the last cell before the
+                                                                   * boards, not the boards' own pixels of the line's light colours) */
+                        for (int y = 0; y < 8; y++)
+                            for (int x = 0; x < 8 && r * 8 + y >= b0 && r * 8 + y <= b1; x++)
+                                if (is_red(&sc, e, x, y) || is_pink(&sc, e, x, y)) cols |= 1 << x;
                         for (int y = 0; y < 8; y++)
                             for (int x = 0; x < 8; x++) {
                                 int c, py = r * 8 + y, line = 0;
                                 unsigned u = px_colour(&sc, e, x, y, &c);
                                 int pcrow = py >= pl_top && py < pl_top + pl_n;
-                                if (py >= b0 && py <= b1) for (int i = 0; c && i < nS; i++) line |= u == S[i];
+                                if (py >= b0 && py <= b1 && (near || cols >> x & 1)) for (int i = 0; c && i < nS; i++) line |= u == S[i];
                                 line |= near && pcrow;                  /* (the PC's line over the circle, as on the PC) */
                                 int v = line ? ic : c, vm = line || (pcrow && c && u == ice_c) ? bc : v;
                                 uint8_t *d = t + y * 4 + (x >> 1), *dm = tm + y * 4 + (x >> 1);
