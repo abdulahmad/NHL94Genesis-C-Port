@@ -700,6 +700,12 @@ static void intro_tick(void)
                                                                         SDL_AtomicGet(&cd_smooth), SDL_AtomicGet(&cd_colour), intro_base,
                                                                         beside("rife-v4.6")) ? 2 : 0);
     else if (st == 2 && !segacd_movie_tick()) SDL_AtomicSet(&intro_state, 0);
+    if (st && !SDL_AtomicGet(&intro_state)) {           /* (over or skipped: black until the game's next frame, not the screen before the movie) */
+        SDL_LockMutex(F.lock);
+        for (int i = 0; i < WIDE_MAX_W * 240; i++) F.picture[i] = 0xFF000000u;
+        SDL_AtomicSet(&F.fresh, 1);
+        SDL_UnlockMutex(F.lock);
+    }
 }
 
 /* the disc's rows say so when no disc was found beside the program (they do nothing then) */
@@ -1198,6 +1204,18 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         }
         int opening = segacd_opening();
         ob_pads_mouse_steps(!opening);                        /* (moving the mouse is not a press on the logos and the title) */
+        {   /* (the clicks that leave the opening screens are not the menu's: the mouse presses nothing till a second after, its button up and
+             * the clicking stopped a moment) */
+            static Uint32 quiet_ms; static int held, was, quiet;
+            Uint32 now = SDL_GetTicks();
+            int ldown = (SDL_GetMouseState(NULL, NULL) & SDL_BUTTON_LMASK) != 0;
+            if (opening) { quiet_ms = now + 1000; held = ldown; }
+            else if (!ldown) held = 0;
+            if (quiet && ldown && !was && quiet_ms - now < 700u) quiet_ms = now + 700;   /* (still clicking: not yet) */
+            was = ldown;
+            quiet = opening || held || (Sint32)(quiet_ms - now) > 0;
+            ob_pads_mouse_quiet(quiet);
+        }
         for (int p = 0; p < MDRT_PADS; p++) {
             int src = seat_n ? (p < seat_n ? seat_pad[p] : -1) : p;       /* (after the select-sides screen the pads are the seated players') */
             SDL_AtomicSet(&F.buttons[p], src >= 0 ? (int)ob_pads_read(src) : 0);
