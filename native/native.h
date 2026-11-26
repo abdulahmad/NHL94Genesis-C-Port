@@ -24,6 +24,7 @@ void native_script_reset(void);                        /* at every wait: a scrip
 void native_frame_done(long frame, int wait);
 /* a vblank now, in the middle of the game's work (hal_native.c) */
 void native_vblank_now(void);
+void native_idle_frame(void);             /* a frame with only the music's vblank: the game waits, the song plays on (hal_native.c) */
 int native_in_vblank(void);              /* running the vblank's code */
 void native_set_accesses(uint32_t n);    /* lockstep: the count of the game's port accesses (the oracle's) */
 void native_set_sr(uint16_t v);          /* the 68k's status register, set without the unmask hook (a snapshot's) */

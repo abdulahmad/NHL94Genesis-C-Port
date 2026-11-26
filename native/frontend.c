@@ -329,6 +329,38 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     if (F.wide) w = wide_frame(mdrt_get_vdp(F.m), pic, w, h, 320, F.picture, WIDE_MAX_W, cd);   /* (the sides: wide.c) */
     else if (!cd && native_net_on() && (wide_rink_frame(w) || wide_hor_frame(w))) wide_crop_follow(), w = wide_crop(mdrt_get_vdp(F.m), pic, h, 320, F.picture, WIDE_MAX_W);   /* (a 16:9 player's wide rink, here 4:3) */
     else for (int y = 0; y < h; y++) memcpy(F.picture + y * WIDE_MAX_W, pic + y * 320, (size_t)w * 4);
+    {   /* a new picture width (the 320-wide screens and the 256-wide ones: the window's shape changes): the old picture fades out first, then
+         * the new one fades in, so the shape never changes under a picture that is showing */
+        enum { FADE = 15 };
+        static uint32_t last[WIDE_MAX_W * 240];
+        static int last_w, last_h, out, in;
+        if (last_w && (w != last_w) && !out && !native_net_on()) {
+            long sum = 0;
+            for (int y = 0; y < last_h; y += 4)
+                for (int x = 0; x < last_w; x += 4) { uint32_t c = last[y * WIDE_MAX_W + x]; sum += (c >> 16 & 255) + (c >> 8 & 255) + (c & 255); }
+            if (sum / ((last_h / 4 + 1) * (last_w / 4 + 1)) > 24) out = FADE, in = FADE;   /* (a picture already black needs no fade) */
+        }
+        if (out) {                                    /* the old picture, darker each frame */
+            out--;
+            for (int y = 0; y < last_h; y++)
+                for (int x = 0; x < last_w; x++) {
+                    uint32_t c = last[y * WIDE_MAX_W + x];
+                    F.picture[y * WIDE_MAX_W + x] = 0xFF000000u | ((c >> 16 & 255) * out / FADE) << 16 | ((c >> 8 & 255) * out / FADE) << 8 | (c & 255) * out / FADE;
+                }
+            w = last_w; h = last_h;
+        } else {
+            for (int y = 0; y < h; y++) memcpy(last + y * WIDE_MAX_W, F.picture + y * WIDE_MAX_W, (size_t)w * 4);
+            last_w = w; last_h = h;
+            if (in) {                                 /* the new one, brighter each frame */
+                in--;
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++) {
+                        uint32_t c = F.picture[y * WIDE_MAX_W + x];
+                        F.picture[y * WIDE_MAX_W + x] = 0xFF000000u | ((c >> 16 & 255) * (FADE - in) / FADE) << 16 | ((c >> 8 & 255) * (FADE - in) / FADE) << 8 | (c & 255) * (FADE - in) / FADE;
+                    }
+            }
+        }
+    }
     F.width = w;
     F.height = h;
     SDL_AtomicSet(&F.fresh, 1);
@@ -1091,7 +1123,7 @@ static void game_starting(void)
     sides_team[0] = native_game_teams[0];
     sides_team[1] = native_game_teams[1];
     SDL_AtomicSet(&sides_state, 1);
-    while (SDL_AtomicGet(&sides_state) && !SDL_AtomicGet(&F.quit)) SDL_Delay(5);
+    while (SDL_AtomicGet(&sides_state) && !SDL_AtomicGet(&F.quit)) native_idle_frame();   /* (the main menu's song plays on behind it) */
     {   int team[4], n = 0;                            /* who plays what: game pad j is the j-th player with a device (visitors play team 2, home team 1) */
         for (int p = 0; p < 4 && p < MDRT_PADS; p++)
             if (ob_pads_seated(p)) { seat_pad[n] = p; team[n] = (p & 1) ? 1 : 2; n++; }
@@ -1199,6 +1231,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     cfg->platform = (mdrt_platform){ .user = NULL, .present = present, .audio = audio, .wait = frame_wait, .input = input, .idle = idle };
     if (!start_game()) { fprintf(stderr, "the game could not start\n"); return 1; }
     native_game_start_hook = game_starting;
+    { extern uint8_t scout_b_back; scout_b_back = 1; }    /* (the scouting report: C the next matchup, B the one before) */
     test_aid_arm();
     while (!SDL_AtomicGet(&F.quit)) {
         test_aid_tick();
@@ -1273,7 +1306,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         pcspr_no_file();
         pcsfx_no_file();
         pc_no_files();
-        hold_other = ob_pads_setup_active() || ob_pads_sides_active() || options_ui_active() || host.overlay_open;
+        hold_other = ob_pads_setup_active() || (ob_pads_sides_active() && !SDL_AtomicGet(&sides_state)) || options_ui_active() || host.overlay_open;   /* (the sides screen a new game asked for: the game waits on it itself, its song playing on) */
         hold_state = hold_other || ob_screen_up();
         ob_plat_present();
         ob_plat_frame_done(SDL_AtomicSet(&F.fresh, 0));

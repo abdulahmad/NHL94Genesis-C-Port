@@ -31,6 +31,8 @@ uint32_t ScoutCrowdRecord(void)
  * when the text is done (Demo), else after about ten minutes more. */
 int scout_disc, scout_last;
 
+uint8_t scout_b_back;                                     /* (the window sets it: B turns back a matchup as A does; 0 is the cartridge) */
+
 void ScoutingReport(void)
 {
     static const uint8_t bigfont[8] = { 0x05, 0x43, 0x15, 0x67, 0x79, 0xAB, 0xCD, 0xEF };
@@ -142,7 +144,7 @@ list_done:
             g.screentimer = 0x7FFF;
             g.scoutwait = 0x8CA0;
             page = 1;
-        } else if (d1 & 0x40) {                           /* A: the previous */
+        } else if (d1 & (scout_b_back ? 0x50 : 0x40)) {   /* A: the previous (the window: B too) */
             g.screentimer = 0x7FFF;
             g.scoutwait = 0x8CA0;
             page = -1;
