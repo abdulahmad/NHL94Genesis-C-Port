@@ -319,6 +319,24 @@ static int named_of(uint16_t team, uint16_t player)
         for (; *f && *r; f++) if (*f == *r) r++;
         if (!*r && C.made[NFACES + NCD + i] == 1) return NFACES + NCD + i;
     }
+    for (int u = 0; u < ROSTERS_MAX; u++) {               /* his photo on another team (John Vanbiesbrk: NYR's, on Florida) */
+        const struct RosterTeam *U = &roster_team[u];
+        for (int i = 0; i < U->pictures && i < RS_PICTURES; i++) {
+            if (u == team || U->picture[i].slot >= U->players) continue;
+            const struct RosterText *n = &U->player[U->picture[i].slot].name;
+            int m = (n->s[0] << 8 | n->s[1]) - 2;
+            if (m < 0) m = 0;
+            if (m > RS_TEXT - 2) m = RS_TEXT - 2;
+            char other[40];
+            squash((const char *)n->s + 2, (size_t)m, other, sizeof other);
+            if (strcmp(other, key)) continue;
+            uint32_t pic = U->picture[i].pic;
+            int k = card_of(pic + 8);
+            if (k < 0) continue;
+            uint32_t map = rd32(rom_ptr(pic + 4)) == 0 ? ART(PicturePalette) + rd32(rom_ptr(ART(PicturePalette) + 4)) : pic + rd32(rom_ptr(pic + 4));
+            if (make(k, pic + 8, map)) return k;
+        }
+    }
     return -1;
 }
 
@@ -331,7 +349,7 @@ static void drawn(uint32_t tiles, uint32_t map, uint16_t start, uint16_t attr)
     int k = tiles ? card_of(tiles) : cd_of();
     if (k < 0 && who) k = named_of((uint16_t)(who >> 16), (uint16_t)((who & 0xFFFF) - 1));   /* (a stock picture: his own face, if named) */
     if (k < 0 || rd16(rom_ptr(map)) != 6 || rd16(rom_ptr(map + 2)) != 6) return;
-    if (tiles && k < NFACES ? !make(k, tiles, map) : C.made[k] != 1) return;
+    if (tiles && k < NFACES && card_of(tiles) == k ? !make(k, tiles, map) : C.made[k] != 1) return;
     uint16_t count = rd16(g.picturebuf);
     struct shown *s = NULL;
     for (int i = 0; i < SHOWN && !s; i++) if (!C.shown[i].used) s = &C.shown[i];
@@ -360,7 +378,8 @@ int cardcolor_covers(uint16_t team, uint16_t player)
     for (int i = 0; i < T->pictures; i++) {                /* (DrawPlayerPicture's: the team's featured pictures) */
         if (T->picture[i].slot != player) continue;
         int k = card_of(T->picture[i].pic + 8);
-        if (k < 0 || C.made[k] == 2) return 0;
+        if (k < 0) break;                                  /* (a stock picture in the list: Anaheim's, Florida's) */
+        if (C.made[k] == 2) return 0;
         if (C.made[k] == 1) return 1;
         const cc_card *c = pc_of(k);
         return c && (have & (c->src == CC_PC95 ? 1 : 2));
