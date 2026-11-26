@@ -269,7 +269,7 @@ static uint8_t *unhuff94(const uint8_t *d, long dn, long *out_n)
     return out;
 }
 
-#define ICE(c) (kind ? ((c) == 106 || (c) == 107 || (c) == 105 || (c) == 104 || (c) == 23 || (c) == 91 || (c) == 90) : ((c) == 96 || (c) == 23 || (c) == 91 || (c) == 102 || (c) == 103))
+#define ICE(c) (kind ? ((c) == 106 || (c) == 107 || (c) == 105 || (c) == 104 || (c) == 23 || (c) == 91 || (c) == 90) : ((c) == 102 || (c) == 103))   /* (95: the ice's two whites; its 96 is the centre line's red and 23 / 91 the blue centre dot, which stay) */
 static void load_logo_set(struct lset *S, const char *dir, ob_cd *cd, int kind)
 {
     long pn = 0;
@@ -322,7 +322,7 @@ static void load_logo_set(struct lset *S, const char *dir, ob_cd *cd, int kind)
                             for (int ty = 0; ty < lh; ty++)
                                 for (int tx = 0; tx < lw; tx++) {
                                     int wd = mb[6 + 2 * (ty * lw + tx)] | mb[7 + 2 * (ty * lw + tx)] << 8;
-                                    int ti = kind ? wd & 0x7FF : wd & 0x1FFF, hfl = wd & (kind ? 0x0800 : 0x2000), vfl = wd & (kind ? 0x1000 : 0x4000);
+                                    int ti = kind ? wd & 0x7FF : wd & 0x3FF, hfl = wd & (kind ? 0x0800 : 0x2000), vfl = wd & (kind ? 0x1000 : 0x4000);
                                     for (int y = 0; y < 8; y++)
                                         for (int x = 0; x < 8; x++) {
                                             int sx = hfl ? 7 - x : x, sy = vfl ? 7 - y : y;
@@ -850,19 +850,6 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     lx = cx + view_shift() - 128 - lw / 2;
     ly = cy - 128 - lh / 2;
     if (x1 >= 0 && x1 - x0 >= 40) { lx = (x0 + x1 + 1) / 2 - lw / 2; ly = (y0 + y1 + 1) / 2 - lh / 2; }   /* (the crest's own place, when it is all in view) */
-    int nx = (lw + 31) / 32, ny = (lh + 31) / 32;
-    if (nx * ny > 6 || !sprite_masks(&sc, lx, ly, nx, ny, base, back, front, 0)) return;
-    for (int y = 0; y < lh; y++)
-        for (int x = 0; x < lw; x++) {
-            int c = LS->t[k].idx[y * lw + x];
-            if (c == 255) continue;                                                    /* (clear) */
-            int ppx = lx + x, ppy = ly + y;
-            if (ppx < 0 || ppx >= w || ppy < 0 || ppy >= h || back[ppy * 320 + ppx] == base[ppy * 320 + ppx]) continue;
-            {
-                const uint8_t *pc = LS == &LGO.L[0] && SDL_AtomicGet(&P.found) ? P.pal[c] : LS->pal[c];   /* (the PC's own rink palette: RINK.PAL is a rougher 5 bit copy of it) */
-                pic[(long)ppy * pitch + ppx] = fadec(0xFF000000u | (uint32_t)pc[0] << 16 | (uint32_t)pc[1] << 8 | pc[2]);
-            }
-        }
     /* the red centre line was part of the crest's tiles: draw it again across the gap in each row, from the 8 columns of it left of the gap (period 8) */
     if (x1 - x0 >= 40 && x0 >= 48 && x1 + 48 < w)
         for (int y = y0; y <= y1 && y < h; y++) {
@@ -876,6 +863,19 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
             if (red < 3) continue;
             for (int x = xl + 1; x < xr; x++) pic[(long)y * pitch + x] = pic[(long)y * pitch + xl - 7 + ((x - xl - 1) & 7)];
 #undef LINERED
+        }
+    int nx = (lw + 31) / 32, ny = (lh + 31) / 32;
+    if (nx * ny > 6 || !sprite_masks(&sc, lx, ly, nx, ny, base, back, front, 0)) return;
+    for (int y = 0; y < lh; y++)
+        for (int x = 0; x < lw; x++) {
+            int c = LS->t[k].idx[y * lw + x];
+            if (c == 255) continue;                                                    /* (clear) */
+            int ppx = lx + x, ppy = ly + y;
+            if (ppx < 0 || ppx >= w || ppy < 0 || ppy >= h || back[ppy * 320 + ppx] == base[ppy * 320 + ppx]) continue;
+            {
+                const uint8_t *pc = LS == &LGO.L[0] && SDL_AtomicGet(&P.found) ? P.pal[c] : LS->pal[c];   /* (the PC's own rink palette: RINK.PAL is a rougher 5 bit copy of it) */
+                pic[(long)ppy * pitch + ppx] = fadec(0xFF000000u | (uint32_t)pc[0] << 16 | (uint32_t)pc[1] << 8 | pc[2]);
+            }
         }
 }
 
