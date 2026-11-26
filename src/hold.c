@@ -186,6 +186,7 @@ void hold_skate_arm(void)
     if (!sk_cap) return;
     sk_cap = 0;
     if (anth) return;                                   /* (the anthem's own walk to the spots) */
+    if (g.gameclock == g.PerTimeTotal) return;          /* (the start of a period: the cartridge's own fade and set up, nobody crosses the rink from where the last period ended) */
     int far = 0;
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) {
