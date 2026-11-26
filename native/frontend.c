@@ -821,6 +821,20 @@ static void pcsfx_no_file(void)
     cd_opts[CD_CROWD_PC].label = lg;
 }
 
+/* the anthems' row says which game's discs were not found (the other's anthems play then) */
+static void pcsong_no_file(void)
+{
+    static int done;
+    static char label[96];
+    if (done || !pcsong_searched()) return;
+    done = 1;
+    int f95 = pcsong_found95(), f96 = pcsong_found96();
+    if (f95 && f96) return;
+    snprintf(label, sizeof label, "%s (%s)", cd_opts[CD_PCANTHEM].label,
+             !f95 && !f96 ? "no NHL 95 or 96 PC disc image found" : !f96 ? "no NHL 96 PC disc: 95's play" : "no NHL 95 PC disc: 96's play");
+    cd_opts[CD_PCANTHEM].label = label;
+}
+
 /* the colour photos' row says so when neither PC game's portraits were found */
 static void pc_no_files(void)
 {
@@ -910,7 +924,8 @@ static void game_page_init(void)
     cd_opts[CD_PCSPR] = (ob_game_opt){ "pc_sprites", "PC player sprites", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's skaters and goalies, the cartridge's where the PC has none) */
     cd_opts[CD_PCREF] = (ob_game_opt){ "pc_referee", "Referee on the ice", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's referee skating with the play and dropping the puck) */
     cd_opts[CD_PCLOGO] = (ob_game_opt){ "pc_centre_logo", "Centre ice logo", cd_logo_pc, 3, 1, 0, 4 };   /* (the cartridge's crest or NHL 95 PC's) */
-    cd_opts[CD_PCANTHEM] = (ob_game_opt){ "pc_anthems", "National anthems", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's, played before the first face off) */
+    static const char *const anthem_of[3] = { "Off", "NHL 95 PC", "NHL 96 PC" };
+    cd_opts[CD_PCANTHEM] = (ob_game_opt){ "pc_anthems", "National anthems", anthem_of, 3, 1, 0, 4 };   /* (NHL 95 PC's FM songs or NHL 96 PC's recordings, played before the first face off) */
     cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 1, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
     cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
     static const char *const shape[2] = { "4:3", "16:9" };
@@ -922,7 +937,7 @@ static void game_page_init(void)
         game_help[CD_PCSPR] = "NHL 95 PC's skaters and goalies, from your NHL 95 PC files.";
         game_help[CD_PCREF] = "A referee skating on the ice, NHL 95 PC's, from your NHL 95 PC files.";
         game_help[CD_PCLOGO] = "The logo at centre ice: the cartridge's, NHL 95 PC's, or NHL 94 PC's (NHL 95's where 94 has none) from your PC game files.";
-        game_help[CD_PCANTHEM] = "NHL 95 PC's national anthems before the first face off, from your NHL 95 PC files. The crowd cheers over the last bars, as the PC's does.";
+        game_help[CD_PCANTHEM] = "The national anthems before the first face off: NHL 95 PC's songs or NHL 96 PC's recordings, from your PC game discs (the other when one is missing). The crowd cheers over the last bars, as the PC's does.";
         game_help[CD_HATS] = "Hats thrown on the ice after a home skater's third goal.";
         game_help[CD_WHITEICE] = "The PC games' white rink instead of the pale cyan one.";
         game_help[CD_PCPHOTOS] = "Player photos in colour.";
@@ -1314,6 +1329,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         hats_no_file();
         pcspr_no_file();
         pcsfx_no_file();
+        pcsong_no_file();
         pc_no_files();
         hold_other = ob_pads_setup_active() || (ob_pads_sides_active() && !SDL_AtomicGet(&sides_state)) || options_ui_active() || host.overlay_open;   /* (the sides screen a new game asked for: the game waits on it itself, its song playing on) */
         hold_state = hold_other || ob_screen_up();
