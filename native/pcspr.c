@@ -858,7 +858,10 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
             if (c == 255) continue;                                                    /* (clear) */
             int ppx = lx + x, ppy = ly + y;
             if (ppx < 0 || ppx >= w || ppy < 0 || ppy >= h || back[ppy * 320 + ppx] == base[ppy * 320 + ppx]) continue;
-            pic[(long)ppy * pitch + ppx] = fadec(0xFF000000u | (uint32_t)LS->pal[c][0] << 16 | (uint32_t)LS->pal[c][1] << 8 | LS->pal[c][2]);
+            {
+                const uint8_t *pc = LS == &LGO.L[0] && SDL_AtomicGet(&P.found) ? P.pal[c] : LS->pal[c];   /* (the PC's own rink palette: RINK.PAL is a rougher 5 bit copy of it) */
+                pic[(long)ppy * pitch + ppx] = fadec(0xFF000000u | (uint32_t)pc[0] << 16 | (uint32_t)pc[1] << 8 | pc[2]);
+            }
         }
     /* the red centre line was part of the crest's tiles: draw it again across the gap in each row, from the 8 columns of it left of the gap (period 8) */
     if (x1 - x0 >= 40 && x0 >= 48 && x1 + 48 < w)
