@@ -748,8 +748,11 @@ static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch
                 if ((t & 0x8000) && (t & 0x7FF) != 0x7FF) win = 1;
             }
     }
+    static uint8_t okm[256 * 256];                                       /* which of the picture's pixels show; then the holes in it closed: a dither of the cartridge's own shading over the ice (the boards' corners) would speckle him */
+    if (s->w > 256 || s->h > 256) return;
     for (int y = 0; y < s->h; y++)
         for (int x = 0; x < s->w; x++) {
+            okm[y * 256 + x] = 0;
             int v = s->px[y * s->w + x];
             if (v == 255) continue;
             int px_ = x0 + x, py = y0 + y;
@@ -765,7 +768,22 @@ static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch
                     if (px_ >= ox && px_ < ox + o->w && py >= oy && py < oy + o->h && list[i].y >= R.sy) ok = 0;
                 }
             }
-            if (!ok) continue;
+            okm[y * 256 + x] = (uint8_t)ok;
+        }
+    for (int y = 0; y < s->h; y++)
+        for (int x = 0; x < s->w; x++) {
+            int v = s->px[y * s->w + x];
+            if (v == 255) continue;
+            int px_ = x0 + x, py = y0 + y;
+            if (px_ < 0 || px_ >= w || py < 0 || py >= h) continue;
+            if (!okm[y * 256 + x]) {
+                if (win && px_ < 112 && py < 112) continue;
+                int near = 0;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                        if ((dx || dy) && x + dx >= 0 && x + dx < s->w && y + dy >= 0 && y + dy < s->h) near += okm[(y + dy) * 256 + x + dx];
+                if (near < 4) continue;                              /* (a straight edge has 3 over it at most) */
+            }
             int r = v < 0x80 ? rec[192 + v] : rec[320 + v - 0x80];
             pic[(long)py * pitch + px_] = fadec(0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2]);
         }
