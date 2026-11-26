@@ -3301,6 +3301,9 @@ void CompLine(struct Team *a2, struct Team *a1)
 }
 
 static int fo_deferred;
+static struct SortObj *fo_defer_pl[12];                 /* the face off assignments the anthem holds back */
+static uint16_t fo_defer_as[12];
+static int fo_defer_n;
 
 /* the face off window (the two men, the line lists) and the tiles it needs: drawn at the setup, or after the anthem */
 static void fo_window(void)
@@ -3343,6 +3346,8 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
         if (o->temp1 < 0 && hold_wait()) o->temp1 = 0;       /* (RULE_HOLD: the announcer is still on) */
         if (fo_deferred && o->temp1 < 0) {                   /* (the anthem is over: the window, and the usual time to the drop) */
             fo_deferred = 0;
+            for (int i = 0; i < fo_defer_n; i++) assinsert(fo_defer_as[i], fo_defer_pl[i]);   /* (now they take the face off) */
+            fo_defer_n = 0;
             fo_window();
             g.disflags |= HI(4);
             o->temp1 = (int16_t)(randomd0(0x78) + 0xB4);
@@ -3400,6 +3405,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     setpersonel(team_struct(1));
     forcepldata(team_struct(1));
     resetplstuff();
+    fo_defer_n = 0;
     struct SortObj *pl = sortobj(0);
     for (int d2 = 11; d2 >= 0; d2--, pl++) {
         pl->Xpos = -0xF0;
@@ -3419,7 +3425,8 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
                 tc->tmflags &= (uint8_t)~8;
                 d0 = afaceoffpl;
             }
-            assinsert(d0, pl);
+            if (hold_anthem_pending() && fo_defer_n < 12) { fo_defer_pl[fo_defer_n] = pl; fo_defer_as[fo_defer_n++] = d0; }   /* (the anthem: no face off yet) */
+            else assinsert(d0, pl);
         }
         int16_t d4 = (int16_t)team_struct(PFLAG(pl, pfteam))->tmap;            /* skaters on the ice 4-6 */
         d4 = (int16_t)((6 - d4) << 3);
