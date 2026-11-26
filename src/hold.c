@@ -76,7 +76,7 @@ int hold_anthem_ref(int *x, int *y, int *dir, int *moving)
     int k = t < 0 ? 0 : t > ANTH_SKATE ? ANTH_SKATE : t;
     *x = 108 + (tx - 108) * k / ANTH_SKATE;
     *y = 0 + (ty - 0) * k / ANTH_SKATE;
-    *dir = (fx > 0 ? 6 : 2);
+    *dir = 6;                                           /* (he stands on the right: facing the rink, the lines of players) */
     *moving = k > 0 && k < ANTH_SKATE;
     if (*moving) *dir = tx > 108 ? 2 : 6;
     return 1;

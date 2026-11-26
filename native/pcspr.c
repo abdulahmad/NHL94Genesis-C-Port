@@ -582,7 +582,7 @@ static void ref_tick(void)
         if (sp > 0.45) {
             int d = (int)floor(atan2((double)R.vx, (double)R.vy) / (M_PI / 4) + 0.5);
             R.dir = ((d % 8) + 8) % 8;
-        }
+        } else R.dir = px > rx ? 2 : 6;                                           /* (standing by the boards: he watches the play, not the boards) */
         if (R.drop > 0) { R.drop--; R.vx = R.vy = 0; }
         R.t = sp > 0.45 ? R.t + 1 : 0;
     }
@@ -593,7 +593,7 @@ static void ref_tick(void)
     if (getenv("PCREF_AT")) { int ax, ay; if (sscanf(getenv("PCREF_AT"), "%d,%d", &ax, &ay) == 2) { R.sx = ax; R.sy = ay; } }   /* (a test: the referee put there) */
     R.sy = y;
     R.valid = 1;
-    if (getenv("PCREF_LOG") && !(g.Vcount & 63)) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos);
+    if (getenv("PCREF_LOG") && (!(g.Vcount & 63) || getenv("PCREF_ALL"))) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos);
 }
 
 static int ref_pos(int *x, int *y)
