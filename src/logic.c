@@ -3306,6 +3306,40 @@ static struct SortObj *fo_defer_pl[12];                 /* the face off assignme
 static uint16_t fo_defer_as[12];
 static int fo_defer_n;
 
+/* the anthem's held back face off (native: kept in every state with src/hold.c's pause): deferred, the count, each skater's
+ * sort object and his assignment */
+size_t faceoff_defer_save(uint8_t *out)
+{
+    out[0] = (uint8_t)fo_deferred;
+    out[1] = (uint8_t)fo_defer_n;
+    for (int i = 0; i < 12; i++) {
+        out[2 + i] = (uint8_t)(i < fo_defer_n ? fo_defer_pl[i] - sortobj(0) : 0);
+        out[14 + 2 * i] = (uint8_t)(i < fo_defer_n ? fo_defer_as[i] : 0);
+        out[15 + 2 * i] = (uint8_t)(i < fo_defer_n ? fo_defer_as[i] >> 8 : 0);
+    }
+    return FACEOFF_DEFER_SIZE;
+}
+
+int faceoff_defer_check(const uint8_t *in)
+{
+    if (in[0] > 1 || in[1] > 12) return -1;
+    for (int i = 0; i < in[1]; i++) {
+        uint16_t as = (uint16_t)(in[14 + 2 * i] | in[15 + 2 * i] << 8);
+        if (in[2 + i] >= 12 || (as != afaceoff && as != afaceoffpl)) return -1;   /* (a skater's, and a face off's assignment) */
+    }
+    return 0;
+}
+
+int faceoff_defer_load(const uint8_t *in)
+{
+    if (!in) { fo_deferred = 0; fo_defer_n = 0; return 0; }
+    if (faceoff_defer_check(in) < 0) return -1;
+    fo_deferred = in[0];
+    fo_defer_n = in[1];
+    for (int i = 0; i < fo_defer_n; i++) { fo_defer_pl[i] = sortobj(in[2 + i]); fo_defer_as[i] = (uint16_t)(in[14 + 2 * i] | in[15 + 2 * i] << 8); }
+    return 0;
+}
+
 /* the face off window (the two men, the line lists) and the tiles it needs: drawn at the setup, or after the anthem */
 static void fo_window(void)
 {
@@ -3360,9 +3394,10 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
         return;
     }
     o->pflags &= (uint8_t)~(1 << pfna);
-    if (anthem_hook_fn && g.gsp == 0 && g.gameclock == g.PerTimeTotal && !(g.gmode2 & 1)) {   /* (the first face off of the game: the anthems) */
-        int fr = anthem_hook_fn(rosters_art(team_struct(0)->tmteam), rosters_art(team_struct(1)->tmteam));
-        if (fr > 0) hold_anthem(fr);
+    if (rules[RULE_ANTHEM] && g.demoflag && g.gsp == 0 && g.gameclock == g.PerTimeTotal && !(g.gmode2 & 1)) {   /* (the first face off of the game: the anthem) */
+        int home = rosters_art(team_struct(0)->tmteam);
+        if (anthem_hook_fn) anthem_hook_fn(home, rosters_art(team_struct(1)->tmteam));   /* (the host plays it, when it has the PC game's files) */
+        hold_anthem(hold_anthem_frames(rules[RULE_ANTHEM], home));   /* (the wait is the rule's: the same on every machine) */
     }
     hold_skate_begin();                                      /* (RULE_HOLD: where the skaters were) */
     int nofade = hold_nofade();

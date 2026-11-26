@@ -16,6 +16,7 @@
 #include "game.h"
 #include "native.h"
 #include "pcsong.h"
+#include "rules.h"
 #include "rosters.h"
 #include "nuked_opl3.h"
 #include "overbar/cdimage.h"
@@ -40,9 +41,9 @@ static struct {
 } S;
 
 /* the set an anthem plays from: the one asked for, else the other one found (-1: none) */
-static int choose(void)
+static int choose_set(int on)
 {
-    int on = SDL_AtomicGet(&S.on), f95 = SDL_AtomicGet(&S.found), f96 = SDL_AtomicGet(&S.found96);
+    int f95 = SDL_AtomicGet(&S.found), f96 = SDL_AtomicGet(&S.found96);
     if (!on) return -1;
     if (on == 2 && f96) return 1;
     if (f95) return 0;
@@ -632,14 +633,14 @@ static int finder(void *arg)
 /* the cartridge's art numbers of the Canadian teams (CGY EDM MTL OTT QUE TOR VAN WPG) */
 static int canadian(int art) { return art == 3 || art == 7 || art == 11 || art == 15 || art == 18 || art == 22 || art == 23 || art == 25; }
 
-static int playing_hook(void) { return S.playing; }
-
-/* the first face off's anthem: the home team's. Its length in frames of the game (60 a second) */
+/* the first face off's anthem (RULE_ANTHEM: the game's choice, the session host's): the home team's, from the set the rule
+ * names, else the other one found. Only the sound: the game waits the rule's own length (src/hold.c), with or without it.
+ * Its length in frames of the game (60 a second) */
 static int anthem_hook(int home_art, int away_art)
 {
     if (!SDL_AtomicGet(&S.searched) || !g.demoflag) return 0;
     SDL_MemoryBarrierAcquire();
-    int set = choose();
+    int set = choose_set(rules[RULE_ANTHEM]);
     if (set < 0) return 0;
     int first = canadian(home_art) ? 1 : 0, second = first;           /* (the home team's anthem only) */
     SDL_LockMutex(S.lock);
@@ -656,7 +657,7 @@ static int anthem_hook(int home_art, int away_art)
 /* the flag of the anthem playing at a frame of the game since it began (0 USA, 1 Canada; -1 none) */
 int pcsong_flag_at(int frame)
 {
-    if (!SDL_AtomicGet(&S.on) || !S.playing) return -1;
+    if (!S.playing) return -1;
     int first = S.which & 1, second = (S.which >> 1) - 1;
     const long *len = S.cur ? S.l96 : S.len;
     if (second >= 0 && (long)frame * (S.cur ? RATE96 : RATE) / 60 >= len[first]) return second;
@@ -669,7 +670,7 @@ int pcsong_flag_at(int frame)
  * playing (-1 when none) */
 int pcsong_cheer_frame(void)
 {
-    if (!SDL_AtomicGet(&S.on) || !S.playing) return -1;
+    if (!S.playing) return -1;
     return S.cur ? 0x23A : (S.which & 1) ? 0x1FE : 0x23A;
 }
 
@@ -680,7 +681,6 @@ void pcsong_start(void)
     started = 1;
     S.lock = SDL_CreateMutex();
     anthem_hook_fn = anthem_hook;
-    song_block_hook = playing_hook;
     stoppage_hook = stoppage;
     char *base = SDL_GetBasePath();
     SDL_Thread *t = SDL_CreateThread(finder, "pcsong", base ? SDL_strdup(base) : SDL_strdup("."));
@@ -747,7 +747,7 @@ void pcsong_mix(int16_t *out, int frames, unsigned rate)
 /* testing: both anthems, USA then CANADA, as a wav (--pc-anthem-wav FILE; with --pc-anthems-96, NHL 96 PC's) */
 int pcsong_write_wav(const char *path)
 {
-    int set = choose();
+    int set = choose_set(SDL_AtomicGet(&S.on));
     if (!pcsong_found() || set < 0) return 0;
     FILE *f = fopen(path, "wb");
     if (!f) return 0;

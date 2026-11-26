@@ -206,6 +206,47 @@ static void referee(void)
     classic_rules();
 }
 
+/* RULE_HOLD (src/hold.c): the walk to the spots and the referee's puck are the game's alone (where the puck lay, the dot, the
+ * walk's time); the pause goes through the state's bytes and bytes that are not a pause's are refused. RULE_ANTHEM: the
+ * anthem's wait is the rule's, fixed per recording */
+static void hold(void)
+{
+    classic_rules();
+    hold_state_load(NULL);
+    CHECK(hold_anthem_frames(0, 3) == 0 && hold_anthem_frames(1, 0) == 795 && hold_anthem_frames(1, 3) == 723 &&
+          hold_anthem_frames(2, 0) == 990 && hold_anthem_frames(2, 7) == 909);
+    rules[RULE_HOLD] = 1;
+    g.gameclock = 100; g.PerTimeTotal = 300; g.Vcount = 1000;
+    for (int i = 0; i < 12; i++) { struct SortObj *o = sortobj(i); memset(o, 0, sizeof *o); o->SCnum = (int16_t)i; o->position = i % 6 ? 1 : 0; o->pnum = (uint8_t)i; }
+    g.puckx[0] = (uint16_t)-40; g.pucky = 60;
+    hold_skate_begin();
+    for (int i = 0; i < 12; i++) { sortobj(i)->Xpos = 100; sortobj(i)->Ypos = 100; }   /* (the face off's set up: 141 to go) */
+    g.fox = 100; g.foy = 100;
+    hold_skate_arm();
+    int x, y, x2, y2;
+    CHECK(hold_skating() && !hold_skate_carry(&x, &y));    /* (the referee is on his way to the puck) */
+    g.Vcount = (uint16_t)(g.Vcount + 50);
+    CHECK(hold_skate_carry(&x, &y) && x > -40 * 256 && x < 115 * 256 && y > 60 * 256 && y < 100 * 256);
+    uint8_t a[HOLD_STATE_SIZE], b[HOLD_STATE_SIZE];
+    CHECK(hold_state_save(a) == HOLD_STATE_SIZE);
+    hold_state_load(NULL);
+    CHECK(!hold_skating() && !hold_skate_carry(&x2, &y2));
+    CHECK(hold_state_load(a) == 0 && hold_skating() && hold_skate_carry(&x2, &y2) && x2 == x && y2 == y);   /* (the same walk) */
+    hold_state_save(b);
+    CHECK(!memcmp(a, b, sizeof a));
+    static const int flags[] = { 2, 3, 4, 7, 82, 83, 84, 89, 96, 97, 324, 325, 334 };
+    for (size_t k = 0; k < sizeof flags / sizeof flags[0]; k++) { memcpy(b, a, sizeof b); b[flags[k]] = 2; CHECK(hold_state_load(b) < 0); }
+    memcpy(b, a, sizeof b); b[98] = 0x2D; b[99] = 1; CHECK(hold_state_load(b) < 0);   /* (a walk of more than 300 frames) */
+    memcpy(b, a, sizeof b); b[322] = 1; CHECK(hold_state_load(b) < 0);                /* (the puck picked up at 1 of 256) */
+    memcpy(b, a, sizeof b); b[335] = 13; CHECK(hold_state_load(b) < 0);               /* (13 held back face off men) */
+    memcpy(b, a, sizeof b); b[335] = 1; b[336] = 12; b[348] = afaceoff; CHECK(hold_state_load(b) < 0);   /* (not a skater's object) */
+    memcpy(b, a, sizeof b); b[335] = 1; b[336] = 3; b[348] = 0x30; CHECK(hold_state_load(b) < 0);       /* (not a face off's assignment) */
+    memcpy(b, a, sizeof b); b[335] = 1; b[336] = 3; b[348] = afaceoff; CHECK(hold_state_load(b) == 0);
+    CHECK(hold_state_load(a) == 0 && hold_skate_carry(&x2, &y2) && x2 == x);        /* (a refused state changed nothing it had) */
+    hold_state_load(NULL);
+    classic_rules();
+}
+
 int main(void)
 {
     const char *rom = getenv("NHL94_ROM");
@@ -216,6 +257,7 @@ int main(void)
     column_ratings();
     sega_cd();
     referee();
+    hold();
     printf("rulestest: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

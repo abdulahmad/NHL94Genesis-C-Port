@@ -194,8 +194,14 @@ void referee_update(void)
     int asn = pk->asslist[pk->assnum & 7];
     int16_t fx = (int16_t)g.fox, fy = (int16_t)g.foy;
     if (asn == pfaceoff || asn == pfaceoff2) {                   /* (assrefatdot: 15 off the dot, at rest) */
-        ref.Xpos = (int16_t)(fx > 0 ? fx + 15 : fx - 15); ref.Xfrac = 0;
-        ref.Ypos = fy; ref.Yfrac = 0;
+        int wx = POS32(ref.Xpos, ref.Xfrac) >> 8, wy = POS32(ref.Ypos, ref.Yfrac) >> 8;
+        if (hold_skate_ref_step(&wx, &wy)) {                     /* (RULE_HOLD: he skates there, fetching the puck, src/hold.c) */
+            ref.Xpos = (int16_t)(wx >> 8); ref.Xfrac = (uint16_t)((uint32_t)wx << 8);
+            ref.Ypos = (int16_t)(wy >> 8); ref.Yfrac = (uint16_t)((uint32_t)wy << 8);
+        } else {
+            ref.Xpos = (int16_t)(fx > 0 ? fx + 15 : fx - 15); ref.Xfrac = 0;
+            ref.Ypos = fy; ref.Yfrac = 0;
+        }
         ref.Xvel = ref.Yvel = 0;
         rx.mode = 1; rx.drop = 0; rx.fall = 0;
         return;

@@ -6,6 +6,7 @@
  * 68k made them. Source addresses (DMA sources, strings, graphics) are 68k addresses: ROM or
  * work RAM, read through m8() and its kin. */
 #include "game.h"
+#include "rules.h"
 #include "view.h"
 #include "hal.h"
 #include "rom.h"
@@ -250,7 +251,7 @@ void sfx(int16_t n)
 void song(int16_t n)
 {
     if (n < 0) return;
-    if (song_block_hook && song_block_hook()) return;
+    if (hold_anthem_song()) return;                       /* (native: the national anthem plays, src/hold.c) */
     play_sfx_or_music_track((uint16_t)n);
 }
 

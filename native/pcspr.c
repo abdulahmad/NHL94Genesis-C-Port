@@ -593,12 +593,19 @@ static void ref_tick(void)
             int pkx, pky, pick;
             hold_skate_puck(&pkx, &pky, &pick);
             pkx *= 256; pky *= 256;
-            int sx, sy, ex, ey, k, kn;                                       /* (to the puck where it lay, then with it to the dot) */
-            if (pr < pick) { sx = fx0; sy = fy0; ex = pkx; ey = pky; k = pr; kn = pick; }
-            else { sx = pkx; sy = pky; ex = tx; ey = ty; k = pr - pick; kn = 256 - pick; }
+            int sx, sy, ex, ey, hx, hy;                                      /* (to the puck where it lay, then with it to the dot) */
+            if (pr < pick) { sx = fx0; sy = fy0; ex = pkx; ey = pky; }
+            else { sx = pkx; sy = pky; ex = tx; ey = ty; }
             double ddx = ex - sx, ddy = ey - sy;
-            R.x = (int)(sx + ddx * k / kn);
-            R.y = (int)(sy + ddy * k / kn);
+            if (referee_get(&gv)) { R.x = gv.x / 256; R.y = gv.y / 256; }   /* (RULE_REFEREE: where the game has him on his walk) */
+            else if (hold_skate_carry(&hx, &hy)) { R.x = hx; R.y = hy; }      /* (he has the puck: where the game has it, src/hold.c) */
+            else if (pr < pick) {                                            /* (on his way to it: the picture's own) */
+                R.x = (int)(sx + ddx * pr / pick);
+                R.y = (int)(sy + ddy * pr / pick);
+            } else {                                                         /* (the start of a period: the puck stays at the dot) */
+                R.x = (int)(sx + ddx * (pr - pick) / (256 - pick));
+                R.y = (int)(sy + ddy * (pr - pick) / (256 - pick));
+            }
             if (ddx * ddx + ddy * ddy > 256.0 * 256.0 * 16) {
                 int d = (int)floor(atan2(ddx, ddy) / (M_PI / 4) + 0.5);
                 R.dir = ((d % 8) + 8) % 8;
@@ -655,13 +662,6 @@ static void ref_tick(void)
     R.sy = y;
     R.valid = 1;
     if (getenv("PCREF_LOG") && (!(g.Vcount & 63) || getenv("PCREF_ALL"))) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos);
-}
-
-static int ref_pos(int *x, int *y)
-{
-    if (!SDL_AtomicGet(&R.on) || !R.init) return 0;
-    *x = R.x / 256; *y = R.y / 256;
-    return 1;
 }
 
 /* the frame the referee shows */
@@ -723,7 +723,6 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
 
 void pcspr_start(void)
 {
-    hold_ref_pos_fn = ref_pos;
     static int started;
     if (started) return;
     started = 1;

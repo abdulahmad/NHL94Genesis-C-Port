@@ -36,6 +36,9 @@ enum {
                                  * until it is done, 2 a home goal's speech waits for the goal song to end */
     RULE_REFEREE,               /* 1: NHL 95 PC's referee in play (src/referee.c): skaters bounce off him, the puck deflects
                                  * off him, a check knocks him down, every third knock down a penalty */
+    RULE_ANTHEM,                /* the national anthem before the first face off (src/hold.c): 1 NHL 95 PC's song, 2 NHL 96 PC's
+                                 * recording. The players line up and the drop waits for the anthem's own length, fixed per
+                                 * recording: every machine waits the same whether it has the PC game's files or not */
     RULE_COUNT
 };
 /* the original's values */
@@ -49,12 +52,15 @@ extern uint8_t rules[RULE_COUNT];   /* each rule's value now (Classic until the 
  * every machine of a session waits the same, with the announcer or without. */
 void hold_for(int frames);
 void hold_anthem(int frames);
-extern int (*hold_ref_pos_fn)(int *x, int *y);      /* set by the host: the referee's place on the rink (1 while he is on the ice) */
+int hold_skate_carry(int *x, int *y);               /* the puck in the referee's hand on his way to the dot, 256ths of a pixel (0: not now) */
+int hold_skate_ref_step(int *x, int *y);            /* the referee's place on his walk to the dot, 256ths of a pixel, from where he is (0: no walk) */
 void hold_skate_begin(void);                        /* the face off set up: the skaters' places before it moves them ... */
 void hold_skate_arm(void);                          /* ... and after: with RULE_HOLD they skate from the first to the second */
 int hold_skate_ref(void);                           /* the referee's progress along his way to the dot, 0 to 256 (-1: none) */
 int hold_anthem_time(void);                         /* the frames into the anthem's song; -1 when it is not playing */
 int hold_anthem_pending(void);                      /* 1 once the anthem has been asked for, until the face off drops */
+int hold_anthem_frames(int set, int home_art);      /* RULE_ANTHEM's wait for the home team's anthem (set: the rule's value) */
+int hold_anthem_song(void);                         /* 1 while the anthem's song lasts (the cartridge's songs stay quiet) */
 void hold_skate_puck(int *x, int *y, int *pickup);  /* the puck's whistle place, and when (of 256) the referee has it */
 int hold_skate_pstart(void);                         /* 1 while the skaters (and the referee) come on at the start of a period */
 int hold_skating(void);                             /* 1 while the skaters walk to the spots (the drop's time waits for them) */
@@ -66,6 +72,15 @@ void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a
 void hold_tick(void);
 int hold_wait(void);
 void hold_reset(void);
+/* the pause's state (src/hold.c) and the face off's held back assignments (src/logic.c), kept in every state: HOLD_STATE_SIZE bytes.
+ * hold_state_load(NULL): none (a state from before them); -1 for bytes that are not this game's, nothing changed */
+#define HOLD_STATE_SIZE 372
+size_t hold_state_save(uint8_t *out);
+int hold_state_load(const uint8_t *in);
+#define FACEOFF_DEFER_SIZE 38
+size_t faceoff_defer_save(uint8_t *out);
+int faceoff_defer_check(const uint8_t *in);
+int faceoff_defer_load(const uint8_t *in);
 
 /* RULE_REFEREE (src/referee.c): the referee is the game's own object, kept in every state. referee_update once a pass after
  * the skaters; referee_cx in checkplcoll's walk (skater o moved to x, y); referee_puck in checkpuckcoll's. referee_get: where
