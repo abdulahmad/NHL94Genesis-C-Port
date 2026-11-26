@@ -389,6 +389,7 @@ void updateplayers(void)
         }
         o->limpact = o->impact;
     }
+    if (rules[RULE_REFEREE]) referee_update();              /* (native: NHL 95 PC's referee, src/referee.c) */
 }
 
 /* logic94.asm:updateanim. Frame switch control on object a3: step SPAcnt by the elapsed frames,

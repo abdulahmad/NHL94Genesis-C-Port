@@ -8,6 +8,7 @@
 #include "rom.h"
 #include "rules.h"
 #include "symbols_gen.h"
+#include "anim_gen.h"
 #include "native.h"
 
 static int checks, fails;
@@ -134,6 +135,77 @@ static void sega_cd(void)
     classic_rules();
 }
 
+/* RULE_REFEREE (src/referee.c): with the rule off nothing; on, he comes on beside the play, a skater who runs into him
+ * bounces off (the mover keeps his place: collflag) and pushes him, the puck bounces off him, a pad player's hard check
+ * knocks him down and the third such check is a roughing penalty; his state goes through the state's bytes, and bytes
+ * that are not a referee's are refused (a state is hostile until checked) */
+static void referee(void)
+{
+    struct referee_view v;
+    classic_rules();
+    referee_state_load(NULL);
+    ram_fill(RAM(PenBuf), 0, sizeof g.PenBuf);
+    g.demoflag = 1; g.sflags = 0; g.gmode = 0; g.gmode2 = 0; g.OptPen = 1; g.PalMode = 0; g.Vpos = 0x40;
+    struct SortObj *pk = sortobj(puckscnum);
+    memset(pk, 0, sizeof *pk);
+    pk->SCnum = puckscnum;
+    pk->asslist[0] = pnorm;                                /* (not a face off) */
+    pk->newpos = 0xFF;                                     /* (no carrier) */
+    pk->Xpos = 0x20; pk->Ypos = 0x40;
+    for (int i = 0; i < 12; i++) { struct SortObj *o = sortobj(i); memset(o, 0, sizeof *o); o->SCnum = (int16_t)i; o->position = -1; }
+    elapsed = 1;
+    referee_update();
+    CHECK(!referee_get(&v));                               /* (the rule off: no referee) */
+    rules[RULE_REFEREE] = 1;
+    referee_update();
+    CHECK(referee_get(&v) && v.x >> 16 == 0x7C && v.y >> 16 == 0x40 && !v.at_dot && v.fall < 0);
+    for (int k = 0; k < 30; k++) referee_update();          /* (past the drop's wait: he skates) */
+    referee_get(&v);
+    int16_t rx = (int16_t)(v.x >> 16), ry = (int16_t)(v.y >> 16);
+    /* a skater (not checking) runs into him */
+    struct SortObj *o = sortobj(3);
+    o->position = 3; o->Xpos = (int16_t)(rx - 12); o->Ypos = ry; o->Xvel = 0x2000; o->weight = 10;
+    g.collflag = 0;
+    referee_cx(o->Xpos, o->Ypos, o);
+    referee_get(&v);
+    CHECK((int16_t)g.collflag < 0 && v.vx > 0 && o->Xvel < 0x2000);
+    CHECK(v.fall < 0);                                     /* (a bump, not a check: he stays up) */
+    /* the puck at his feet */
+    for (int k = 0; k < 10; k++) referee_update();          /* (his nopuck wait over) */
+    referee_get(&v);
+    rx = (int16_t)(v.x >> 16); ry = (int16_t)(v.y >> 16);
+    pk->Xpos = (int16_t)(rx + 4); pk->Ypos = (int16_t)(ry + 4); pk->Zpos = 0; pk->Xvel = -0x900; pk->Yvel = 0;
+    referee_puck(pk);
+    CHECK((int8_t)(pk->Xvel >> 8) == 4 && (int8_t)(pk->Yvel >> 8) == 4);   /* (off him, along the gap) */
+    /* a pad player's hard checks */
+    int pen = 0;
+    for (int hit = 0; hit < 3; hit++) {
+        referee_get(&v);
+        rx = (int16_t)(v.x >> 16); ry = (int16_t)(v.y >> 16);
+        o->Xpos = (int16_t)(rx - 16); o->Ypos = ry; o->Xvel = 0x7C00; o->Yvel = 0;
+        o->SPA = SPAburst; o->pflags = 1 << pfjoycon; o->pflags2 = 0; o->pflags3 = 0; o->impact = 0;
+        g.collflag = 0;
+        referee_cx(o->Xpos, o->Ypos, o);
+        referee_get(&v);
+        CHECK(v.fall >= 0);
+        for (int i = 0; i < 32; i += 2) if (g.PenBuf[i] == 0x1A && g.PenBuf[i + 1] == 3) pen = hit + 1;
+    }
+    CHECK(pen == 3);                                       /* (the third, not before) */
+    /* the state */
+    uint8_t a[REFEREE_STATE_SIZE], b[REFEREE_STATE_SIZE];
+    CHECK(referee_state_save(a) == REFEREE_STATE_SIZE);
+    CHECK(referee_state_load(a) == 0);
+    referee_state_save(b);
+    CHECK(!memcmp(a, b, sizeof a));
+    for (int k = 14; k < REFEREE_STATE_SIZE; k++) {        /* (each flag byte out of range is refused) */
+        memcpy(b, a, sizeof b);
+        b[k] = 0xFF;
+        CHECK(k == 14 || referee_state_load(b) < 0);       /* (byte 14, nopuck, takes any value) */
+    }
+    CHECK(referee_state_load(NULL) == 0 && !referee_get(&v));
+    classic_rules();
+}
+
 int main(void)
 {
     const char *rom = getenv("NHL94_ROM");
@@ -143,6 +215,7 @@ int main(void)
     overall_ratings();
     column_ratings();
     sega_cd();
+    referee();
     printf("rulestest: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

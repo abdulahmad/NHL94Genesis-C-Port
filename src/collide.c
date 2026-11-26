@@ -84,10 +84,11 @@ void checkplcoll(int16_t x, int16_t y, struct SortObj *o)
         unsigned nxt = g.OOlist[pos - 1];
         int16_t dy = (int16_t)(y - g.Ylist[nxt / 2]);
         if (dy > 0x10)
-            return;
+            break;
         checkcx(nxt, x, dy, o);
         pos--;
     }
+    if (rules[RULE_REFEREE]) referee_cx(x, y, o);           /* (native: NHL 95 PC's referee, src/referee.c) */
 }
 
 /* collide94.asm:checkcx. d4 = other object number * 2, d2 = x, d5 = delta y, a3 = moving object.
@@ -1035,10 +1036,11 @@ void checkpuckcoll(struct SortObj *puck)
     while (pos != 0) {
         unsigned nxt = g.OOlist[pos - 1];
         if ((int16_t)(puck->Ypos - g.Ylist[nxt / 2]) > 0x16)
-            return;
+            break;
         ccx(nxt, puck);
         pos--;
     }
+    if (rules[RULE_REFEREE]) referee_puck(puck);            /* (native: NHL 95 PC's referee, src/referee.c) */
 }
 
 /* collide94.asm:puckstick. a2 = player, a3 = puck, d0 = distance squared. A stick on the puck

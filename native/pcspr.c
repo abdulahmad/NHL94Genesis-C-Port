@@ -62,11 +62,12 @@ static const char *const logo_name[NLOGOS] = { "ANH", "BOS", "BUF", "CGY", "CHI"
  * as the index of logo_name (-1: none, the All-Star teams) */
 static const signed char logo_of_art[28] = { 0, 1, 2, 3, 4, 10, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 24, -1, -1 };
 
-/* the referee: not in the cartridge's game at all, only in this picture (a visual one: nothing in the game knows of it) */
+/* the referee: not in the cartridge's game, only in this picture (a visual one: nothing in the game knows of it), unless
+ * RULE_REFEREE puts him in play (src/referee.c): then, in play, he is drawn where the game has him */
 static struct {
-    SDL_atomic_t on, phys;                  /* phys: skaters bump him (ref_bump) */
+    SDL_atomic_t on, phys;                  /* phys: skaters bump him (ref_bump), the picture's alone */
     int init, x, y, vx, vy;                 /* the rink position and velocity in 1/256 pixels */
-    int dir, t, wasfo, drop;
+    int dir, t, wasfo, drop, fall;          /* fall: the frames into his fall (RULE_REFEREE), -1 standing */
     int sx, sy, valid;                      /* the sprite table position of the last frame */
 } R;
 
@@ -513,6 +514,9 @@ static int pc_frame(int fr)
     return fr - 9;
 }
 
+/* the referee is drawn with the Game page's row, or whenever he is in play (RULE_REFEREE: play must not have an unseen man in it) */
+static int ref_on(void) { return SDL_AtomicGet(&R.on) || rules[RULE_REFEREE]; }
+
 static int in_game(void) { return g.demoflag && ((g.disflags & HI(dfok)) || (g.sflags & HI(sfpz))); }   /* (the pause screen too: its rink strip has the skaters) */
 
 
@@ -561,9 +565,11 @@ static int ref_bump(void)
  * and assrefatdot (at the face off spot, facing the dot) */
 static void ref_tick(void)
 {
+    struct referee_view gv;
     R.valid = 0;
+    R.fall = -1;
     if (getenv("PCREF_LOG") && !(g.Vcount & 255)) fprintf(stderr, "ref? on %d found %d ingame %d hor %d gm2 %d\n", SDL_AtomicGet(&R.on), SDL_AtomicGet(&P.found), in_game(), !!(g.sflags & HI(sfhor)), g.gmode2 & 1);
-    if (!SDL_AtomicGet(&R.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || (g.sflags & HI(sfhor)) || (g.gmode2 & 1)) { R.init = 0; return; }
+    if (!ref_on() || !SDL_AtomicGet(&P.found) || !g.demoflag || (g.sflags & HI(sfhor)) || (g.gmode2 & 1)) { R.init = 0; return; }
     const struct SortObj *pk = sortobj(puckscnum);
     int asn = pk->asslist[pk->assnum & 7];
     int fo = asn == pfaceoff || asn == pfaceoff2;
@@ -606,6 +612,17 @@ static void ref_tick(void)
         }
         R.vx = R.vy = 0;
         R.wasfo = 1; R.drop = 0; R.init = 1;
+    } else if (referee_get(&gv) && !gv.at_dot) {                            /* (RULE_REFEREE: in play, where the game has him) */
+        R.x = gv.x / 256; R.y = gv.y / 256; R.vx = gv.vx / 256; R.vy = gv.vy / 256;
+        R.wasfo = 0; R.drop = gv.drop; R.init = 1;
+        int rx = R.x / 256;
+        double sp = sqrt((double)R.vx * R.vx + (double)R.vy * R.vy) / 256.0;
+        if (gv.fall >= 0) R.fall = gv.fall;                                  /* (down: he keeps the way he faced) */
+        else if (sp > 0.45 && !R.drop) {
+            int d = (int)floor(atan2((double)R.vx, (double)R.vy) / (M_PI / 4) + 0.5);
+            R.dir = ((d % 8) + 8) % 8;
+        } else if (!R.drop) R.dir = px > rx ? 2 : 6;
+        R.t = sp > 0.45 && gv.fall < 0 ? R.t + 1 : 0;
     } else {
         if (!R.init) { R.x = (px > 0 ? 0x7C : -0x7C) * 256; R.y = cy * 256; R.init = 1; R.vx = R.vy = 0; }
         if (R.wasfo) { R.wasfo = 0; R.drop = 24; }                           /* (the puck is dropped: the referee's drop) */
@@ -620,7 +637,7 @@ static void ref_tick(void)
         if (l > m) { wx = (int)(wx * m / l); wy = (int)(wy * m / l); }
         R.vx += (wx - R.vx) / 6;
         R.vy += (wy - R.vy) / 6;
-        if (SDL_AtomicGet(&R.phys)) ref_bump();
+        if (SDL_AtomicGet(&R.phys) && !rules[RULE_REFEREE]) ref_bump();
         R.x += R.vx; R.y += R.vy;
         double sp = sqrt((double)R.vx * R.vx + (double)R.vy * R.vy) / 256.0;
         if (sp > 0.45) {
@@ -655,6 +672,7 @@ static int ref_frame(void)
     int d = R.dir & 7;
     if (hold_anthem_time() >= 0) return idle_ref(hold_anthem_time());                                             /* (the anthem: the referee's standing picture) */
     if ((asn == pfaceoff || asn == pfaceoff2) && R.t == 0) return (d >= 3 && d <= 6) ? 711 : 703;       /* (still: skating to the dot, he is not) */       /* (SPAreffowait) */
+    if (R.fall >= 0) return 787 + 3 * d + (R.fall < 10 ? 0 : R.fall < 38 ? 1 : 2);     /* (SPAreffallback: 10, 28, 10 ticks) */
     if (R.drop > 0) {                                                                    /* (SPArefdrop: 8 ticks each) */
         int k = (24 - R.drop) / 8;
         if (d >= 3 && d <= 6) return k == 0 ? 845 : k == 1 ? 846 : 711;
@@ -776,7 +794,7 @@ static int sprite_masks(const mdrt_vdp *vdp, int x0, int y0, int nx, int ny, uin
  * against the copy without it say where. Where it is in front of the sprites, a skater below it (nearer) still covers it. */
 static void ref_draw(const mdrt_vdp *vdp, uint32_t *pic, int w, int h, int pitch, const shown *list, int n)
 {
-    if (!SDL_AtomicGet(&R.on) || !R.valid) return;
+    if (!ref_on() || !R.valid) return;
     int fr = ref_frame();
     if (fr < 0 || fr >= NFRAMES || !P.f[fr].px) return;
     const spr *s = &P.f[fr];
@@ -1013,7 +1031,7 @@ static int ext_masks(const mdrt_vdp *vdp, const shown *list, int n, uint16_t *ba
 
 void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
-    if ((!SDL_AtomicGet(&P.on) && !SDL_AtomicGet(&R.on) && !SDL_AtomicGet(&LGO.on) && hold_anthem_time() < 0) || !SDL_AtomicGet(&P.found) || !in_game()) return;
+    if ((!SDL_AtomicGet(&P.on) && !ref_on() && !SDL_AtomicGet(&LGO.on) && hold_anthem_time() < 0) || !SDL_AtomicGet(&P.found) || !in_game()) return;
     fade_update(vdp);
     shown list[16];
     int n = 0;

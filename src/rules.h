@@ -6,8 +6,10 @@
  * ones for the whole game, and states keep them. The game code reads them here, never the
  * settings file. */
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 struct Team;
+struct SortObj;
 
 enum {
     RULE_WEIGHT_FIX,            /* 1: a check's weights summed in full (the original's 8-bit sum wraps,
@@ -32,6 +34,8 @@ enum {
     RULE_FIGHT,                 /* NHL 93's fighting (src/fight.c): hard checks between opposing skaters can start a fight */
     RULE_ANNOUNCE,              /* the rink announcer's timing (src/hold.c): 1 the speech starts with the goal or penalty and play waits
                                  * until it is done, 2 a home goal's speech waits for the goal song to end */
+    RULE_REFEREE,               /* 1: NHL 95 PC's referee in play (src/referee.c): skaters bounce off him, the puck deflects
+                                 * off him, a check knocks him down, every third knock down a penalty */
     RULE_COUNT
 };
 /* the original's values */
@@ -62,6 +66,24 @@ void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a
 void hold_tick(void);
 int hold_wait(void);
 void hold_reset(void);
+
+/* RULE_REFEREE (src/referee.c): the referee is the game's own object, kept in every state. referee_update once a pass after
+ * the skaters; referee_cx in checkplcoll's walk (skater o moved to x, y); referee_puck in checkpuckcoll's. referee_get: where
+ * he is for the host's picture (0 while he is off the ice or the rule is off). The state's bytes: REFEREE_STATE_SIZE;
+ * referee_state_load(NULL) starts him off the ice (a state from before him), -1 for bytes that are not a referee's. */
+struct referee_view {
+    int32_t x, y;                                   /* the rink position, 1/65536 pixels */
+    int32_t vx, vy;                                 /* the speed, 1/65536 pixels a frame */
+    int at_dot, drop;                               /* at the face off spot; the frames left of the puck drop */
+    int fall, fall_dir;                             /* the frames into his fall (-1: standing), the way he faced */
+};
+void referee_update(void);
+void referee_cx(int16_t x, int16_t y, struct SortObj *o);
+void referee_puck(struct SortObj *puck);
+int referee_get(struct referee_view *v);
+#define REFEREE_STATE_SIZE 22
+size_t referee_state_save(uint8_t *out);
+int referee_state_load(const uint8_t *in);
 
 /* RULE_CD_COLOURS: a uniform's 16 colours (c) as the Sega CD has them, for the cartridge team art
  * (rosters_art) on the side away (0 home, 1 away); a colour changed only where it is the cartridge's */
