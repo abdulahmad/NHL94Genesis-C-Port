@@ -246,10 +246,18 @@ static uint8_t sk_gate[12];                             /* 1: this place has a n
 static int16_t sk_delay[12];                            /* frames each waits at the bench gate before he skates on (the start of a period: one after another) */
 static int sk_pick = SK_PICKUP, sk_pstart, sk_lock;
 static uint16_t sk_view[4];                             /* the view at the whistle (Vpos, Hpos, yc1, xc1): the set up scrolls it to the dot at once, the walk there keeps it */
-/* NHL 95 PC's bench gate (assbench, asspsclear): x -A8h, y -32h for the home team, 41h for the visitors; a player comes on through it */
-#define GATE_X (-0xA8)
-#define GATE_Y(away) ((away) ? 0x41 : -0x32)
-#define GATE_IN (-0x70)                                 /* (just inside the boards: out of the gate straight onto the ice, then to his spot) */
+/* The bench (a line change between plays, and the start of a period). NHL 95 PC's assbench / assleaveice and asseben are the
+ * cartridge's own, moved to its rink: the player going off skates to his team's gate (cartridge x -88h - 8, y 50h for the
+ * visitors, -50h for the home team; the PC's -A8h, 41h / -32h), glides the last 10h to it turning a step every 8 frames to face
+ * down the ice (facing 4), then hops the boards (SPAwallleft, facing 2) and is gone (frame 0). The one coming on hops in at
+ * his own place along the bench (asseben: x -88h, y (SCnum - 6, one more from 0) x 0Eh) with SPAwallright, facing 2, then skates
+ * to his spot. Every part is a fixed time from the game's own state (the hops' lengths from their animations), so every copy
+ * of the game agrees. */
+#define DOOR_X (-0x88 - 8)
+#define DOOR_Y(pl) (PFLAG(pl, pfteam) ? 0x50 : -0x50)
+#define DOOR_GLIDE 0x10                                 /* (the last stretch to the gate: gliding, turning) */
+#define ENTER_X (-0x88)
+#define BENCH_GAP 8                                     /* (frames on the bench between the one going off and the one coming on) */
 #define REF_START_X (-0x78)                             /* (the PC's referee at the start of play: StartHL2, x -78h, y 0) */
 
 void hold_skate_begin(void)
@@ -266,8 +274,53 @@ void hold_skate_begin(void)
 }
 
 static int plen(int ax, int ay, int bx, int by) { double dx = bx - ax, dy = by - ay; return (int)sqrt(dx * dx + dy * dy); }
-static int path_way(int i) { return sk_gate[i] ? plen(sk_from[i].x, sk_from[i].y, sk_via[i].x, sk_via[i].y) + plen(sk_via[i].x, sk_via[i].y, sk_to[i].x, sk_to[i].y) : plen(sk_from[i].x, sk_from[i].y, sk_to[i].x, sk_to[i].y); }
-static int path_len(int i) { return sk_delay[i] * SKATE_SPEED + path_way(i); }   /* (the time to his spot, in pixels: his wait at the gate too) */
+static int pframes(int ax, int ay, int bx, int by) { return (plen(ax, ay, bx, by) + SKATE_SPEED - 1) / SKATE_SPEED; }
+
+/* an animation's frames in a direction (updateanim: each step lasts its time + 1) */
+static int anim_len(uint16_t spa, int dir)
+{
+    const uint8_t *a = spa_table(spa);
+    a += (int16_t)rd16(a + dir * 2);
+    int n = 0;
+    for (int k = 0; k < 64; k++, a += 4) {
+        int16_t tm = (int16_t)rd16(a + 2);
+        n += (tm < 0 ? -tm : tm) + 1;
+        if (tm < 0) break;
+    }
+    return n;
+}
+
+/* the turns (8 frames each) from the way he skated to the gate to facing down the ice, the shorter way round (assbench) */
+static int door_turns(int i)
+{
+    const struct SortObj *pl = sortobj(i);
+    int f = vtoa((int16_t)(DOOR_X + DOOR_GLIDE - sk_from[i].x), (int16_t)(DOOR_Y(pl) - sk_from[i].y)) & 7, d = (4 - f) & 7;
+    return d > 4 ? 8 - d : d;
+}
+
+/* a bench skater's parts, in frames from the end of his wait: to the gate, the glide and turns, the hop off, the bench, the hop
+ * on (the start of a period: only the hop on, then the skate) */
+struct benchway { int skate, turn, off, gap, on; };
+static struct benchway bench_way(int i)
+{
+    struct benchway w = { 0, 0, 0, 0, 0 };
+    if (!sk_pstart) {
+        w.skate = pframes(sk_from[i].x, sk_from[i].y, DOOR_X + DOOR_GLIDE, DOOR_Y(sortobj(i)));
+        w.turn = (door_turns(i) > 0 ? door_turns(i) : 1) * 8;
+        w.off = anim_len(SPAwallleft, 2);
+        w.gap = BENCH_GAP;
+    }
+    w.on = anim_len(SPAwallright, 2);
+    return w;
+}
+
+/* the frames from the end of his wait to his spot */
+static int walk_frames(int i)
+{
+    if (!sk_gate[i]) return pframes(sk_from[i].x, sk_from[i].y, sk_to[i].x, sk_to[i].y);
+    struct benchway w = bench_way(i);
+    return w.skate + w.turn + w.off + w.gap + w.on + pframes(sk_via[i].x, sk_via[i].y, sk_to[i].x, sk_to[i].y);
+}
 
 void hold_skate_arm(void)
 {
@@ -282,34 +335,32 @@ void hold_skate_arm(void)
         int fx = sk_from[i].x, fy = sk_from[i].y;
         sk_gate[i] = 0;
         sk_delay[i] = 0;
-        if (pstart && pl->position > 0) {               /* (through his team's gate, one after another: the two teams' turns side by side) */
+        sk_via[i].x = ENTER_X;                          /* (his place along the bench, asseben) */
+        sk_via[i].y = (int16_t)(((int16_t)pl->SCnum - 6 + ((int16_t)pl->SCnum >= 6)) * 0xE);
+        sk_pstart = pstart;
+        if (pstart && pl->position > 0) {               /* (over the boards one after another: the two teams' turns side by side) */
             int away = PFLAG(pl, pfteam) ? 1 : 0;
-            sk_from[i].x = GATE_X; sk_from[i].y = (int16_t)GATE_Y(away);
-            sk_via[i].x = GATE_IN; sk_via[i].y = (int16_t)GATE_Y(away);
+            sk_from[i] = sk_via[i];
             sk_gate[i] = 1;
             sk_delay[i] = (int16_t)(order[away]++ * 12);
-            int d0 = path_len(i);
+            int d0 = sk_delay[i] + walk_frames(i);
             if (d0 > far) far = d0;
             continue;
         }
         if (pl->position <= 0 || fx < -300 || fx > 300 || fy < -300 || fy > 300) { sk_from[i] = sk_to[i]; continue; }
-        if ((int8_t)pl->pnum != sk_pnum[i]) {             /* (a line change: out through the gate, the next one in) */
-            sk_gate[i] = 1;
-            sk_via[i].x = GATE_X; sk_via[i].y = (int16_t)GATE_Y(PFLAG(pl, pfteam));
-        }
-        int d = path_len(i);
+        if ((int8_t)pl->pnum != sk_pnum[i]) sk_gate[i] = 1;   /* (a line change: off through the gate, the next one on over the boards) */
+        int d = walk_frames(i);
         if (d > far) far = d;
     }
-    sk_dur = far / SKATE_SPEED + 1;
+    sk_dur = far + 1;
     if (pstart) {                                       /* (the referee comes on too, with the puck: from the PC's start of play to the dot) */
-        sk_pstart = 1;
         sk_puckx = REF_START_X; sk_pucky = 0;
         sk_pick = 0;
         int rl = plen(REF_START_X, 0, (int16_t)g.fox, (int16_t)g.foy) / SKATE_SPEED + 1;
         if (rl > sk_dur) sk_dur = rl;
     }
     if (sk_dur < 24) return;
-    if (sk_dur > 300) sk_dur = 300;
+    if (sk_dur > 400) sk_dur = 400;
     sk_t0 = g.Vcount;
     sk_on = 1;
     g.yleader = 0;                                      /* (the PC's drop: the view on the dot, no lead) */
@@ -375,39 +426,89 @@ int hold_skate_ref_step(int *x, int *y)
     return 1;
 }
 
+/* a bench skater before he is on the ice again (r: frames from the end of his wait). 0 once he skates to his spot */
+static int bench_pose(int i, struct SortObj *pl, int r)
+{
+    struct benchway w = bench_way(i);
+    int dy = DOOR_Y(pl);
+    pl->Xvel = 0; pl->Yvel = 0;
+    if (r < 0) goto benched;                            /* (the start of a period: on the bench, his turn to come) */
+    if (r < w.skate) {                                  /* (to the gate) */
+        int ax = sk_from[i].x, ay = sk_from[i].y, bx = DOOR_X + DOOR_GLIDE, l = plen(ax, ay, bx, dy);
+        int run = r * SKATE_SPEED;
+        if (l < 1) l = 1;
+        pl->Xpos = (int16_t)(ax + (bx - ax) * run / l);
+        pl->Ypos = (int16_t)(ay + (dy - ay) * run / l);
+        stride(pl, bx - ax, dy - ay, SKATE_SPEED);
+        return 1;
+    }
+    r -= w.skate;
+    if (r < w.turn) {                                   /* (gliding the last of it, a step round every 8 frames) */
+        int f = vtoa((int16_t)(DOOR_X + DOOR_GLIDE - sk_from[i].x), (int16_t)(dy - sk_from[i].y)) & 7, n = door_turns(i), k = r / 8 + 1;
+        if (k > n) k = n;
+        int dir = ((4 - f) & 7) <= 4 ? 1 : -1;
+        pl->facedir = (int16_t)((f + dir * k) & 7);
+        pl->Xpos = (int16_t)(DOOR_X + DOOR_GLIDE - DOOR_GLIDE * (r + 1) / w.turn);
+        pl->Ypos = (int16_t)dy;
+        if (r == 0) SetSPA(pl, SPAglide);
+        return 1;
+    }
+    r -= w.turn;
+    if (r < w.off) {                                    /* (over the boards) */
+        pl->Xpos = DOOR_X; pl->Ypos = (int16_t)dy;
+        pl->facedir = 2;
+        if (r == 0) { SetSPA(pl, SPAwallleft); pl->pflags |= 1 << pfalock; }
+        return 1;
+    }
+    r -= w.off;
+    if (r < w.gap) goto benched;
+    r -= w.gap;
+    if (r < w.on) {                                     /* (over the boards onto the ice) */
+        pl->Xpos = sk_via[i].x; pl->Ypos = sk_via[i].y;
+        pl->facedir = 2;
+        if (r == 0) { SetSPA(pl, SPAwallright); pl->pflags |= 1 << pfalock; }
+        return 1;
+    }
+    if (r == w.on) pl->pflags &= (uint8_t)~(1 << pfalock);
+    return 0;
+benched:                                                /* (on the bench: not seen, as the cartridge's assbench leaves him) */
+    pl->Xpos = sk_via[i].x; pl->Ypos = sk_via[i].y;
+    pl->pflags &= (uint8_t)~(1 << pfalock);
+    if (pl->SPA) SetSPA(pl, 0);
+    pl->frame = 0;
+    return 1;
+}
+
 static void skate_pose(void)
 {
     int t = (int16_t)(g.Vcount - sk_t0);
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) {
-        int d = path_way(i);
+        int d = sk_gate[i] ? 2 : plen(sk_from[i].x, sk_from[i].y, sk_to[i].x, sk_to[i].y);
         if (d < 2) continue;
-        int run = (t - sk_delay[i]) * SKATE_SPEED;
-        if (run < 0) {                                  /* (still at the bench gate, his turn to come) */
-            pl->Xpos = sk_from[i].x; pl->Ypos = sk_from[i].y;
-            pl->facedir = (int16_t)vtoa((int16_t)(sk_via[i].x - sk_from[i].x), (int16_t)(sk_via[i].y - sk_from[i].y));
-            pl->Xvel = 0; pl->Yvel = 0;
-            if (pl->SPA != SPAglide) SetSPA(pl, SPAglide);
-            continue;
+        int r = t - sk_delay[i];
+        if (sk_gate[i] && t < sk_dur && bench_pose(i, pl, r)) continue;
+        int ax = sk_from[i].x, ay = sk_from[i].y;
+        if (sk_gate[i]) {                               /* (on the ice again, from his place along the bench) */
+            struct benchway w = bench_way(i);
+            r -= w.skate + w.turn + w.off + w.gap + w.on;
+            ax = sk_via[i].x; ay = sk_via[i].y;
+            d = plen(ax, ay, sk_to[i].x, sk_to[i].y);
         }
+        int run = r * SKATE_SPEED;
         if (run >= d || t >= sk_dur) {                  /* (there: face the puck, glide) */
             /* (the frame he gets there, or the walk's last: the stride stops whatever its step, as the PC's asstakeposition
              * sets its glide at the spot; the face off men's stance comes once all are there, src/logic.c) */
             if (run - SKATE_SPEED < d || t == sk_dur || pl->Xpos != sk_to[i].x || pl->Ypos != sk_to[i].y) {
                 pl->Xpos = sk_to[i].x; pl->Ypos = sk_to[i].y;
                 pl->facedir = sk_face[i];
+                pl->pflags &= (uint8_t)~(1 << pfalock);
                 SetSPA(pl, SPAglide);
             }
         } else {
-            int ax = sk_from[i].x, ay = sk_from[i].y, bx = sk_to[i].x, by = sk_to[i].y, r = run, l = d;
-            if (sk_gate[i]) {
-                int l1 = plen(ax, ay, sk_via[i].x, sk_via[i].y);
-                if (run < l1) { bx = sk_via[i].x; by = sk_via[i].y; l = l1; }
-                else { ax = sk_via[i].x; ay = sk_via[i].y; r = run - l1; l = d - l1; }
-            }
-            if (l < 1) l = 1;
-            pl->Xpos = (int16_t)(ax + (bx - ax) * r / l);
-            pl->Ypos = (int16_t)(ay + (by - ay) * r / l);
+            int bx = sk_to[i].x, by = sk_to[i].y, l = d < 1 ? 1 : d;
+            pl->Xpos = (int16_t)(ax + (bx - ax) * run / l);
+            pl->Ypos = (int16_t)(ay + (by - ay) * run / l);
             stride(pl, bx - ax, by - ay, SKATE_SPEED);   /* (whatever the set up gave him: a face off man's stance waits for the dot) */
             continue;
         }
@@ -549,7 +650,7 @@ int hold_state_load(const uint8_t *in)
     int fs = hs_r8(&p), so = hs_r8(&p), sst = hs_r8(&p), sl = hs_r16(&p), sf = hs_r16(&p), stm = hs_r8(&p), spl = hs_r16(&p), sa1 = hs_r16(&p), sa2 = hs_r16(&p);
     if (!flag(fs) || !flag(so) || !flag(sst) || sf < 0 || sf > 900 || !flag(stm) || spl < 0 || spl > 31 || sa1 < -1 || sa1 > 31 || sa2 < -1 || sa2 > 31) return -1;
     int kc = hs_r8(&p), ko = hs_r8(&p), kd = hs_r16(&p), kt0 = hs_r16(&p);
-    if (!flag(kc) || !flag(ko) || kd < 0 || kd > 300 || (ko && kd < 24)) return -1;
+    if (!flag(kc) || !flag(ko) || kd < 0 || kd > 400 || (ko && kd < 24)) return -1;
     const uint8_t *walk = p;
     for (int i = 0; i < 12; i++) {
         p += 12;
