@@ -185,8 +185,11 @@ static int hook(int ev)
     return 1;
 }
 
+static int siren_busy(void) { return S.lock && S.playing[GOAL]; }
+
 void pcsfx_start(void)
 {
+    siren_busy_hook = siren_busy;
     static int started;
     if (started) return;
     started = 1;

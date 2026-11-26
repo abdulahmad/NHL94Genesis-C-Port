@@ -3425,7 +3425,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
                 tc->tmflags &= (uint8_t)~8;
                 d0 = afaceoffpl;
             }
-            if (hold_anthem_pending() && fo_defer_n < 12) { fo_defer_pl[fo_defer_n] = pl; fo_defer_as[fo_defer_n++] = d0; }   /* (the anthem: no face off yet) */
+            if (hold_anthem_pending() && fo_defer_n < 12) { fo_defer_pl[fo_defer_n] = pl; fo_defer_as[fo_defer_n++] = d0; assinsert(pnothing, pl); }   /* (the anthem: no face off yet) */
             else assinsert(d0, pl);
         }
         int16_t d4 = (int16_t)team_struct(PFLAG(pl, pfteam))->tmap;            /* skaters on the ice 4-6 */

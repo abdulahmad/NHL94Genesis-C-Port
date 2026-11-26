@@ -24,6 +24,7 @@ void (*cd_event_hook)(int ev, uint16_t n);
 void (*pa_hook)(int ev, struct Team *tm, int player, int a, int b);
 int (*sfx_hook)(int ev);
 int (*anthem_hook_fn)(int home_art, int away_art);
+int (*siren_busy_hook)(void);                         /* the host's siren is playing (native/pcsfx.c) */
 int (*song_block_hook)(void);
 void (*hat_hook)(int ev, int arg);
 void (*test_frame_hook)(void);                        /* (native/main.c, HOLDTEST: forces a goal or a penalty in a headless run) */
