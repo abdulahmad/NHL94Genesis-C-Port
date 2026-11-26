@@ -26,6 +26,7 @@
 #include "overbar/plat_pads.h"
 #include "overbar/net.h"
 #include "native.h"
+#include "replaymouse.h"
 #include "optionsui.h"
 #include "rules.h"
 #include "overbar/postfx.h"
@@ -440,11 +441,13 @@ static int frame_wait(void *user)
 }
 
 void (*frontend_script)(void *m, uint16_t *b);
+static uint16_t replay_mouse_pad(int k);
 static void input(void *user, uint16_t b[MDRT_PADS])
 {
     (void)user;
-    if (frontend_script) { frontend_script(F.m, b); return; }
-    for (int p = 0; p < MDRT_PADS; p++) b[p] = (uint16_t)SDL_AtomicGet(&F.buttons[p]);
+    if (frontend_script) frontend_script(F.m, b);     /* (a test's pads; the replay's mouse on top) */
+    else for (int p = 0; p < MDRT_PADS; p++) b[p] = (uint16_t)SDL_AtomicGet(&F.buttons[p]);
+    for (int p = 0; p < MDRT_PADS; p++) b[p] |= replay_mouse_pad(p);
 }
 
 static int idle(void *user)
@@ -508,7 +511,98 @@ static int hook_captures(void) { return ob_pads_setup_active() || ob_pads_sides_
 static void hook_raw_key(int sc) { if (options_ui_active()) options_ui_key(sc); else ob_pads_setup_key(sc); }
 static void hook_raw_button(int slot, int b) { if (options_ui_active()) options_ui_button(slot, b); else ob_pads_setup_button(slot, b); }
 static int hook_action(int id) { if (id == OB_ID_CONTROLLERS) ob_pads_setup_open(-1); return 1; }
-static void hook_draw_over(const SDL_Rect *dst) { ob_pads_setup_draw(dst); ob_pads_mouse_draw(dst); options_ui_draw(dst); }
+/* ---- the mouse in the instant replay (replaymouse.h): its own gestures there, not Overbar's mouse pad (quiet while the replay runs) ---- */
+static SDL_Rect pic_dst;                              /* where the picture was drawn in the window (the last draw) */
+static SDL_atomic_t rm_pad_at;                        /* the pad the gestures' buttons go to (F.buttons' index; an online session's local pad) */
+static int replay_mouse_on(void) { return native_in_replay() && !host.overlay_open && !ob_screen_up() && !hook_captures(); }
+static int replay_direct(void) { return !F.session && !native_net_on(); }   /* (camera moves are not pad input: not online) */
+/* window points to picture pixels from the picture's middle (as Overbar's menu pointer reads them) */
+static void replay_point(int wx, int wy, int *x, int *y)
+{
+    int w = F.width > 0 ? F.width : 320, h = F.height > 0 ? F.height : 224;
+    *x = pic_dst.w > 0 ? (int)((long)(wx - pic_dst.x) * w / pic_dst.w) - w / 2 : 0;
+    *y = pic_dst.h > 0 ? (int)((long)(wy - pic_dst.y) * h / pic_dst.h) - h / 2 : 0;
+}
+static int hook_event(const SDL_Event *e)
+{
+    int x, y;
+    if (!replay_mouse_on()) return 0;
+    Uint32 now = SDL_GetTicks();
+    int banner = native_replay_banner(), direct = replay_direct();
+    switch (e->type) {
+    case SDL_MOUSEBUTTONDOWN: replay_point(e->button.x, e->button.y, &x, &y); rm_down(e->button.button, x, y, now, banner, direct); break;
+    case SDL_MOUSEBUTTONUP: replay_point(e->button.x, e->button.y, &x, &y); rm_up(e->button.button, x, y, now); break;
+    case SDL_MOUSEMOTION: replay_point(e->motion.x, e->motion.y, &x, &y); rm_motion(x, y, now, banner, direct); break;
+    case SDL_MOUSEWHEEL: rm_wheel(e->wheel.direction == SDL_MOUSEWHEEL_FLIPPED ? -e->wheel.y : e->wheel.y, banner); break;
+    default: break;
+    }
+    return 0;                                         /* (Overbar sees them too: its mouse pad is quiet in the replay) */
+}
+/* the game's thread: the gestures' buttons, on the pad they go to */
+static uint16_t replay_mouse_pad(int k)
+{
+    return native_in_replay() && k == SDL_AtomicGet(&rm_pad_at) ? rm_pad(native_replay_entries, native_replay_passes) : 0;
+}
+
+/* test aid NHL94_TEST_MOUSE="MS:EVENT ...": mouse events pushed as SDL events (the road real ones take), MS after the instant replay
+ * began. EVENT: move:X,Y (picture pixels from its top left), player:N (to sort object N's middle; -1: the first in the picture), ldown, lup, rdown, rup, x1 (down and up), wheel:N (plus: up).
+ * Each one, and every 250 ms in the replay, logs "TEST mouse" with the replay's camera to stderr (replaycam_state) */
+static void test_mouse_tick(void)
+{
+    static const char *s;
+    static int init, wx, wy;
+    static Uint32 t0, last_log;
+    const char *spec = getenv("NHL94_TEST_MOUSE");
+    if (!spec) return;
+    static Uint32 first;
+    if (!init) { init = 1; s = spec; first = SDL_GetTicks(); }
+    Uint32 now = SDL_GetTicks();
+    if (!native_in_replay()) { if (t0) fprintf(stderr, "TEST mouse t=%u: the replay is over\n", (unsigned)(now - t0)); t0 = 0; return; }
+    if (!t0) { t0 = now; fprintf(stderr, "TEST mouse: the replay began %u ms after the first frame of the window\n", (unsigned)(now - first)); }
+    char line[200], what[40];
+    while (s && *s) {
+        char *end;
+        unsigned at = (unsigned)strtoul(s, &end, 10);
+        if (*end != ':' || now - t0 < at) break;
+        int n = 0;
+        s = end + 1;
+        while (*s && *s != ' ' && n < 39) what[n++] = *s++;
+        what[n] = 0;
+        while (*s == ' ') s++;
+        SDL_Event e;
+        SDL_zero(e);
+        int px, py, w = F.width > 0 ? F.width : 320, h = F.height > 0 ? F.height : 224;
+        if (sscanf(what, "player:%d", &px) == 1) {
+            int who = px;
+            for (int i = 0; who < 0 && i < 12; i++) {       /* (player:-1: the first player wholly in the picture) */
+                replaycam_player_at(i, &px, &py);
+                if (px > -w / 2 + 12 && px < w / 2 - 12 && py > -h / 2 + 24 && py < h / 2 - 12) who = i;
+            }
+            if (who < 0 || who > 11) who = 0;
+            replaycam_player_at(who, &px, &py);
+            px += w / 2; py += h / 2;
+            fprintf(stderr, "TEST mouse player %d at %d,%d\n", who, px, py);
+        }
+        else if (sscanf(what, "move:%d,%d", &px, &py) != 2) px = -1;
+        if (px >= 0 && (!strncmp(what, "move:", 5) || !strncmp(what, "player:", 7))) {
+            int nx = pic_dst.x + px * pic_dst.w / w, ny = pic_dst.y + py * pic_dst.h / h;
+            e.type = SDL_MOUSEMOTION; e.motion.x = nx; e.motion.y = ny; e.motion.xrel = nx - wx; e.motion.yrel = ny - wy;
+            wx = nx; wy = ny;
+        } else if (!strncmp(what, "wheel:", 6)) { e.type = SDL_MOUSEWHEEL; e.wheel.y = atoi(what + 6); }
+        else {
+            int b = what[0] == 'l' ? SDL_BUTTON_LEFT : what[0] == 'r' ? SDL_BUTTON_RIGHT : SDL_BUTTON_X1;
+            e.type = strstr(what, "up") ? SDL_MOUSEBUTTONUP : SDL_MOUSEBUTTONDOWN;
+            e.button.button = (Uint8)b; e.button.x = wx; e.button.y = wy; e.button.state = e.type == SDL_MOUSEBUTTONDOWN ? SDL_PRESSED : SDL_RELEASED;
+            if (!strcmp(what, "x1")) { SDL_PushEvent(&e); e.type = SDL_MOUSEBUTTONUP; e.button.state = SDL_RELEASED; }
+        }
+        SDL_PushEvent(&e);
+        replaycam_state(line, sizeof line);
+        fprintf(stderr, "TEST mouse t=%u %s: %s\n", (unsigned)(now - t0), what, line);
+    }
+    if (now - last_log >= 250) { last_log = now; replaycam_state(line, sizeof line); fprintf(stderr, "TEST mouse t=%u: %s\n", (unsigned)(now - t0), line); }
+}
+
+static void hook_draw_over(const SDL_Rect *dst) { pic_dst = *dst; ob_pads_setup_draw(dst); ob_pads_mouse_draw(dst); options_ui_draw(dst); }
 static void hook_changed(void) { settings_write(); }
 /* the game stopped, its save RAM and the settings written */
 static void shutdown_game(void)
@@ -536,7 +630,7 @@ static uint16_t window_pad(int pad, int k)
         if (n-- <= 0) { x = x * 1103515245u + 12345u; n = 5 + (int)(x >> 16) % 40; b = (int)(x >> 8) & 0xFFF; }
         return (uint16_t)(b & ~MDRT_PAD_START);
     }
-    return k >= 0 && k < MDRT_PADS ? (uint16_t)SDL_AtomicGet(&F.buttons[k]) : 0;
+    return k >= 0 && k < MDRT_PADS ? (uint16_t)(SDL_AtomicGet(&F.buttons[k]) | replay_mouse_pad(k)) : 0;
 }
 
 static int online_start(const ob_online *o, char *msg, int msg_size)
@@ -1370,7 +1464,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         ob_plat_hooks hooks = { .title = o->title ? o->title : "NHL '94", .win_w = (host.widescreen ? 400 : 320) * (o->scale > 0 ? o->scale : 3), .win_h = 224 * (o->scale > 0 ? o->scale : 3),
                                 .cls = OB_CLASS_LORES, .src_w = 320, .src_h = 224, .frame = hook_frame, .wide = hook_wide, .changed = hook_changed,
                                 .action = hook_action, .captures = hook_captures, .raw_key = hook_raw_key, .raw_button = hook_raw_button,
-                                .draw_over = hook_draw_over, .quit = hook_quit, .esc_opens = 1,
+                                .draw_over = hook_draw_over, .quit = hook_quit, .esc_opens = 1, .event = hook_event,
                                 .game_name = "NHL 94", .game_platform = "For Sega Genesis" };
         host.widescreen_ok = 1;                       /* (the Widescreen setting: wide.c) */
         if (!ob_plat_open(&hooks, &host)) return 1;
@@ -1385,6 +1479,8 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     cfg->platform = (mdrt_platform){ .user = NULL, .present = present, .audio = audio, .wait = frame_wait, .input = input, .idle = idle };
     if (!start_game()) { fprintf(stderr, "the game could not start\n"); return 1; }
     native_game_start_hook = game_starting;
+    rm_init((rm_bits){ .a = MDRT_PAD_A, .b = MDRT_PAD_B, .c = MDRT_PAD_C, .start = MDRT_PAD_START });
+    native_replay_pass_hook = replaycam_pass;          /* (the game's thread; never online: replaycam.c) */
     { extern uint8_t scout_b_back; scout_b_back = 1; }    /* (the scouting report: C the next matchup, B the one before) */
     test_aid_arm();
     while (!SDL_AtomicGet(&F.quit)) {
@@ -1403,9 +1499,8 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
             if (native_play_frames != seen_frames) { seen_frames = native_play_frames; play_ms = SDL_GetTicks(); }
             in_play = play_ms && SDL_GetTicks() - play_ms < 250u;
             ob_pads_mouse_mode(play_ms && SDL_GetTicks() - play_ms < 250u);
-            /* (the instant replay runs inside the pause menu, but the pause menu's rows are not on the screen: no pointer at them, whose hovering
-             * pressed up and down (the camera jumped from object to object) and whose clicks pressed C / B. The mouse steps the d-pad by its travel
-             * there, a short press per stretch (the camera nudged that way, or onto the skater there), its buttons B, C and A as everywhere) */
+            /* (the instant replay runs inside the pause menu, but the pause menu's rows are not on the screen: no pointer at them. The mouse
+             * has gestures of its own there (replaymouse.h: hook_event), Overbar's mouse pad quiet) */
             {   static unsigned seen_menu; static Uint32 menu_ms;       /* a game menu is being read: the mouse points at its rows */
                 static ob_menu_rect mr[OB_MENU_ROWS]; int rect[OB_MENU_ROWS][4], n, sel, lr;
                 ob_pad_menu pm = { mr, 0, 0, 0, MDRT_PAD_C, MDRT_PAD_B, 320, 0, 0, 0 };
@@ -1434,7 +1529,16 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
             if (quiet && ldown && !was && quiet_ms - now < 700u) quiet_ms = now + 700;   /* (still clicking: not yet) */
             was = ldown;
             quiet = opening || held || (Sint32)(quiet_ms - now) > 0;
-            ob_pads_mouse_quiet(quiet);
+            {   static int was_replay;                    /* the instant replay: the mouse's own gestures (replaymouse.h) */
+                int r = native_in_replay();
+                if (r != was_replay) { rm_reset(); was_replay = r; }
+                if (r) {
+                    rm_tick(now, native_replay_banner());
+                    SDL_AtomicSet(&rm_pad_at, (F.session || native_net_on()) ? 0 : native_replay_pad());   /* (online: this machine's first pad) */
+                }
+                test_mouse_tick();
+                ob_pads_mouse_quiet(quiet || r);
+            }
         }
         for (int p = 0; p < MDRT_PADS; p++) {
             int src = seat_n ? (p < seat_n ? seat_pad[p] : -1) : p;       /* (after the select-sides screen the pads are the seated players') */

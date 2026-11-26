@@ -72,6 +72,13 @@ int native_player_on_screen(int p, int *dx, int *dy);   /* the controlled player
 int native_menu_rows(int rect[][4], int max, int *n, int *sel, int *lr);   /* the game menu being read: rows on the 320x224 picture, the selected one; 0 none */
 extern volatile unsigned native_menu_calls;
 int native_in_replay(void);                          /* the instant replay is on (inside the pause menu, but not a menu: the mouse is its own there) */
+extern volatile unsigned native_replay_entries, native_replay_passes;   /* ReplayMode's calls and its passes (each pass reads the pad once) */
+extern void (*native_replay_pass_hook)(unsigned entries);   /* the game's thread, at each replay pass's pad read (frontend.c sets it: replaycam.c) */
+int native_replay_banner(void);
+int native_replay_pad(void);                         /* the pad the replay reads (getpzjoy's: the pad that paused), 0 .. 3 */
+int replaycam_state(char *line, int size);
+void replaycam_player_at(int i, int *x, int *y);    /* (tests) player i's middle: picture pixels from its middle */           /* (tests) the replay's camera and the frame it shows, as a line */                      /* the replay's banner is up (start pressed in it) */
+void replaycam_pass(unsigned entries);               /* the mouse's camera moves in the replay (replaycam.c) */
 int native_menu_waiting(void);                       /* the setup screen is inside its wait for a pad */
 int native_menu_kind(void);                          /* which menu the game is reading: 1 pause, 2 setup, 3 line editor grid, 4 line editor player list */
 extern volatile unsigned native_play_frames;          /* counts DoGameFrame calls: the window front end tells play from menus by it */                       /* (away, home) as it is called */
