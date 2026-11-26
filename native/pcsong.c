@@ -37,6 +37,7 @@ static struct {
     int16_t *p96[2];                          /* NHL 96 PC's: the same at RATE96 */
     long l96[2];
     int playing, which, cur;                  /* cur: the set playing, 0 NHL 95 PC's, 1 NHL 96 PC's */
+    int cheer;                                /* the game frame of the anthem the crowd cheers at (the game's: its last note) */
     double at;
 } S;
 
@@ -489,7 +490,7 @@ static int load(const char *dir, ob_cd *cd)
         S.pcm[0] = render(usa, un, usac, ucn, &S.len[0]);
         S.pcm[1] = render(can, cn, canc, ccn, &S.len[1]);
         ok = S.pcm[0] && S.pcm[1];
-        if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsong: USA %.1f s, CANADA %.1f s\n", (double)S.len[0] / RATE, (double)S.len[1] / RATE);
+        if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsong: USA %.3f s, CANADA %.3f s\n", (double)S.len[0] / RATE, (double)S.len[1] / RATE);
         if (ok) rock_read(dir, cd);
     }
     free(pat); free(usa); free(usac); free(can); free(canc);
@@ -570,7 +571,7 @@ static int load96(const char *dir, ob_cd *cd)
     }
     if (!pcm[0] || !pcm[1]) { free(pcm[0]); free(pcm[1]); return 0; }
     for (int w = 0; w < 2; w++) { S.p96[w] = pcm[w]; S.l96[w] = len[w]; }
-    if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsong: NHL 96 PC USA %.1f s, CANADA %.1f s\n", (double)len[0] / RATE96, (double)len[1] / RATE96);
+    if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsong: NHL 96 PC USA %.3f s (%ld), CANADA %.3f s (%ld)\n", (double)len[0] / RATE96, len[0], (double)len[1] / RATE96, len[1]);
     return 1;
 }
 
@@ -648,6 +649,7 @@ static int anthem_hook(int home_art, int away_art)
     S.which = first | (first != second ? (second + 1) << 1 : 0);     /* (bit 0 the first anthem; bits 1-2: the second, +1) */
     S.playing = 1;
     S.at = 0;
+    S.cheer = hold_anthem_frames(rules[RULE_ANTHEM], home_art) - 1;     /* (the rule's set, as the game waits: the song's last note) */
     const long *len = set ? S.l96 : S.len;
     long total = len[first] + (first != second ? len[second] : 0);
     SDL_UnlockMutex(S.lock);
@@ -664,14 +666,15 @@ int pcsong_flag_at(int frame)
     return first;
 }
 
-/* the crowd at the end of the anthem: NHL 95 PC's referee counts down (assintroline, temp5 from RockTuneIds by the home team's
- * teamrocktune) 1FEh game frames into "O Canada", 23Ah into the "Star Spangled Banner", then sets Crowdlevel to 320h: the
- * crowd cheers over the last bars. NHL 96 PC's (RunPreGameSkate) counts 23Ah for either recording. The frame of the anthem
- * playing (-1 when none) */
+/* the crowd at the end of the anthem. NHL 95 PC's referee counts down (assintroline, temp5 from RockTuneIds by the home team's
+ * teamrocktune: 1FEh game frames into "O Canada", 23Ah into the "Star Spangled Banner"), then sets Crowdlevel to 320h and the
+ * players skate to their spots; NHL 96 PC's (RunPreGameSkate) counts 23Ah for either recording. Here the cheer comes with the
+ * game's own end of the song (mods/hold.c: the last note), when the players leave their lines. The frame of the anthem (-1 when
+ * none plays) */
 int pcsong_cheer_frame(void)
 {
-    if (!S.playing) return -1;
-    return S.cur ? 0x23A : (S.which & 1) ? 0x1FE : 0x23A;
+    if (!S.playing || S.cheer < 0) return -1;
+    return S.cheer;
 }
 
 void pcsong_start(void)

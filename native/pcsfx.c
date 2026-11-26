@@ -253,11 +253,13 @@ void pcsfx_set_crowd_vol(int pct) { SDL_AtomicSet(&S.crowd_vol, pct); }
 static void crowd_hook(int meter)
 {
     if (!SDL_AtomicGet(&S.found)) return;
-    /* the anthem's end (NHL 95 PC's assintroline: Crowdlevel 320h), eased down as DecayCrowdLevel does each game frame;
-     * it plays with NHL 95 PC's anthems whether or not the crowd bed is on */
+    /* the anthem's end (pcsong_cheer_frame: the song's last note), eased down as DecayCrowdLevel does each game frame; it plays
+     * with the PC anthems whether or not the crowd bed is on. NHL 95 PC's assintroline sets Crowdlevel 320h, which its
+     * Crowd_Noise plays at 28 of 127 on the louder voice, under the song; here the crowd roars at 5DCh, the PC's own loudest
+     * (its three stars, a home star: both voices at 127) */
     int at = hold_anthem_time(), cf = pcsong_cheer_frame();
     if (at >= 0 && cf >= 0 && at < cf) S.cheered = 0;
-    else if (at >= cf && cf >= 0 && !S.cheered) { S.cheered = 1; S.cheer = 0x320; if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsfx: the anthem's cheer at frame %d of the song\n", at); }
+    else if (at >= cf && cf >= 0 && !S.cheered) { S.cheered = 1; S.cheer = 0x5DC; if (getenv("PCSONG_LOG")) fprintf(stderr, "pcsfx: the anthem's cheer at frame %d of the song\n", at); }
     if (S.cheer > 0) S.cheer -= S.cheer > 0x2BC ? 3 : S.cheer > 0x15E ? 4 : 1;
     if (S.cheer < 0) S.cheer = 0;
     int crowd = SDL_AtomicGet(&S.crowd_on);
