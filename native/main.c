@@ -565,7 +565,7 @@ static long script_reset = -1;          /* alone: the frame a script's RESET was
 /* HOLDTEST=goal:FRAME,pen:FRAME,fight:FRAME (a headless run): at that vblank in a game in play the puck is put into a net (",away": the other), a penalty queued on
  * a home skater, or a home and a visiting skater put together for a fight (checkfight; with --rule fighting=2 it always starts),
  * and every change of the stoppage wait is logged with its frame: tests the announcer and the face off wait
- * (src/hold.c) at the game's own call sites. */
+ * (mods/hold.c) at the game's own call sites. */
 static int holdtest_goal = -1, holdtest_pen = -1, holdtest_fight = -1, holdtest_last = -1;
 static long holdtest_fired = -1;                          /* (the console frame the goal was forced at) */
 static void holdtest_frame(void)

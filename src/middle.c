@@ -251,7 +251,7 @@ void sfx(int16_t n)
 void song(int16_t n)
 {
     if (n < 0) return;
-    if (hold_anthem_song()) return;                       /* (native: the national anthem plays, src/hold.c) */
+    if (hold_anthem_song()) return;                       /* (native: the national anthem plays, mods/hold.c) */
     play_sfx_or_music_track((uint16_t)n);
 }
 

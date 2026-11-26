@@ -223,9 +223,9 @@ def record(args):
 
 
 def check(args):
-    nhl94 = os.path.join(REPO, 'build', 'nhl94')
+    nhl94 = os.path.join(REPO, os.environ.get('NHL94_BIN', os.path.join('build', 'nhl94')))   # (NHL94_BIN=build/nhl94-vanilla: the vanilla build)
     if not os.path.exists(nhl94):
-        sys.exit('no build/nhl94 (make nhl94)')
+        sys.exit('no %s (make nhl94)' % nhl94)
     chosen = [i for i in pick(items(args.root), args.names) if i.kind == 'lockstep']
     bad = 0
     for i in chosen:

@@ -195,7 +195,7 @@ void referee_update(void)
     int16_t fx = (int16_t)g.fox, fy = (int16_t)g.foy;
     if (asn == pfaceoff || asn == pfaceoff2) {                   /* (assrefatdot: 15 off the dot, at rest) */
         int wx = POS32(ref.Xpos, ref.Xfrac) >> 8, wy = POS32(ref.Ypos, ref.Yfrac) >> 8;
-        if (hold_skate_ref_step(&wx, &wy)) {                     /* (RULE_HOLD: he skates there, fetching the puck, src/hold.c) */
+        if (hold_skate_ref_step(&wx, &wy)) {                     /* (RULE_HOLD: he skates there, fetching the puck, mods/hold.c) */
             ref.Xpos = (int16_t)(wx >> 8); ref.Xfrac = (uint16_t)((uint32_t)wx << 8);
             ref.Ypos = (int16_t)(wy >> 8); ref.Yfrac = (uint16_t)((uint32_t)wy << 8);
         } else {

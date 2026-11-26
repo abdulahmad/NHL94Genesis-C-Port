@@ -6,7 +6,7 @@
  * the program or on the NHL 95 PC disc image), never shipped. The sequencer follows NHL 95 PC's (sub_99925: a 100 Hz
  * timer, 32000 / tempo ticks to a step) as NHL 9X Studio's lib/audio/pc94-player.js has it; the sound is made by
  * Nuked OPL3 (LGPL 2.1+, nuked_opl3.c). Both anthems are rendered once, when the files are found; nothing of the game
- * is touched but its wait before the first face off (src/hold.c) and its own songs, which stay quiet while an anthem
+ * is touched but its wait before the first face off (mods/hold.c) and its own songs, which stay quiet while an anthem
  * plays. */
 #include <SDL.h>
 #include <stdio.h>
@@ -634,7 +634,7 @@ static int finder(void *arg)
 static int canadian(int art) { return art == 3 || art == 7 || art == 11 || art == 15 || art == 18 || art == 22 || art == 23 || art == 25; }
 
 /* the first face off's anthem (RULE_ANTHEM: the game's choice, the session host's): the home team's, from the set the rule
- * names, else the other one found. Only the sound: the game waits the rule's own length (src/hold.c), with or without it.
+ * names, else the other one found. Only the sound: the game waits the rule's own length (mods/hold.c), with or without it.
  * Its length in frames of the game (60 a second) */
 static int anthem_hook(int home_art, int away_art)
 {

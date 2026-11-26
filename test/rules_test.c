@@ -135,7 +135,7 @@ static void sega_cd(void)
     classic_rules();
 }
 
-/* RULE_REFEREE (src/referee.c): with the rule off nothing; on, he comes on beside the play, a skater who runs into him
+/* RULE_REFEREE (mods/referee.c): with the rule off nothing; on, he comes on beside the play, a skater who runs into him
  * bounces off (the mover keeps his place: collflag) and pushes him, the puck bounces off him, a pad player's hard check
  * knocks him down and the third such check is a roughing penalty; his state goes through the state's bytes, and bytes
  * that are not a referee's are refused (a state is hostile until checked) */
@@ -206,7 +206,7 @@ static void referee(void)
     classic_rules();
 }
 
-/* RULE_HOLD (src/hold.c): the walk to the spots and the referee's puck are the game's alone (where the puck lay, the dot, the
+/* RULE_HOLD (mods/hold.c): the walk to the spots and the referee's puck are the game's alone (where the puck lay, the dot, the
  * walk's time); the pause goes through the state's bytes and bytes that are not a pause's are refused. RULE_ANTHEM: the
  * anthem's wait is the rule's, fixed per recording */
 static void hold(void)

@@ -30,16 +30,16 @@ enum {
                                  * faceoff song in puckfaceoff (not queued for the drop) */
     RULE_CD_PERIOD_END,         /* PeriodOver_sp without the two vblank waits and the p_turnoff between them */
     RULE_HOLD,                  /* play waits between a goal, a penalty or a penalty shot and the next face off for
-                                 * about as long as NHL 95 PC's announcer takes to say it (src/hold.c) */
-    RULE_FIGHT,                 /* NHL 93's fighting (src/fight.c): hard checks between opposing skaters can start a fight */
-    RULE_ANNOUNCE,              /* the rink announcer's timing (src/hold.c): 1 the speech starts with the goal or penalty and play waits
+                                 * about as long as NHL 95 PC's announcer takes to say it (mods/hold.c) */
+    RULE_FIGHT,                 /* NHL 93's fighting (mods/fight.c): hard checks between opposing skaters can start a fight */
+    RULE_ANNOUNCE,              /* the rink announcer's timing (mods/hold.c): 1 the speech starts with the goal or penalty and play waits
                                  * until it is done, 2 a home goal's speech waits for the goal song to end */
-    RULE_REFEREE,               /* 1: NHL 95 PC's referee in play (src/referee.c): skaters bounce off him, the puck deflects
+    RULE_REFEREE,               /* 1: NHL 95 PC's referee in play (mods/referee.c): skaters bounce off him, the puck deflects
                                  * off him, a check knocks him down, every third knock down a penalty */
-    RULE_ANTHEM,                /* the national anthem before the first face off (src/hold.c): 1 NHL 95 PC's song, 2 NHL 96 PC's
+    RULE_ANTHEM,                /* the national anthem before the first face off (mods/hold.c): 1 NHL 95 PC's song, 2 NHL 96 PC's
                                  * recording. The players line up and the drop waits for the anthem's own length, fixed per
                                  * recording: every machine waits the same whether it has the PC game's files or not */
-    RULE_SIREN,                 /* the goal siren the rink announcer waits for (RULE_ANNOUNCE 2, src/hold.c): 1 NHL 95 PC's, its fixed
+    RULE_SIREN,                 /* the goal siren the rink announcer waits for (RULE_ANNOUNCE 2, mods/hold.c): 1 NHL 95 PC's, its fixed
                                  * 7 seconds (the Game page's PC goal siren row sets it from the file the host has). The cartridge's
                                  * siren plays in the game either way; the host that has the PC's file plays that in its place */
     RULE_COUNT
@@ -48,8 +48,15 @@ enum {
 #define RULES_CLASSIC { 0 }
 extern const uint8_t rule_classic[RULE_COUNT];
 extern uint8_t rules[RULE_COUNT];   /* each rule's value now (Classic until the platform sets them) */
+/* src/ reads a rule only as RULE(r). The vanilla build (make VANILLA=1, -DNHL94_VANILLA on src/) makes every one the
+ * cartridge's 0, so each customized branch in the game's code is compiled out and src/ is the cartridge's path alone. */
+#ifdef NHL94_VANILLA
+#define RULE(r) ((void)(r), 0)
+#else
+#define RULE(r) (rules[r])
+#endif
 
-/* RULE_HOLD (src/hold.c): the stoppage's pause (NHL 95 PC's between-play time; RULE_ANNOUNCE also uses it, for the speech). hold_for makes the next face off wait
+/* RULE_HOLD (mods/hold.c): the stoppage's pause (NHL 95 PC's between-play time; RULE_ANNOUNCE also uses it, for the speech). hold_for makes the next face off wait
  * until frames vblanks have passed since now (a later call adds to what is left); hold_wait is 1 while it
  * must; hold_reset forgets it (a state loaded). The wait is in the game's own vblank count, not in audio:
  * every machine of a session waits the same, with the announcer or without. */
@@ -75,7 +82,7 @@ void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a
 void hold_tick(void);
 int hold_wait(void);
 void hold_reset(void);
-/* the pause's state (src/hold.c) and the face off's held back assignments (src/logic.c), kept in every state: HOLD_STATE_SIZE bytes.
+/* the pause's state (mods/hold.c) and the face off's held back assignments (src/logic.c), kept in every state: HOLD_STATE_SIZE bytes.
  * hold_state_load(NULL): none (a state from before them); -1 for bytes that are not this game's, nothing changed */
 #define HOLD_STATE_SIZE 372
 size_t hold_state_save(uint8_t *out);
@@ -90,7 +97,7 @@ size_t faceoff_defer_save(uint8_t *out);
 int faceoff_defer_check(const uint8_t *in);
 int faceoff_defer_load(const uint8_t *in);
 
-/* RULE_REFEREE (src/referee.c): the referee is the game's own object, kept in every state. referee_update once a pass after
+/* RULE_REFEREE (mods/referee.c): the referee is the game's own object, kept in every state. referee_update once a pass after
  * the skaters; referee_cx in checkplcoll's walk (skater o moved to x, y); referee_puck in checkpuckcoll's. referee_get: where
  * he is for the host's picture (0 while he is off the ice or the rule is off). The state's bytes: REFEREE_STATE_SIZE;
  * referee_state_load(NULL) starts him off the ice (a state from before him), -1 for bytes that are not a referee's. */

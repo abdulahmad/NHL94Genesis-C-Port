@@ -29,7 +29,7 @@ static int face_set;                         /* the way each faced at his spot a
 /* a goal's speech held back until its song has ended */
 static struct { int on, started; uint16_t limit; int frames; struct Team *tm; int player, a1, a2; } sg;
 
-static int wanted(void) { return rules[RULE_HOLD] || rules[RULE_ANNOUNCE]; }
+static int wanted(void) { return RULE(RULE_HOLD) || RULE(RULE_ANNOUNCE); }
 
 void hold_for(int frames)
 {
@@ -66,7 +66,7 @@ int hold_anthem_song(void) { return anth && pending && (int16_t)(g.Vcount - anth
 
 /* RULE_HOLD: a face off in the middle of play comes with no fade to black (the PC game has none: the players skate to their dots with the
  * rink in view). The start of a period keeps the cartridge's. */
-int hold_nofade(void) { return rules[RULE_HOLD] && !anth && g.gameclock != g.PerTimeTotal; }
+int hold_nofade(void) { return RULE(RULE_HOLD) && !anth && g.gameclock != g.PerTimeTotal; }
 
 /* the frames into the anthem's song (-1 when no song is on: before it, after it, or no anthem) */
 int hold_anthem_time(void)
@@ -100,7 +100,7 @@ static struct { int on; uint16_t t0; } siren;
 /* the goal's siren starts (src/collide.c): with RULE_SIREN its fixed length counts from now (a demo plays the cartridge's) */
 void hold_siren(void)
 {
-    siren.on = rules[RULE_SIREN] && g.demoflag;
+    siren.on = RULE(RULE_SIREN) && g.demoflag;
     siren.t0 = g.Vcount;
 }
 
@@ -216,7 +216,7 @@ static uint16_t sk_view[4];                             /* the view at the whist
 void hold_skate_begin(void)
 {
     sk_cap = 0;
-    if (!rules[RULE_HOLD]) return;
+    if (!RULE(RULE_HOLD)) return;
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) { sk_from[i].x = pl->Xpos; sk_from[i].y = pl->Ypos; sk_pnum[i] = (int8_t)pl->pnum; sk_delay[i] = 0; }
     sk_pick = SK_PICKUP;
@@ -315,7 +315,7 @@ int hold_skate_carry(int *x, int *y)
 
 /* the referee's place on his walk, in 256ths of a pixel (x, y in: where he is now). The start of a period: from the PC's start
  * of play to his spot; else to the puck where it lay (each call a step: the frames left to SK_PICKUP share what is left of
- * the way), then with it to the dot (hold_skate_carry). For a referee of the game's own (RULE_REFEREE: src/referee.c), whose
+ * the way), then with it to the dot (hold_skate_carry). For a referee of the game's own (RULE_REFEREE: mods/referee.c), whose
  * place is in every state: one call a frame. 0: no walk */
 int hold_skate_ref_step(int *x, int *y)
 {
