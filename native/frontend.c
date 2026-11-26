@@ -292,7 +292,11 @@ static void sram_save(void)
     FILE *f;
     if (!r || !F.sram_file[0] || !r->size || !r->dirty) return;
     f = fopen(F.sram_file, "wb");
-    if (!f) return;
+    if (!f) {                                          /* (said once: it is tried again every 300 frames) */
+        static int said;
+        if (!said++) fprintf(stderr, "save RAM: %s cannot be written\n", F.sram_file);
+        return;
+    }
     if (fwrite(r->bytes, 1, r->size, f) == r->size) r->dirty = 0;
     fclose(f);
 }
