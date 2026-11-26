@@ -675,13 +675,28 @@ static void segacd_frame(void)
 static int shots_wide;
 static int crop43;                                        /* --crop43: a wide rink cropped to 4:3 as a session's 4:3 machine shows it */
 static int shots_crop(int w) { return !screen_frame && (crop43 || native_net_on()) && (wide_rink_frame(w) || wide_hor_frame(w)); }
+/* --live-shots: the picture as the console drew it, line by line, and the VDP as it stood then (what the window's present gets),
+ * not the VDP's end state drawn again: the host's overlays (pcspr.c) see the raster effects the window does */
+static int live_shots, live_have, live_w, live_h;
+static uint16_t live_px[320 * 240];
+static mdrt_vdp live_vdp;
+static void live_present(void *user, const uint16_t *px, int w, int h, int pitch)
+{
+    (void)user;
+    if (golden) golden_present(user, px, w, h, pitch);
+    if (w > 320 || h > 240) { live_have = 0; return; }
+    for (int y = 0; y < h; y++) memcpy(live_px + y * 320, px + (long)y * pitch, (size_t)w * 2);
+    live_vdp = *mdrt_get_vdp(native_m);
+    live_w = w; live_h = h; live_have = 1;
+}
 static void write_ppm(const char *path)
 {
     static uint16_t px[320 * 240];
     static uint32_t pic[320 * 240], wide[WIDE_MAX_W * 240];
     mdrt_vdp *v = mdrt_get_vdp(native_m);
     int w = mdrt_vdp_width(v), h = mdrt_vdp_height(v);
-    mdrt_vdp_render(v, px, 320);
+    if (live_shots && live_have) { v = &live_vdp; w = live_w; h = live_h; memcpy(px, live_px, sizeof px); }
+    else mdrt_vdp_render(v, px, 320);
     if (screen_frame) { w = 320; h = 224; }
     for (int i = 0; i < h; i++)
         for (int x = 0; x < w; x++) pic[i * 320 + x] = screen_frame ? screen_px[i * 320 + x] : 0xFF000000u | mdrt_vdp_rgb(px[i * 320 + x], 1);
@@ -865,6 +880,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--segacd-crowd") && i + 1 < argc) { segacd_on = 1; segacd_set_crowd(atoi(argv[++i])); }
         else if (!strcmp(argv[i], "--segacd-voice") && i + 1 < argc) { segacd_on = 1; segacd_set_voice(atoi(argv[++i])); }
         else if (!strcmp(argv[i], "--crop43")) crop43 = 1;
+        else if (!strcmp(argv[i], "--live-shots")) live_shots = 1;
         else if (!strcmp(argv[i], "--widescreen")) { shots_wide = 1; rules_widescreen(1); }   /* (16:9: the wide rink too, as in the window) */
         else if (!strcmp(argv[i], "--segacd-screens")) { segacd_on = segacd_screens = 1; segacd_set_screens(1); }
         else if (!strcmp(argv[i], "--segacd-title")) { segacd_on = segacd_screens = 1; segacd_set_title(1); }
@@ -917,7 +933,7 @@ int main(int argc, char **argv)
         }
         else {
             fprintf(stderr, "usage: %s [--rom FILE] [--snap FILE | --boot] [--scale N] [--aspect] [--sram FILE] [--headless]\n"
-                            "       [--frames N] [--shot FILE.ppm] [--shots DIR --every N] [--wav FILE] [--input FILE]\n"
+                            "       [--frames N] [--shot FILE.ppm] [--shots DIR --every N] [--live-shots] [--wav FILE] [--input FILE]\n"
                             "       [--state FILE] [--load-state FILE] [--save-state FRAME:FILE] [--load-at FRAME:FILE]\n"
                             "       [--net-load FRAME:FILE] [--lockstep FILE | --golden FILE]\n"
                             "       [--record DIR] [--fm-core nuked|ymfm] [--fm-model ym2612|ym3438] [--watch ADDR,...]\n"
@@ -1059,7 +1075,7 @@ int main(int argc, char **argv)
     if (segacd_sfx_flag) { segacd_set_sfx(1); segacd_sfx_wait(); }
     if (golden_path && !(golden = fopen(golden_path, "w"))) { fprintf(stderr, "cannot write %s\n", golden_path); return 1; }
     if (hashes_path && !(hashes = fopen(hashes_path, "w"))) { fprintf(stderr, "cannot write %s\n", hashes_path); return 1; }
-    c.platform = (mdrt_platform){ .present = golden ? golden_present : NULL, .audio = wav_audio };
+    c.platform = (mdrt_platform){ .present = live_shots ? live_present : golden ? golden_present : NULL, .audio = wav_audio };
     if (script_requests) c.platform.requests = script_request;
     mdrt *m = mdrt_new(&c);
     if (!m) { fprintf(stderr, "no FM core %s in this build of pulseman\n", fm_core ? fm_core : "(default)"); return 1; }
