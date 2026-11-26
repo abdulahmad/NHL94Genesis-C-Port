@@ -74,6 +74,8 @@ int native_menu_waiting(void);                       /* the setup screen is insi
 int native_menu_kind(void);                          /* which menu the game is reading: 1 pause, 2 setup, 3 line editor grid, 4 line editor player list */
 extern volatile unsigned native_play_frames;          /* counts DoGameFrame calls: the window front end tells play from menus by it */                       /* (away, home) as it is called */
 extern void (*native_game_start_hook)(void);           /* a new game begins (the game's thread; frontend.c sets it: the select-sides screen) */
+void menuopts_use(const char *file);                     /* the setup screen's options kept in file (menuopts.c; NULL or "": not kept) */
+void menuopts_power_on(void);                            /* at power on: the hook for them, none in a session */
 int native_net_on(void);                                /* in a session (headless: from before power on) */
 /* the session's settings (the host's, sent to the guests before power on): the next game's rules
  * and its roster set as a package (the save RAM is a new cartridge's on every machine). Made by the

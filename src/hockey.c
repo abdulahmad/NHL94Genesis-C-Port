@@ -38,6 +38,7 @@ void Begin(void)
     ReadLineData();
     HiScoreScreen();
     DefaultMenus();
+    if (setup_options_hook) setup_options_hook(SETUP_OPTS_POWER_ON);   /* (the host's: the options chosen last time) */
     g.TmpOptLine2 = g.OptLine;
     g.TempOptPlayMode = g.OptPlayMode;
     orjoy();                                              /* forget the presses so far */

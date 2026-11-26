@@ -15,6 +15,7 @@
 #                       hacks on the 32-team template (../roms or HACKS=) extracted
 #   make scouttest      the Sega CD scouting report: Ron Barr's paragraphs paced by his clips (a made-up disc)
 #   make sramtest       the window's save RAM beside the program, kept between runs from other folders
+#   make setupoptstest  the setup screen's options kept between runs (out/setup.ini beside the program; never in a session)
 #   make oracle         the hooked oracle core (build/nhl_oracle.so)
 #   make gen            regenerate the committed headers from ref/ and the asm rebuild
 #   make release VERSION=0.3.2  the downloads for Linux, Windows and macOS in out/release/v0.3.2,
@@ -57,6 +58,10 @@ scouttest: build/nhl94$(EXE)
 sramtest: build/nhl94$(EXE)
 	$(PY) tools/sramtest.py
 
+# the setup screen's options between runs (tools/setupoptstest.py: headless with --setup-options, a session, the window)
+setupoptstest: build/nhl94$(EXE)
+	$(PY) tools/setupoptstest.py
+
 test: build/captest
 	@test -n "$(CAPS)" || { echo "no captures in out/captures: tools/hybrid/capture_all.sh records them"; exit 1; }
 	@# (RAM's bytes only through src/mem.h's places: no host pointer into g as bytes in the game's code;
@@ -78,7 +83,7 @@ NATIVE := $(wildcard native/*.c)
 # VANILLA=1: the game without the host extras (game rules, roster sets, states, online play):
 # build/nhl94-vanilla, its own objects (native/vanilla/stubs.c, docs/VANILLA.md)
 ifeq ($(VANILLA),1)
-NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c romsrc.c art.c banner.c ratings.c state.c net.c),$(NATIVE)) native/vanilla/stubs.c
+NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c romsrc.c art.c banner.c ratings.c state.c net.c menuopts.c),$(NATIVE)) native/vanilla/stubs.c
 BIN    ?= build/nhl94-vanilla$(EXE)
 OBJ    ?= build/obj-vanilla
 endif
@@ -285,5 +290,5 @@ gen-pin:
 
 clean:
 	rm -rf build/captest build/oracle_shim.o build/nhl94 build/obj build/cross build/relaytest
-.PHONY: rulestest rosterstest scouttest sramtest test oracle clean nhl94 relaytest mdrt vectors lockstep runtime-check runtime-selfcheck golden golden-check \
+.PHONY: rulestest rosterstest scouttest sramtest setupoptstest test oracle clean nhl94 relaytest mdrt vectors lockstep runtime-check runtime-selfcheck golden golden-check \
 	golden-cross golden-ubsan netplay-check gen gen-pin release FORCE
