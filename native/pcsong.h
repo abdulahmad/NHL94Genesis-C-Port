@@ -10,4 +10,5 @@ int pcsong_flag_at(int frame);               /* the flag (0 USA, 1 Canada) of th
 void pcsong_set(int on);                     /* the Game page: the anthems before the game */
 void pcsong_stop(void);
 void pcsong_mix(int16_t *out, int frames, unsigned rate);   /* the anthem into a frame of sound */
+int pcsong_cheer_frame(void);              /* the game frame of the anthem playing at which NHL 95 PC's crowd cheers (-1 none) */
 int pcsong_write_wav(const char *path);      /* testing: both anthems as a wav */

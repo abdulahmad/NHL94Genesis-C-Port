@@ -414,6 +414,15 @@ int pcsong_flag_at(int frame)
     return first;
 }
 
+/* NHL 95 PC's crowd at the end of the anthem: the referee's countdown (assintroline, temp5 from RockTuneIds by the home team's
+ * teamrocktune) runs out 1FEh game frames into "O Canada", 23Ah into the "Star Spangled Banner", and sets Crowdlevel to 320h:
+ * the crowd cheers over the last bars. The frame of the anthem playing (-1 when none) */
+int pcsong_cheer_frame(void)
+{
+    if (!SDL_AtomicGet(&S.on) || !SDL_AtomicGet(&S.found) || !S.playing) return -1;
+    return (S.which & 1) ? 0x1FE : 0x23A;
+}
+
 void pcsong_start(void)
 {
     static int started;
