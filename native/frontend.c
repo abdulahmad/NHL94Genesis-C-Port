@@ -39,6 +39,8 @@
 #include "pcspr.h"
 #include "cardcolor.h"
 #include "wide.h"
+#include "overbar/sides.h"
+#include "mdrt/menu.h"
 
 #define SETTINGS "settings.ini"
 
@@ -1097,6 +1099,33 @@ static void game_starting(void)
 }
 static const ob_sides_skin sides_skin = { .background = sides_background, .text = sides_text, .text_width = sides_text_width, .frame = sides_frame,
                                         .team = sides_team_plate, .team_w = 88, .team_h = 16 };
+
+/* --sides-shot FILE (headless): the select-sides screen in the game's own art, as the window shows it with two devices seated and one ready */
+int frontend_sides_shot(const char *path)
+{
+    static ob_sides sd;
+    static uint32_t pic[960 * 672];
+    ob_sides_game g;
+    memset(&g, 0, sizeof g);
+    g.skin = sides_skin;
+    g.teams = 2; g.seats = 2; g.per_team = 2;
+    g.team_name[0] = "Away"; g.team_name[1] = "Home";
+    sides_team[0] = 10; sides_team[1] = 11;
+    ob_sides_init(&sd, &g, 0, NULL, NULL);
+    ob_sides_open(&sd);
+    ob_sides_add(&sd, 0, "Keyboard");
+    ob_sides_add(&sd, 1, "Gamepad 1");
+    ob_sides_input(&sd, 0, MDRT_MENU_LEFT);
+    ob_sides_input(&sd, 1, MDRT_MENU_RIGHT);
+    ob_sides_input(&sd, 0, MDRT_MENU_OK);
+    ob_sides_draw(&sd, pic, 960, 672, 960);
+    FILE *f = fopen(path, "wb");
+    if (!f) return -1;
+    fprintf(f, "P6\n960 672\n255\n");
+    for (int i = 0; i < 960 * 672; i++) { unsigned char c[3] = { (unsigned char)(pic[i] >> 16), (unsigned char)(pic[i] >> 8), (unsigned char)pic[i] }; fwrite(c, 1, 3, f); }
+    fclose(f);
+    return 0;
+}
 
 int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game, void *user)
 {
