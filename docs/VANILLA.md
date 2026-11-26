@@ -26,6 +26,9 @@ cartridge does.
   romsrc.c, art.c, banner.c, ratings.c, state.c and net.c are left out, and `native/vanilla/stubs.c` stands in for
   them (the original's rules, the cartridge's teams, no pages, a plain error for the options that need them).
   `src/` is the same code in both builds. Gate: the lockstep vectors pass on it against the cartridge (2026-11-04: 20 of 20).
+* **`tools/check_vanilla.sh`** (CI, smoke.yml): `src/` includes no host header and reads no setting, and
+  `make VANILLA=1 nhl94` builds. Customizations still inside `src/` (fights, the between-play pause, the referee)
+  are listed in the script's `MOD_FILES` while they move out to their own layer; that list only shrinks.
 * Slowdown: an option, off by default (`--original` / `--speed original`, or the window's Speed page
   / `game.speed` in settings.ini). Smooth (the default) is one vblank a pass; Original uses a 68k
   cost model so a pass can take extra vblanks (`native/costs.inc`, fitted from lockstep traces).
