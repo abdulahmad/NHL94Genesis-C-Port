@@ -1128,7 +1128,7 @@ static void open_manual(void)
     if (!n) { bx_say("<b>No manual scans.</b> Put them in the box art folder."); if (BX.manual_only) bx_manual_only_closed(0); return; }
     for (int i = 0; i < n; i++) k[i] = keys[i];
     if (BX.manual_only) bx_view_open_keys("NHL '94 Genesis manual", k, n, 1, bx_manual_only_closed);
-    else bx_book_open("NHL '94 Genesis manual", k, n, NULL);         /* read in 3D, in front of the open case */
+    else bx_book_open_at("NHL '94 Genesis manual", k, n, NULL, cmanual, 6.15f);   /* read in 3D where the manual is (6.15 in tall) */
 }
 
 static void enter(int mode)
