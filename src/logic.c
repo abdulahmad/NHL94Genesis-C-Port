@@ -762,6 +762,7 @@ void faceoffinput(uint16_t d0, uint16_t d1, struct SortObj *o)
 {
     if (g.sflags5 & 0x40) return;
     if (o->asslist[o->assnum] != afaceoffpl) return;      /* not a faceoff player */
+    if (hold_skating()) return;                           /* (RULE_HOLD: still skating to the dot) */
     if (PFLAG(o, pfgoal)) g.fodir2 = d0; else g.fodir1 = d0;
     if (o->pflags2 & (1 << pf2aip)) return;
     if (d1 & BUT_B) {
@@ -1628,6 +1629,7 @@ void assfaceoffpl(struct Team *tm, struct SortObj *o)
     uint16_t d0 = (uint16_t)((o->SPAnum >> 2) + 1);
     if (o->handed[0] == 0) d0 += 3;
     fof->frame = d0;
+    if (hold_skating()) return;                           /* (RULE_HOLD: he skates to the dot first; the stance once all are there) */
     if (PFLAG(o, pfjoycon)) return;
     if (o->pflags2 & (1 << pf2aip)) return;
     o->pflags2 |= 1 << pf2aip;
@@ -3462,7 +3464,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
                 tc->tmflags &= (uint8_t)~8;
                 d0 = afaceoffpl;
             }
-            if (hold_anthem_pending() && fo_defer_n < 12) { fo_defer_pl[fo_defer_n] = pl; fo_defer_as[fo_defer_n++] = d0; assinsert(pnothing, pl); }   /* (the anthem: no face off yet) */
+            if (hold_anthem_pending() && fo_defer_n < 12) { fo_defer_pl[fo_defer_n] = pl; fo_defer_as[fo_defer_n++] = d0; assinsert(anull, pl); }   /* (the anthem: no face off yet; anull stands by, as pnothing (the puck's) on a skater would restart his animation every frame) */
             else assinsert(d0, pl);
         }
         int16_t d4 = (int16_t)team_struct(PFLAG(pl, pfteam))->tmap;            /* skaters on the ice 4-6 */
