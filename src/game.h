@@ -868,6 +868,7 @@ void PrintOptions(uint16_t line);                       /* d7 */
 void PrintOptionValue(uint16_t line);                   /* d7 */
 void PrintScrollMarks(void);
 void PrintOptTeamName(uint16_t line);                   /* d7 */
+extern uint8_t setup_no_players;                          /* 1 (the host's): the setup menu has no Players line (optsetup.c) */
 void PrintOptionNames(void);
 void setoptions(void);
 uint16_t ReadSetupPads(void);                           /* -> d1 */

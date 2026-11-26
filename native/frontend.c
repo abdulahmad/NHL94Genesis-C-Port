@@ -1133,6 +1133,7 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
         if (cd_restart) { cd_restart = 0; if (!F.session) restart_console(0); }   /* (the Game page's roster set) */
         ob_plat_pump();
         ob_pads_tick();
+        { extern uint8_t setup_no_players; setup_no_players = (uint8_t)(!native_net_on() && !F.session && atoi(pads_get("sides.at_start", "1")));   /* (controller setup says who plays: no Players line) */ }
         if (SDL_AtomicGet(&sides_state) == 1) { ob_pads_sides_open(); SDL_AtomicSet(&sides_state, 2); }
         else if (SDL_AtomicGet(&sides_state) == 2 && !ob_pads_sides_active()) SDL_AtomicSet(&sides_state, 0);
         int in_play = 0;
