@@ -11,3 +11,5 @@ void pcsfx_set_horn(int on);                 /* the same for the end of the peri
 void pcsfx_mix(int16_t *out, int frames, unsigned rate);   /* the sounds into a frame of sound */
 void pcsfx_stop(void);
 int pcsfx_load_file(const char *path);       /* testing: a PCFF001.DIG read in place of the search (--pc-sfx FILE) */
+void pcsfx_set_crowd(int on);                /* the Game page: NHL 95 PC's crowd bed on top of the game's crowd meter */
+void pcsfx_set_crowd_vol(int pct);           /* its volume, percent */

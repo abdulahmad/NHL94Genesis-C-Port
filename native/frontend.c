@@ -584,7 +584,21 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_PCREF (CD_ROWS + 22)                            /* (a referee on the ice, from NHL 95 PC's frames: group 4) */
 #define CD_PCLOGO (CD_ROWS + 23)                           /* (NHL 95 PC's centre ice logos, its own files: group 4) */
 #define CD_PCANTHEM (CD_ROWS + 24)                         /* (NHL 95 PC's national anthems, its own files: group 4) */
-#define CD_OPTS (CD_ROWS + 25)
+#define CD_CROWD_CARTVOL (CD_ROWS + 25)                    /* (the three crowd beds: CD_CROWD is the cartridge's, then each bed's volume) */
+#define CD_CROWD_CD (CD_ROWS + 26)
+#define CD_CROWD_CDVOL (CD_ROWS + 27)
+#define CD_CROWD_PC (CD_ROWS + 28)
+#define CD_CROWD_PCVOL (CD_ROWS + 29)
+#define CD_OPTS (CD_ROWS + 30)
+static const int crowd_pct[7] = { 25, 50, 75, 100, 125, 150, 200 };
+static int crowd_vol_of(int idx) { int v = ob_game_get(&host, idx); return crowd_pct[v < 0 ? 0 : v > 6 ? 6 : v]; }
+static void crowd_apply(void)
+{
+    segacd_set_crowd((ob_game_get(&host, CD_CROWD) ? 1 : 0) | (ob_game_get(&host, CD_CROWD_CD) ? 2 : 0));
+    segacd_set_crowd_vol(crowd_vol_of(CD_CROWD_CARTVOL), crowd_vol_of(CD_CROWD_CDVOL));
+    pcsfx_set_crowd(ob_game_get(&host, CD_CROWD_PC) != 0);
+    pcsfx_set_crowd_vol(crowd_vol_of(CD_CROWD_PCVOL));
+}
 static ob_game_opt cd_opts[CD_OPTS];
 static const char *const cd_logo_pc[3] = { "Cartridge", "NHL 95 PC", "NHL 94 PC" };
 /* the Widescreen rows (the Game page's, Overbar's Scaling page's) are one setting: the Scaling page's change shown on the Game page */
@@ -615,7 +629,7 @@ static void cd_changed(void *ctx, int index, int value)
     char key[64];
     (void)ctx;
     if (index == CD_MUSIC) { segacd_set_music(value); return; }
-    if (index == CD_CROWD) { segacd_set_crowd(value); return; }
+    if (index == CD_CROWD || index == CD_CROWD_CARTVOL || index == CD_CROWD_CD || index == CD_CROWD_CDVOL || index == CD_CROWD_PC || index == CD_CROWD_PCVOL) { crowd_apply(); return; }
     if (index == CD_VOICE) { segacd_set_voice(value); return; }
     if (index == CD_SCREENS) { segacd_set_screens(value); return; }
     if (index == CD_TITLE) { segacd_set_title(value); return; }
@@ -777,7 +791,14 @@ static void game_page_init(void)
     cd_opts[CD_ROSTERS] = (ob_game_opt){ "cd_rosters", "Sega CD rosters (restarts)", cd_off_on, 2, r >= 0 && F.opt_values && F.opt_values[r] == 1, 1, 2 };
     static const char *const music[2] = { "cartridge", "Sega CD" }, *const crowd[3] = { "cartridge", "Sega CD", "both" };
     cd_opts[CD_MUSIC] = (ob_game_opt){ "cd_music", "Music", music, 2, 0, 0, 3 };
-    cd_opts[CD_CROWD] = (ob_game_opt){ "cd_crowd", "Crowd", crowd, 3, 0, 0, 3 };
+    (void)crowd;
+    static const char *const vols[7] = { "25%", "50%", "75%", "100%", "125%", "150%", "200%" };
+    cd_opts[CD_CROWD] = (ob_game_opt){ "crowd_cart", "Cartridge crowd bed", cd_off_on, 2, 1, 0, 3 };   /* (the cartridge's own noise, following the crowd meter) */
+    cd_opts[CD_CROWD_CARTVOL] = (ob_game_opt){ "crowd_cart_vol", "Cartridge crowd volume", vols, 7, 3, 0, 3 };
+    cd_opts[CD_CROWD_CD] = (ob_game_opt){ "crowd_cd", "Sega CD crowd bed", cd_off_on, 2, 0, 0, 3 };     /* (the disc's track 2) */
+    cd_opts[CD_CROWD_CDVOL] = (ob_game_opt){ "crowd_cd_vol", "Sega CD crowd volume", vols, 7, 3, 0, 3 };
+    cd_opts[CD_CROWD_PC] = (ob_game_opt){ "crowd_pc", "PC crowd bed", cd_off_on, 2, 0, 0, 4 };         /* (NHL 95 PC's two crowd voices, on the same crowd meter) */
+    cd_opts[CD_CROWD_PCVOL] = (ob_game_opt){ "crowd_pc_vol", "PC crowd volume", vols, 7, 3, 0, 4 };
     static const char *const voice[3] = { "off", "speech only", "speech and music" };   /* (speech only: Ron Barr alone as on the disc) */
     cd_opts[CD_VOICE] = (ob_game_opt){ "cd_voice", "Ron Barr scouting voice", voice, 3, 0, 0, 3 };
     cd_opts[CD_SCREENS] = (ob_game_opt){ "cd_screens", "Opening screens", music, 2, 0, 0, 3 };
@@ -807,7 +828,12 @@ static void game_page_init(void)
         for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];
         game_help[CD_ROSTERS] = "The Sega CD's rosters (the game restarts to change them).";
         game_help[CD_MUSIC] = "Where the songs come from: the cartridge or the Sega CD disc.";
-        game_help[CD_CROWD] = "Where the crowd comes from: the cartridge, the disc, or both.";
+        game_help[CD_CROWD] = "The cartridge's crowd noise, which swells with the crowd meter.";
+        game_help[CD_CROWD_CARTVOL] = "How loud the cartridge's crowd is.";
+        game_help[CD_CROWD_CD] = "The Sega CD disc's crowd bed (track 2).";
+        game_help[CD_CROWD_CDVOL] = "How loud the Sega CD crowd is.";
+        game_help[CD_CROWD_PC] = "NHL 95 PC's crowd, from your NHL 95 PC files; it follows the crowd meter the way the PC game does.";
+        game_help[CD_CROWD_PCVOL] = "How loud NHL 95 PC's crowd is.";
         game_help[CD_VOICE] = "Ron Barr's scouting lines from the disc; speech and music plays them over the scouting song.";
         game_help[CD_SCREENS] = "The opening screens: the cartridge's or the disc's.";
         game_help[CD_TITLE] = "The title page: the cartridge's or the disc's.";
@@ -850,7 +876,7 @@ static void game_page_init(void)
     static signed char pv[3][CD_OPTS];
     for (int p = 0; p < 3; p++) for (int k = 0; k < CD_OPTS; k++) pv[p][k] = p == 1 ? 1 : 0;   /* Cartridge 0, Sega CD 1 */
     pv[1][CD_DEDITHER] = pv[1][CD_SMOOTH] = pv[1][CD_COLOUR] = pv[1][CD_MOVIELOOK] = 0;            /* (the movie as the disc has it) */
-    pv[1][CD_VOICE] = 1; pv[1][CD_CROWD] = 1;
+    pv[1][CD_VOICE] = 1;
     pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
     pv[1][CD_ANNOUNCER] = 0;                                                  /* (95 PC's voice: not the Sega CD's) */
     pv[1][CD_HOLD] = 0;                                                        /* (95 PC's pause: not the Sega CD's) */
@@ -876,7 +902,9 @@ static void game_page_init(void)
     pv[2][CD_WIDESCREEN] = 1;                                                    /* (Abdul: on in Recommended) */
     static const int disc_look[] = { CD_VOICE, CD_SCREENS, CD_TITLE, CD_INTRO, CD_SFX, CD_PHOTOS, CD_CAREER };
     for (size_t k = 0; k < sizeof disc_look / sizeof *disc_look; k++) pv[2][disc_look[k]] = 1;
-    pv[2][CD_CROWD] = 2;                                                       /* (both beds) */
+    pv[0][CD_CROWD] = pv[2][CD_CROWD] = 1; pv[1][CD_CROWD] = 0;                 /* (the cartridge's bed: on in Cartridge and Recommended, off on the Sega CD) */
+    pv[0][CD_CROWD_CD] = 0; pv[1][CD_CROWD_CD] = 1; pv[2][CD_CROWD_CD] = 1;     /* (the disc's: on in Sega CD and Recommended) */
+    for (int p = 0; p < 3; p++) { pv[p][CD_CROWD_CARTVOL] = pv[p][CD_CROWD_CDVOL] = pv[p][CD_CROWD_PCVOL] = 3; pv[p][CD_CROWD_PC] = 0; }   /* (100%; the PC's off in all) */
     pv[2][CD_DEDITHER] = OB_POSTFX_LIVE;                                       /* (the movie without the dither) */
     pv[2][CD_MOVIELOOK] = 1;                                                   /* (its own look: soft CRT unless changed on Scaling (Movie)) */
     for (int k = 0; k < CD_ROWS; k++) if (!strcmp(cd_rows[k].key, "cd_clear_shots")) pv[2][k] = 1;   /* (the one fix) */

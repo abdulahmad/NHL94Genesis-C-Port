@@ -15,6 +15,7 @@
  * cartridge, so states, replays and online play are the same with it on or off; it only changes
  * what reaches the chips and the speakers. */
 #include <SDL.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -124,6 +125,8 @@ ob_cd *segacd_disc(void)
 
 void segacd_set_music(int on) { SDL_AtomicSet(&S.music, on ? 1 : 0); }
 void segacd_set_crowd(int v) { SDL_AtomicSet(&S.crowd, v); }
+static SDL_atomic_t vol_cart = { 100 }, vol_cd = { 100 };
+void segacd_set_crowd_vol(int cart, int cd) { SDL_AtomicSet(&vol_cart, cart); SDL_AtomicSet(&vol_cd, cd); }
 void segacd_set_voice(int v) { SDL_AtomicSet(&S.voice, v); }
 void segacd_set_screens(int v) { SDL_AtomicSet(&S.screens, v); }
 void segacd_set_title(int v) { SDL_AtomicSet(&S.title, v); }
@@ -195,9 +198,9 @@ static int music_on(void) { return SDL_AtomicGet(&S.music) && segacd_disc(); }
 /* the crowd: bit 0 the cartridge's PSG noise, bit 1 the disc's track 2 */
 static int crowd_bits(void)
 {
-    int v = SDL_AtomicGet(&S.crowd);
-    if (!v || !segacd_disc() || ob_cd_track_frames(S.cd, 2) <= 0) return 1;
-    return v == 1 ? 2 : 3;
+    int v = SDL_AtomicGet(&S.crowd);                    /* the Game page's rows: bit 0 the cartridge's bed, bit 1 the disc's */
+    int cd = (v & 2) && segacd_disc() && ob_cd_track_frames(S.cd, 2) > 0;
+    return (v & 1) | (cd ? 2 : 0);
 }
 
 static void play(int track, int loop, int bed)
@@ -439,8 +442,13 @@ uint8_t segacd_ym(int port, uint8_t v)
 
 uint8_t segacd_psg(uint8_t v)
 {
-    if ((v & 0xF0) == 0xF0 && !(crowd_bits() & 1)) return 0xFF;   /* the noise channel's volume: off */
-    return v;
+    if ((v & 0xF0) != 0xF0) return v;
+    int pct = SDL_AtomicGet(&vol_cart);
+    if (!(crowd_bits() & 1) || pct <= 0) return 0xFF;   /* the noise channel's volume: off */
+    if (pct == 100) return v;
+    int att = (v & 0x0F) + (int)floor(-10.0 * log10(pct / 100.0) + 0.5);   /* (2 dB a step) */
+    if (att < 0) att = 0;
+    return att >= 15 ? 0xFF : (uint8_t)(0xF0 | att);
 }
 
 static void mix_voice(int16_t *out, int frames, unsigned rate)
@@ -500,7 +508,7 @@ void segacd_mix(int16_t *out, int frames, unsigned rate)
     if (S.bed && !(crowd_bits() & 2)) stop();
     if (S.track && !S.bed && !music_on()) { stop(); S.song_on_cd = 0; }
     if (!S.track || !S.cd || !rate) return;
-    float gain = S.bed ? BED_GAIN : SONG_GAIN;
+    float gain = S.bed ? BED_GAIN * (float)SDL_AtomicGet(&vol_cd) / 100.0f : SONG_GAIN;
     double step = (double)OB_CD_RATE / rate;
     int16_t buf[2 * 1100];
     int i = 0;
