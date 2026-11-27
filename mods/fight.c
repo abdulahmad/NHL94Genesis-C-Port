@@ -88,6 +88,7 @@ const uint8_t *spa_table(uint16_t spa)
         fight_spa_init();
         return fight_spa_tab[(spa - FIGHT_SPA) / SPA_STRIDE];
     }
+    if (spa >= MOD_SPA) return mod_spa_table(spa);       /* (NHL 95's moves and the PC goalie, mods/anims.c) */
     return rom_ptr(SYM_SPAlist + spa);
 }
 
@@ -369,11 +370,12 @@ static void inst92(struct SortObj *a3)
     }
 }
 
+int (*fight_cheat_hook)(void);
+
 void checkfight(struct SortObj *a2, struct SortObj *a3)
 {
     if (!rules[RULE_FIGHT]) return;
     int mode = rules[RULE_FIGHT];                          /* 1 NHL 93's, 2 NHL 92's, 3 the two together */
-    if (mode != 2 && (a3->impact < 10 || a2->impact < 10)) return;
     if (PFLAG(a3, pfalock) || PFLAG(a2, pfalock)) return;
     if ((a3->pflags2 & (1 << pf2pen)) || (a2->pflags2 & (1 << pf2pen))) return;
     if (a3->position == 0 || a2->position == 0) return;
@@ -382,7 +384,12 @@ void checkfight(struct SortObj *a2, struct SortObj *a3)
     struct SortObj *puck = sortobj(puckscnum);
     if (puck->pflags2 & (1 << pf2fight)) return;
     if (puck->asslist[puck->assnum >> 0] == pfaceoff) return;
-    if (mode == 1) {
+    if (fight_cheat_hook && fight_cheat_hook()) {          /* (debug: FIGHT was typed: this check starts one, whatever the hit) */
+        a3->pflags2 |= 1 << pf2fight;
+        a2->pflags2 |= 1 << pf2fight;
+        if (mode != 1 && g.OptPen) { inst92(a3); inst92(a2); }
+    } else if (mode != 2 && (a3->impact < 10 || a2->impact < 10)) return;
+    else if (mode == 1) {
         int16_t need = (int16_t)(0x28 - g.ChkCnt);
         if (need < 0) need = 0;
         need = (int16_t)((need >> 2) + 0xA);

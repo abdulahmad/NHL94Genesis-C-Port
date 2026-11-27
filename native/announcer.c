@@ -31,6 +31,7 @@
 #include "rosters.h"
 #include "native.h"
 #include "announcer.h"
+#include "segacd.h"
 #include "overbar/cdimage.h"
 
 #define RATE 11025                          /* the clips' rate (the mixer plays 95 PC's speech at 0x2B11) */
@@ -52,6 +53,7 @@ static struct {
     int nq;
     int log;                                /* ANNOUNCER_LOG: the clips said, to stderr */
     int last_pen_team;                      /* the team of the last penalty said in this stoppage, -1 none */
+    SDL_atomic_t talking;                   /* a clip plays or waits (announcer_speaking: the Sega CD's song is lowered under him) */
 } A;
 
 /* ---- the archive: C0 FB, a big-endian count at +4, then per clip a 24-bit offset, a 24-bit size and the name ---- */
@@ -341,8 +343,11 @@ void announcer_stop(void)
     SDL_LockMutex(A.lock);
     A.v[0].c = A.v[1].c = NULL;
     A.nq = 0;
+    SDL_AtomicSet(&A.talking, 0);
     SDL_UnlockMutex(A.lock);
 }
+
+int announcer_speaking(void) { return SDL_AtomicGet(&A.talking); }
 
 /* ---- what is said ---- */
 static const struct clip *find(const char *name)
@@ -460,7 +465,8 @@ static void hook(int ev, struct Team *tm, int player, int a, int b)
         } else add("andnum.cor");
         add("%d.num", jersey(player, tm));
         add("pause.cor");
-        add(mins == 5 ? "5min.cor" : "2min.cor");
+        if (mins == 4) { add("4.num"); add("minutes.cor"); }   /* (a double minor, RULE_PENALTIES: 95 PC has no clip of its own) */
+        else add(mins == 5 ? "5min.cor" : "2min.cor");
         const char *pc = pen_clip(a);
         if (pc) add("%s.pen", pc);
         add("pause.cor");
@@ -502,6 +508,7 @@ static void hook(int ev, struct Team *tm, int player, int a, int b)
         add("%d.num", jersey(player, tm));
         break;
     }
+    SDL_AtomicSet(&A.talking, A.v[0].c || A.v[1].c || A.nq);
     SDL_UnlockMutex(A.lock);
 }
 
@@ -511,15 +518,17 @@ void announcer_mix(int16_t *out, int frames, unsigned rate)
     if (!A.lock || !rate || !SDL_AtomicGet(&A.found)) return;
     SDL_LockMutex(A.lock);
     double step = (double)RATE / rate;
+    int barr = segacd_voice_busy();                     /* (Ron Barr's scouting line from the Sega CD: the next clip waits for him) */
     for (int i = 0; i < frames; i++) {
         /* 95 PC's SpeechTimerTick: the next clip starts when the delay of the one before has run out, which is that clip's length
          * less 26 ticks of 1/100 s (OpenSpeechBank: size * 100 / 5512 - 1Ah): it starts over the tail of the last, on the other channel */
-        while (A.nq && A.wait <= 0) {
+        while (A.nq && A.wait <= 0 && !barr) {
             const struct clip *c = A.queue[0];
             memmove(A.queue, A.queue + 1, (size_t)--A.nq * sizeof A.queue[0]);
             A.ch ^= 1;
             A.v[A.ch].c = c;
             A.v[A.ch].at = 0;
+            if (A.log) fprintf(stderr, "announcer: plays %s at %u Hz\n", c->name, rate);
             long ticks = (long)(c->len / 2) * 100 / 5512 - 26;
             A.wait = ticks > 0 ? (double)ticks * RATE / 100.0 : 0;
         }
@@ -539,5 +548,6 @@ void announcer_mix(int16_t *out, int frames, unsigned rate)
             out[2 * i + c] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
         }
     }
+    SDL_AtomicSet(&A.talking, A.v[0].c || A.v[1].c || A.nq);
     SDL_UnlockMutex(A.lock);
 }

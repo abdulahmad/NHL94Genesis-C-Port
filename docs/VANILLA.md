@@ -22,7 +22,7 @@ cartridge does.
 | Folder | What | In `make VANILLA=1` |
 |---|---|---|
 | `src/` | the cartridge's game, routine for routine (lockstep against the cartridge) | yes |
-| `mods/` | customizations that run inside the game and change play (NHL 93's fights, NHL 95 PC's referee in play, the between-play pause, the anthem and the skate to the spots) | no: `native/vanilla/mods.c` stands in with the cartridge's own behaviour |
+| `mods/` | customizations that run inside the game and change play (NHL 93's fights, NHL 95 PC's referee in play, the between-play pause, the anthem and the skate to the spots, NHL 96 Genesis's double minors, NHL 95's fake shot, drop pass and shot blocks, the PC goalie's animations) | no: `native/vanilla/mods.c` stands in with the cartridge's own behaviour |
 | `native/` | the host: window, sound, menus, netplay, and the picture and sound extras (PC sprites, announcer, Sega CD extras, box, widescreen) | yes (host), with `native/vanilla/stubs.c` for rules, roster sets, states and netplay |
 
 `src/` reaches `mods/` only through the declarations in `src/game.h` and `src/rules.h`, and every such call is a

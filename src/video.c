@@ -567,7 +567,7 @@ void addframe2(int16_t x, int16_t y, struct SpriteHead *o, struct Vid *v)
     if (spr_art_hook && spr_art_hook(fr, &own, &own_n, &tiles) && own_n > 0 && own_n <= 8) { a2 = own; d5 = (int16_t)(own_n - 1); }   /* (the host's art: NHL 93's fight frames) */
     else {
         tiles = ART(Spritetiles);
-        unsigned idx = (spr_sc >= 0 && spr_sc < 12 ? fight_frame_shown(fr, sortobj((uint16_t)spr_sc)->facedir) : fr) * 2u;   /* (a fighter: the cartridge has no fight art, fight.c) */
+        unsigned idx = mod_frame(spr_sc >= 0 && spr_sc < 12 ? fight_frame_shown(fr, sortobj((uint16_t)spr_sc)->facedir) : fr) * 2u;   /* (a fighter: the cartridge has no fight art, fight.c; a mod frame: its cartridge frame, mods/anims.c) */
         if (!((int16_t)idx < (int16_t)rd16(a2 + 2))) { o->attribute = attr_saved; return; }
         d5 = (int16_t)(((rd16(a2 + idx + 2) - rd16(a2 + idx)) >> 3) - 1);
         a2 += rd16(a2 + idx);

@@ -711,8 +711,13 @@ void doinput_ispc(uint16_t d0, uint16_t d1, uint16_t d2, uint16_t d3, int16_t d4
     checkob(o);
     if (o->position == 0 && (o->pflags2 & 2)) return;
     if (g.sflags & HI(sfspdir)) { passmode(d0, d2, o); return; }
-    if (g.sflags & HI(sfssdir)) { ShotMode(d0, d2, o); return; }
+    if (g.sflags & HI(sfssdir)) {
+        if (moves_fake_pc(d1, o)) return;                 /* (RULE_FAKESHOT 1: NHL 95 PC's fake shot, mods/moves.c) */
+        ShotMode(d0, d2, o);
+        return;
+    }
     if (d1 & BUT_B) { CountButtonPress(d4, o); setpassmode(o); return; }
+    if ((d1 & BUT_A) && moves_drop_g(d3, o)) return;      /* (RULE_DROPPASS 2: NHL 95 Genesis's drop pass) */
     if (d1 & BUT_A) TIMER_SET(g.aholdtimer, d4, 0xF);
     if (d3 & BUT_A) {
         uint8_t t = timer_dec(timer_get(g.aholdtimer, d4));
@@ -724,6 +729,7 @@ void doinput_ispc(uint16_t d0, uint16_t d1, uint16_t d2, uint16_t d3, int16_t d4
             return;
         }
     } else if (d2 & BUT_A) {                              /* A released: a pass */
+        if (moves_fake_g(o)) return;                      /* (RULE_FAKESHOT 2: NHL 95 Genesis's fake shot in the zone) */
         g.sflags5 |= 8;
         setpassmode(o);
         return;
@@ -932,7 +938,11 @@ void burst(struct SortObj *o)
 void Holdplayer(struct SortObj *o)
 {
     o->pflags |= 1 << pfalock;
-    if (o->impact == 0) { SetSPA(o, SPAhook); return; }
+    if (o->impact == 0) {
+        if (moves_block_hold(o)) return;                  /* (RULE_SHOTBLOCK: NHL 95's shot block, mods/moves.c) */
+        SetSPA(o, SPAhook);
+        return;
+    }
     Acheck(sortobj(o->impactp), o);
 }
 
@@ -983,7 +993,7 @@ void dopass(struct SortObj *o)
 {
     g.sflags &= (uint16_t)~HI(sfspdir);
     puck_loose();
-    o->nopuck[0] = 0x10;
+    o->nopuck[0] = moves_dropping() ? 0x18 : 0x10;       /* (RULE_DROPPASS 2: 95G's drop pass, mods/moves.c) */
     g.lastplayer = (uint16_t)o->SCnum;
     if (g.sflags5 & 8) {
         g.sflags5 &= (uint8_t)~8;
@@ -1019,9 +1029,10 @@ void dopass(struct SortObj *o)
                 best = a1;
             }
         }
-        if (d4 >= 0)
+        if (d4 >= 0) {
+            if (moves_scatter(o, best)) return;           /* (RULE_DROPPASS 1: NHL 95 PC's drop pass to a trailing team-mate) */
             passto(best, o);
-        else {                                            /* nobody: hit it in passdir */
+        } else {                                            /* nobody: hit it in passdir */
             unsigned idx = (unsigned)g.passdir * 2;
             int32_t v = (int32_t)(int16_t)dirtab[idx + 1] * (int16_t)g.passspeed;
             v = (int32_t)((uint32_t)v << 10);             /* (asl.l #10, wrapping as the 68k's) */
@@ -1030,6 +1041,7 @@ void dopass(struct SortObj *o)
             v = (int32_t)((uint32_t)v << 10);
             g.puckvx = (uint16_t)((int16_t)m68k_divs(v, 0xBB8) + o->Xvel);
             g.puckvz[0] = randomd0(0x1000);
+            moves_drop_loose();
         }
     }
     if (o->position == 0) {                               /* the goalie clears away from his net */
@@ -1042,12 +1054,12 @@ void dopass(struct SortObj *o)
         d1 = SPApassf;
         if (!Findhittype(dir, o)) d1 = SPApassb;
     }
-    SetSPA(o, d1);
+    SetSPA(o, moves_pass_spa(d1));
     o->pflags |= 1 << pfalock;
     uint16_t snd = (uint16_t)(uint8_t)(0xC - (uint8_t)(g.puckvz[0] >> 8));
     snd = (uint16_t)(((snd >> 2) & 3) + 0x10);            /* SFXpass, by the puck's hop */
     if (RULE(RULE_CD_SOUNDS)) snd = 0x10;                /* (rules: the Sega CD's move.w #$10 for addi.w #$10) */
-    sfx((int16_t)snd);
+    if (!moves_dropping()) sfx((int16_t)snd);             /* (95G's drop pass makes no sound) */
 }
 
 /* logic94.asm:passto. Pass the puck to player a0 from a3: a human goalie's pass hands the
@@ -1105,8 +1117,10 @@ void passtoa0(struct SortObj *rcv, struct SortObj *o)
     }
     if (zero) t = (int16_t)(t + 1);                       /* can't be zero */
     if ((uint16_t)t > 0x18) t = 0x18;                     /* at most 3 seconds, in eighths */
+    int drop = moves_drop_time(&t);                       /* (RULE_DROPPASS 2: 95G's drop pass, 4 times as long) */
     g.puckvz[0] = (uint16_t)(((uint8_t)t << 8) | (g.puckvz[0] & 0xFF));
     if (t >= 0xC) g.puckvz[0] = (uint16_t)((0xC << 8) | (g.puckvz[0] & 0xFF));
+    if (drop && t >= 0xC) g.puckvz[0] = 0;
     int16_t w = (int16_t)((t << 3) - 0xA);
     rcv->temp1 = (int16_t)(((uint16_t)(uint8_t)w << 8) | ((uint16_t)rcv->temp1 & 0xFF));
     w = (int16_t)(w - 6);
@@ -1186,7 +1200,7 @@ int Findhittype(uint16_t dir, const struct SortObj *o)
  * the far boards. */
 void SetShotMode(struct SortObj *o)
 {
-    if (g.BA_PS_flags & HI(2)) {
+    if ((g.BA_PS_flags & HI(2)) && !moves_fake_pending()) {   /* (RULE_FAKESHOT 2: 95G's fake shot skips the penalty shot's start) */
         g.gmode2 &= (uint16_t)~HI(2);
         int was = g.BA_PS_flags & HI(5);
         g.BA_PS_flags |= HI(5);
@@ -1206,7 +1220,7 @@ void SetShotMode(struct SortObj *o)
         spa = SPAshotb;
         g.passspeed = 0xF;
     }
-    SetSPA(o, spa);
+    SetSPA(o, moves_shot_spa(spa));
 }
 
 /* logic94.asm:ShotMode. Shot input: the dpad aims, the windup adds speed until the C button
@@ -1248,6 +1262,7 @@ void prepshot(struct SortObj *o)
  * luck by his accuracy, else scattered; the height from the distance. */
 void doshot(struct SortObj *o)
 {
+    if (moves_fake_end(o)) return;                        /* (RULE_FAKESHOT 2: 95G's fake ends here, no shot; mods/moves.c) */
     g.gmode2 &= (uint16_t)~HI(4);
     if (o->pflags3 & (1 << pf3break)) g.gmode2 |= HI(4);
     shotdiradj(o);
@@ -1460,7 +1475,7 @@ void assbench(struct Team *tm, struct SortObj *o)
     if (o->facedir != 4) return;
     o->Xvel = -0x800;
     o->facedir = 2;
-    SetSPA(o, SPAwallleft);
+    SetSPA(o, goalie_wall_spa(o, SPAwallleft));         /* (RULE_GOALIE: the PC goalie's own hop, mods/goalie.c) */
     o->pflags |= 1 << pfalock;
     o->temp1 = 0x64;
     return;
@@ -1483,7 +1498,7 @@ void asseben(struct Team *tm, struct SortObj *o)
         o->Xpos = -0x88;
         o->facedir = 2;
         o->pflags |= 1 << pfalock;
-        SetSPA(o, SPAwallright);
+        SetSPA(o, goalie_wall_spa(o, SPAwallright));     /* (RULE_GOALIE: the PC goalie's own hop) */
         return;
     }
     o->facedir = 4;
@@ -2244,7 +2259,7 @@ void goaliesave(const struct PuckCross *pcross, int16_t goalline, struct SortObj
     d1 = (int16_t)saveanim[d0];
     if (d1 == SPAgglovel && (d3 & 3) != 0 && (int8_t)gk->aggress >= 0xB)
         d1 = SPAgglovel2;                                 /* reach out glove save */
-    SetSPA(gk, (uint16_t)d1);
+    SetSPA(gk, goalie_save_spa((uint16_t)d1, d3, pcross, gk));   /* (RULE_GOALIE: the PC goalie's saves, mods/goalie.c) */
     g.Crowdlevel += 0x96;
     g.CwdExciteLvl += 0xA;
     gk->Xvel = (int16_t)(gk->Xvel >> 2);
@@ -2762,6 +2777,7 @@ topuck:
 void check4check(struct SortObj *o)
 {
     if (o->position == 0) return;
+    if (moves_block_cpu(o)) return;                       /* (RULE_SHOTBLOCK 2: 95G's computer skater blocks the shot, mods/moves.c) */
     uint16_t d0 = (uint16_t)((0x28 - o->checking) & 0xFF);
     if (g.OptPen != 0) d0 = (uint16_t)(d0 << 1);
     if (randomd0(d0) > 6) return;
@@ -2780,6 +2796,7 @@ void check4check(struct SortObj *o)
         Acheck(a0, o);
         return;
     }
+    moves_block_try(o);                                   /* (RULE_SHOTBLOCK 1: 95 PC's TryBlockShot) */
 }
 
 /* logic94.asm:asspassrec. Assignment for catching a pass: coast until the puck is loose,
@@ -3304,6 +3321,7 @@ void CompLine(struct Team *a2, struct Team *a1)
 }
 
 static int fo_deferred;
+static int fo_late;                                     /* (RULE_HOLD: the window waits for the skate to the spots) */
 static struct SortObj *fo_defer_pl[12];                 /* the face off assignments the anthem holds back */
 static uint16_t fo_defer_as[12];
 static int fo_defer_n;
@@ -3312,7 +3330,7 @@ static int fo_defer_n;
  * sort object and his assignment */
 size_t faceoff_defer_save(uint8_t *out)
 {
-    out[0] = (uint8_t)fo_deferred;
+    out[0] = (uint8_t)(fo_deferred | fo_late << 1);
     out[1] = (uint8_t)fo_defer_n;
     for (int i = 0; i < 12; i++) {
         out[2 + i] = (uint8_t)(i < fo_defer_n ? fo_defer_pl[i] - sortobj(0) : 0);
@@ -3324,7 +3342,7 @@ size_t faceoff_defer_save(uint8_t *out)
 
 int faceoff_defer_check(const uint8_t *in)
 {
-    if (in[0] > 1 || in[1] > 12) return -1;
+    if (in[0] > 3 || in[1] > 12) return -1;
     for (int i = 0; i < in[1]; i++) {
         uint16_t as = (uint16_t)(in[14 + 2 * i] | in[15 + 2 * i] << 8);
         if (in[2 + i] >= 12 || (as != afaceoff && as != afaceoffpl)) return -1;   /* (a skater's, and a face off's assignment) */
@@ -3334,9 +3352,10 @@ int faceoff_defer_check(const uint8_t *in)
 
 int faceoff_defer_load(const uint8_t *in)
 {
-    if (!in) { fo_deferred = 0; fo_defer_n = 0; return 0; }
+    if (!in) { fo_deferred = 0; fo_late = 0; fo_defer_n = 0; return 0; }
     if (faceoff_defer_check(in) < 0) return -1;
-    fo_deferred = in[0];
+    fo_deferred = in[0] & 1;
+    fo_late = in[0] >> 1;
     fo_defer_n = in[1];
     for (int i = 0; i < fo_defer_n; i++) { fo_defer_pl[i] = sortobj(in[2 + i]); fo_defer_as[i] = (uint16_t)(in[14 + 2 * i] | in[15 + 2 * i] << 8); }
     return 0;
@@ -3382,6 +3401,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
 {
     if (!PFLAG(o, pfna)) {
         if (hold_skating()) return;                          /* (RULE_HOLD: the drop's time starts once all are at the spots, as the PC's AllInPlace) */
+        if (fo_late) { fo_late = 0; fo_window(1); g.disflags |= HI(4); }   /* (... and the face off window opens then, as the PC's overlay) */
         o->temp1 = (int16_t)(o->temp1 - 1);
         if (o->temp1 < 0 && hold_wait()) o->temp1 = 0;       /* (RULE_HOLD: the announcer is still on) */
         if (fo_deferred && o->temp1 < 0) {                   /* (the anthem is over: the window, and the usual time to the drop) */
@@ -3503,7 +3523,9 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     g.arenaanim = 0xFFFF;
     if ((g.sflags7 & 1) && (int16_t)g.faceoffanim[0] >= 0)
         StartArenaAnim(g.faceoffanim[0]);
-    fo_window(!hold_anthem_pending());
+    fo_late = !hold_anthem_pending() && hold_skating();     /* (RULE_HOLD: they skate to the spots first: the window once all are there) */
+    fo_window(!hold_anthem_pending() && !fo_late);
+    if (fo_late) g.disflags &= (uint16_t)~HI(4);
     if (hold_anthem_pending()) { fo_deferred = 1; g.disflags &= (uint16_t)~HI(4); }   /* (the anthem first: the face off window and its men come after it, as on the PC) */
     int16_t d0 = (int16_t)(randomd0(0x78) + 0xB4);        /* time to the drop */
     {
@@ -4010,7 +4032,7 @@ void GetHot(const struct SortObj *o, int16_t *hx, int16_t *hy)
 {
     int16_t x = 0, y = 0;
     if ((int16_t)o->frame > 0) {
-        const uint8_t *hot = rom_ptr(SYM_HotList) + o->frame * 2;
+        const uint8_t *hot = rom_ptr(SYM_HotList) + mod_frame(o->frame) * 2;   /* (a mod frame: its cartridge frame's, mods/anims.c) */
         x = (int8_t)hot[0];
         y = (int8_t)hot[1];
         if (o->attribute & HI(3)) x = (int16_t)-x;          /* x flip */

@@ -35,3 +35,8 @@ int wide_hor_frame(int w);       /* the wide view's horizontal rink (the penalty
  * overlays and boxes where the cartridge has them -> 256 */
 void wide_crop_follow(void);   /* (each frame the rink is up: the crop's camera) */
 int wide_crop(const mdrt_vdp *v, const uint32_t *pic, int h, int pitch, uint32_t *out, int opitch);
+
+/* the 16:9 rink's overlay windows (the face off window, the referee's, the goal box...) each 32 pixels out to the side of
+ * the 256 it is nearer, keeping its 4:3 gap: the VDP to draw the picture from (v itself when nothing moves), and the lines
+ * from <= y < to that differ from v's. Only the picture: the game is not changed */
+const mdrt_vdp *wide_windows(const mdrt_vdp *v, int *from, int *to);

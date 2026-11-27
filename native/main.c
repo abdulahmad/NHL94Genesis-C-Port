@@ -717,6 +717,11 @@ static void write_ppm(const char *path)
     if (live_shots && live_have) { v = &live_vdp; w = live_w; h = live_h; memcpy(px, live_px, sizeof px); }
     else mdrt_vdp_render(v, px, 320);
     if (screen_frame) { w = 320; h = 224; }
+    if (shots_wide && !screen_frame) {                    /* (16:9: the overlay windows keep their 4:3 gaps, wide.c) */
+        int from, to;
+        const mdrt_vdp *mv = wide_windows(v, &from, &to);
+        if (mv != v) { if (from < to) mdrt_vdp_render_lines(mv, px, 320, from, to); v = (mdrt_vdp *)mv; }
+    }
     for (int i = 0; i < h; i++)
         for (int x = 0; x < w; x++) pic[i * 320 + x] = screen_frame ? screen_px[i * 320 + x] : 0xFF000000u | mdrt_vdp_rgb(px[i * 320 + x], 1);
     if (!screen_frame) pcspr_present(v, px, 320, pic, w, h, 320);
@@ -1044,6 +1049,7 @@ int main(int argc, char **argv)
         o.net_pads = 4;                                   /* (up to four players online: 4 Way Play) */
         if (netopt.on) { fprintf(stderr, "netplay in the window: its Online page (` or F11); --host / --join / --peer are for --headless\n"); return 2; }
         if (inputs) frontend_script = script_source;      /* (test aid: the window's own path, the pads from the script) */
+        if (getenv("HOLDTEST")) { const char *h = getenv("HOLDTEST"), *q; if ((q = strstr(h, "goal:"))) holdtest_goal = atoi(q + 5); if ((q = strstr(h, "pen:"))) holdtest_pen = atoi(q + 4); test_frame_hook = holdtest_frame; }   /* (test aid: the forced goal in the window too) */
         int r = mdrt_sdl_run(&c, &o, native_game, NULL);
         native_net_close();
         return r;
