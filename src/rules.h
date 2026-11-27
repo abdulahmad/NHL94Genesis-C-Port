@@ -53,6 +53,8 @@ enum {
                                  * kneeling block) */
     RULE_GOALIE,                /* the goalie's PC animations (mods/goalie.c): 1 NHL 95 PC's saves and hop over the boards, 2 also
                                  * NHL 96 Genesis's straight on blocks and low catches */
+    RULE_FIGHT_RATINGS,         /* 1: with RULE_FIGHT, each skater's fighting on NHL 93's scale, from NHLPA 93 and NHL 96 PC (the player's own
+                                 * files, the host's in a session: native/fightrate.c); 0 the cartridge's (mods/fight.c fight_rating) */
     RULE_COUNT
 };
 /* the original's values */

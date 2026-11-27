@@ -87,6 +87,7 @@
 #include "symbols_gen.h"
 #include "z80.h"
 #include "native.h"
+#include "fightrate.h"
 #include "segacd.h"
 #include "announcer.h"
 #include "pcsfx.h"
@@ -856,6 +857,7 @@ int main(int argc, char **argv)
 {
     mdrt_sdl_home("ninety-four");                         /* (macOS: the app from the Finder keeps its files in Application Support) */
     const char *rom = "NHL 94 (UE) [!].gen", *rom_given = NULL, *sram = "out/nhl94.srm", *rosters_arg = NULL;
+    const char *fight_report = NULL;                     /* (--fight-ratings [@sega-cd | DIR]: native/fightrate.c's table, and nothing else) */
     const char *export_dir = NULL, *check_dir = NULL, *extract_rom = NULL, *extract_dir = NULL, *pack_dir = NULL, *pack_zip = NULL;
     int sram_given = 0, state_given = 0;
     const char *setup_opts = NULL;                       /* --setup-options FILE: the setup screen's options kept there (the window: out/setup.ini beside it) */
@@ -879,6 +881,7 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--sram") && i + 1 < argc) { sram = argv[++i]; sram_given = 1; }
         else if (!strcmp(argv[i], "--rosters") && i + 1 < argc) rosters_arg = rosters_folder(argv[++i]);
         else if (!strcmp(argv[i], "--export-rosters") && i + 1 < argc) export_dir = argv[++i];
+        else if (!strcmp(argv[i], "--fight-ratings")) fight_report = i + 1 < argc && argv[i + 1][0] != '-' ? argv[++i] : "";
         else if (!strcmp(argv[i], "--check-rosters") && i + 1 < argc) check_dir = rosters_folder(argv[++i]);
         else if (!strcmp(argv[i], "--extract-rom") && i + 2 < argc) { extract_rom = argv[++i]; extract_dir = argv[++i]; }
         else if (!strcmp(argv[i], "--pack-rosters") && i + 2 < argc) { pack_dir = rosters_folder(argv[++i]); pack_zip = argv[++i]; }
@@ -964,12 +967,21 @@ int main(int argc, char **argv)
                             "       [--record DIR] [--fm-core nuked|ymfm] [--fm-model ym2612|ym3438] [--watch ADDR,...]\n"
                             "       [--restart-at FRAME] [--four-way] [--input2 FILE] [--input3 FILE] [--input4 FILE]\n"
                             "       [--rule NAME=VALUE ...] (the game rules: native/rules.c) [--rosters DIR] (rosters.c)\n"
+                            "       [--fight-ratings [@sega-cd | DIR]] (each skater's fight rating: fightrate.c)\n"
                             "       [--check-rosters DIR] [--export-rosters DIR] [--extract-rom HACK DIR] [--pack-rosters DIR FILE.zip]\n"
                             "       [--art-check | --art-map] (the art map: art.c) [--hashes FILE]\n"
                             "       [--smooth | --original | --speed smooth|original] (Original: the cartridge's slowdown)\n"
                             "       %s (netplay: net.c)\n", argv[0], MDRT_NET_USAGE);
             return 2;
         }
+    }
+    if (fight_report) {
+        if (!rom_load(rom)) { fprintf(stderr, "cannot load the ROM %s\n", rom); return 1; }
+        rosters_next(fight_report);
+        rosters_power_on();
+        fightrate_start();
+        fightrate_report(stdout);
+        return 0;
     }
     if ((headless || export_dir || check_dir || extract_rom || pack_dir) && !rom_load(rom)) { fprintf(stderr, "cannot load the ROM %s\n", rom); return 1; }   /* (the window: pulseman's menu) */
     if (export_dir || check_dir || extract_rom || pack_dir) {   /* (and nothing else) */
@@ -1115,6 +1127,10 @@ int main(int argc, char **argv)
     if (inputs) mdrt_set_pad_source(m, script_source, m);
     if (four_way) mdrt_pads_set_adaptor(mdrt_get_pads(m), MDRT_ADAPTOR_EA4WAY);
     if (netopt.on) segacd_set_session(1);                 /* (the disc's pages, photos and scouting report: not in a session, as the window's) */
+    {   uint8_t nx[RULE_COUNT];                           /* (the fight ratings' sources: read before a session sends them, or a game plays by them) */
+        rules_next_get(nx);
+        if (netopt.on || nx[RULE_FIGHT_RATINGS]) fightrate_start();
+    }
     if (netopt.on) {                                      /* (from power on: the session's pads replace the scripts'; its save RAM a new cartridge's) */
         size_t n;
         const void *set = native_net_settings(&n);

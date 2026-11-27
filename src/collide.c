@@ -1603,7 +1603,7 @@ void setplayer(uint16_t roster, struct SortObj *o)
     o->handed[0] = (uint8_t)((r[LR_HANDED_FIGHTING] & 1) ^ 1);   /* 1 = left handed */
     if (o->handed[0] == 0)
         o->attribute |= HI(3);
-    o->fighting = r[LR_HANDED_FIGHTING] & 0xE;
+    o->fighting = fight_rating(tm->tmteam, (uint16_t)(idx >> 1), r[LR_HANDED_FIGHTING] & 0xE);   /* (the cartridge's, unless RULE_FIGHT_RATINGS) */
     g.TempWord2 = 0xA; d3 = AttributeCalc(r[LR_STICK_HANDLING], o);
     o->stickhand = ClampNibble((uint8_t)(d3 + g.PPBonus + g.PKBonus + g.HmAwBonus));
     g.TempWord2 = 0xB; d3 = AttributeCalc(r[LR_SHOT_ACCURACY], o);

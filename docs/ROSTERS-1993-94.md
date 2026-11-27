@@ -75,3 +75,10 @@ are already there. After it runs, `touch native/rosters.c` so that `make` builds
 Between 1992-93 and 1993-94 the only team whose jersey changed was Minnesota, which became Dallas.
 Anaheim and Florida were new teams, which the cartridge already has. The cartridge's jerseys are
 already 1993-94's, so both sets use them. St. Louis's new jersey came in 1994-95.
+
+## Fight ratings
+
+With **Fight ratings** on ([FIGHT_RATINGS.md](FIGHT_RATINGS.md)), a skater's fighting comes from NHLPA 93 and NHL 96 PC by his
+name, so it covers these sets too. The 51 skaters in these sets who are in neither game have a row in
+`native/fightrate_pim.inc` with their 1993-94 games and penalty minutes, the season that file's scale was fitted on. They were
+listed with `nhl94 --fight-ratings @1993-94-opening` (and `@1993-94-deadline`): the rows whose "from" said cart.
