@@ -207,6 +207,61 @@ static void referee(void)
     classic_rules();
 }
 
+/* RULE_REFEREE: he keeps out of the way (95 PC's EvadePlayers for his assreffollow): a skater in his way turns him aside; a fight is
+ * the fighters' (he does not collide with them, and watches from 50h away as the others do, NHL 93's assfwatch); a dead puck (the
+ * clock stopped) does not bounce off him (bounced every 8 frames, it went along at his feet) */
+static void referee_avoid(void)
+{
+    struct referee_view v;
+    classic_rules();
+    referee_state_load(NULL);
+    g.demoflag = 1; g.sflags = 0; g.gmode = 0; g.gmode2 = 0; g.PalMode = 0; g.Vpos = 0x40;
+    struct SortObj *pk = sortobj(puckscnum);
+    memset(pk, 0, sizeof *pk);
+    pk->SCnum = puckscnum; pk->asslist[0] = pnorm; pk->newpos = 0xFF; pk->Xpos = 0x20; pk->Ypos = 0x40;
+    for (int i = 0; i < 12; i++) { struct SortObj *o = sortobj(i); memset(o, 0, sizeof *o); o->SCnum = (int16_t)i; o->position = -1; }
+    elapsed = 1;
+    rules[RULE_REFEREE] = 1;
+    for (int k = 0; k < 40; k++) referee_update();          /* (on beside the play, past the drop's wait) */
+    referee_get(&v);
+    int16_t rx = (int16_t)(v.x >> 16), ry = (int16_t)(v.y >> 16);
+    CHECK(rx == 0x7C && ry == 0x40);
+    /* a dead puck at his feet stays as it was */
+    g.gmode = 1 << gmclock;
+    pk->Xpos = (int16_t)(rx + 4); pk->Ypos = (int16_t)(ry + 4); pk->Zpos = 0; pk->Xvel = -0x900; pk->Yvel = 0;
+    referee_puck(pk);
+    CHECK(pk->Xvel == -0x900 && pk->Yvel == 0);
+    g.gmode = 0;
+    pk->Xpos = 0x20; pk->Ypos = 0x40; pk->Xvel = 0;
+    /* a skater coming at him: he steps aside, and no one runs into him */
+    struct SortObj *o = sortobj(3);
+    o->position = 3; o->Xpos = (int16_t)(rx - 0x30); o->Ypos = ry; o->Xvel = 0x1800; o->weight = 10;
+    for (int k = 0; k < 12; k++) referee_update();
+    referee_get(&v);
+    CHECK((v.y >> 16) != ry || (v.x >> 16) != rx);
+    o->position = -1;
+    /* a fight beside him at the boards */
+    struct SortObj *f1 = sortobj(2), *f2 = sortobj(8);
+    f1->position = 2; f1->Xpos = 0x66; f1->Ypos = 0x40; f1->pflags2 = 1 << pf2fight;
+    f2->position = 2; f2->Xpos = 0x7A; f2->Ypos = 0x40; f2->pflags2 = 1 << pf2fight; f2->Xvel = 0x1000;
+    g.collflag = 0;
+    referee_get(&v);
+    f2->Xpos = (int16_t)((v.x >> 16) - 12); f2->Ypos = (int16_t)(v.y >> 16);
+    referee_cx(f2->Xpos, f2->Ypos, f2);
+    CHECK(g.collflag == 0 && f2->Xvel == 0x1000);          /* (a fighter does not hit him) */
+    f2->Xpos = 0x7A; f2->Ypos = 0x40; f2->Xvel = 0;
+    pk->pflags2 = 1 << pf2fight; pk->newpos = 0; pk->newpnum = 2;
+    g.xc1 = 0x70; g.yc1 = 0x40;
+    for (int k = 0; k < 240; k++) referee_update();
+    referee_get(&v);
+    int dx = (int)(v.x >> 16) - 0x70, dy = (int)(v.y >> 16) - 0x40;
+    CHECK(dx * dx + dy * dy >= 0x40 * 0x40 && (v.x >> 16) <= 0x7E);   /* (watching from about 50h, not between them) */
+    f1->position = f2->position = -1; f1->pflags2 = f2->pflags2 = 0;
+    pk->pflags2 = 0; pk->newpos = 0xFF;
+    referee_state_load(NULL);
+    classic_rules();
+}
+
 /* RULE_HOLD (mods/hold.c): the walk to the spots and the referee's puck are the game's alone (where the puck lay, the dot, the
  * walk's time); the pause goes through the state's bytes and bytes that are not a pause's are refused. RULE_ANTHEM: the
  * anthem's wait is the rule's, fixed per recording */
@@ -252,6 +307,12 @@ static void hold(void)
     memcpy(b, a, sizeof b); b[335] = 1; b[336] = 3; b[348] = 0x30; CHECK(hold_state_load(b) < 0);       /* (not a face off's assignment) */
     memcpy(b, a, sizeof b); b[335] = 1; b[336] = 3; b[348] = afaceoff; CHECK(hold_state_load(b) == 0);
     CHECK(hold_state_load(a) == 0 && hold_skate_carry(&x2, &y2) && x2 == x);        /* (a refused state changed nothing it had) */
+    struct SortObj *pk = sortobj(puckscnum), *sh = sortobj(puckscnum + 1);
+    sh->frame = SPFpuck; pk->Zpos = 0;
+    hold_tick();                                           /* (in his hand: neither the puck nor its shadow on the ice) */
+    CHECK(hold_skate_carry(&x2, &y2) && pk->Zpos < 0 && sh->frame == 0);
+    for (int k = 0; k < 500 && hold_skating(); k++) { g.Vcount++; hold_tick(); }
+    CHECK(!hold_skating() && sh->frame == SPFpuck && pk->Xpos == 100 && pk->Ypos == 100);   /* (at the dot: the cartridge's shadow again) */
     hold_state_load(NULL);
     classic_rules();
 }
@@ -472,6 +533,7 @@ int main(void)
     column_ratings();
     sega_cd();
     referee();
+    referee_avoid();
     hold();
     siren();
     fight_ratings();

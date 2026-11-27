@@ -730,12 +730,13 @@ static void skate_pose(void)
     int t = (int16_t)(g.Vcount - sk_t0);
     skate_players(t);
     if (getenv("HOLDSK") && !(t % 6)) { struct SortObj *q = sortobj(1); fprintf(stderr, "sk t %d dur %d: x %d y %d frame %d spa %d face %d\n", t, sk_dur, q->Xpos, q->Ypos, q->frame, q->SPA, q->facedir); }
-    int rx, ry;
+    int rx, ry, hand = 0;
     struct SortObj *pk = sortobj(puckscnum);
     if (sk_pstart) {                                    /* (the start of a period: the referee has the puck in his hand; it stays at the dot, and the view with it) */
         pk->Xpos = (int16_t)g.fox; pk->Ypos = (int16_t)g.foy;
         g.puckx[0] = g.fox; g.pucky = g.foy;
         ST_W(g.puckz[0]);
+        hand = t < sk_dur;
     } else if (t < sk_dur && t * 256 / sk_dur < sk_pick) {      /* (the referee is still on his way to the puck where it lay) */
         pk->Xpos = sk_puckx; pk->Ypos = sk_pucky;
         g.puckx[0] = (uint16_t)sk_puckx; g.pucky = (uint16_t)sk_pucky;
@@ -743,12 +744,20 @@ static void skate_pose(void)
     } else if (t < sk_dur && hold_skate_carry(&rx, &ry)) {   /* the referee carries the puck to the dot (the host's picture of him follows it) */
         pk->Xpos = (int16_t)(rx / 256); pk->Ypos = (int16_t)(ry / 256);
         g.puckx[0] = (uint16_t)pk->Xpos; g.pucky = (uint16_t)pk->Ypos;
-        g.puckz[0] = 0;
+        ST_W(g.puckz[0]);                                /* (in his hand, as at the dot: not drawn. On the ice (0) it went along at his feet) */
+        hand = 1;
     } else if (t >= sk_dur) {
         pk->Xpos = (int16_t)g.fox; pk->Ypos = (int16_t)g.foy;
         g.puckx[0] = g.fox; g.pucky = g.foy;
         ST_W(g.puckz[0]);
     }
+    /* NHL 95 PC's assrefdrop gives him the puck off the ice (puckz -100: neither it nor a shadow is drawn) until he drops it. The
+     * cartridge's shadow (sort object 15, frame SPFpuck: palette 0's grey-pink colour 8) followed the puck in his hand and showed
+     * through his legs, the PC's own shadows being blue. Frame 0 is the shadow's way to be off (puckshadow, addframe2); only the
+     * shadow's own frame is touched (not the goal siren's, which it also draws). Back at the dot it is the cartridge's again */
+    struct SortObj *shadow = sortobj(puckscnum + 1);
+    if (hand && shadow->frame == SPFpuck) shadow->frame = 0;
+    else if (!hand && shadow->frame == 0) shadow->frame = SPFpuck;
     g.sflags |= HI(sfslock);                            /* (the view is the walk's: it follows the referee, no cut to where the puck lay) */
     sk_lock = 1;
     /* NHL 95 PC's checkwindow between plays: the camera follows the referee (object 10h) as he steps to the puck (RefStep: toward
