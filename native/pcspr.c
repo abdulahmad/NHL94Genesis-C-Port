@@ -543,6 +543,7 @@ static void fade_update(const mdrt_vdp *vdp)
  * fight_frame_shown first (the cartridge frame he is drawn with: holding, hooking, falling), whose PC frame is the real one. */
 static int pc_frame(int fr)
 {
+    if (fr >= MODF_BASE) return mod_frame_pc((uint16_t)fr);   /* (the PC's pictures of NHL 95's moves and goalie, mods/anims.c) */
     if (fr < 1 || fr > 657) return -1;
     if (fr >= SPFgloves && fr < SPFPen) return -1;      /* (the fight frames: fight_frame_shown leaves only the gloves, 353) */
     if (fr == SPFPen + 4 || fr == SPFPen + 5) return -1; /* (the box's wall jump seen from the side, below) */
