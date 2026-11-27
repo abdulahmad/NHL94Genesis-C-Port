@@ -82,6 +82,7 @@ void hold_for(int frames);
 void hold_anthem(int frames);
 int hold_skate_carry(int *x, int *y);               /* the puck in the referee's hand on his way to the dot, 256ths of a pixel (0: not now) */
 int hold_skate_ref_step(int *x, int *y);            /* the referee's place on his walk to the dot, 256ths of a pixel, from where he is (0: no walk) */
+int hold_skate_pending(void);                    /* 1 between the face off's set up and the walk's start (the referee stays where he is) */
 void hold_skate_begin(void);                        /* the face off set up: the skaters' places before it moves them ... */
 void hold_skate_arm(void);                          /* ... and after: with RULE_HOLD they skate from the first to the second */
 void hold_skate_place(void);                        /* ... once the controlled players are picked: the skaters shown where they are on their way */
@@ -125,14 +126,23 @@ struct referee_view {
     int32_t vx, vy;                                 /* the speed, 1/65536 pixels a frame */
     int at_dot, drop;                               /* at the face off spot; the frames left of the puck drop */
     int fall, fall_dir;                             /* the frames into his fall (-1: standing), the way he faced */
+    int dir, anim, at;                              /* his facedir; his picture (REF_GLIDE ...) and the frames into it */
 };
+enum { REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL, REF_TURNR };   /* (SPArefglide, SPArefskate, SPArefstop, SPArefturnl / r) */
 void referee_update(void);
 void referee_cx(int16_t x, int16_t y, struct SortObj *o);
 void referee_puck(struct SortObj *puck);
 int referee_get(struct referee_view *v);
-#define REFEREE_STATE_SIZE 22
+/* NHL 95 PC's skating for him on a SortObj of its own (the game's referee's, or the host's picture's: it changes nothing of the
+ * game): referee_skate_start puts him on at x, y; referee_follow is a frame of assreffollow (his spot, skateto, doplayeracc);
+ * referee_glide a frame of updateplayers' glide and the boards (2: a hard hit) */
+void referee_skate_start(struct SortObj *o, int16_t x, int16_t y);
+void referee_follow(struct SortObj *o);
+int referee_glide(struct SortObj *o);
+#define REFEREE_STATE_SIZE 29                       /* (version 10 of the rules' part; 9 and before: REFEREE_STATE_SIZE_9) */
+#define REFEREE_STATE_SIZE_9 22
 size_t referee_state_save(uint8_t *out);
-int referee_state_load(const uint8_t *in);
+int referee_state_load(const uint8_t *in, size_t n);
 
 /* RULE_PENALTIES (mods/penalties.c): pen_minutes, the minutes of penalty pen whose Penaltylist entry has mins (InProgress, the
  * penalty summary); pen_goal_keep, at a power play goal (PenGoalStuff) for player box of team tm in the box, his tmpdst word st:

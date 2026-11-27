@@ -23,6 +23,9 @@ void referee_update(void) {}
 void referee_cx(int16_t x, int16_t y, struct SortObj *o) { (void)x; (void)y; (void)o; }
 void referee_puck(struct SortObj *puck) { (void)puck; }
 int referee_get(struct referee_view *v) { (void)v; return 0; }
+void referee_skate_start(struct SortObj *o, int16_t x, int16_t y) { (void)o; (void)x; (void)y; }
+void referee_follow(struct SortObj *o) { (void)o; }
+int referee_glide(struct SortObj *o) { (void)o; return 0; }
 
 /* mods/hold.c: the between-play pause, the announcer's wait, the anthem and the skate to the spots. The cartridge goes
  * straight back to the face off. */
@@ -45,6 +48,7 @@ int hold_skating(void) { return 0; }
 int hold_skate_ref(void) { return -1; }
 int hold_skate_carry(int *x, int *y) { (void)x; (void)y; return 0; }
 int hold_skate_ref_step(int *x, int *y) { (void)x; (void)y; return 0; }
+int hold_skate_pending(void) { return 0; }
 void hold_tick(void) {}
 int hold_wait(void) { return 0; }
 void hold_reset(void) {}

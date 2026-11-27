@@ -69,7 +69,8 @@ static const signed char logo_of_art[28] = { 0, 1, 2, 3, 4, 10, 5, 6, 7, 8, 9, 1
 static struct {
     SDL_atomic_t on, phys;                  /* phys: skaters bump him (ref_bump), the picture's alone */
     int init, x, y, vx, vy;                 /* the rink position and velocity in 1/256 pixels */
-    int dir, t, wasfo, drop, fall;          /* fall: the frames into his fall (RULE_REFEREE), -1 standing */
+    int dir, t, wasfo, drop, fall;          /* fall: the frames into his fall (RULE_REFEREE), -1 standing; t: the frames into his picture */
+    int anim;                               /* his picture: REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL / R (src/rules.h) */
     int sx, sy, valid;                      /* the sprite table position of the last frame */
 } R;
 
@@ -599,8 +600,35 @@ static int ref_bump(void)
     return hit;
 }
 
-/* where the referee stands, from the PC's assreffollow (the puck's zone picks a spot beside the boards; the view's middle gives the y)
- * and assrefatdot (at the face off spot, facing the dot) */
+/* doplayeracc's turn for the picture's referee where the game does not turn him (the walk to the dot, mods/hold.c): toward want, a
+ * step of 45 degrees when 16 x 300h (from rest; 180h at speed) a frame has made 10000h, 95 PC's facedir as a 16.16 (pad_34). rate: the
+ * share a frame, 10000h / rate frames a step (assrefdrop's and assrefwhistle's turn at the dot is a step every 8 ticks: 2000h).
+ * Before, the walk's way snapped him round at once, by as much as half a turn */
+static void ref_turn(int want, unsigned rate)
+{
+    static unsigned acc;
+    int t = (want - R.dir) & 7;
+    if (!t) { acc = 0; return; }
+    acc += rate;
+    if (acc < 0x10000) return;
+    acc -= 0x10000;
+    R.dir = (R.dir + (t <= 4 ? 1 : -1)) & 7;
+}
+
+/* the picture's own referee (the Visual only one, RULE_REFEREE off): NHL 95 PC's skating on a SortObj of his own (mods/referee.c:
+ * referee_follow, referee_glide), which reads the game and changes nothing of it */
+static struct SortObj VO;
+static int vo_live;                                      /* (VO moved him last frame) */
+static void vo_to_r(void)
+{
+    int K = g.PalMode ? 0x16 : 0x11;
+    R.x = POS32(VO.Xpos, VO.Xfrac) >> 8; R.y = POS32(VO.Ypos, VO.Yfrac) >> 8;
+    R.vx = VO.Xvel * K / 256; R.vy = VO.Yvel * K / 256;
+    R.dir = VO.facedir & 7; R.anim = VO.SPA; R.t = VO.SPAcnt;
+}
+
+/* where the referee stands: NHL 95 PC's assreffollow (in play: mods/referee.c, the game's referee's or the picture's own), the walk
+ * to the dot (mods/hold.c) and assrefatdot (at the face off spot, facing the dot) */
 static void ref_live(void)
 {
     struct referee_view gv;
@@ -613,95 +641,63 @@ static void ref_live(void)
     int fo = asn == pfaceoff || asn == pfaceoff2;
     int fx = (int16_t)g.fox, fy = (int16_t)g.foy;
     int px = pk->Xpos, py = pk->Ypos, cy = (int16_t)g.Vpos;
-    int ax_, ay_, ad_, am_;
+    int ax_, ay_, ad_, am_, vis = 0;
     if (hold_anthem_ref(&ax_, &ay_, &ad_, &am_)) {                           /* (the anthem: at the side with the players in their lines) */
         R.x = ax_ * 256; R.y = ay_ * 256; R.vx = R.vy = 0;
-        R.dir = ad_; R.t = am_ ? R.t + 1 : 0; R.wasfo = 1; R.drop = 0; R.init = 1;
+        R.dir = ad_; R.t = am_ ? R.t + 1 : 0; R.anim = am_ ? REF_SKATE : REF_GLIDE; R.wasfo = 1; R.drop = 0; R.init = 1;
     } else if (fo) {
-        int tx = (fx > 0 ? fx + 15 : fx - 15) * 256, ty = fy * 256;
-        int pr = hold_skate_ref();                                           /* (the between-play pause: he skates to the dot with the players) */
-        if (pr >= 0 && pr < 256 && hold_skate_pstart() && (!R.init || !R.wasfo)) {   /* (the start of a period: he comes on with the puck from where the PC starts him) */
-            int sx0, sy0, pk0;
-            hold_skate_puck(&sx0, &sy0, &pk0);
-            R.x = sx0 * 256; R.y = sy0 * 256; R.vx = R.vy = 0; R.init = 1; R.wasfo = 0;
-        }
-        if (pr >= 0 && pr < 256 && R.init) {
-            static int fx0, fy0, started;
-            if (!started || !R.wasfo) { fx0 = R.x; fy0 = R.y; started = 1; }
-            int pkx, pky, pick;
-            hold_skate_puck(&pkx, &pky, &pick);
-            pkx *= 256; pky *= 256;
-            int sx, sy, ex, ey, hx, hy;                                      /* (to the puck where it lay, then with it to the dot) */
-            if (pr < pick) { sx = fx0; sy = fy0; ex = pkx; ey = pky; }
-            else { sx = pkx; sy = pky; ex = tx; ey = ty; }
-            double ddx = ex - sx, ddy = ey - sy;
-            if (referee_get(&gv)) { R.x = gv.x / 256; R.y = gv.y / 256; }   /* (RULE_REFEREE: where the game has him on his walk) */
-            else if (hold_skate_carry(&hx, &hy)) { R.x = hx; R.y = hy; }      /* (he has the puck: where the game has it, mods/hold.c) */
-            else if (pr < pick) {                                            /* (on his way to it: the picture's own) */
-                R.x = (int)(sx + ddx * pr / pick);
-                R.y = (int)(sy + ddy * pr / pick);
-            } else {                                                         /* (the start of a period: the puck stays at the dot) */
-                R.x = (int)(sx + ddx * (pr - pick) / (256 - pick));
-                R.y = (int)(sy + ddy * (pr - pick) / (256 - pick));
-            }
-            if (ddx * ddx + ddy * ddy > 256.0 * 256.0 * 16) {
-                int d = (int)floor(atan2(ddx, ddy) / (M_PI / 4) + 0.5);
-                R.dir = ((d % 8) + 8) % 8;
-                R.t++;
-            }
+        int ox = R.x, oy = R.y, walk = hold_skate_ref() >= 0, put = 0;
+        static uint16_t stepvc;
+        if (referee_get(&gv)) { R.x = gv.x / 256; R.y = gv.y / 256; put = !walk && !hold_skate_pending(); }   /* (RULE_REFEREE: where the game has him) */
+        else if (walk) {                                                     /* (the between-play pause: his walk, mods/hold.c, a step a frame) */
+            if (!R.init) { int pick; hold_skate_puck(&R.x, &R.y, &pick); R.x *= 256; R.y *= 256; }   /* (not seen till now, the penalty screen: at the puck) */
+            if (g.Vcount != stepvc) { int x = R.x, y = R.y; if (hold_skate_ref_step(&x, &y)) { R.x = x; R.y = y; } }
+        } else if (R.init && hold_skate_pending()) {
+            /* (the face off is set up a frame before the walk is: he stays where he is. Put at the dot that frame, the walk then
+             * started from the dot (PR #167's walk) or from where the period's start had left him (the fx0 it kept): gone from
+             * the view and back, or a jump) */
+        } else { R.x = (fx > 0 ? fx + 15 : fx - 15) * 256; R.y = fy * 256; put = 1; }
+        stepvc = g.Vcount;
+        double ddx = R.x - ox, ddy = R.y - oy;
+        int want = fx > 0 ? 6 : 2;
+        if (walk && R.init && ddx * ddx + ddy * ddy > 77.0 * 77.0) {        /* (on his way, over 0.3 a frame: striding, turning to his way) */
+            int d = (int)floor(atan2(ddx, ddy) / (M_PI / 4) + 0.5);
+            ref_turn(((d % 8) + 8) % 8, 0x1800);
+            R.anim = REF_SKATE; R.t = R.t + 1;
         } else {
-            R.x = tx;
-            R.y = ty;
-            R.t = 0;
-            R.dir = fx > 0 ? 6 : 2;
+            if (put || !R.init) R.dir = want;                                /* (put at the dot: assrefatdot's facing) */
+            else ref_turn(want, 0x2000);                                     /* (there: a step every 8, assrefdrop's) */
+            R.anim = REF_GLIDE; R.t = 0;
         }
         R.vx = R.vy = 0;
         R.wasfo = 1; R.drop = 0; R.init = 1;
-    } else if (referee_get(&gv) && !gv.at_dot) {                            /* (RULE_REFEREE: in play, where the game has him) */
+    } else if (referee_get(&gv)) {                                          /* (RULE_REFEREE: in play, where the game has him) */
         R.x = gv.x / 256; R.y = gv.y / 256; R.vx = gv.vx / 256; R.vy = gv.vy / 256;
         R.wasfo = 0; R.drop = gv.drop; R.init = 1;
-        int rx = R.x / 256;
-        double sp = sqrt((double)R.vx * R.vx + (double)R.vy * R.vy) / 256.0;
-        if (gv.fall >= 0) R.fall = gv.fall;                                  /* (down: he keeps the way he faced) */
-        else if (sp > 0.45 && !R.drop) {
-            int d = (int)floor(atan2((double)R.vx, (double)R.vy) / (M_PI / 4) + 0.5);
-            R.dir = ((d % 8) + 8) % 8;
-        } else if (!R.drop) R.dir = px > rx ? 2 : 6;
-        R.t = sp > 0.45 && gv.fall < 0 ? R.t + 1 : 0;
+        R.dir = gv.dir; R.anim = gv.anim; R.t = gv.at;
+        if (gv.fall >= 0) { R.fall = gv.fall; R.dir = gv.fall_dir; }
     } else {
-        if (!R.init) { R.x = (px > 0 ? 0x7C : -0x7C) * 256; R.y = cy * 256; R.init = 1; R.vx = R.vy = 0; }
-        if (R.wasfo) { R.wasfo = 0; R.drop = 24; }                           /* (the puck is dropped: the referee's drop) */
-        int rx = R.x / 256, ry = R.y / 256, tx, ty;
-        int ax = px < 0 ? -px : px, ay = py < 0 ? -py : py;
-        if (pk->pflags2 & (1 << pf2fight)) {                                                                        /* a fight: watching it from 50h (NHL 93's assfwatch), */
-            int fx_ = (int16_t)g.xc1, fy_ = (int16_t)g.yc1, gx = rx - fx_, gy = ry - fy_;                           /* never between the two (mods/referee.c) */
-            double gl = sqrt((double)gx * gx + (double)gy * gy);
-            if (gl < 1) { gx = fx_ > 0 ? -1 : 1; gy = 0; gl = 1; }
-            tx = fx_ + (int)(gx * 0x50 / gl); ty = fy_ + (int)(gy * 0x50 / gl);
-            if (tx > 0x7E || tx < -0x7E) {                                                                          /* (the boards: along them, 50h off) */
-                tx = tx > 0 ? 0x7E : -0x7E;
-                double r2 = 0x50 * 0x50 - (double)(tx - fx_) * (tx - fx_);
-                ty = fy_ + (gy < 0 ? -1 : 1) * (int)(r2 > 0 ? sqrt(r2) : 0);
+        vis = 1;
+        if (!R.init) { referee_skate_start(&VO, (int16_t)(px > 0 ? 0x7A : -0x7A), (int16_t)cy); vo_to_r(); R.init = 1; }
+        else if (!vo_live || R.wasfo) {                                      /* (from the walk, the dot or the game's referee: he goes on from where he is) */
+            referee_skate_start(&VO, (int16_t)(R.x / 256), (int16_t)(R.y / 256));
+            VO.facedir = (int16_t)R.dir;
+        }
+        if (R.wasfo) { R.wasfo = 0; R.drop = 24; }                           /* (the puck is dropped: the referee's drop, then he skates from there) */
+        if (R.drop > 0) { R.drop--; VO.Xvel = VO.Yvel = 0; }
+        else referee_follow(&VO);
+        if (SDL_AtomicGet(&R.phys) && !rules[RULE_REFEREE]) {
+            int K = g.PalMode ? 0x16 : 0x11;
+            vo_to_r();
+            if (ref_bump()) {
+                VO.Xpos = (int16_t)(R.x >> 8); VO.Xfrac = (uint16_t)(R.x << 8); VO.Ypos = (int16_t)(R.y >> 8); VO.Yfrac = (uint16_t)(R.y << 8);
+                VO.Xvel = (int16_t)(R.vx * 256 / K); VO.Yvel = (int16_t)(R.vy * 256 / K);
             }
-        } else if (ax < 0x32 && ay > 0xAC && ay < 0xE8) { tx = rx > 0 ? 0x46 : -0x46; ty = py > 0 ? 0xED : -0xED; }   /* behind the net */
-        else if (ax > 0x62 && ay > 0x80) { tx = rx > 0 ? 0x6A : -0x6A; ty = py > 0 ? 0xE8 : -0xE8; }              /* in a corner */
-        else { tx = rx > 0 ? 0x7C : -0x7C; ty = (ry - cy < 0 ? cy - ry : ry - cy) > 0x32 ? cy : ry; }          /* beside the play */
-        int dx = tx * 256 - R.x, dy = ty * 256 - R.y;
-        int wx = dx / 12, wy = dy / 12, m = 2 * 256;                              /* (the speed it wants: easing in, at most 2 a frame) */
-        double l = sqrt((double)wx * wx + (double)wy * wy);
-        if (l > m) { wx = (int)(wx * m / l); wy = (int)(wy * m / l); }
-        R.vx += (wx - R.vx) / 6;
-        R.vy += (wy - R.vy) / 6;
-        if (SDL_AtomicGet(&R.phys) && !rules[RULE_REFEREE]) ref_bump();
-        R.x += R.vx; R.y += R.vy;
-        double sp = sqrt((double)R.vx * R.vx + (double)R.vy * R.vy) / 256.0;
-        if (sp > 0.45) {
-            int d = (int)floor(atan2((double)R.vx, (double)R.vy) / (M_PI / 4) + 0.5);
-            R.dir = ((d % 8) + 8) % 8;
-        } else R.dir = px > rx ? 2 : 6;                                           /* (standing by the boards: he watches the play, not the boards) */
-        if (R.drop > 0) { R.drop--; R.vx = R.vy = 0; }
-        R.t = sp > 0.45 ? R.t + 1 : 0;
+        }
+        referee_glide(&VO);
+        vo_to_r();
     }
+    vo_live = vis;
     int16_t x = (int16_t)(R.x / 256), y = (int16_t)(R.y / 256);
     find3d(&x, &y, 0);
     if (y == 0x4E20) return;
@@ -709,7 +705,7 @@ static void ref_live(void)
     if (getenv("PCREF_AT")) { int ax, ay; if (sscanf(getenv("PCREF_AT"), "%d,%d", &ax, &ay) == 2) { R.sx = ax; R.sy = ay; } }   /* (a test: the referee put there) */
     R.sy = y;
     R.valid = 1;
-    if (getenv("PCREF_LOG") && (!(g.Vcount & 63) || getenv("PCREF_ALL"))) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d vblank %u\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos, (unsigned)g.Vcount);
+    if (getenv("PCREF_LOG") && (!(g.Vcount & 63) || getenv("PCREF_ALL"))) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d vblank %u anim %d\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos, (unsigned)g.Vcount, R.anim);
 }
 
 /* The instant replay: the cartridge has no referee in its recorded frames, so the picture keeps its own beside them. Each tick of the game
@@ -719,7 +715,7 @@ static void ref_live(void)
 #define REP_FRAME 0x62
 #define REP_END 0xFFFFAF54u
 #define REP_N ((REP_END - RAM_BASE) / REP_FRAME)
-static struct { int8_t have, fo; int8_t dir; int16_t fall, drop; int32_t x, y, t; } REP[REP_N];
+static struct { int8_t have, fo; int8_t dir, anim; int16_t fall, drop; int32_t x, y, t; } REP[REP_N];
 static struct { int on, slot, fo; } RPL = { 0, -1, 0 };
 static __typeof__(R) R_before;                                   /* (the referee at the record point, while the replay is on) */
 
@@ -746,7 +742,7 @@ static void ref_tick(void)
         if (k >= 0) {
             const struct SortObj *pk = sortobj(puckscnum);
             int asn = pk->asslist[pk->assnum & 7];
-            REP[k].have = (int8_t)R.valid; REP[k].x = R.x; REP[k].y = R.y; REP[k].dir = (int8_t)R.dir; REP[k].t = R.t;
+            REP[k].have = (int8_t)R.valid; REP[k].x = R.x; REP[k].y = R.y; REP[k].dir = (int8_t)R.dir; REP[k].anim = (int8_t)R.anim; REP[k].t = R.t;
             REP[k].fall = (int16_t)R.fall; REP[k].drop = (int16_t)R.drop; REP[k].fo = (int8_t)(asn == pfaceoff || asn == pfaceoff2);
         }
         return;
@@ -761,7 +757,7 @@ static void ref_tick(void)
     if (k < 0 || !REP[k].have) { RPL.slot = k; return; }
     RPL.slot = k;
     R.x = rev ? -REP[k].x : REP[k].x; R.y = rev ? -REP[k].y : REP[k].y;
-    R.dir = rev ? (REP[k].dir + 4) & 7 : REP[k].dir; R.t = REP[k].t; R.fall = REP[k].fall; R.drop = REP[k].drop; RPL.fo = REP[k].fo;
+    R.dir = rev ? (REP[k].dir + 4) & 7 : REP[k].dir; R.t = REP[k].t; R.anim = REP[k].anim; R.fall = REP[k].fall; R.drop = REP[k].drop; RPL.fo = REP[k].fo;
     int16_t x = (int16_t)(R.x / 256), y = (int16_t)(R.y / 256);
     find3d(&x, &y, 0);
     if (y == 0x4E20) return;
@@ -779,7 +775,7 @@ static int ref_frame(void)
     int d = R.dir & 7;
     int fo = RPL.on ? RPL.fo : asn == pfaceoff || asn == pfaceoff2;   /* (the replay: as he was in the frame on show) */
     if (hold_anthem_time() >= 0 && !RPL.on) return idle_ref(hold_anthem_time());                                  /* (the anthem: the referee's standing picture) */
-    if (fo && R.t == 0) return (d >= 3 && d <= 6) ? 711 : 703;       /* (still: skating to the dot, he is not) */       /* (SPAreffowait) */
+    if (fo && R.t == 0 && R.anim == REF_GLIDE) return (d >= 3 && d <= 6) ? 711 : 703;   /* (still: skating to the dot, he is not) */   /* (SPAreffowait) */
     if (R.fall >= 0) return 787 + 3 * d + (R.fall < 10 ? 0 : R.fall < 38 ? 1 : 2);     /* (SPAreffallback: 10, 28, 10 ticks) */
     if (R.drop > 0) {                                                                    /* (SPArefdrop: 8 ticks each) */
         int k = (24 - R.drop) / 8;
@@ -787,9 +783,14 @@ static int ref_frame(void)
         return k == 0 ? 843 : k == 1 ? 844 : 703;
     }
     int b = 5 * ((8 - d) & 7);
-    if (R.t == 0) return 650 + b;                                                      /* (SPArefglide) */
     static const int o[4] = { 2, 3, 0, 1 };
-    return 651 + b + o[(R.t / 6) & 3];                                                   /* (SPArefskate) */
+    switch (R.anim) {                                                                    /* (95 PC's frames.asm) */
+    case REF_SKATE: return 651 + b + o[(R.t / 10) & 3];                                  /* (SPArefskate: 10 ticks a frame) */
+    case REF_STOP: return 771 + 2 * d + ((R.t / 4) & 1);                                 /* (SPArefstop: 4 ticks a frame, looping) */
+    case REF_TURNL: return 755 + d;                                                      /* (SPArefturnl) */
+    case REF_TURNR: return 763 + d;                                                      /* (SPArefturnr) */
+    default: return 650 + b;                                                             /* (SPArefglide) */
+    }
 }
 
 /* the sprite table entries of the last sprite the hook took */
