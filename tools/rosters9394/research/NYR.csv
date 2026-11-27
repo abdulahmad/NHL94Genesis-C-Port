@@ -1,0 +1,37 @@
+code,number,name,pos,shoots,height,weight,gp,g,a,pim,plusminus,gaa,svpct,opening,deadline,notes
+NYR,33,Tony Amonte,RW,L,6-0,200,72,16,22,31,5,,,3,0,
+NYR,36,Glenn Anderson,RW,L,6-1,190,12,4,2,12,1,,,0,3,
+NYR,5,Peter Andersson,D,L,6-0,196,8,1,1,2,-3,,,0,0,number 5 shared with Norstrom
+NYR,23,Jeff Beukeboom,D,R,6-5,230,68,8,8,170,18,,,0,3,
+NYR,29,Phil Bourque,LW,L,6-1,196,16,0,1,8,-2,,,0,0,
+NYR,22,Mike Gartner,RW,R,6-0,187,71,28,24,58,11,,,3,0,
+NYR,17,Greg Gilbert,LW,L,6-1,191,76,4,11,29,-3,,,3,3,
+NYR,9,Adam Graves,LW,L,6-0,205,84,52,27,127,27,,,3,3,
+NYR,18,Mike Hartman,LW,L,6-0,190,35,1,1,70,-5,,,3,0,
+NYR,16,Jim Hiller,RW,R,6-0,190,2,0,0,7,1,,,0,0,number 16 shared with Noonan
+NYR,15,Mike Hudson,C,L,6-1,205,48,4,7,47,-5,,,2,0,
+NYR,25,Alexander Karpovtsev,D,R,6-3,221,67,3,15,58,12,,,1,3,
+NYR,26,Joe Kocur,RW,R,6-0,205,71,2,1,129,-9,,,3,3,
+NYR,27,Alex Kovalev,C,L,6-2,222,76,23,33,154,18,,,3,3,
+NYR,19,Nick Kypreos,RW,L,6-0,205,46,3,5,102,-8,,,0,3,
+NYR,32,Daniel Lacroix,C,L,6-2,205,4,0,0,0,0,,,1,0,number 32 shared with Matteau
+NYR,28,Steve Larmer,RW,L,5-11,195,68,21,39,41,14,,,0,3,
+NYR,2,Brian Leetch,D,L,6-0,185,84,23,56,67,28,,,3,3,
+NYR,6,Doug Lidster,D,R,6-1,190,34,0,2,33,-12,,,3,0,
+NYR,4,Kevin Lowe,D,L,6-2,200,71,5,14,70,4,,,3,3,
+NYR,14,Craig MacTavish,C,L,6-1,195,12,4,2,11,6,,,0,3,
+NYR,39,Todd Marchant,C,L,5-10,179,1,0,0,0,-1,,,0,0,
+NYR,32,Stephane Matteau,LW,L,6-4,215,12,4,3,2,5,,,0,3,number 32 shared with Lacroix; box score spelling Stéphane
+NYR,8,Joby Messier,D,R,6-0,200,4,0,2,0,-1,,,2,0,number 8 shared with Turcotte
+NYR,11,Mark Messier,C,L,6-1,210,76,26,58,76,25,,,3,2,captain
+NYR,13,Sergei Nemchinov,C,L,6-1,205,76,22,27,36,13,,,3,0,
+NYR,16,Brian Noonan,RW,R,6-1,200,12,4,2,12,5,,,0,3,number 16 shared with Hiller
+NYR,5,Mattias Norstrom,D,L,6-2,210,9,0,2,6,0,,,0,0,number 5 shared with Andersson
+NYR,12,Eddie Olczyk,C,L,6-1,207,37,3,5,28,-1,,,0,1,
+NYR,3,James Patrick,D,R,6-2,202,6,0,3,2,1,,,3,0,
+NYR,10,Esa Tikkanen,LW,L,6-1,190,83,22,32,114,5,,,3,3,
+NYR,8,Darren Turcotte,C,L,6-0,182,13,2,4,13,-2,,,3,0,number 8 shared with Joby Messier
+NYR,24,Jay Wells,D,L,6-1,210,79,2,7,110,4,,,3,3,
+NYR,21,Sergei Zubov,D,R,6-1,198,78,12,77,39,20,,,0,3,
+NYR,35,Mike Richter,G,L,5-11,185,68,,,,,2.57,.910,2,2,
+NYR,30,Glenn Healy,G,L,5-9,190,29,,,,,3.03,.878,1,1,

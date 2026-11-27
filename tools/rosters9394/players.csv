@@ -1,0 +1,201 @@
+set,team,number,name,pos,shoots,start,cart,nib
+opening,ANH,1,Ron Tugnutt,G,L,8,Ron Tugnutt,
+opening,ANH,31,Guy Hebert,G,L,15,Guy Hebert,
+opening,ANH,14,Joe Sacco,RW,L,0,,6 3 3 3 3 3 2 4 7 3 3 2 2 2
+opening,ANH,25,Terry Yake,RW,R,0,Terry Yake,
+opening,ANH,22,Shaun Van Allen,C,L,0,,7 3 3 2 3 2 2 4 6 2 3 3 2 2
+opening,ANH,8,Tim Sweeney,LW,L,0,Tim Sweeney,
+opening,ANH,18,Garry Valk,LW,L,0,Garry Valk,
+opening,ANH,32,Stu Grimson,LW,L,0,Stu Grimson,
+opening,ANH,20,Bob Corkum,C,R,0,Bob Corkum,
+opening,ANH,36,Todd Ewen,RW,R,0,Todd Ewen,
+opening,ANH,21,Patrik Carnback,C,L,0,,6 3 3 3 3 2 2 4 6 2 3 3 2 2
+opening,ANH,24,Troy Loney,LW,L,0,Troy Loney,
+opening,ANH,19,Anatoli Semenov,C,L,0,Anatoli Semenov,
+opening,ANH,17,Steven King,RW,R,0,Steven King,
+opening,ANH,33,Jim Thomson,RW,R,0,,9 2 2 1 1 1 1 7 3 2 2 4 1 2
+opening,ANH,16,Peter Douris,RW,R,0,Peter Douris,
+opening,ANH,29,Randy Ladouceur,D,L,0,Randy Ladouceur,
+opening,ANH,23,Bill Houlder,D,L,0,Bill Houlder,
+opening,ANH,6,Sean Hill,D,R,0,Sean Hill,
+opening,ANH,4,David Williams,D,R,0,David Williams,
+opening,ANH,7,Alexei Kasatonov,D,L,0,Alexei Kasatonov,
+opening,ANH,3,Mark Ferner,D,L,0,,7 3 2 2 2 2 2 4 6 1 3 2 3 2
+opening,ANH,44,Myles O'Connor,D,L,0,Myles O'Connor,
+opening,ANH,2,Bobby Dollas,D,L,0,Bobby Dollas,
+opening,BOS,30,Jon Casey,G,L,15,Jon Casey,
+opening,BOS,39,John Blue,G,L,5,John Blue,
+opening,BOS,21,Ted Donato,LW,L,0,Ted Donato,
+opening,BOS,17,Dave Reid,LW,L,0,Dave Reid,
+opening,BOS,20,Bryan Smolinski,C,R,0,,7 3 3 3 3 3 3 5 6 3 3 3 2 3
+opening,BOS,44,Glen Murray,RW,R,0,,8 2 2 2 3 3 2 5 5 3 3 3 2 2
+opening,BOS,23,Steve Heinze,RW,R,0,,7 3 2 2 2 2 2 5 4 2 2 4 2 2
+opening,BOS,12,Adam Oates,C,R,0,Adam Oates,
+opening,BOS,49,Joe Juneau,C,L,0,Joe Juneau,
+opening,BOS,22,Jozef Stumpel,C,R,0,,8 2 3 2 2 2 2 5 5 3 3 3 2 2
+opening,BOS,16,Cam Stewart,LW,L,0,,7 2 2 2 2 2 2 6 4 2 2 3 2 2
+opening,BOS,27,Steve Leach,RW,R,0,,8 3 2 2 2 2 2 7 6 2 3 3 2 3
+opening,BOS,33,Daniel Marois,LW,R,0,,7 3 3 3 2 3 2 5 6 3 3 3 2 2
+opening,BOS,8,Cam Neely,RW,R,0,Cam Neely,
+opening,BOS,48,Fred Knipscheer,C,L,0,,7 3 3 3 2 3 2 4 5 3 3 4 2 3
+opening,BOS,18,Brent Hughes,LW,L,0,Brent Hughes,
+opening,BOS,26,Glen Wesley,D,L,0,Glen Wesley,
+opening,BOS,77,Ray Bourque,D,L,0,Ray Bourque,
+opening,BOS,14,Gordie Roberts,D,L,0,Gordie Roberts,
+opening,BOS,6,Glen Featherstone,D,L,0,,11 3 3 1 2 3 4 6 6 1 3 4 2 4
+opening,BOS,34,David Shaw,D,R,0,David Shaw,
+opening,BOS,32,Don Sweeney,D,L,0,Don Sweeney,
+opening,BOS,25,Paul Stanton,D,R,0,Paul Stanton,
+opening,BOS,28,Mikhail Tatarinov,D,L,0,Mikhail Tatarinov,
+opening,EDM,30,Bill Ranford,G,L,15,Bill Ranford,
+opening,EDM,31,Fred Brathwaite,G,L,4,,3 3 3 3 3 3 3 0 3 3 3 3 3 3
+opening,EDM,16,Kelly Buchberger,RW,L,0,Kelly Buchberger,
+opening,EDM,8,Zdeno Ciger,RW,L,0,Zdeno Ciger,
+opening,EDM,39,Doug Weight,C,L,0,Doug Weight,
+opening,EDM,7,Jason Arnott,C,R,0,,8 3 3 4 4 4 3 5 8 4 4 2 3 3
+opening,EDM,33,Scott Pearson,LW,L,0,Scott Pearson,
+opening,EDM,14,Craig MacTavish,C,L,0,Craig MacTavish,
+opening,EDM,9,Shayne Corson,LW,L,0,Shayne Corson,
+opening,EDM,12,Steven Rice,RW,R,0,Steven Rice,
+opening,EDM,23,Vladimir Vujtek,C,L,0,,7 3 3 3 3 2 2 2 7 3 3 2 3 1
+opening,EDM,28,Roman Oksiuta,RW,L,0,,10 2 2 2 2 2 2 6 4 3 2 3 2 2
+opening,EDM,18,Kirk Maltby,RW,R,0,,7 3 3 2 2 2 2 5 5 2 3 3 2 2
+opening,EDM,37,Dean McAmmond,LW,L,0,,7 3 3 3 3 3 2 2 6 3 3 3 3 1
+opening,EDM,29,Louie DeBrusk,LW,L,0,Louie DeBrusk,
+opening,EDM,27,Todd Elik,C,L,0,Todd Elik,
+opening,EDM,21,Igor Kravchuk,D,L,0,Igor Kravchuk,
+opening,EDM,22,Luke Richardson,D,L,0,Luke Richardson,
+opening,EDM,24,Dave Manson,D,L,0,Dave Manson,
+opening,EDM,6,Ian Herbers,D,L,0,,10 3 2 1 2 2 2 6 6 1 2 4 2 3
+opening,EDM,2,Chris Joseph,D,R,0,Chris Joseph,
+opening,EDM,25,Geoff Smith,D,L,0,Geoff Smith,
+opening,EDM,5,Brad Werenka,D,L,0,Brad Werenka,
+opening,EDM,2,Bob Beers,D,R,0,Bob Beers,
+opening,EDM,15,Fredrik Olausson,D,R,0,Fredrik Olausson,
+opening,EDM,35,Adam Bennett,D,R,0,Adam Bennett,
+opening,STL,31,Curtis Joseph,G,L,15,Curtis Joseph,
+opening,STL,29,Jim Hrivnak,G,L,5,Jim Hrivnak,
+opening,STL,19,Brendan Shanahan,LW,R,0,Brendan Shanahan,
+opening,STL,36,Philippe Bozon,C,L,0,Philippe Bozon,
+opening,STL,14,Kevin Miller,RW,R,0,Kevin Miller,
+opening,STL,38,Igor Korolev,RW,L,0,Igor Korolev,
+opening,STL,15,Craig Janney,C,L,0,Craig Janney,
+opening,STL,39,Kelly Chase,RW,R,0,Kelly Chase,
+opening,STL,12,Vitali Karamnov,LW,L,0,,6 3 3 3 3 3 2 2 7 3 3 2 2 2
+opening,STL,28,Bob Bassen,RW,L,0,Bob Bassen,
+opening,STL,17,Basil McRae,LW,L,0,Basil McRae,
+opening,STL,18,Tony Hrkac,C,L,0,,7 3 3 2 2 2 1 4 5 2 3 3 2 2
+opening,STL,16,Brett Hull,RW,R,0,Brett Hull,
+opening,STL,10,Jim Montgomery,C,R,0,,6 3 3 2 3 2 2 3 5 2 3 3 2 2
+opening,STL,25,Vitali Prokhorov,LW,L,0,,7 3 3 3 2 2 2 4 5 3 3 4 2 2
+opening,STL,37,Kevin Miehm,C,L,0,,7 2 3 2 2 2 1 4 5 3 3 3 2 1
+opening,STL,34,Murray Baron,D,L,0,Murray Baron,
+opening,STL,4,Rick Zombo,D,R,0,Rick Zombo,
+opening,STL,21,Jeff Brown,D,R,0,Jeff Brown,
+opening,STL,44,Bret Hedican,D,L,0,Bret Hedican,
+opening,STL,5,Garth Butcher,D,R,0,Garth Butcher,
+opening,STL,6,Phil Housley,D,L,0,Phil Housley,
+opening,STL,20,Tom Tilley,D,R,0,,7 3 2 2 3 2 2 5 5 1 3 2 3 2
+opening,STL,32,Doug Crossman,D,L,0,Doug Crossman,
+deadline,ANH,31,Guy Hebert,G,L,15,Guy Hebert,
+deadline,ANH,35,Mikhail Shtalenkov,G,L,3,,3 3 3 3 3 3 3 0 3 3 3 3 3 3
+deadline,ANH,14,Joe Sacco,RW,L,0,,6 3 3 3 3 3 2 4 7 3 3 2 2 2
+deadline,ANH,25,Terry Yake,RW,R,0,Terry Yake,
+deadline,ANH,8,Tim Sweeney,LW,L,0,Tim Sweeney,
+deadline,ANH,18,Garry Valk,LW,L,0,Garry Valk,
+deadline,ANH,20,Bob Corkum,C,R,0,Bob Corkum,
+deadline,ANH,36,Todd Ewen,RW,R,0,Todd Ewen,
+deadline,ANH,16,Peter Douris,RW,R,0,Peter Douris,
+deadline,ANH,21,Patrik Carnback,C,L,0,,6 3 3 3 3 2 2 4 6 2 3 3 2 2
+deadline,ANH,47,Stephan Lebeau,C,R,0,Stephan Lebeau,
+deadline,ANH,48,John Lilley,RW,R,0,,6 3 3 3 3 2 1 3 6 3 3 3 3 1
+deadline,ANH,22,Shaun Van Allen,C,L,0,,7 3 3 2 3 2 2 4 6 2 3 3 2 2
+deadline,ANH,32,Stu Grimson,LW,L,0,Stu Grimson,
+deadline,ANH,24,Troy Loney,LW,L,0,Troy Loney,
+deadline,ANH,19,Anatoli Semenov,C,L,0,Anatoli Semenov,
+deadline,ANH,29,Randy Ladouceur,D,L,0,Randy Ladouceur,
+deadline,ANH,2,Bobby Dollas,D,L,0,Bobby Dollas,
+deadline,ANH,6,Sean Hill,D,R,0,Sean Hill,
+deadline,ANH,4,David Williams,D,R,0,David Williams,
+deadline,ANH,3,Mark Ferner,D,L,0,,7 3 2 2 2 2 2 4 6 1 3 2 3 2
+deadline,ANH,23,Bill Houlder,D,L,0,Bill Houlder,
+deadline,ANH,39,Don McSween,D,L,0,,7 3 3 3 3 3 3 4 7 2 3 2 4 2
+deadline,ANH,7,Alexei Kasatonov,D,L,0,Alexei Kasatonov,
+deadline,BOS,30,Jon Casey,G,L,15,Jon Casey,
+deadline,BOS,37,Vincent Riendeau,G,L,5,Vincent Riendeau,
+deadline,BOS,21,Ted Donato,LW,L,0,Ted Donato,
+deadline,BOS,17,Dave Reid,LW,L,0,Dave Reid,
+deadline,BOS,20,Bryan Smolinski,C,R,0,,7 3 3 3 3 3 3 5 6 3 3 3 2 3
+deadline,BOS,44,Glen Murray,RW,R,0,,8 2 2 2 3 3 2 5 5 3 3 3 2 2
+deadline,BOS,18,Brent Hughes,LW,L,0,Brent Hughes,
+deadline,BOS,12,Adam Oates,C,R,0,Adam Oates,
+deadline,BOS,10,Dmitri Kvartalnov,RW,L,0,Dmitri Kvartalnov,
+deadline,BOS,45,Andrew McKim,C,R,0,,6 3 3 2 1 1 1 3 4 2 2 3 2 1
+deadline,BOS,33,Daniel Marois,LW,R,0,,7 3 3 3 2 3 2 5 6 3 3 3 2 2
+deadline,BOS,23,Steve Heinze,RW,R,0,,7 3 2 2 2 2 2 5 4 2 2 4 2 2
+deadline,BOS,48,Fred Knipscheer,C,L,0,,7 3 3 3 2 3 2 4 5 3 3 4 2 3
+deadline,BOS,16,Cam Stewart,LW,L,0,,7 2 2 2 2 2 2 6 4 2 2 3 2 2
+deadline,BOS,49,Joe Juneau,C,L,0,Joe Juneau,
+deadline,BOS,22,Jozef Stumpel,C,R,0,,8 2 3 2 2 2 2 5 5 3 3 3 2 2
+deadline,BOS,26,Glen Wesley,D,L,0,Glen Wesley,
+deadline,BOS,32,Don Sweeney,D,L,0,Don Sweeney,
+deadline,BOS,34,David Shaw,D,R,0,David Shaw,
+deadline,BOS,28,Jamie Huscroft,D,R,0,,11 3 3 1 2 3 5 9 7 0 3 4 2 6
+deadline,BOS,43,Al Iafrate,D,L,0,Al Iafrate,
+deadline,BOS,29,John Gruden,D,L,0,,7 3 2 2 2 1 1 4 6 2 2 2 3 1
+deadline,BOS,14,Gordie Roberts,D,L,0,Gordie Roberts,
+deadline,BOS,77,Ray Bourque,D,L,0,Ray Bourque,
+deadline,BOS,6,Glen Featherstone,D,L,0,,11 3 3 1 2 3 4 6 6 1 3 4 2 4
+deadline,BOS,25,Paul Stanton,D,R,0,Paul Stanton,
+deadline,EDM,31,Fred Brathwaite,G,L,4,,3 3 3 3 3 3 3 0 3 3 3 3 3 3
+deadline,EDM,30,Bill Ranford,G,L,15,Bill Ranford,
+deadline,EDM,16,Kelly Buchberger,RW,L,0,Kelly Buchberger,
+deadline,EDM,8,Zdeno Ciger,RW,L,0,Zdeno Ciger,
+deadline,EDM,39,Doug Weight,C,L,0,Doug Weight,
+deadline,EDM,7,Jason Arnott,C,R,0,,8 3 3 4 4 4 3 5 8 4 4 2 3 3
+deadline,EDM,33,Scott Pearson,LW,L,0,Scott Pearson,
+deadline,EDM,18,Kirk Maltby,RW,R,0,,7 3 3 2 2 2 2 5 5 2 3 3 2 2
+deadline,EDM,12,Steven Rice,RW,R,0,Steven Rice,
+deadline,EDM,17,Scott Thornton,C,L,0,,9 2 2 2 2 2 2 6 5 2 2 3 1 3
+deadline,EDM,37,Dean McAmmond,LW,L,0,,7 3 3 3 3 3 2 2 6 3 3 3 3 1
+deadline,EDM,34,Brent Grieve,LW,L,0,,7 3 3 3 3 3 3 4 6 4 3 4 3 2
+deadline,EDM,25,Mike Stapleton,C,R,0,Mike Stapleton,
+deadline,EDM,36,Todd Marchant,C,L,0,,7 3 3 3 2 2 1 2 6 3 3 2 3 1
+deadline,EDM,14,Craig MacTavish,C,L,0,Craig MacTavish,
+deadline,EDM,9,Shayne Corson,LW,L,0,Shayne Corson,
+deadline,EDM,29,Louie DeBrusk,LW,L,0,Louie DeBrusk,
+deadline,EDM,21,Igor Kravchuk,D,L,0,Igor Kravchuk,
+deadline,EDM,22,Luke Richardson,D,L,0,Luke Richardson,
+deadline,EDM,2,Bob Beers,D,R,0,Bob Beers,
+deadline,EDM,15,Fredrik Olausson,D,R,0,Fredrik Olausson,
+deadline,EDM,20,Boris Mironov,D,R,0,,9 3 2 2 2 2 2 7 6 2 2 3 2 2
+deadline,EDM,32,Gord Mark,D,R,0,,11 3 3 1 2 3 4 9 7 0 3 4 2 5
+deadline,EDM,24,Dave Manson,D,L,0,Dave Manson,
+deadline,EDM,35,Adam Bennett,D,R,0,Adam Bennett,
+deadline,EDM,10,Ilja Byakin,D,L,0,,6 4 3 4 3 3 2 4 9 3 4 1 5 2
+deadline,STL,31,Curtis Joseph,G,L,15,Curtis Joseph,
+deadline,STL,29,Jim Hrivnak,G,L,5,Jim Hrivnak,
+deadline,STL,16,Brett Hull,RW,R,0,Brett Hull,
+deadline,STL,36,Philippe Bozon,C,L,0,Philippe Bozon,
+deadline,STL,14,Kevin Miller,RW,R,0,Kevin Miller,
+deadline,STL,38,Igor Korolev,RW,L,0,Igor Korolev,
+deadline,STL,10,Jim Montgomery,C,R,0,,6 3 3 2 3 2 2 3 5 2 3 3 2 2
+deadline,STL,25,Vitali Prokhorov,LW,L,0,,7 3 3 3 2 2 2 4 5 3 3 4 2 2
+deadline,STL,23,David Mackey,LW,L,0,,8 2 2 2 3 2 2 6 7 3 3 3 2 3
+deadline,STL,93,Petr Nedved,C,L,0,Petr Nedved,
+deadline,STL,26,Peter Stastny,C,L,0,Peter Stastny,
+deadline,STL,12,Vitali Karamnov,LW,L,0,,6 3 3 3 3 3 2 2 7 3 3 2 2 2
+deadline,STL,18,Tony Hrkac,C,L,0,,7 3 3 2 2 2 1 4 5 2 3 3 2 2
+deadline,STL,19,Brendan Shanahan,LW,R,0,Brendan Shanahan,
+deadline,STL,39,Kelly Chase,RW,R,0,Kelly Chase,
+deadline,STL,17,Basil McRae,LW,L,0,Basil McRae,
+deadline,STL,34,Murray Baron,D,L,0,Murray Baron,
+deadline,STL,4,Rick Zombo,D,R,0,Rick Zombo,
+deadline,STL,32,Doug Crossman,D,L,0,Doug Crossman,
+deadline,STL,28,Steve Duchesne,D,L,0,Steve Duchesne,
+deadline,STL,6,Phil Housley,D,L,0,Phil Housley,
+deadline,STL,20,Tom Tilley,D,R,0,,7 3 2 2 3 2 2 5 5 1 3 2 3 2
+deadline,STL,44,Terry Hollinger,D,L,0,,6 2 2 2 2 1 1 4 4 1 1 1 2 0
+deadline,STL,21,Jeff Brown,D,R,0,Jeff Brown,
+deadline,STL,44,Bret Hedican,D,L,0,Bret Hedican,
+deadline,STL,5,Garth Butcher,D,R,0,Garth Butcher,

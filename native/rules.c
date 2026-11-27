@@ -62,7 +62,7 @@ static void page_init(void)
     const char *const *names, *const *labels;
     if (rule_page[0].key) return;
     int n = rosters_list(&names, &labels);
-    if (n > 2) n = 2;                                      /* (the cartridge's and the Sega CD's: no roster sets of the player's own) */
+    if (n > 1 + ROSTERS_BUILTINS) n = 1 + ROSTERS_BUILTINS;   /* (the cartridge's and the built-in ones: no roster sets of the player's own) */
     rule_page[P_ROSTERS] = (mdrt_sdl_option){ "rules.rosters", "Rosters", n, names, labels, 0, 0, 0, 0, NULL, NULL, NULL };
     memcpy(rule_page + P_RULES, rule_options, sizeof rule_options);
     rule_page[P_SPEED] = (mdrt_sdl_option){ "game.speed", "Game Speed", 2, speed_names, speed_labels, 0, 0, 0, 0, NULL, NULL, NULL };

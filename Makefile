@@ -91,7 +91,7 @@ NATIVE := $(wildcard native/*.c)
 # VANILLA=1: the game without the host extras (game rules, roster sets, states, online play):
 # build/nhl94-vanilla, its own objects (native/vanilla/stubs.c, docs/VANILLA.md)
 ifeq ($(VANILLA),1)
-NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c romsrc.c art.c banner.c ratings.c state.c net.c menuopts.c),$(NATIVE)) native/vanilla/stubs.c native/vanilla/mods.c
+NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c rom95g.c romsrc.c art.c banner.c ratings.c state.c net.c menuopts.c),$(NATIVE)) native/vanilla/stubs.c native/vanilla/mods.c
 SRC    := $(wildcard src/*.c)
 VFLAGS := -DNHL94_VANILLA                                # (src/rules.h: every RULE() the cartridge's 0)
 BIN    ?= build/nhl94-vanilla$(EXE)
