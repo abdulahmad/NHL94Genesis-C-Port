@@ -51,6 +51,7 @@ static struct {
     int crowd_live;                         /* frames left of the game's crowd (updatesound) */
     float duck;                             /* the song's level under the rink announcer, 1 none (the mixer's) */
     int miss;                               /* the mixer's reads of the song's track that failed in a row */
+    long loop_from, loop_to;                /* a looped song's loop: from loop_to back to loop_from (0 0: the whole track) */
     uint8_t ym_addr;                        /* the YM2612's part 1 address latch (the relay's last) */
     SDL_atomic_t voice;                     /* the Ron Barr row: 0 off, 1 on (the music held back), 2 on over the music */
     int16_t *clip;                          /* the clip playing (16276 Hz mono), NULL none */
@@ -213,6 +214,17 @@ static int crowd_bits(void)
 
 /* SEGACD_LOG: each start and stop of a disc track, where it was and why (the game's frame; the mixer's calls are the sound thread's) */
 static int cd_log(void) { static int log = -1; if (log < 0) log = SDL_getenv("SEGACD_LOG") != NULL; return log; }
+/* the songs the disc loops, looped inside the music as NHL 95 PC's desk does (Abdul): the scouting report's (track 3, the song NHL 94 PC's
+ * menus play as ADTITLE.KMS) from its first downbeat to the bar before its three closing stabs, 50 bars; the intermission's (track 5,
+ * the song NHL 95 PC's desk plays as MAINDESK.IFF / TONIGHTS.IFF) from MAINDESK's loop start through TONIGHTS' end and one bar on,
+ * up to its held closing chord, 42 bars. The lead-in before each plays once. Frames from the track's INDEX 01, for the disc's own
+ * track lengths (another length: another rip's cut, the whole track looped as before). 147 and 150.17 beats a minute. */
+static const struct { int track; long frames, from, to; } song_loop[] = {
+    { 3, 3818472L, 15772L, 3615772L },
+    { 5, 3215772L, 50961L, 3011145L },
+};
+#define LOOP_XF 441                         /* (frames: 10 ms crossfade into the loop's start) */
+
 static void play_why(int track, int loop, int bed, const char *why)
 {
     if (S.track == track && S.loop == loop) { S.bed = bed; return; }   /* (the same song asked again: it goes on) */
@@ -223,6 +235,9 @@ static void play_why(int track, int loop, int bed, const char *why)
     S.bed = bed;
     S.at = 0;
     S.miss = 0;
+    S.loop_from = S.loop_to = 0;
+    for (unsigned k = 0; loop && k < sizeof song_loop / sizeof song_loop[0]; k++)
+        if (song_loop[k].track == S.track && song_loop[k].frames == S.frames) { S.loop_from = song_loop[k].from; S.loop_to = song_loop[k].to; }
 }
 static void stop_why(const char *why)
 {
@@ -545,9 +560,25 @@ void segacd_mix(int16_t *out, int frames, unsigned rate)
     int i = 0;
     while (i < frames && S.track) {
         long at = (long)S.at;
+        if (S.loop_to && at >= S.loop_to) { S.at -= (double)(S.loop_to - S.loop_from); continue; }
         int want = (int)((frames - i) * step) + 2;
         if (want > 1024) want = 1024;
+        if (S.loop_to && at + want > S.loop_to + 1) want = (int)(S.loop_to + 1 - at);
         long got = ob_cd_track_read(S.cd, S.track, at, buf, want);
+        if (S.loop_to && got >= 2 && at + got > S.loop_to - LOOP_XF) {   /* (the loop's end: into its start) */
+            static int16_t alt[2 * 1100];
+            long a0 = at > S.loop_to - LOOP_XF ? at : S.loop_to - LOOP_XF, n2 = at + got - a0;
+            long g2 = ob_cd_track_read(S.cd, S.track, a0 - (S.loop_to - S.loop_from), alt, n2);
+            for (long q = 0; q < g2; q++) {
+                long p = a0 + q;
+                float w = (float)(p - (S.loop_to - LOOP_XF)) / LOOP_XF;
+                if (w > 1) w = 1;
+                for (int c = 0; c < 2; c++) {
+                    int16_t *b = &buf[2 * (p - at) + c];
+                    *b = (int16_t)(*b * (1 - w) + alt[2 * q + c] * w);
+                }
+            }
+        }
         if (got < 2 && at + 2 < S.frames && ++S.miss < MISS_MAX) {   /* (a read that failed short of the end: this frame without it, not the song's end) */
             if (cd_log()) fprintf(stderr, "segacd: frame %ld track %d: no read at %.1f s (%d)\n", native_frames(), S.track, S.at / OB_CD_RATE, S.miss);
             break;
