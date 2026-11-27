@@ -1013,31 +1013,103 @@ static int tile_px(const mdrt_vdp *v, uint16_t e, int x, int y)
 }
 
 /* where the crest is in the planes: the cells of plane A (0) or B (1) whose tile is one of the crest's, in plane pixels (x0, y0 the top
- * left, x1, y1 past the bottom right); 0 when no cell has one */
+ * left, x1, y1 past the bottom right; past the plane's right or bottom edge when the crest runs round it); 0 when no cell has one.
+ * The cartridge streams the rink's rows into a plane shorter than the rink as it scrolls: near the screen's top or bottom edge the
+ * crest's rows off the screen are the far end of the rink's, and only part of the crest is in the plane. Once the whole crest has
+ * been seen (with a row of the rink in view past each of its edges, so none of its rows can be one the cartridge has written over), its
+ * layout is kept (LC: the cell of each of its 24 tiles, and the centre line's rows in it), and from then on the crest's place is the
+ * one the cells still in the plane give by that layout: full is the whole crest's, c only the part still in the plane. Returns 2 when
+ * part of the crest is gone (full by the layout kept), else 1 (c and full the same). Only the VDP's state and the frames shown before
+ * go in: the picture only, nothing of the game's */
 struct crest_at { int plane, x0, y0, x1, y1, pw, ph; uint32_t table; };
-static int crest_cells(const mdrt_vdp *v, int crest, struct crest_at *c)
+static struct {
+    int ok, crest, plane, pw, ph, cw, ch, n; uint32_t table;
+    signed char dx[24], dy[24];              /* (each tile's cell from the crest's top left; -1: not in it, or in it twice) */
+    int line, ly0, ly1, bl, b0, b1;           /* (the centre line's rows, from the crest's top: the red at 5 cells left of it, and its edges) */
+    int at, ox, oy;                           /* (where the crest was last seen in the plane, by its layout: its top left in plane pixels) */
+    int sy_ok, sy; uint16_t sy_at;            /* (its middle's row on the screen then, and the frame (Vcount)) */
+} LC;
+static int crest_cells(const mdrt_vdp *v, int crest, struct crest_at *c, struct crest_at *full)
 {
     static const int cells[4] = { 32, 64, 32, 128 };
     int w = cells[v->s.reg[16] & 3], h = cells[(v->s.reg[16] >> 4) & 3];
+    if (LC.ok && LC.crest != crest) LC.ok = 0;
     for (int plane = 1; plane >= 0; plane--) {
         uint32_t table = plane ? (uint32_t)(v->s.reg[4] & 7) << 13 : (uint32_t)(v->s.reg[2] & 0x38) << 10;
         int cx0 = 1 << 20, cy0 = 1 << 20, cx1 = -1, cy1 = -1, cn = 0;
+        static short ck[512], cr[512], ct[512];
         for (int r = 0; r < h; r++)
             for (int k = 0; k < w; k++) {
                 uint32_t a = (table + (uint32_t)((r * w + k) << 1)) & 0xFFFE;
                 int t = (v->s.vram[a] << 8 | v->s.vram[a + 1]) & 0x7FF;
                 if (t < crest || t >= crest + 24) continue;
+                if (cn < 512) { ck[cn] = (short)k; cr[cn] = (short)r; ct[cn] = (short)(t - crest); }
                 cn++;
                 if (k < cx0) cx0 = k;
                 if (k > cx1) cx1 = k;
                 if (r < cy0) cy0 = r;
                 if (r > cy1) cy1 = r;
             }
+        if (!cn) continue;
+        if (LC.ok && LC.plane == plane && LC.table == table && LC.pw == w * 8 && LC.ph == h * 8 && cn <= 512) {
+            int bo = -1, bv = 0;                                       /* (the crest's top left the most cells give by the layout) */
+            for (int i = 0; i < cn; i++) {
+                if (LC.dx[ct[i]] < 0) continue;
+                int o = ((cr[i] - LC.dy[ct[i]]) & (h - 1)) * w + ((ck[i] - LC.dx[ct[i]]) & (w - 1)), n = 0;
+                if (o == bo) continue;
+                for (int j = 0; j < cn; j++)
+                    n += LC.dx[ct[j]] >= 0 && (((cr[j] - LC.dy[ct[j]]) & (h - 1)) * w + ((ck[j] - LC.dx[ct[j]]) & (w - 1))) == o;
+                if (n > bv) { bv = n; bo = o; }
+            }
+            if (bv) {
+                int ox = bo % w, oy = bo / w, x0 = 1 << 20, y0 = 1 << 20, x1 = -1, y1 = -1, in = 0;
+                for (int i = 0; i < cn; i++) {                         /* (the cells of this crest: in its layout's box from there) */
+                    int dx = (ck[i] - ox) & (w - 1), dy = (cr[i] - oy) & (h - 1);
+                    if (dx >= LC.cw || dy >= LC.ch) continue;
+                    in++;
+                    if (dx < x0) x0 = dx;
+                    if (dx > x1) x1 = dx;
+                    if (dy < y0) y0 = dy;
+                    if (dy > y1) y1 = dy;
+                }
+                *full = (struct crest_at){ plane, ox * 8, oy * 8, (ox + LC.cw) * 8, (oy + LC.ch) * 8, w * 8, h * 8, table };
+                *c = (struct crest_at){ plane, (ox + x0) * 8, (oy + y0) * 8, (ox + x1 + 1) * 8, (oy + y1 + 1) * 8, w * 8, h * 8, table };
+                return in == LC.n && x0 == 0 && y0 == 0 && x1 == LC.cw - 1 && y1 == LC.ch - 1 ? 1 : 2;
+            }
+        }
         if (cn < 12 || cx1 - cx0 >= w / 2 || cy1 - cy0 >= h / 2) continue;   /* (none, a stray tile of another screen, or not one crest: wrapped round the plane) */
-        *c = (struct crest_at){ plane, cx0 * 8, cy0 * 8, (cx1 + 1) * 8, (cy1 + 1) * 8, w * 8, h * 8, table };
+        *c = *full = (struct crest_at){ plane, cx0 * 8, cy0 * 8, (cx1 + 1) * 8, (cy1 + 1) * 8, w * 8, h * 8, table };
         return 1;
     }
     return 0;
+}
+
+/* the crest's layout kept (LC) from the whole crest c in the plane, seen with a row of the rink past each of its edges on the screen
+ * (vs, hsv the plane's scroll there; w, h the screen's): its tiles' cells. 1 when kept (logo_draw then keeps the line's rows) */
+static int crest_keep(const mdrt_vdp *v, int crest, const struct crest_at *c, int vs, int hsv, int w, int h)
+{
+    int top = ((c->y0 - 8 - vs) & (c->ph - 1)), left = ((c->x0 - 8 + hsv) & (c->pw - 1));
+    if (top >= h / 2 + c->ph / 2) top -= c->ph;
+    if (left >= w / 2 + c->pw / 2) left -= c->pw;
+    if (top < 0 || top + c->y1 - c->y0 + 16 > h || left < 0 || left + c->x1 - c->x0 + 16 > w) return 0;
+    int cw = c->pw / 8, ch = c->ph / 8, n = 0;
+    memset(LC.dx, -1, sizeof LC.dx);
+    memset(LC.dy, -1, sizeof LC.dy);
+    static unsigned char seen[24];
+    memset(seen, 0, sizeof seen);
+    for (int r = c->y0 / 8; r < c->y1 / 8; r++)
+        for (int q = c->x0 / 8; q < c->x1 / 8; q++) {
+            uint32_t a = (c->table + (uint32_t)(((r & (ch - 1)) * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
+            int t = ((v->s.vram[a] << 8 | v->s.vram[a + 1]) & 0x7FF) - crest;
+            if (t < 0 || t >= 24) continue;
+            n++;
+            if (seen[t]++) { LC.dx[t] = LC.dy[t] = -1; continue; }   /* (a tile the crest has twice says nothing of where it is) */
+            LC.dx[t] = (signed char)(q - c->x0 / 8);
+            LC.dy[t] = (signed char)(r - c->y0 / 8);
+        }
+    LC.ok = 1; LC.crest = crest; LC.plane = c->plane; LC.table = c->table; LC.pw = c->pw; LC.ph = c->ph;
+    LC.cw = (c->x1 - c->x0) / 8; LC.ch = (c->y1 - c->y0) / 8; LC.n = n;
+    return 1;
 }
 
 /* pixel x, y of the tile of plane map entry e: the centre line's red (is_red), or its pink edge rows (is_pink: red over green and blue, not white) */
@@ -1104,12 +1176,53 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     int k = logo_of_art[art];
     const struct lset *LS = (mode == 2 || !LGO.L[0].have) && LGO.L[1].have && LGO.L[1].t[k].idx ? &LGO.L[1] : &LGO.L[0];   /* (94 falls back to 95 where it has no such logo) */
     if (!LS->t[k].idx) { logo_why(3, "the PC files have no logo of the home team: the cartridge's crest shown"); return; }
+    if (LGO.seen != team) LC.ok = LC.sy_ok = 0;                          /* (another team's crest: its layout seen again) */
     if (LGO.crest < 0 || !(g.Vcount & 63) || LGO.seen != team) { LGO.crest = find_crest(vdp, team); LGO.seen = team; }
     int log = getenv("PCLOGO_LOG") && (!(g.Vcount & 63) || getenv("PCLOGO_LOG")[0] == '2');
-    if (log) fprintf(stderr, "logo? team %d art %d crest %d\n", team, art, LGO.crest);
+    if (log) fprintf(stderr, "logo? frame %u team %d art %d crest %d\n", (unsigned)g.Vcount, team, art, LGO.crest);
     if (LGO.crest < 0) { if (find3d_visible()) logo_why(4, "the cartridge's crest was not found in the VDP's memory: the cartridge's crest shown"); return; }
-    struct crest_at C;
-    if (!crest_cells(vdp, LGO.crest, &C)) return;                  /* (the crest is in no plane's map: not on the rink in view) */
+    struct crest_at C, F;
+    int got = crest_cells(vdp, LGO.crest, &C, &F);
+    if (!got && LC.ok && LC.at) {                                    /* (none of its cells left: its rows all written over, off the screen,
+                                                                      * while the logo, taller than the crest, still shows: where it was) */
+        static const int cells[4] = { 32, 64, 32, 128 };
+        int pw = cells[vdp->s.reg[16] & 3] * 8, ph = cells[(vdp->s.reg[16] >> 4) & 3] * 8, vs0 = vdp->s.vsram[LC.plane] & 0x7FF, off = 1;
+        uint32_t table = LC.plane ? (uint32_t)(vdp->s.reg[4] & 7) << 13 : (uint32_t)(vdp->s.reg[2] & 0x38) << 10;
+        for (int y = LC.oy; y < LC.oy + LC.ch * 8 && off; y++) off = ((y - vs0) & (ph - 1)) >= h;
+        if (off && pw == LC.pw && ph == LC.ph && table == LC.table) {
+            F = (struct crest_at){ LC.plane, LC.ox, LC.oy, LC.ox + LC.cw * 8, LC.oy + LC.ch * 8, pw, ph, table };
+            C = F; C.y1 = C.y0; got = 2;                             /* (none of its rows the crest's: none changed) */
+        }
+    }
+    LC.at = got && LC.ok && F.plane == LC.plane && F.table == LC.table;
+    if (!got) return;                                                /* (the crest is in no plane's map: not on the rink in view) */
+    /* the crest's middle on the screen, by the plane's scroll as the VDP draws it (vertical: the whole screen's; horizontal: the
+     * line's, the crest's middle line): the whole crest's, by its layout when part of it is gone, so the logo stays on the rink to
+     * the pixel as the crest scrolls off the screen */
+    int vs = vdp->s.vsram[F.plane] & 0x7FF;
+    int sy = ((F.y0 + F.y1) / 2 - vs) & (F.ph - 1);
+    /* (the plane is 256 high and the screen 224: a crest off the screen is as far off its top as off its bottom in the plane. Which:
+     * the side of it the cartridge has written over is the one away from the screen (its top gone: above the screen, its bottom
+     * gone: below); all of it there or none, the side nearer where it was the frame before (the camera moves a few pixels a
+     * frame); with none, the nearer edge) */
+    if (got == 2 && C.y1 > C.y0 && C.y0 > F.y0 && C.y1 == F.y1) { if (sy >= h / 2) sy -= F.ph; }
+    else if (got == 2 && C.y1 > C.y0 && C.y0 == F.y0 && C.y1 < F.y1) { if (sy < h / 2) sy += F.ph; }
+    else if (LC.sy_ok && (uint16_t)(g.Vcount - LC.sy_at) <= 2) { if (abs(sy - F.ph - LC.sy) < abs(sy - LC.sy)) sy -= F.ph; }
+    else if (sy >= h / 2 + F.ph / 2) sy -= F.ph;
+    LC.sy = sy; LC.sy_at = (uint16_t)g.Vcount; LC.sy_ok = 1;
+    int hl = sy < 0 ? 0 : sy >= h ? h - 1 : sy;
+    if ((vdp->s.reg[11] & 3) == 2) hl &= ~7;
+    else if ((vdp->s.reg[11] & 3) != 3) hl = 0;
+    uint32_t hs = ((uint32_t)(vdp->s.reg[13] & 0x3F) << 10) + (uint32_t)(hl << 2) + (F.plane ? 2u : 0u);
+    int hsv = (vdp->s.vram[hs & 0xFFFE] << 8 | vdp->s.vram[(hs & 0xFFFE) + 1]) & 0x3FF;
+    if (hsv & 0x200) hsv -= 0x400;
+    int sx = ((F.x0 + F.x1) / 2 + hsv) & (F.pw - 1);
+    if (sx >= w / 2 + F.pw / 2) sx -= F.pw;
+    int keep = got == 1 && crest_keep(vdp, LGO.crest, &F, vs, hsv, w, h), part = got == 2;
+    if (part) { C.x0 = F.x0; C.x1 = F.x1; }                         /* (C: the crest's rows still in the plane, the only ones changed below;
+                                                                      * the others are the rink past the screen's edge now, some of them in view) */
+    int ch = C.ph / 8;
+#define ROW_OURS(y) (!part || ((y) >= C.y0 && (y) < C.y1))          /* (a row of the plane still the crest's: not one written over) */
     static mdrt_vdp sc;
     static uint16_t blank[320 * 240];
     static uint8_t shows[320 * 240];
@@ -1117,12 +1230,12 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     int cw = C.pw / 8;
     for (int r = C.y0 / 8; r < C.y1 / 8; r++)                        /* (each crest cell: the first cell left of it in the row that is not the crest's) */
         for (int q = C.x0 / 8; q < C.x1 / 8; q++) {
-            uint32_t a = (C.table + (uint32_t)((r * cw + q) << 1)) & 0xFFFE;
+            uint32_t a = (C.table + (uint32_t)(((r & (ch - 1)) * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
             int t = (vdp->s.vram[a] << 8 | vdp->s.vram[a + 1]) & 0x7FF;
             if (t < LGO.crest || t >= LGO.crest + 24) continue;
             uint32_t from = a;
             for (int l = 1; l <= cw; l++) {
-                uint32_t b2 = (C.table + (uint32_t)((r * cw + ((q - l) & (cw - 1))) << 1)) & 0xFFFE;
+                uint32_t b2 = (C.table + (uint32_t)(((r & (ch - 1)) * cw + ((q - l) & (cw - 1))) << 1)) & 0xFFFE;
                 int t2 = (vdp->s.vram[b2] << 8 | vdp->s.vram[b2 + 1]) & 0x7FF;
                 if (t2 < LGO.crest || t2 >= LGO.crest + 24) { from = b2; break; }
             }
@@ -1137,7 +1250,7 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     int lw = LS->t[k].w, lh = LS->t[k].h;
     int ly0 = 1 << 20, ly1 = -1;                                       /* (the line's rows in the plane: its red and its pink edges) */
     for (int r = C.y0 / 8; r < C.y1 / 8; r++) {
-        uint32_t a = (C.table + (uint32_t)((r * cw + ((C.x0 / 8 - 5) & (cw - 1))) << 1)) & 0xFFFE;
+        uint32_t a = (C.table + (uint32_t)(((r & (ch - 1)) * cw + ((C.x0 / 8 - 5) & (cw - 1))) << 1)) & 0xFFFE;
         uint16_t e = (uint16_t)(sc.s.vram[a] << 8 | sc.s.vram[a + 1]);
         int red = 0;
         for (int i = 0; i < 64; i++) red += is_red(&sc, e, i & 7, i >> 3);
@@ -1148,6 +1261,9 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
             if (n >= 2 || pink >= 2) { if (r * 8 + y < ly0) ly0 = r * 8 + y; if (r * 8 + y > ly1) ly1 = r * 8 + y; }
         }
     }
+    if (keep || LC.at) { LC.ox = F.x0; LC.oy = F.y0; LC.at = LC.ok; }
+    if (keep) { LC.line = ly1 >= 0; LC.ly0 = ly0 - C.y0; LC.ly1 = ly1 - C.y0; }
+    if (part) { ly0 = LC.line ? F.y0 + LC.ly0 : 1 << 20; ly1 = LC.line ? F.y0 + LC.ly1 : -1; }   /* (the line's rows as the whole crest had them) */
     int a0 = -1, a1 = -1;                                              /* (the logo's own centre line: the rows red at both its edges) */
     const uint8_t (*lp)[3] = LS == &LGO.L[0] && SDL_AtomicGet(&P.found) ? P.pal : LS->pal;
     for (int y = 0; y < lh; y++) {
@@ -1155,12 +1271,12 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
         if (c0 != 255 && c1 != 255 && lp[c0][0] > 150 && lp[c0][1] < 120 && lp[c1][0] > 150 && lp[c1][1] < 120) { if (a0 < 0) a0 = y; a1 = y; }
     }
     /* the logo in the plane: its middle column the crest's, its line on the cartridge's line (else its middle the crest's) */
-    int pmx = (C.x0 + C.x1) / 2, px0 = pmx - lw / 2, py0 = ly1 >= 0 && a0 >= 0 ? (ly0 + ly1 + 1) / 2 - (a0 + a1 + 1) / 2 : (C.y0 + C.y1) / 2 - lh / 2;
+    int pmx = (F.x0 + F.x1) / 2, px0 = pmx - lw / 2, py0 = ly1 >= 0 && a0 >= 0 ? (ly0 + ly1 + 1) / 2 - (a0 + a1 + 1) / 2 : (F.y0 + F.y1) / 2 - lh / 2;
     uint16_t ice = 0;                                                  /* (a cell of plain ice: one colour, the crest's neighbours give one) */
     int have_ice = 0;
     for (int r = C.y0 / 8; r < C.y1 / 8 && !have_ice; r++)
         for (int q = C.x0 / 8 - 1; q >= C.x0 / 8 - 3 && !have_ice; q--) {
-            uint32_t a = (C.table + (uint32_t)((r * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
+            uint32_t a = (C.table + (uint32_t)(((r & (ch - 1)) * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
             uint16_t e = (uint16_t)(sc.s.vram[a] << 8 | sc.s.vram[a + 1]);
             int c0 = tile_px(&sc, e, 0, 0), same = 1;
             for (int i = 1; i < 64 && same; i++) same = tile_px(&sc, e, i & 7, i >> 3) == c0;
@@ -1169,7 +1285,7 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     for (int r = C.y0 / 8; r < C.y1 / 8; r++) {
         uint16_t run = 0;
         for (int q = C.x0 / 8 - 5; q <= C.x1 / 8 + 4; q++) {
-            uint32_t a = (C.table + (uint32_t)((r * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
+            uint32_t a = (C.table + (uint32_t)(((r & (ch - 1)) * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
             uint16_t e = (uint16_t)(sc.s.vram[a] << 8 | sc.s.vram[a + 1]);
             int t = (vdp->s.vram[a] << 8 | vdp->s.vram[a + 1]) & 0x7FF, red = 0;
             int crest = t >= LGO.crest && t < LGO.crest + 24;
@@ -1192,6 +1308,7 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     if (have_ice && ly1 >= 0 && a0 >= 0 && lw >= 16) {
         int mid = (ly0 + ly1 + 1) / 2;
         for (int y = mid - 6; y <= mid + 6; y++) {                     /* (the cartridge's line: the rows most cells left of the crest have, their colours) */
+            if (!ROW_OURS(y)) continue;                                 /* (its colours from the crest's rows still in the plane) */
             int r = (y >> 3) & (C.ph / 8 - 1), cells = 0;
             for (int q = C.x0 / 8 - 12; q < C.x0 / 8; q++) {
                 uint32_t a = (C.table + (uint32_t)((r * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
@@ -1218,6 +1335,8 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
         }
     }
     if (b1 >= b0 && b1 - b0 > 10) b1 = -1;
+    if (keep) { LC.bl = b1 >= b0; LC.b0 = b0 - C.y0; LC.b1 = b1 - C.y0; }
+    if (part) { b0 = LC.bl ? F.y0 + LC.b0 : 1 << 20; b1 = LC.bl ? F.y0 + LC.b1 : -1; }   /* (the cartridge's line's rows as the whole crest had them) */
     if (b1 >= b0) py0 = (b0 + b1 + 1) / 2 - (a0 + a1 + 1) / 2;          /* (the logo's line on the middle of the cartridge's, edges and all) */
     if (have_ice)                                                      /* (under the logo, in the crest's rows: the ice; the circle stays) */
         for (int r = (py0 > C.y0 ? py0 : C.y0) >> 3; r <= (py0 + lh < C.y1 ? py0 + lh - 1 : C.y1 - 1) >> 3; r++)
@@ -1241,13 +1360,14 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
                 for (int *run = side ? &run_r : &run_l; nearn + run_l + run_r + 1 < cw; ++*run) {
                     int q = side ? q0 + nearn + 1 + *run : q0 - 1 - *run, red = 0;
                     for (int y = b0; y <= b1; y++) {
+                        if (!ROW_OURS(y)) continue;
                         uint32_t a = (C.table + (uint32_t)((((y >> 3) & (C.ph / 8 - 1)) * cw + (q & (cw - 1))) << 1)) & 0xFFFE;
                         uint16_t e = (uint16_t)(sc.s.vram[a] << 8 | sc.s.vram[a + 1]);
                         for (int x = 0; x < 8; x++) red += is_red(&sc, e, x, y & 7) || is_pink(&sc, e, x, y & 7);
                     }
                     if (red < 2) break;
                 }
-            for (int r = b0 >> 3; r <= b1 >> 3; r++)
+            for (int r = b0 >> 3; r <= b1 >> 3; r++) if (ROW_OURS(r * 8))
                 for (int q = 0; q < cw; q++) {
                     int off = (q - q0) & (cw - 1);
                     if (off > nearn + run_r && off < cw - run_l) continue;   /* (past the boards) */
@@ -1313,20 +1433,7 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
     for (int y = 0; y < h; y++)                                      /* (the crest's pixels: where the picture changes) */
         for (int x = 0; x < w; x++)
             if (blank[y * 320 + x] != px[y * pitch_px + x]) pic[(long)y * pitch + x] = 0xFF000000u | mdrt_vdp_rgb(blank[y * 320 + x], MDRT_RGB_GPGX);
-    /* the crest's middle on the screen, by the plane's scroll as the VDP draws it (vertical: the whole screen's; horizontal: the
-     * line's, the crest's middle line) */
-    int vs = vdp->s.vsram[C.plane] & 0x7FF;
-    int sy = ((C.y0 + C.y1) / 2 - vs) & (C.ph - 1);
-    if (sy >= h / 2 + C.ph / 2) sy -= C.ph;
-    int hl = sy < 0 ? 0 : sy >= h ? h - 1 : sy;
-    if ((vdp->s.reg[11] & 3) == 2) hl &= ~7;
-    else if ((vdp->s.reg[11] & 3) != 3) hl = 0;
-    uint32_t hs = ((uint32_t)(vdp->s.reg[13] & 0x3F) << 10) + (uint32_t)(hl << 2) + (C.plane ? 2u : 0u);
-    int hsv = (vdp->s.vram[hs & 0xFFFE] << 8 | vdp->s.vram[(hs & 0xFFFE) + 1]) & 0x3FF;
-    if (hsv & 0x200) hsv -= 0x400;
-    int sx = ((C.x0 + C.x1) / 2 + hsv) & (C.pw - 1);
-    if (sx >= w / 2 + C.pw / 2) sx -= C.pw;
-    int lx = sx - lw / 2, ly = sy + py0 - (C.y0 + C.y1) / 2;         /* (its rows as in the plane: the line's on the cartridge's) */
+    int lx = sx - lw / 2, ly = sy + py0 - (F.y0 + F.y1) / 2;         /* (its rows as in the plane: the line's on the cartridge's) */
     uint32_t ice_rgb = 0xFF000000u | mdrt_vdp_rgb((uint16_t)ice_c, MDRT_RGB_GPGX);
     if (pl_n > 0)                                                      /* (the PC's line out from the logo's edges, where it shows; the ice where the cartridge's was) */
         for (int y = 0; y < h && y < 240; y++)
@@ -1342,7 +1449,8 @@ static void logo_draw(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uin
                 pic[(long)y * pitch + x] = c == 255 ? ice_rgb : fadec(0xFF000000u | (uint32_t)lp[c][0] << 16 | (uint32_t)lp[c][1] << 8 | lp[c][2]);
             }
     if (log) fprintf(stderr, "logo: line plane rows %d-%d, art rows %d-%d, plane top %d, ice %d, screen %d,%d\n", ly0, ly1, a0, a1, py0, have_ice, lx, ly);
-    if (log) fprintf(stderr, "logo: art %d crest tile %d plane %c cells %d,%d-%d,%d scroll %d,%d middle %d,%d\n", art, LGO.crest, C.plane ? 'B' : 'A', C.x0, C.y0, C.x1, C.y1, hsv, vs, sx, sy);
+    if (log) fprintf(stderr, "logo: art %d crest tile %d plane %c cells %d,%d-%d,%d scroll %d,%d middle %d,%d%s%s\n", art, LGO.crest, C.plane ? 'B' : 'A', C.x0, C.y0, C.x1, C.y1, hsv, vs, sx, sy, part ? " (part gone: by the layout kept)" : "", keep ? " (layout kept)" : "");
+#undef ROW_OURS
     if (lx >= w || ly >= h || lx + lw <= 0 || ly + lh <= 0) return;
     if (!layer_mask(drop, -1, 0, lx, ly, lw, lh, w, h, shows)) { if (getenv("PCLOGO_LOG")) fprintf(stderr, "logo: no mask (%dx%d)\n", lw, lh); return; }   /* (plane B's: behind the last sprite, under every high tile) */
     for (int y = 0; y < lh; y++)
