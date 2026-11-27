@@ -56,6 +56,7 @@ void TitleScreen(void)
         memset(g.palfadenew, 0, sizeof g.palfadenew);
         CopyPaletteToCRAM();
         setVram_0();
+        song(SYM_SngTitle);                               /* (the song the title starts, which plays on into the setup screen) */
         return;
     }
     if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 2);
