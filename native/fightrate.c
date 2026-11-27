@@ -44,7 +44,7 @@ static unsigned generation;                        /* (the cache's: a new source
 /* a Latin-1 letter without its accent, lower case; 0 when not a letter */
 static char base_letter(uint8_t c)
 {
-    static const char hi[64] = "aaaaaaaceeeeiiiidnooooo\0ouuuuyts" "aaaaaaaceeeeiiiidnooooo\0ouuuuyty";
+    static const char hi[65] = "aaaaaaaceeeeiiiidnooooo\0ouuuuyts" "aaaaaaaceeeeiiiidnooooo\0ouuuuyty";   /* (64 and the string's own 0) */
     if (c >= 'A' && c <= 'Z') return (char)(c - 'A' + 'a');
     if (c >= 'a' && c <= 'z') return (char)c;
     if (c >= 0xC0) return hi[c - 0xC0];
