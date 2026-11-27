@@ -1,0 +1,39 @@
+code,number,name,pos,shoots,height,weight,gp,g,a,pim,plusminus,gaa,svpct,opening,deadline,notes
+DAL,10,Dave Barr,C,R,6-1,195,20,2,5,21,-6,,,0,0,
+DAL,5,Brad Berry,D,L,6-2,190,8,0,0,12,-2,,,0,0,number 5 shared with Doug Zmolek
+DAL,28,James Black,C,L,6-0,202,13,2,3,2,-4,,,2,0,
+DAL,37,Neil Brady,C,L,6-2,200,5,0,1,21,-1,,,0,0,
+DAL,7,Neal Broten,C,L,5-9,175,79,17,35,62,10,,,2,2,
+DAL,21,Paul Broten,RW,R,5-11,188,64,12,12,30,18,,,0,1,
+DAL,25,Rob Brown,RW,L,5-10,177,1,0,0,0,-1,,,0,0,
+DAL,14,Paul Cavallini,D,L,6-1,202,74,11,33,82,13,,,2,2,
+DAL,27,Shane Churla,RW,R,6-1,200,69,6,7,333,-8,,,2,2,
+DAL,26,Russ Courtnall,RW,R,5-11,185,84,23,57,59,6,,,2,2,
+DAL,20,Mike Craig,RW,R,6-1,185,72,13,24,139,-14,,,0,2,
+DAL,22,Ulf Dahlén,RW,L,6-2,199,65,19,38,10,-1,,,2,0,
+DAL,23-43,Gord Donnelly,D,R,6-1,202,18,0,1,66,-4,,,0,0,wore multiple numbers (23-43)
+DAL,6,Pelle Eklund,LW,L,5-10,175,5,2,1,2,-1,,,0,0,number 6 shared with Jim Johnson
+DAL,16,Dean Evason,C,R,5-10,180,80,11,33,66,-12,,,2,2,
+DAL,15,Dave Gagner,LW,L,5-10,188,76,32,29,83,13,,,2,2,
+DAL,41,Brent Gilchrist,C,L,5-11,180,76,17,14,31,0,,,2,2,
+DAL,2,Derian Hatcher,D,L,6-5,235,83,12,19,211,19,,,2,2,
+DAL,6,Jim Johnson,D,L,6-1,190,53,0,7,51,-6,,,2,0,number 6 shared with Pelle Eklund
+DAL,23,Duane Joyce,D,R,6-2,203,3,0,0,0,0,,,0,0,"number 23 shared with Alan May, Derrick Smith"
+DAL,29,Trent Klatt,LW,R,6-1,210,61,14,24,30,13,,,2,2,
+DAL,18,Mike Lalor,D,L,6-0,200,12,0,1,6,-5,,,0,2,"number 18 shared with Jim McKenzie, Chris Tancill"
+DAL,12,Grant Ledyard,D,L,6-2,195,84,9,37,42,7,,,2,2,
+DAL,3,Craig Ludwig,D,L,6-3,220,84,1,13,123,-1,,,2,2,
+DAL,4,Richard Matvichuk,D,L,6-3,215,25,0,3,22,1,,,0,0,
+DAL,23,Alan May,LW,R,6-1,200,8,1,0,18,-1,,,0,2,"number 23 shared with Duane Joyce, Derrick Smith"
+DAL,18,Jim McKenzie,LW,L,6-4,230,34,2,3,63,4,,,0,0,"number 18 shared with Mike Lalor, Chris Tancill"
+DAL,17,Mike McPhee,LW,L,6-1,203,79,20,15,36,8,,,2,2,
+DAL,9,Mike Modano,C,L,6-3,212,76,50,43,54,-8,,,2,2,
+DAL,35,Andy Moog,G,L,5-8,175,55,,,,,3.27,.894,2,1,
+DAL,33,Mike Needham,RW,R,5-10,185,5,0,0,0,-2,,,0,1,number 33 shared with Tommy Sjödin
+DAL,33,Tommy Sjödin,D,R,5-11,190,7,0,2,4,-1,,,0,0,number 33 shared with Mike Needham
+DAL,23,Derrick Smith,LW,L,6-2,215,1,0,0,0,-1,,,0,0,"number 23 shared with Duane Joyce, Alan May"
+DAL,18,Chris Tancill,C,R,5-10,185,12,1,3,8,-7,,,0,0,"number 18 shared with Mike Lalor, Jim McKenzie"
+DAL,24,Mark Tinordi,D,L,6-4,213,61,6,18,143,6,,,2,0,
+DAL,11,Jarkko Varvio,LW,R,5-9,175,8,2,3,4,1,,,2,0,
+DAL,34,Darcy Wakaluk,G,L,5-11,180,36,,,,,2.64,.910,0,1,
+DAL,5,Doug Zmolek,D,L,6-2,222,7,1,0,11,1,,,0,2,number 5 shared with Brad Berry

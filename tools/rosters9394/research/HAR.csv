@@ -1,0 +1,46 @@
+code,number,name,pos,shoots,height,weight,gp,g,a,pim,plusminus,gaa,svpct,opening,deadline,notes
+HAR,1,Sean Burke,G,L,6-4,211,47,0,0,16,0,2.99,.906,0,2,
+HAR,6,Adam Burt,D,L,6-2,205,63,1,17,75,-4,,,2,0,
+HAR,21,Andrew Cassels,C,L,6-1,185,79,16,42,37,-21,,,2,1,
+HAR,32,Igor Chibirev,C,L,6-0,180,37,4,11,2,7,,,0,0,
+HAR,11,Yvon Corriveau,RW,L,6-1,195,3,0,0,0,0,,,0,0,
+HAR,33,Ted Crowley,D,R,6-2,188,21,1,2,10,-1,,,0,2,number 33 shared with Jim McKenzie
+HAR,7,Randy Cunneyworth,LW,L,6-0,198,63,9,8,87,-2,,,0,0,
+HAR,17,Ted Drury,C,L,6-2,210,16,1,5,10,-10,,,0,2,number 17 shared with Mark Greig
+HAR,5,Alexander Godynyuk,D,L,6-0,207,43,3,9,40,8,,,0,2,
+HAR,31,Mario Gosselin,G,L,5-8,160,7,0,0,0,0,5.27,.804,1,0,
+HAR,17,Mark Greig,RW,R,5-11,190,31,4,5,31,-6,,,2,0,number 17 shared with Ted Drury
+HAR,15,Todd Harkins,C,R,6-3,210,28,1,0,49,-4,,,0,1,
+HAR,27,Doug Houda,D,R,6-2,208,7,0,0,23,-4,,,2,0,number 27 shared with Bryan Marchment
+HAR,22,Mark Janssens,C,L,6-3,212,84,2,10,137,-13,,,2,2,
+HAR,37,Dan Keczmer,D,L,6-1,190,12,0,1,12,-6,,,2,0,
+HAR,18,Robert Kron,RW,L,5-11,185,77,24,26,8,0,,,2,2,
+HAR,4,František Kučera,D,L,6-2,205,16,1,3,14,-12,,,0,2,"number 4 shared with James Patrick, Eric Weinrich"
+HAR,20,Nick Kypreos,RW,L,6-0,205,10,0,0,37,-8,,,2,0,
+HAR,23,Jocelyn Lemieux,RW,L,5-11,220,16,6,1,19,-8,,,0,2,
+HAR,30,Mike Lenarduzzi,G,L,6-1,165,1,0,0,0,0,2.83,.917,0,0,
+HAR,27,Bryan Marchment,D,L,6-1,200,42,3,7,124,-12,,,0,0,number 27 shared with Doug Houda
+HAR,10,Brad McCrimmon,D,L,5-11,197,65,1,5,72,-7,,,2,2,
+HAR,25,Bob McGill,D,R,6-1,193,30,0,3,41,-7,,,0,2,
+HAR,33,Jim McKenzie,LW,L,6-4,230,26,1,2,67,-6,,,2,0,number 33 shared with Ted Crowley
+HAR,92,Michael Nylander,LW,L,6-1,195,58,11,33,24,-2,,,2,0,
+HAR,4,James Patrick,D,R,6-2,202,47,8,20,32,-12,,,0,0,"number 4 shared with František Kučera, Eric Weinrich"
+HAR,41,Allen Pedersen,D,L,6-3,210,7,0,0,9,-1,,,0,0,
+HAR,39,Róbert Petrovický,C,L,5-11,172,33,6,5,39,-1,,,1,2,
+HAR,40,Frank Pietrangelo,G,L,5-10,185,19,0,0,2,0,3.60,.875,2,0,
+HAR,29,Marc Potvin,RW,R,6-1,200,51,2,3,246,-5,,,0,1,
+HAR,24,Patrick Poulin,LW,L,6-1,216,9,2,1,11,-8,,,2,0,
+HAR,44,Chris Pronger,D,L,6-6,220,81,5,25,113,-3,,,2,2,
+HAR,15-26,Brian Propp,LW,L,5-10,195,65,12,17,44,3,,,1,2,wore multiple numbers (15-26)
+HAR,14,Paul Ranheim,LW,R,6-1,210,15,0,3,2,-11,,,0,2,number 14 shared with Jim Sandlak
+HAR,35,Jeff Reese,G,L,5-9,180,19,0,1,0,0,3.09,.893,0,0,
+HAR,8,Geoff Sanderson,LW,L,6-0,190,82,41,26,42,-13,,,2,2,
+HAR,14,Jim Sandlak,RW,R,6-4,219,27,6,2,32,6,,,2,0,number 14 shared with Paul Ranheim
+HAR,20-51,Kevin Smyth,LW,L,6-2,217,21,3,2,10,-1,,,0,1,wore multiple numbers (20-51)
+HAR,45,John Stevens,D,L,6-1,195,9,0,3,4,4,,,0,0,
+HAR,24-46,Jim Storm,LW,L,6-2,200,68,6,10,27,4,,,0,2,wore multiple numbers (24-46)
+HAR,28,Mike Tomlak,C,L,6-3,205,1,0,0,0,0,,,0,0,
+HAR,89,Darren Turcotte,C,L,6-0,182,19,2,11,4,-11,,,0,0,
+HAR,16,Pat Verbeek,RW,R,5-9,192,84,37,38,177,-15,,,2,2,
+HAR,4,Eric Weinrich,D,L,6-1,207,8,1,1,2,-5,,,0,0,"number 4 shared with František Kučera, James Patrick"
+HAR,3,Zarley Zalapski,D,L,6-1,215,56,7,30,56,-6,,,2,0,

@@ -1,0 +1,41 @@
+code,number,name,pos,shoots,height,weight,gp,g,a,pim,plusminus,gaa,svpct,opening,deadline,notes
+TOR,9,Glenn Anderson,RW,L,6-1,190,73,17,18,50,-6,,,2,0,number 9 shared with Darby Hendrickson
+TOR,14,Dave Andreychuk,RW,R,6-4,220,83,53,46,98,22,,,2,2,
+TOR,24,Patrik Augusta,RW,L,5-10,170,2,0,0,0,0,,,0,0,
+TOR,22,Ken Baumgartner,LW,L,6-1,205,64,4,4,185,-6,,,2,0,
+TOR,55,Drake Berehowsky,D,R,6-2,225,49,2,8,63,-3,,,0,2,
+TOR,10,Bill Berg,LW,L,6-1,205,83,8,11,93,-3,,,2,2,
+TOR,36,Frank Bialowas,D,L,5-11,220,3,0,0,12,0,,,0,0,
+TOR,16,Nikolai Borschevsky,RW,L,5-9,180,45,14,20,10,6,,,2,0,
+TOR,17,Wendel Clark,LW,L,5-11,194,64,46,30,115,10,,,2,2,
+TOR,19,John Cullen,C,R,5-10,182,53,13,17,67,-2,,,2,2,
+TOR,32,Mike Eastwood,C,R,6-3,216,54,8,10,28,2,,,0,2,
+TOR,4,Dave Ellett,D,L,6-2,205,68,7,36,42,6,,,2,2,
+TOR,71,Mike Foligno,RW,R,6-2,195,4,0,0,4,0,,,0,0,
+TOR,11,Mike Gartner,RW,R,6-0,187,10,6,6,4,9,,,0,2,"number 11 shared with Mark Greig, Guy Larose"
+TOR,23,Todd Gill,D,L,6-0,180,45,4,24,44,8,,,2,0,
+TOR,93,Doug Gilmour,C,L,5-11,177,83,27,84,105,25,,,2,2,
+TOR,8,Chris Govedaris,LW,L,6-0,200,12,2,2,14,4,,,0,0,
+TOR,11,Mark Greig,RW,R,5-11,190,13,2,2,10,1,,,0,0,"number 11 shared with Mike Gartner, Guy Larose"
+TOR,28,David Harlock,D,L,6-2,215,6,0,0,0,-2,,,0,0,number 28 shared with Greg Smyth
+TOR,9,Darby Hendrickson,C,L,6-1,195,,,,,,,,0,0,number 9 shared with Glenn Anderson;no stats row on team page
+TOR,26,Mike Krushelnyski,C,L,6-2,200,54,5,6,28,-5,,,2,2,
+TOR,20,Alexei Kudashov,C,R,6-0,183,25,1,0,4,-3,,,0,0,
+TOR,41,Eric Lacroix,LW,L,6-1,210,3,0,0,2,0,,,0,0,
+TOR,11,Guy Larose,C,L,5-9,180,10,1,2,10,-2,,,0,0,"number 11 shared with Mike Gartner, Mark Greig"
+TOR,2,Sylvain Lefebvre,D,L,6-2,205,84,2,9,79,33,,,2,2,
+TOR,34,Jamie Macoun,D,L,6-2,200,82,3,27,115,-5,,,2,2,
+TOR,18,Kent Manderville,LW,L,6-3,200,67,7,9,63,5,,,0,2,
+TOR,33,Matt Martin,D,L,6-3,230,12,0,1,6,0,,,0,0,
+TOR,40,Ken McRae,C,R,6-1,195,9,1,1,36,1,,,0,0,
+TOR,15,Dmitri Mironov,D,R,6-4,224,76,9,27,78,5,,,2,2,
+TOR,21,Mark Osborne,RW,L,6-2,205,73,9,15,145,2,,,2,2,
+TOR,12,Rob Pearson,RW,R,6-3,198,67,12,18,189,-6,,,2,2,
+TOR,44,Yanic Perreault,C,L,5-11,185,13,3,3,0,1,,,0,0,
+TOR,29,Félix Potvin,G,L,6-1,190,66,0,4,4,0,2.89,.907,2,0,
+TOR,1,Damian Rhodes,G,L,5-11,195,22,0,0,2,0,2.62,.902,0,2,
+TOR,3,Bob Rouse,D,R,6-2,215,63,5,11,101,8,,,2,2,
+TOR,7,David Sacco,RW,R,6-0,180,4,1,1,4,-2,,,0,0,
+TOR,28,Greg Smyth,D,R,6-3,212,11,0,1,38,-2,,,0,0,number 28 shared with David Harlock
+TOR,38,Chris Snell,D,L,5-11,200,2,0,0,2,-1,,,0,0,
+TOR,25,Peter Zezel,C,L,5-11,220,41,8,8,19,5,,,2,2,

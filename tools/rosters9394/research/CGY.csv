@@ -1,0 +1,43 @@
+code,number,name,pos,shoots,height,weight,gp,g,a,pim,plusminus,gaa,svpct,opening,deadline,notes
+CGY,38,Peter Ahola,D,L,6-3,205,2,0,0,0,0,,,0,0,
+CGY,4,Kevin Dahl,D,R,5-11,190,33,0,3,23,-2,,,2,1,
+CGY,5,Chris Dahlquist,D,L,6-1,195,77,1,11,52,5,,,2,0,
+CGY,27,Ted Drury,C,L,6-2,210,34,5,7,26,-5,,,2,0,
+CGY,36,Len Esau,D,R,6-3,190,6,0,3,7,-1,,,0,0,
+CGY,14,Theo Fleury,RW,R,5-6,182,83,40,45,186,30,,,2,2,
+CGY,16,Mark Freer,C,L,5-10,180,2,0,0,4,0,,,0,0,
+CGY,19,David Haas,LW,L,6-2,200,2,1,1,7,2,,,0,0,number 19 shared with Vesa Viitakoski
+CGY,39,Dan Keczmer,D,L,6-1,190,57,1,20,48,-2,,,0,2,
+CGY,37,Trevor Kidd,G,L,6-2,213,31,0,4,4,0,3.16,.887,0,0,
+CGY,11,Kelly Kisio,C,R,5-10,185,51,7,23,28,-6,,,1,2,
+CGY,12,Paul Kruse,LW,L,6-1,215,68,3,8,185,-6,,,0,2,
+CGY,42,Guy Larose,C,L,5-9,180,7,0,1,4,-3,,,0,0,
+CGY,2,Al MacInnis,D,R,6-2,204,75,28,54,95,35,,,2,2,
+CGY,15,Sandy McCarthy,RW,R,6-3,222,79,5,5,173,-3,,,2,2,
+CGY,34,Brad Miller,D,L,6-4,220,8,0,1,14,-2,,,0,0,number 34 shared with Kevin Wortman
+CGY,3,František Musil,D,L,6-3,215,75,1,8,50,38,,,2,1,
+CGY,31,Jason Muzzatti,G,L,6-2,210,1,0,0,0,0,8.00,.771,0,0,
+CGY,25,Joe Nieuwendyk,C,L,6-2,205,64,36,39,51,19,,,2,0,
+CGY,6,Lee Norwood,D,L,6-1,198,16,0,1,16,3,,,0,0,number 6 shared with James Patrick
+CGY,92,Michael Nylander,LW,L,6-1,195,15,2,9,6,10,,,0,2,
+CGY,29,Joel Otto,C,R,6-4,220,81,11,12,92,-17,,,2,2,
+CGY,23,Greg Paslawski,RW,R,5-11,190,15,2,0,2,-4,,,1,0,
+CGY,6,James Patrick,D,R,6-2,202,15,2,2,6,6,,,0,2,number 6 shared with Lee Norwood
+CGY,7,Michel Petit,D,R,6-1,205,63,2,21,110,5,,,2,1,
+CGY,28,Paul Ranheim,LW,R,6-1,210,67,10,14,20,-7,,,2,0,
+CGY,35,Jeff Reese,G,L,5-9,180,1,0,0,0,0,4.52,.800,0,0,
+CGY,26,Robert Reichel,C,L,5-10,180,84,40,53,58,20,,,2,2,
+CGY,10,Gary Roberts,LW,L,6-2,215,73,41,43,145,37,,,2,1,
+CGY,21,Brad Schlegel,D,R,5-10,188,26,1,6,4,-4,,,0,0,
+CGY,22,Ronnie Stern,RW,R,6-0,200,71,9,20,243,6,,,2,2,
+CGY,33,David Struch,C,L,5-10,180,4,0,0,4,-2,,,0,0,number 33 shared with Zarley Zalapski
+CGY,32,Mike Sullivan,LW,L,6-2,204,19,2,3,6,2,,,0,2,
+CGY,20,Gary Suter,D,L,6-0,215,25,4,9,20,-3,,,2,0,
+CGY,13,German Titov,LW,L,6-1,203,76,27,18,28,20,,,2,2,
+CGY,1,Andrei Trefilov,G,L,6-0,190,11,0,0,4,0,2.51,.915,0,0,
+CGY,30,Mike Vernon,G,L,5-9,180,48,0,0,14,0,2.81,.892,2,2,
+CGY,19,Vesa Viitakoski,LW,L,6-3,215,8,1,2,0,0,,,1,0,number 19 shared with David Haas
+CGY,17,Wes Walz,RW,R,5-10,189,53,11,27,16,20,,,1,2,
+CGY,34,Kevin Wortman,D,R,6-0,200,5,0,0,2,1,,,0,0,number 34 shared with Brad Miller
+CGY,18,Trent Yawney,D,L,6-3,195,58,6,15,60,21,,,0,2,
+CGY,33,Zarley Zalapski,D,L,6-1,215,13,3,7,18,0,,,0,2,number 33 shared with David Struch

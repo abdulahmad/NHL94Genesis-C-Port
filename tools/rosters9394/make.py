@@ -73,7 +73,8 @@ def elsewhere(teams, t, name, col):
 def pick(teams, t, col):
     rows = teams[t]
     on = [r for r in rows if num(r[col]) > 0]
-    hurt = [r for r in rows if num(r[col]) == 0 and num(r["gp"]) >= REGULAR_GP and not elsewhere(teams, t, r["name"], col)]
+    star = lambda r: num(r["gp"]) >= REGULAR_GP or (num(r["gp"]) >= 15 and (num(r["g"]) + num(r["a"])) / num(r["gp"]) >= 0.8)   # (a regular, or a star who was hurt)
+    hurt = [r for r in rows if num(r[col]) == 0 and star(r) and not elsewhere(teams, t, r["name"], col)]
     hurt.sort(key=lambda r: -num(r["gp"]))
     g = sorted([r for r in on + hurt if r["pos"] == "G"], key=lambda r: (-num(r[col]), -num(r["gp"])))[:MAXG]
     d = sorted([r for r in on + hurt if r["pos"] == "D"], key=lambda r: (-num(r[col]), -num(r["gp"])))[:MAXD]
@@ -166,9 +167,47 @@ def allstars(teams):
     with open(path, newline="", encoding="utf-8") as f:
         for a in csv.DictReader(f):
             conf = "ASE" if a["conference"].lower().startswith("e") else "ASW"
-            r = next((r for rows in teams.values() for r in rows if key(r["name"]) == key(a["name"])), None)
+            club = next((t for t, c in HR.items() if c == a["team"]), None)   # (his club's row: his number, his record there)
+            r = next((r for r in teams.get(club, []) if key(r["name"]) == key(a["name"])), None) or \
+                next((r for rows in teams.values() for r in rows if key(r["name"]) == key(a["name"])), None)
             if r: out[conf].append(dict(r, opening="1", deadline="1"))
+            else: print(f"All-Star {a['name']}: not in the research")
     return out
+
+import difflib
+def split_key(n):
+    w = ascii_name(n).split()
+    return key(w[0]) if w else "", key(" ".join(w[1:]))
+
+NICK = [{"dave", "david"}, {"steve", "stephen", "steven"}, {"matt", "mathieu", "matthew"}, {"rich", "richard"}, {"frank", "frantisek"},
+        {"alex", "alexei", "alexander", "alexandre", "alexnder"}, {"al", "allan", "alan"}, {"mike", "michael", "mikael"}, {"jon", "john"},
+        {"ilja", "ilya"}, {"dmitri", "dmitry", "dimitri"}, {"vyacheslav", "viacheslav", "vachslav"}]
+
+def same_first(a, b):
+    if a == b or a.startswith(b) or b.startswith(a): return True       # (Ed / Eddie, Bob / Bobby, Theo / Theoren)
+    if any(a in s and b in s for s in NICK): return True
+    return difflib.SequenceMatcher(None, a, b).ratio() >= 0.8           # (the cartridges' "Christan", "Frantsek")
+
+def matcher(names, taken=()):
+    """a name's spelling among names (a cartridge's): the same letters, else the same first initial and a last name
+    within a typo or a truncation of it (the cartridges' "Alexnder", "Vanbiesbrk", "Frank" Musil), the only one so"""
+    exact = {key(n): n for n in names}
+    parts = [(n,) + split_key(n) for n in set(names)]
+    def find(name):
+        k = key(name)
+        if k in exact: return exact[k], False
+        f, l = split_key(name)
+        hits = [n for n, f2, l2 in parts if key(n) not in taken and same_first(f, f2) and difflib.SequenceMatcher(None, l, l2).ratio() >= 0.8]
+        return (hits[0], True) if len(set(hits)) == 1 else (None, False)
+    return find
+
+def shown(name, n95):
+    """his name on the roster screen: the cartridge's room is 19 letters (NHL 95's spelling, else his first initial, when longer)"""
+    n = ascii_name(name)
+    if len(n) <= 19: return n
+    if n95 and len(n95) <= 19: return n95
+    w = n.split()
+    return (w[0][0] + ". " + " ".join(w[1:]))[:19]
 
 def cstr(s): return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
@@ -176,7 +215,10 @@ def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--cart"); ap.add_argument("--rom95"); a = ap.parse_args()
     teams = research()
     cart = rom_players(a.cart) if a.cart else None
-    cartkeys = {key(n): n for pl in (cart or {}).values() for n, _ in pl}
+    real = {key(r["name"]) for rows in teams.values() for r in rows}   # (a cartridge's name that is another real player's is his)
+    cartfind = matcher([n for pl in (cart or {}).values() for n, _ in pl], real) if cart else None
+    find95 = matcher([n for pl in rom_players(a.rom95).values() for n, _ in pl], real) if a.rom95 else None
+    fuzzy = set()
     fitpath = os.path.join(HERE, "fit.json")
     if a.rom95 and cart:
         r95 = {key(n): nib for t, pl in rom_players(a.rom95).items() if t not in ("ASE", "ASW") for n, nib in pl}
@@ -188,7 +230,7 @@ def main():
     pc = os.path.join(HERE, "players.csv")
     if os.path.exists(pc):
         with open(pc, newline="", encoding="utf-8") as f:
-            for r in csv.DictReader(f): prev[key(r["name"])] = r["cart"]
+            for r in csv.DictReader(f): prev[key(r["name"])] = r
     sets = {}
     asg = allstars(teams)
     for si, col in enumerate(("opening", "deadline")):
@@ -203,9 +245,16 @@ def main():
     out = []
     for (si, t), (g, f, d) in sorted(sets.items()):
         for r, st in zip(g + f + d, starts(g) + [0] * (len(f) + len(d))):
-            c = cartkeys.get(key(r["name"])) if cart else prev.get(key(r["name"]), "")
+            if cart:
+                c, fz = cartfind(r["name"])
+                if fz and c not in fuzzy: fuzzy.add(c); print(f"  {r['name']} is the cartridge's {c}")
+            else: c = prev.get(key(r["name"]), {}).get("cart", "")
+            if find95:
+                n95, fz = find95(r["name"])
+                if fz and ("95", n95) not in fuzzy: fuzzy.add(("95", n95)); print(f"  {r['name']} is NHL 95's {n95}")
+            else: n95 = prev.get(key(r["name"]), {}).get("n95", "")
             out.append({"set": ("opening", "deadline")[si], "team": t, "number": r["number"], "name": ascii_name(r["name"]),
-                        "pos": r["pos"], "shoots": r["shoots"], "start": st, "cart": c or "",
+                        "pos": r["pos"], "shoots": r["shoots"], "start": st, "cart": c or "", "n95": n95 or "",
                         "nib": " ".join(map(str, rate(r, model["from95"], model["from94"]))) if not c else ""})
     with open(pc, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(out[0].keys())); w.writeheader(); w.writerows(out)
@@ -219,7 +268,7 @@ def main():
             o = next(x for x in out if x["set"] == ("opening", "deadline")[si] and x["team"] == t and x["name"] == ascii_name(r["name"]))
             nib = rate(r, model["from95"], model["from94"])
             pos = "G" if r["pos"] == "G" else "D" if r["pos"] == "D" else "F"
-            L.append(f"    {{ {cstr(ascii_name(r['name'])[:24])}, {cstr(o['cart']) if o['cart'] else 'NULL'}, {int(num(r['number']))}, '{pos}', {st}, {{ {', '.join(map(str, nib))} }} }},")
+            L.append(f"    {{ {cstr(shown(r['name'], o['n95']))}, {cstr(o['cart']) if o['cart'] else 'NULL'}, {cstr(o['n95']) if o['n95'] else 'NULL'}, {int(num(r['number']))}, '{pos}', {st}, {{ {', '.join(map(str, nib))} }} }},")
         L.append("};")
     L.append("static const struct season_team season9394[2][28] = {")
     for si in range(2):

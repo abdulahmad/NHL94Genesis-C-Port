@@ -1,0 +1,42 @@
+code,number,name,pos,shoots,height,weight,gp,g,a,pim,plusminus,gaa,svpct,opening,deadline,notes
+QUE,28,Bob Bassen,RW,L,5-10,185,37,11,8,55,-3,,,0,2,
+QUE,55,Garth Butcher,D,R,6-0,204,34,3,9,67,-1,,,0,2,number 55 shared with René Corbet
+QUE,32,Jacques Cloutier,G,L,5-7,168,14,0,0,2,0,3.03,.897,0,1,
+QUE,55,René Corbet,LW,L,6-0,195,9,1,1,0,1,,,0,0,number 55 shared with Garth Butcher
+QUE,73,Alain Côté,D,R,6-0,207,6,0,0,4,-2,,,0,0,
+QUE,29,Steven Finn,D,L,6-0,191,80,4,13,159,-9,,,2,2,
+QUE,35,Stéphane Fiset,G,L,6-1,215,50,0,3,8,0,3.39,.890,2,2,
+QUE,52,Adam Foote,D,R,6-2,220,45,2,6,67,3,,,2,0,
+QUE,38,Iain Fraser,RW,L,5-10,175,60,17,20,23,-5,,,1,2,
+QUE,22,Martin Gélinas,RW,L,5-11,202,31,6,6,8,-2,,,2,0,number 22 shared with Ron Sutter
+QUE,5,Alexei Gusarov,D,L,6-3,185,76,5,20,38,3,,,2,2,
+QUE,2,Kerry Huffman,D,L,6-2,200,28,0,6,28,2,,,2,0,number 2 shared with Tommy Sjödin
+QUE,4,Mike Hurlbut,D,L,6-2,206,1,0,0,0,-1,,,0,0,
+QUE,31,Valeri Kamensky,LW,R,6-2,198,76,28,37,42,12,,,2,2,
+QUE,59,Dave Karpa,D,R,6-1,210,60,5,12,148,0,,,1,1,
+QUE,42,Jon Klemm,D,R,6-2,205,7,0,0,4,-1,,,0,0,
+QUE,51,Andrei Kovalenko,RW,L,5-10,200,58,16,17,46,-5,,,2,2,
+QUE,47,Claude Lapointe,LW,L,5-9,188,59,11,17,70,2,,,2,1,
+QUE,7,Curtis Leschyshyn,D,L,6-1,207,72,5,17,65,-2,,,2,1,
+QUE,17,Chris Lindberg,LW,L,6-1,190,37,6,8,12,-1,,,1,0,
+QUE,23,Paul MacDermid,RW,R,6-1,205,44,2,3,35,-3,,,1,2,
+QUE,45,Mike McKee,LW,R,6-3,203,48,3,12,41,5,,,0,0,
+QUE,44,Aaron Miller,D,R,6-3,210,1,0,0,0,-1,,,0,0,
+QUE,11,Owen Nolan,RW,R,6-1,214,6,2,2,8,2,,,2,0,
+QUE,14,Dwayne Norris,RW,R,5-10,175,4,1,1,4,1,,,0,0,
+QUE,9,Mike Ricci,C,L,6-0,200,83,30,21,113,-9,,,2,2,
+QUE,25,Martin Ručinský,LW,L,6-1,205,60,9,23,58,4,,,2,0,
+QUE,19,Joe Sakic,C,L,5-11,195,84,28,64,18,-8,,,2,2,
+QUE,33,Reggie Savage,LW,L,5-10,197,17,3,4,16,3,,,0,0,
+QUE,24,Paxton Schulte,LW,L,6-2,217,1,0,0,2,0,,,0,0,
+QUE,12,Chris Simon,LW,L,6-3,233,37,4,4,132,-2,,,2,0,
+QUE,2,Tommy Sjödin,D,R,5-11,190,22,1,9,18,5,,,0,2,number 2 shared with Kerry Huffman
+QUE,1,Garth Snow,G,L,6-3,200,5,0,0,2,0,3.44,.874,0,0,
+QUE,13,Mats Sundin,C,R,6-5,231,84,32,53,60,1,,,2,2,
+QUE,22,Ron Sutter,C,R,6-0,180,37,9,13,44,3,,,0,2,number 22 shared with Martin Gélinas
+QUE,41,Jocelyn Thibault,G,L,5-11,169,29,0,0,2,0,3.31,.892,1,0,
+QUE,15,Tony Twist,LW,L,6-1,220,49,0,4,101,-1,,,0,2,
+QUE,54,Ed Ward,RW,R,6-3,220,7,1,0,5,0,,,0,0,
+QUE,27,Brad Werenka,D,L,6-1,221,11,0,7,8,4,,,0,1,
+QUE,6,Craig Wolanin,D,L,6-4,215,63,6,10,80,16,,,2,2,
+QUE,48,Scott Young,RW,R,6-1,200,76,26,25,14,-4,,,0,2,

@@ -1671,11 +1671,11 @@ static int builtin_folder(struct folder *L, int kind)
 /* ---- the 1993-94 seasons' rosters (rosters9394.inc, made by tools/rosters9394.py from data/rosters9394/) ----
  * Each of the cartridge's 28 teams as it was on 1993-94's opening night (set 0) and after its trade deadline
  * (set 1): who played, his number and position, in the cartridge's order (goalies, forwards, defensemen),
- * and the lines. A player the cartridge has (cart: its spelling) keeps the cartridge's ratings, and his
+ * and the lines; cart and n95, his name as the NHL 94 and NHL 95 cartridges spell it, when they have him. A player the cartridge has (cart: its spelling) keeps the cartridge's ratings, and his
  * photo, wherever he plays now; another takes NHL 95 Genesis's (the player's own image: rom95g.c) with
  * his real hand, else the ratings worked out from his record (docs/ROSTERS-1993-94.md). The teams' names,
  * colours, logos and ratings stay the cartridge's: its jerseys are 1993-94's. */
-struct season_player { const char *name, *cart; uint8_t number; char pos; uint8_t start, nib[14]; };
+struct season_player { const char *name, *cart, *n95; uint8_t number; char pos; uint8_t start, nib[14]; };
 struct season_team { uint8_t players, goalies, forwards; uint8_t lines[8][7]; const struct season_player *pl; };
 #include "rosters9394.inc"
 
@@ -1717,7 +1717,7 @@ static int season_folder(struct folder *L, int set)
                 snprintf(P->name, sizeof P->name, "%s", R->name);
                 memcpy(P->nib, R->nib, 14);
                 uint8_t n95[14];
-                if (rom95g_ratings(R->name, n95)) {       /* (NHL 95's but his hand and fighting, and the two 94 does not use) */
+                if (R->n95 && rom95g_ratings(R->n95, n95)) {       /* (NHL 95's but his hand and fighting, and the two 94 does not use) */
                     for (int k = 0; k < 14; k++) if (k != LR_HANDED_FIGHTING && k != LR_CHECKING && k != LR_STICK_HANDLING) P->nib[k] = n95[k];
                 }
             }
