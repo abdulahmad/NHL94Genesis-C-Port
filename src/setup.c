@@ -895,6 +895,7 @@ void ScrollDisplayUp(void)
  * until a button or $50 x 4 frames (about 5 s). */
 void EASportsScreen(void)
 {
+    if (setup_fast) return;                               /* (the host's change of rosters: straight to the setup screen) */
     if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 4);   /* (the Sega CD's opening screens: its own EA SPORTS logo) */
     g.VBint = SYM_vb2;
     g.disflags &= (uint16_t)~HI(df32c);

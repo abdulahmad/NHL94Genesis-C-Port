@@ -891,6 +891,13 @@ void PrintOptionValue(uint16_t line);                   /* d7 */
 void PrintScrollMarks(void);
 void PrintOptTeamName(uint16_t line);                   /* d7 */
 extern uint8_t setup_no_players;                          /* 1 (the host's): the setup menu has no Players line (optsetup.c) */
+/* The host's Rosters line (optsetup.c): setup_rosters_want 1 asks for it under Play Mode (taken at the screen's start into
+ * setup_rosters_line; d7 1 is the line), setup_rosters_text its value, setup_rosters_hook (d2 -1 or 1) changes it. 0 / NULL:
+ * the cartridge's menu. setup_fast 1: the power on goes straight to the setup screen, on its Rosters line (the host's
+ * change of rosters: no EA SPORTS screen, no title). */
+extern uint8_t setup_rosters_want, setup_rosters_line, setup_fast;
+extern struct Text (*setup_rosters_text)(void);
+extern void (*setup_rosters_hook)(int16_t d2);
 void PrintOptionNames(void);
 void setoptions(void);
 uint16_t ReadSetupPads(void);                           /* -> d1 */

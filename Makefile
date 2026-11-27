@@ -58,9 +58,9 @@ replaymousetest: build/replaymousetest
 
 # roster sets: the cartridge's exported and built again (byte for byte), a 32-team one, broken ones
 # (tools/rosterstest.py; the ROM as for make nhl94)
-build/rosterstest: native/rosters.c native/banner.c native/romsrc.c native/art.c native/ratings.c src/rosters.c src/rom.c src/rosters.h src/rom.h native/native.h test/rosters_test.c mdrt
+build/rosterstest: native/rom95g.c native/rosters9394.inc native/rosters.c native/banner.c native/romsrc.c native/art.c native/ratings.c src/rosters.c src/rom.c src/rosters.h src/rom.h native/native.h test/rosters_test.c mdrt
 	@mkdir -p build
-	$(CC) $(CFLAGS) -Isrc -Inative -I$(MDRT)/include -o $@ native/rosters.c native/banner.c native/romsrc.c native/art.c native/ratings.c src/rosters.c src/rom.c \
+	$(CC) $(CFLAGS) -DROM95G_NO_SDL -Isrc -Inative -I$(MDRT)/include -o $@ native/rosters.c native/rom95g.c native/banner.c native/romsrc.c native/art.c native/ratings.c src/rosters.c src/rom.c \
 	    test/rosters_test.c $(MDRT)/$(MDRTB)/libmdrt.a -lm $(CXXLIB)
 rosterstest: build/rosterstest build/nhl94$(EXE)
 	$(PY) tools/rosterstest.py
@@ -98,7 +98,7 @@ NATIVE := $(wildcard native/*.c)
 # VANILLA=1: the game without the host extras (game rules, roster sets, states, online play):
 # build/nhl94-vanilla, its own objects (native/vanilla/stubs.c, docs/VANILLA.md)
 ifeq ($(VANILLA),1)
-NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c romsrc.c art.c banner.c ratings.c state.c net.c menuopts.c fightrate.c),$(NATIVE)) native/vanilla/stubs.c native/vanilla/mods.c
+NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c rom95g.c romsrc.c art.c banner.c ratings.c state.c net.c menuopts.c fightrate.c),$(NATIVE)) native/vanilla/stubs.c native/vanilla/mods.c
 SRC    := $(wildcard src/*.c)
 VFLAGS := -DNHL94_VANILLA                                # (src/rules.h: every RULE() the cartridge's 0)
 BIN    ?= build/nhl94-vanilla$(EXE)

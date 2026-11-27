@@ -140,6 +140,14 @@ int rosters_next_bytes(const uint8_t *b, size_t n);   /* the next game's built f
 /* the roster set a host sent (kept for the run), one of the Rosters page's: its index (listed when it
  * is not, read again for another), -1 when none was sent (or it is being read: ask again) */
 int rosters_session_entry(void);
+/* NHL 95 Genesis's ratings from the player's own image (rom95g.c), for the 1993-94 roster sets */
+int rom95g_have(void);
+int rom95g_ratings(const char *name, uint8_t nib[14]);   /* (by name: 1 found) */
+void rom95g_key(const char *s, char *out, size_t size);
+#define ROSTERS_BUILTINS 3
+/* the setup menu's Rosters line (menuopts.c): want it, its value's words, a change (-1, 1) asked for on it */
+void menuopts_rosters_line(int want, const char *(*word)(void), void (*change)(int));
+void menuopts_setup_fast(int on);                        /* (the next power on straight to the setup screen) */                       /* (the roster sets built from the cartridge: the Sega CD's, 1993-94 opening night's and trade deadline's: list entries 1-3) */
 int rosters_next_is_cartridge(void);
 void rosters_power_on(void);             /* (a roster set that will not build: the cartridge's, and why on stderr) */
 uint64_t rosters_hash(void);             /* this game's roster set: its checksum (0 the cartridge's) */

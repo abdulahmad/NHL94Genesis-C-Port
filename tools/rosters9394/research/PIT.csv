@@ -1,0 +1,38 @@
+code,number,name,pos,shoots,height,weight,gp,g,a,pim,plusminus,gaa,svpct,opening,deadline,notes
+PIT,4,Greg Andrusak,D,R,6-1,195,3,0,0,2,-1,,,0,0,number 4 shared with Greg Hawgood
+PIT,35,Tom Barrasso,G,R,6-3,210,44,,,,,3.36,.893,2,2,
+PIT,24,Doug Brown,RW,R,5-10,185,77,18,37,18,19,,,2,2,
+PIT,34,Greg Brown,D,R,6-0,185,36,3,8,28,1,,,0,2,
+PIT,20,Jeff Daniels,RW,L,6-1,200,63,3,5,20,-1,,,1,0,
+PIT,12,Larry DePalma,LW,L,6-0,195,7,1,0,5,1,,,0,0,
+PIT,1,Rob Dopson,G,L,6-0,200,2,,,,,3.96,.870,0,0,
+PIT,37,Justin Duberman,RW,R,6-1,185,4,0,0,0,0,,,0,0,
+PIT,10,Ron Francis,C,L,6-3,200,82,27,66,62,-3,,,2,2,
+PIT,4,Greg Hawgood,D,L,5-10,190,12,1,2,8,-1,,,0,2,number 4 shared with Greg Andrusak
+PIT,68,Jaromír Jágr,RW,L,6-3,230,80,32,67,61,15,,,2,2,
+PIT,3,Grant Jennings,D,L,6-3,210,61,2,4,126,-10,,,1,0,
+PIT,14,Ladislav Karabin,LW,L,6-1,189,9,0,0,2,0,,,0,0,
+PIT,66,Mario Lemieux,C,R,6-4,230,22,17,20,32,-2,,,0,2,
+PIT,15,Shawn McEachern,C,L,5-11,200,27,12,9,10,13,,,0,2,
+PIT,33,Jim McKenzie,LW,L,6-4,230,11,0,0,16,-5,,,0,2,number 33 shared with Marty McSorley
+PIT,33,Marty McSorley,D,R,6-1,235,47,3,18,139,-9,,,2,0,number 33 shared with Jim McKenzie
+PIT,7,Joe Mullen,LW,R,5-9,180,84,38,32,41,9,,,2,2,
+PIT,55,Larry Murphy,D,R,6-2,210,84,17,56,44,10,,,2,2,
+PIT,29,Markus Näslund,RW,L,6-0,195,71,4,7,27,-3,,,2,0,
+PIT,36,Pat Neaton,D,L,6-0,180,9,1,1,12,3,,,0,0,
+PIT,39,Mike Needham,RW,R,5-10,185,25,1,0,2,0,,,2,0,
+PIT,2,Jim Paek,D,L,6-1,195,41,0,4,8,-7,,,0,0,number 2 shared with Chris Tamer
+PIT,44,Ed Patterson,RW,R,6-2,213,27,3,1,10,-5,,,0,0,
+PIT,6,Mike Ramsey,D,L,6-3,195,65,2,2,22,-4,,,2,0,
+PIT,30,Roberto Romano,G,L,5-6,170,2,,,,,1.44,.946,0,0,
+PIT,28,Kjell Samuelsson,D,R,6-6,235,59,5,8,118,18,,,2,2,
+PIT,5,Ulf Samuelsson,D,L,6-1,205,80,5,24,199,23,,,2,2,
+PIT,17,Tomas Sandström,LW,L,6-2,205,27,6,11,24,5,,,0,2,
+PIT,26,Mike Stapleton,C,R,5-10,183,58,7,4,18,-4,,,2,0,
+PIT,25,Kevin Stevens,LW,L,6-3,230,83,41,47,155,-24,,,2,2,
+PIT,82,Martin Straka,C,L,5-9,180,84,30,34,24,24,,,2,2,
+PIT,32,Peter Taglianetti,D,L,6-2,195,60,2,12,142,5,,,2,2,
+PIT,2,Chris Tamer,D,L,6-2,205,12,0,0,9,3,,,0,2,number 2 shared with Jim Paek
+PIT,22,Rick Tocchet,RW,R,6-0,210,51,14,26,134,-15,,,2,2,
+PIT,19,Bryan Trottier,C,L,5-11,195,41,4,11,36,-12,,,2,0,
+PIT,31,Ken Wregget,G,L,6-1,201,42,,,,,3.37,.893,1,0,

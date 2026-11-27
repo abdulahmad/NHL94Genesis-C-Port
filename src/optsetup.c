@@ -20,7 +20,17 @@ static uint16_t option(uint16_t line) { return g.options[line / 2]; }   /* (line
 
 /* The host's: 1 leaves the Players line out of the menu (the select-sides screen says who plays). 0 is the cartridge's menu, which every check plays. */
 uint8_t setup_no_players;
-static int vis(uint16_t line) { return (int16_t)line / 2 - (setup_no_players && (int16_t)line > 2); }   /* (the line's place in the menu) */
+uint8_t setup_rosters_want, setup_rosters_line, setup_fast;
+struct Text (*setup_rosters_text)(void);
+void (*setup_rosters_hook)(int16_t d2);
+static int vis(uint16_t line)                            /* (the line's place in the menu) */
+{
+    if (setup_rosters_line && line == 1) return 1;
+    return (int16_t)line / 2 - (setup_no_players && (int16_t)line > 2) + (setup_rosters_line && (int16_t)line >= 2);
+}
+static int last_first(void) { return 3 - (setup_no_players ? 1 : 0) + (setup_rosters_line ? 1 : 0); }   /* (setupfirstline's most) */
+/* the Rosters line's rows past its line offset: 1 for itself (row 2 under Play Mode), 2 for those after it */
+static int rosters_rows(uint16_t line) { return !setup_rosters_line || line == 0 ? 0 : line == 1 ? 1 : 2; }
 
 /* optsetup94.asm:GameSetUp. The setup screen: the line data and the saved playoff state, the
  * modes' start changes undone (SetupStart), the screen (setoptions), random teams after a demo,
@@ -28,6 +38,9 @@ static int vis(uint16_t line) { return (int16_t)line / 2 - (setup_no_players && 
  * Opening2. */
 void GameSetUp(void)
 {
+    setup_rosters_line = setup_rosters_want && setup_rosters_text && setup_rosters_hook;
+    int fast = setup_fast && setup_rosters_line;
+    setup_fast = 0;
     ReadLineData();
     ReadPassBits(pass_bits(RAM(passbits)));
     g.OptLine = g.TmpOptLine2;
@@ -49,7 +62,7 @@ void GameSetUp(void)
         if ((int16_t)g.OptPlayMode >= 2) GoNewPlayoffs();
         if (g.OptPlayMode == 1) GoContinuePlayoffs();
     }
-    uint16_t d7 = MoveMenuFrame(0, 0);                    /* the frame on line 0 */
+    uint16_t d7 = MoveMenuFrame(0, fast && g.OptPlayMode != 1 ? 1 : 0);   /* the frame on line 0 (the host's change of rosters: on its line) */
     FixModeOptions(d7);
     g.setuphome = g.HomeTeam;
     g.logoteam = g.HomeTeam;
@@ -70,6 +83,12 @@ void GameSetUp(void)
         if (d1 == 0) { SetupDemo(); return; }
         if (d1 & 0x80) { SetupStart(); return; }
         int16_t d0;
+        if ((d1 & 3) && setup_rosters_line && g.OptPlayMode != 1 && (((d1 & 2) && d7 <= 1) || ((d1 & 1) && d7 >= 1 && d7 <= (setup_no_players ? 4 : 2)))) {
+            int16_t to = d1 & 2 ? (d7 == 0 ? 1 : setup_no_players ? 4 : 2) : (d7 == 1 ? 0 : 1);   /* (the Rosters line, between Play Mode and Players) */
+            d7 = MoveMenuFrame(d7, (int16_t)(to - (int16_t)d7));
+            FixModeOptions(d7);
+            continue;
+        }
         if (d1 & 2) {                                     /* down: the next line, past those that do not apply */
             d0 = g.OptNOP == 0 && d7 == 8 ? 4 : 2;
             if (g.OptPlayMode != 4 && g.OptNOP == 0 && d7 == 8) d0 = 6;
@@ -103,6 +122,7 @@ void GameSetUp(void)
         if (d1 & 8) d2 = 1;                               /* right */
         else if (d1 & 4) d2 = -1;                         /* left */
         else continue;
+        if (setup_rosters_line && d7 == 1) { setup_rosters_hook(d2); continue; }   /* (the host's: the console powers on again with them) */
         if (g.OptPlayMode != 4) FigureJoy();
         ChangeOption(d7, d2);
         if (g.OptPlayMode == 4 || g.OptPlayMode == 0) {   /* Regular Season and Shootout: the menu's teams */
@@ -158,7 +178,7 @@ uint16_t MoveMenuFrame(uint16_t d7, int16_t d0)
             g.sflags5 |= 4;
             g.setupfirstline++;
             if (vis(d7) - (int16_t)g.setupfirstline > 5) g.setupfirstline++;
-            if ((int16_t)g.setupfirstline > 3 - (setup_no_players ? 1 : 0)) g.setupfirstline = (uint16_t)(3 - (setup_no_players ? 1 : 0));
+            if ((int16_t)g.setupfirstline > last_first()) g.setupfirstline = (uint16_t)last_first();
         }
         if (!(g.sflags5 & 4)) g.setupprevline = g.setupfirstline;
         if ((int16_t)d7 >= 0x12) d7 = (uint16_t)(d7 - d0);   /* past Line Changes */
@@ -193,6 +213,7 @@ void SetFrameRect(uint16_t line, uint16_t *w, uint16_t *h)
     printz(str_SetFrameRect_1, sizeof str_SetFrameRect_1);
     g.printy += line;
     if (setup_no_players && line > 2) g.printy -= 2;
+    g.printy += (uint16_t)rosters_rows(line);
     g.printy -= (uint16_t)(g.setupfirstline * 2);
     *w = 0x17;
     *h = 3;
@@ -297,6 +318,7 @@ void PrintOptions(uint16_t d7)
     for (uint16_t line = 0;; line += 2) {
         ChangeOption(line, 0);
         if (vis(line) >= (int16_t)g.setupfirstline && !(setup_no_players && line == 2)) PrintOptionValue(line);
+        if (line == 0 && setup_rosters_line && vis(1) >= (int16_t)g.setupfirstline) PrintOptionValue(1);
         if (line == 0x10) break;
     }
     PrintScrollMarks();
@@ -313,9 +335,17 @@ void PrintOptionValue(uint16_t line)
     g.printy -= (uint16_t)(g.setupfirstline * 2);
     g.printy += line;
     if (setup_no_players && line > 2) g.printy -= 2;
+    g.printy += (uint16_t)rosters_rows(line);
     if ((int16_t)g.printy > 0x1B) return;
     g.printy--;
     g.printx = 0x11;
+    if (setup_rosters_line && line == 1) {                /* (the host's Rosters line: a blank value, then its own) */
+        uint16_t x = g.printx;
+        print(SYM_BlankValueTxt);
+        g.printx = x;
+        print_p(setup_rosters_text());
+        return;
+    }
     if (line == 4 || line == 6) { PrintOptTeamName(line); return; }
     uint16_t n = option(line);
     uint32_t a0 = SYM_OptionValueOffsets + (int16_t)rd16(rom_ptr(SYM_OptionValueOffsets + line)), a1;
@@ -331,7 +361,7 @@ void PrintScrollMarks(void)
 {
     g.printy = 0x19;
     uint32_t a1 = SYM_ScrollClearTxt;
-    if ((int16_t)g.setupfirstline != 3 - (setup_no_players ? 1 : 0) && g.OptPlayMode != 4) a1 = SYM_ScrollDownTxt;
+    if ((int16_t)g.setupfirstline != last_first() && g.OptPlayMode != 4) a1 = SYM_ScrollDownTxt;
     g.printx = 2;
     print(a1);
     a1 = SYM_ScrollClearTxt;
@@ -366,6 +396,16 @@ void PrintOptionNames(void)
     uint32_t a1 = SYM_OptionNames;
     g.printy = (uint16_t)(0xF - g.setupfirstline * 2);
     for (int name = 0;; g.printy += 2, name++) {
+        if (setup_rosters_line && name == 1) {            /* (the host's Rosters line, before Players) */
+            if ((int16_t)g.printy >= 0xF && (int16_t)g.printy <= 0x19) {
+                static const uint8_t word[] = { 0, 10, 'R', 'o', 's', 't', 'e', 'r', 's', 0 };   /* (a String: its length word, the letters, a 0) */
+                g.printx = 3;
+                g.printa = 0;
+                g.printm = 0;
+                printsmall_p((struct Text){ word, 0 });
+            }
+            g.printy += 2;
+        }
         if (setup_no_players && name == 1) { a1 += (uint32_t)(int16_t)rd16(rom_ptr(a1)); g.printy -= 2; continue; }   /* (no Players line: its name is passed over) */
         if ((int16_t)g.printy < 0xF) { a1 += (uint32_t)(int16_t)rd16(rom_ptr(a1)); continue; }
         if ((int16_t)g.printy > 0x19) break;
