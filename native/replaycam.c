@@ -15,6 +15,7 @@
 #include "game.h"
 #include "native.h"
 #include "replaymouse.h"
+#include "view.h"
 
 #define PICK_R 16           /* a double click this near a player (picture pixels) is on him */
 #define BODY_UP 10          /* his middle: this far up from his place (his feet) */
@@ -28,8 +29,8 @@ static void camera_to(int16_t x, int16_t y, struct RinkObj *cam)
     if (g.sflags4 & HI(7)) { x = (int16_t)-x; y = (int16_t)-y; }
     cam->Xpos = x;
     cam->Ypos = y;
-    if (!(x < 0x3C)) x = 0x3C;
-    if (!(x > -0x3C)) x = -0x3C;
+    if (!(x < view_hpos())) x = view_hpos();             /* (the wide view's rink: less far, as the game's) */
+    if (!(x > -view_hpos())) x = (int16_t)-view_hpos();
     g.Hpos = (uint16_t)x;
     if (!(y < 0x100)) y = 0x100;
     if (!(y > -0xC8)) y = -0xC8;
@@ -46,8 +47,11 @@ static void go_free(struct RinkObj *cam)
     g.PadControlBits = (uint16_t)((g.PadControlBits & 0xFFF) | 0xE000);
 }
 
-/* where the free camera may be: as far as the view goes (no travel with nothing moving) */
-static int16_t clampx(int v) { return (int16_t)(v > 0x3C ? 0x3C : v < -0x3C ? -0x3C : v); }
+/* where the free camera may be: as far as the view goes (no travel with nothing moving). The view's reach is the
+ * game's own (UpdateCameraPos, checkwindow): Hpos -$3C..$3C on the cartridge's 256, -VIEW_HPOS..VIEW_HPOS in the
+ * wide view (its 320, or the 16:9 replay's 256 with 32 of plane B each side), Vpos -$C8..$100; past them the
+ * picture shows the plane's columns past the rink's 48 (never written) or the stands' last rows */
+static int16_t clampx(int v) { int h = view_hpos(); return (int16_t)(v > h ? h : v < -h ? -h : v); }
 static int16_t clampy(int v) { return (int16_t)(v > 0x100 ? 0x100 : v < -0xC8 ? -0xC8 : v); }
 
 void replaycam_pass(unsigned entries)
