@@ -874,7 +874,7 @@ void DisplayPenaltyEntry(uint16_t at)
     struct Team *tm = team_struct(e[2] & 0x80);
     uint16_t kind = e[2] & 0x7F;
     uint32_t pen = SYM_Penaltylist + (uint32_t)(int16_t)rd16(rom_ptr(SYM_Penaltylist + kind));
-    uint32_t mins = PushNumber(rom_ptr(pen)[1]);
+    uint32_t mins = PushNumber(pen_minutes(kind, rom_ptr(pen)[1]));   /* (RULE_PENALTIES: a double minor's 4) */
     g.printx = 0x23;
     print(mins);
     g.printx = 0x10;

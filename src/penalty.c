@@ -184,7 +184,7 @@ void InProgress(void)
         uint16_t pen = a0[0];
         const uint8_t *e = penalty_entry(pen);
         g.sflags5 &= (uint8_t)~0x20;
-        uint16_t d2 = e[penmins];
+        uint16_t d2 = pen_minutes(pen, e[penmins]);        /* (RULE_PENALTIES: a double minor's 4; else the entry's) */
         if (d2 == 0 || (int8_t)d2 < 0) {                  /* no player involved */
             wr16(a0, 0);
             if (g.sflags & HI(sfhor)) continue;
@@ -239,7 +239,7 @@ void InProgress(void)
                 remaining++;
                 next_same = (PFLAG(sortobj(r[1] & 0x7F), pfteam) != 0) == (PFLAG(pl, pfteam) != 0);
             }
-            if (pa_hook) pa_hook(PA_PENALTY, a2, pl->pnum, pen, penalty_entry(pen)[penmins] | remaining << 8 | next_same << 16);
+            if (pa_hook) pa_hook(PA_PENALTY, a2, pl->pnum, pen, (int)(uint8_t)d2 | remaining << 8 | next_same << 16);
             hold_for((hold_wait() ? 276 : 372) + (remaining ? 0 : 210));   /* 4.6 s for "and number n, 2 minutes, name", else 6.2 s; 3.5 s more for "at 12 minutes 30 seconds" */
         }
         SetPA(pen);
@@ -503,6 +503,9 @@ void PenGoalStuff(struct Team *a1, struct Team *a2)
         uint8_t d2 = *a0++;
         if ((int8_t)d2 < 0) return;
         if (a1->tmpdst[d2 / 2] & 0x4000) continue;          /* coincidental */
+        int32_t keep = pen_goal_keep(a1, d2, a1->tmpdst[d2 / 2]);   /* (RULE_PENALTIES 2: a major stays, a double minor's first 2 minutes end) */
+        if (keep == -2) continue;
+        if (keep >= 0) { a1->tmpdst[d2 / 2] = (uint16_t)keep; a2->tmPwrGoals++; return; }
         a1->tmpdst[d2 / 2] = 0;
         RemovePlayerFromList(a0);
         g.DelayedPen |= 1;
