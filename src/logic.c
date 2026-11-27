@@ -3304,6 +3304,7 @@ void CompLine(struct Team *a2, struct Team *a1)
 }
 
 static int fo_deferred;
+static int fo_late;                                     /* (RULE_HOLD: the window waits for the skate to the spots) */
 static struct SortObj *fo_defer_pl[12];                 /* the face off assignments the anthem holds back */
 static uint16_t fo_defer_as[12];
 static int fo_defer_n;
@@ -3312,7 +3313,7 @@ static int fo_defer_n;
  * sort object and his assignment */
 size_t faceoff_defer_save(uint8_t *out)
 {
-    out[0] = (uint8_t)fo_deferred;
+    out[0] = (uint8_t)(fo_deferred | fo_late << 1);
     out[1] = (uint8_t)fo_defer_n;
     for (int i = 0; i < 12; i++) {
         out[2 + i] = (uint8_t)(i < fo_defer_n ? fo_defer_pl[i] - sortobj(0) : 0);
@@ -3324,7 +3325,7 @@ size_t faceoff_defer_save(uint8_t *out)
 
 int faceoff_defer_check(const uint8_t *in)
 {
-    if (in[0] > 1 || in[1] > 12) return -1;
+    if (in[0] > 3 || in[1] > 12) return -1;
     for (int i = 0; i < in[1]; i++) {
         uint16_t as = (uint16_t)(in[14 + 2 * i] | in[15 + 2 * i] << 8);
         if (in[2 + i] >= 12 || (as != afaceoff && as != afaceoffpl)) return -1;   /* (a skater's, and a face off's assignment) */
@@ -3334,9 +3335,10 @@ int faceoff_defer_check(const uint8_t *in)
 
 int faceoff_defer_load(const uint8_t *in)
 {
-    if (!in) { fo_deferred = 0; fo_defer_n = 0; return 0; }
+    if (!in) { fo_deferred = 0; fo_late = 0; fo_defer_n = 0; return 0; }
     if (faceoff_defer_check(in) < 0) return -1;
-    fo_deferred = in[0];
+    fo_deferred = in[0] & 1;
+    fo_late = in[0] >> 1;
     fo_defer_n = in[1];
     for (int i = 0; i < fo_defer_n; i++) { fo_defer_pl[i] = sortobj(in[2 + i]); fo_defer_as[i] = (uint16_t)(in[14 + 2 * i] | in[15 + 2 * i] << 8); }
     return 0;
@@ -3382,6 +3384,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
 {
     if (!PFLAG(o, pfna)) {
         if (hold_skating()) return;                          /* (RULE_HOLD: the drop's time starts once all are at the spots, as the PC's AllInPlace) */
+        if (fo_late) { fo_late = 0; fo_window(1); g.disflags |= HI(4); }   /* (... and the face off window opens then, as the PC's overlay) */
         o->temp1 = (int16_t)(o->temp1 - 1);
         if (o->temp1 < 0 && hold_wait()) o->temp1 = 0;       /* (RULE_HOLD: the announcer is still on) */
         if (fo_deferred && o->temp1 < 0) {                   /* (the anthem is over: the window, and the usual time to the drop) */
@@ -3503,7 +3506,9 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     g.arenaanim = 0xFFFF;
     if ((g.sflags7 & 1) && (int16_t)g.faceoffanim[0] >= 0)
         StartArenaAnim(g.faceoffanim[0]);
-    fo_window(!hold_anthem_pending());
+    fo_late = !hold_anthem_pending() && hold_skating();     /* (RULE_HOLD: they skate to the spots first: the window once all are there) */
+    fo_window(!hold_anthem_pending() && !fo_late);
+    if (fo_late) g.disflags &= (uint16_t)~HI(4);
     if (hold_anthem_pending()) { fo_deferred = 1; g.disflags &= (uint16_t)~HI(4); }   /* (the anthem first: the face off window and its men come after it, as on the PC) */
     int16_t d0 = (int16_t)(randomd0(0x78) + 0xB4);        /* time to the drop */
     {
