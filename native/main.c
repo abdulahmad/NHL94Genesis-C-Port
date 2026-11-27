@@ -659,6 +659,7 @@ static void headless_rosters_change(int d2)
     rosters_next(rosters_list_dir(rosters_line_at, dir, sizeof dir));
     fprintf(stderr, "rosters line: %s (frame %ld)\n", headless_rosters_word(), (long)mdrt_frame_count(native_m));
     menuopts_setup_fast(1);
+    mdrt_power_on(native_m);                              /* (a console powered on afresh, its VDP too, as the window's restart_console makes one) */
     restart_at(native_power_on_again);
 }
 
