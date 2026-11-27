@@ -518,7 +518,8 @@ void announcer_mix(int16_t *out, int frames, unsigned rate)
     if (!A.lock || !rate || !SDL_AtomicGet(&A.found)) return;
     SDL_LockMutex(A.lock);
     double step = (double)RATE / rate;
-    int barr = segacd_voice_busy();                     /* (Ron Barr's scouting line from the Sega CD: the next clip waits for him) */
+    int barr = !g.demoflag && segacd_voice_busy();      /* (Ron Barr's scouting line from the Sega CD, before the game: the next clip waits for him; never in play) */
+    if (barr && A.nq && A.log) { static long said = -1; if (said != native_frames()) { said = native_frames(); fprintf(stderr, "announcer: waits for Ron Barr\n"); } }
     for (int i = 0; i < frames; i++) {
         /* 95 PC's SpeechTimerTick: the next clip starts when the delay of the one before has run out, which is that clip's length
          * less 26 ticks of 1/100 s (OpenSpeechBank: size * 100 / 5512 - 1Ah): it starts over the tail of the last, on the other channel */
