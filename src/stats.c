@@ -609,7 +609,7 @@ void GetNameandAttrib(uint16_t player, uint32_t sel, struct Team *tm)
     else if (handler == SYM_AttribEnergy) AttribEnergy(v, tm);
     else if (handler == SYM_AttribHanded) AttribHanded(v);
     else if (handler == SYM_AttribWeight) AttribWeight(v);
-    else if (handler == SYM_AttribFighting) AttribFighting(v, div);
+    else if (handler == SYM_AttribFighting) AttribFighting((uint16_t)((v & ~0xEu) | fight_rating(tm->tmteam, player, (uint8_t)(v & 0xE))), div);   /* (RULE_FIGHT_RATINGS: the one played) */
     else AttribRating(v, div);
 }
 

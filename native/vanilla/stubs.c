@@ -87,3 +87,16 @@ void native_net_close(void) {}
 /* the setup screen's options: the cartridge's at every power on, as it has them */
 void menuopts_use(const char *file) { (void)file; }
 void menuopts_power_on(void) { setup_options_hook = NULL; }
+
+/* native/fightrate.c (RULE_FIGHT_RATINGS): not in this build; the cartridge's fighting values */
+#include "fightrate.h"
+void fightrate_start(void) {}
+int fightrate_found93(void) { return 0; }
+int fightrate_found96(void) { return 0; }
+int fightrate_value(const char *name, int cart, const char **how) { (void)name; if (how) *how = "cart"; return cart & 0xE; }
+uint8_t *fightrate_pack(size_t *size) { *size = 0; return NULL; }
+const char *fightrate_session_use(const uint8_t *b, size_t size) { (void)b; (void)size; return "no fight ratings in this build"; }
+void fightrate_session_clear(void) {}
+void fightrate_report(FILE *out) { (void)out; }
+#include "rules.h"
+void rules_next_get(uint8_t *v) { memset(v, 0, RULE_COUNT); }   /* (the next game's rules: the original's) */

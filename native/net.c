@@ -36,6 +36,7 @@
 #include <time.h>
 #include "game.h"
 #include "native.h"
+#include "fightrate.h"
 #include "rules.h"
 #include "build_id.h"
 #include "overbar/net.h"
@@ -92,8 +93,9 @@ const char *native_net_identity(const char *setup)
 }
 
 /* ---- the session's settings: the host's, the next game's for all ----------------------------------
- * "N94S", a version byte (2), then little-endian: the rules (a count byte, each rule's value), the
- * roster set (a u32 size, 0 for the cartridge's, a package's bytes) */
+ * "N94S", a version byte (3), then little-endian: the rules (a count byte, each rule's value), the
+ * roster set (a u32 size, 0 for the cartridge's, a package's bytes), then the fight ratings' sources (a u32 size, the bytes:
+ * native/fightrate.c, RULE_FIGHT_RATINGS plays by the host's) */
 static uint8_t *settings;
 static uint8_t session_rules[RULE_COUNT];               /* the settings the game plays by (the window's pages show them) */
 static int session_rosters, session_host;
@@ -105,15 +107,21 @@ const void *native_net_settings(size_t *size)
     long n = rosters_next_package(&pkg);
     if (n < 0) { fprintf(stderr, "netplay: the roster set: %s: the session plays the cartridge's teams\n", rosters_error()); n = 0; }
     rules_next_send(v);
-    size_t total = 5 + 1 + RULE_COUNT + 4 + (size_t)n;
+    size_t fn = 0;
+    uint8_t *fr = fightrate_pack(&fn);
+    size_t total = 5 + 1 + RULE_COUNT + 4 + (size_t)n + 4 + fn;
     free(settings);
-    if (!(settings = malloc(total))) { free(pkg); *size = 0; return NULL; }
+    if (!(settings = malloc(total))) { free(pkg); free(fr); *size = 0; return NULL; }
     uint8_t *o = settings;
-    memcpy(o, "N94S", 4); o[4] = 2; o += 5;
+    memcpy(o, "N94S", 4); o[4] = 3; o += 5;
     *o++ = RULE_COUNT; memcpy(o, v, RULE_COUNT); o += RULE_COUNT;
     for (int k = 0; k < 4; k++) *o++ = (uint8_t)((size_t)n >> 8 * k);
     if (n) memcpy(o, pkg, (size_t)n);
+    o += n;
+    for (int k = 0; k < 4; k++) *o++ = (uint8_t)(fn >> 8 * k);
+    if (fn) memcpy(o, fr, fn);
     free(pkg);
+    free(fr);
     *size = total;
     return settings;
 }
@@ -121,16 +129,23 @@ const void *native_net_settings(size_t *size)
 /* the settings b (size bytes) the next game's: NULL, or what is wrong */
 static const char *settings_use(mdrt *m, const uint8_t *b, size_t size)
 {
-    if (!b || size < 6 || memcmp(b, "N94S", 4) || b[4] != 2) return "none from this build";
+    if (!b || size < 6 || memcmp(b, "N94S", 4) || b[4] != 3) return "none from this build";
     size_t at = 5, k = b[at++];
     if (size < at + k + 4) return "cut short";
     const uint8_t *v = b + at;
     at += k;
     size_t n = (size_t)b[at] | (size_t)b[at + 1] << 8 | (size_t)b[at + 2] << 16 | (size_t)b[at + 3] << 24;
     at += 4;
-    if (n > size - at || size - at != n) return "its roster set cut short";      /* (written so that it cannot wrap) */
+    if (n > size - at || size - at < 4) return "its roster set cut short";      /* (written so that it cannot wrap) */
+    const uint8_t *pkg = b + at;
+    at += n;
+    size_t fn = (size_t)b[at] | (size_t)b[at + 1] << 8 | (size_t)b[at + 2] << 16 | (size_t)b[at + 3] << 24;
+    at += 4;
+    if (fn > size - at || size - at != fn) return "its fight ratings cut short";
+    const char *fwhy = fightrate_session_use(b + at, fn);
+    if (fwhy) return fwhy;
     if (rules_next_set(v, (int)k) < 0) return "a rule out of range";
-    if (rosters_next_bytes(b + at, n) < 0) return rosters_error();
+    if (rosters_next_bytes(pkg, n) < 0) return rosters_error();
     mdrt_sram *r = mdrt_get_sram(m);                      /* (a new cartridge's on every machine) */
     memset(r->bytes, 0xFF, r->size);
     rules_next_get(session_rules);
@@ -158,6 +173,7 @@ static ob_net *playing(void)
 void native_net_power_on(mdrt *m)
 {
     atomic_store(&session_known, 0);
+    fightrate_session_clear();                            /* (this machine's own sources, unless the session's host sends its) */
     if (!playing()) return;
     size_t size = 0;
     const void *b = ob_net_settings(net, &size);

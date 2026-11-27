@@ -429,3 +429,24 @@ void checkfight(struct SortObj *a2, struct SortObj *a3)
     assinsert(pnothing, puck);
     ST_W(g.collflag);
 }
+
+/* RULE_FIGHT_RATINGS (with RULE_FIGHT): skater slot of team's fighting on NHL 93's scale, from his name (native/fightrate.c: NHLPA 93's
+ * and NHL 96 PC's ratings, read from the player's files); his cartridge value (cart, even) otherwise, and always for a goalie */
+int (*fight_rating_hook)(const char *name, int cart);
+
+uint8_t fight_rating(uint16_t team, uint16_t slot, uint8_t cart)
+{
+    if (!rules[RULE_FIGHT] || !rules[RULE_FIGHT_RATINGS] || !fight_rating_hook || team >= ROSTERS_MAX) return cart;
+    const struct RosterTeam *T = rosters_team(team);
+    if (slot < T->goalies || slot >= T->players || slot >= RS_ROSTER) return cart;
+    const uint8_t *s = T->player[slot].name.s;
+    size_t n = (size_t)(s[0] << 8 | s[1]);
+    n = n >= 2 ? n - 2 : 0;
+    if (n > RS_TEXT - 2) n = RS_TEXT - 2;
+    char name[RS_TEXT];
+    size_t k = 0;
+    for (size_t i = 0; i < n && s[2 + i]; i++) name[k++] = (char)s[2 + i];
+    name[k] = 0;
+    int v = fight_rating_hook(name, cart);
+    return v < 0 || v > 14 ? cart : (uint8_t)(v & 0xE);
+}

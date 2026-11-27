@@ -197,6 +197,12 @@ on or off, and each machine in an online game can set it for itself. The sounds 
   fight art (its fight frames are blank): put your own NHLPA Hockey 93 cartridge (512 KB, a name with "93" in it, .bin/.md/.gen) beside the
   program, or name it with `NHL93_ROM`, and the fighters are drawn with 93's own fight frames (also with PC sprites on: NHL 95 PC has no
   fights). Without it they are drawn with the 94 cartridge's holding, hooking and falling frames. `HOLDTEST=fight:FRAME` forces a fight.
+- **Fight ratings**: who fights, and how hard, when Fighting is on. *Cartridge*: the 94 cartridge's fighting values (only 19 skaters are
+  high enough to start a fight). *NHLPA 93 + NHL 96*: each skater's rating on NHL 93's scale, by name, from your NHLPA Hockey 93 cartridge
+  (as above) and your NHL 96 PC disc image beside the program (`NHL96.iso` and the like, or `NHL96_DISC`); in both games the two together,
+  in neither his penalty minutes or the cartridge's value. Every roster set, Sega CD and 1993-94 included. On in Recommended (it changes
+  nothing with Fighting off), off in Cartridge and Sega CD; online, the host's files decide. Headless: `--rule fight_ratings=1`;
+  `--fight-ratings [@sega-cd]` prints the table. The method: [docs/FIGHT_RATINGS.md](docs/FIGHT_RATINGS.md).
 - Headless test: `HOLDTEST=goal:FRAME,pen:FRAME` (with `--announcer FILE`, optional `HOLDPEN=30` for hooking) forces a goal or a penalty at that vblank and logs each change of the stoppage wait (`ANNOUNCER_LOG=1` the clips); the frames are the game's own vblanks, a 30 second period lasts about 1000.
 - Headless: `--announcer FILE` plays the announcer from that `XBRUCE2.VIV` into `--wav`; `ANNOUNCER_LOG=1` prints each clip said.
 

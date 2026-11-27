@@ -35,6 +35,7 @@
 #include "announcer.h"
 #include "pcsfx.h"
 #include "pcsong.h"
+#include "fightrate.h"
 #include "whiteice.h"
 #include "hats.h"
 #include "pcspr.h"
@@ -724,11 +725,13 @@ static const struct { int rule; const char *key; } cd_rows[] = {
     { RULE_CD_SOUNDS, "cd_sounds" }, { RULE_CD_SONGS, "cd_songs" }, { RULE_CD_PERIOD_END, "cd_period_end" },
     { RULE_HOLD, "hold_play" },
     { RULE_FIGHT, "fighting" },                          /* (NHL 93's fighting: group 4) */
+    { RULE_FIGHT_RATINGS, "fight_ratings" },             /* (the fighters' ratings from NHLPA 93 and NHL 96 PC: group 4) */
     { RULE_ANNOUNCE, "announce_timing" },                /* (when the rink announcer speaks, and play waits for it: group 4) */
 };
 #define CD_ROWS ((int)(sizeof cd_rows / sizeof cd_rows[0]))
-#define CD_HOLD (CD_ROWS - 3)                              /* (RULE_HOLD) */
-#define CD_FIGHT (CD_ROWS - 2)                             /* (RULE_FIGHT) */
+#define CD_HOLD (CD_ROWS - 4)                              /* (RULE_HOLD) */
+#define CD_FIGHT (CD_ROWS - 3)                             /* (RULE_FIGHT) */
+#define CD_FIGHTRATE (CD_ROWS - 2)                         /* (RULE_FIGHT_RATINGS) */
 #define CD_ANNOUNCE (CD_ROWS - 1)                          /* (the last rule row: RULE_ANNOUNCE) */
 #define CD_ROSTERS CD_ROWS                                /* (the roster set, the built-in "sega-cd", list entry 1) */
 #define CD_MUSIC (CD_ROWS + 1)                            /* (this machine's sound only: the disc's music, its crowd bed) */
@@ -1092,12 +1095,12 @@ static void game_page_init(void)
 {
     static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
                                                   "Sega CD playoff password", "Sega CD shot data fix", "Sega CD uniforms",
-                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "PC between-play pause", "Fighting", "Rink announcer: when he speaks" };
+                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "PC between-play pause", "Fighting", "Fight ratings", "Rink announcer: when he speaks" };
     for (int k = 0; k < CD_ROWS; k++) {
         char key[64];
         snprintf(key, sizeof key, "rules.%s", cd_rows[k].key);
         int i = option_index(key);
-        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], i >= 0 ? F.o->options[i].names : cd_off_on, i >= 0 ? F.o->options[i].count : 2, i >= 0 && F.opt_values ? F.opt_values[i] : 0, 1, (cd_rows[k].rule == RULE_HOLD || cd_rows[k].rule == RULE_FIGHT || cd_rows[k].rule == RULE_ANNOUNCE) ? 4 : 1 };
+        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], i >= 0 ? F.o->options[i].names : cd_off_on, i >= 0 ? F.o->options[i].count : 2, i >= 0 && F.opt_values ? F.opt_values[i] : 0, 1, (cd_rows[k].rule == RULE_HOLD || cd_rows[k].rule == RULE_FIGHT || cd_rows[k].rule == RULE_FIGHT_RATINGS || cd_rows[k].rule == RULE_ANNOUNCE) ? 4 : 1 };
     }
     int r = option_index("rules.rosters");
     cd_opts[CD_ROSTERS] = (ob_game_opt){ "cd_rosters", "Sega CD rosters (restarts)", cd_off_on, 2, r >= 0 && F.opt_values && F.opt_values[r] == 1, 1, 2 };
@@ -1140,6 +1143,7 @@ static void game_page_init(void)
             "At a period's end the Sega CD goes straight to the song.",
             "NHL 95 PC's between-play time: play waits a moment after a goal, penalty or penalty shot before the face off, and at every whistle the players and the referee skate from where they were to the face off spot instead of appearing there.",
             "NHL 93's fights: a hard check between two fighters can start one (B low punch, C high punch, A grab).",
+            "Who fights, and how hard, when Fighting is on. Cartridge: the 94 cartridge's fighting values, which only a handful of players are high enough in to start a fight. NHLPA 93 + NHL 96: every skater's rating from your NHLPA 93 cartridge and NHL 96 PC disc, by name (in both: the two together), on NHL 93's scale; a player in neither gets one from his penalty minutes or the cartridge's value. Online, the host's files decide.",
             "When the rink announcer speaks. Right after the goal or penalty, as on NHL 95 PC: play waits until he is done (the goal celebration lasts as long as the speech, with or without the between-play pause). After the goal song: a home goal's speech starts when the song ends. Talks over the face off: the cartridge's pace." };
         for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];
         game_help[CD_ROSTERS] = "The Sega CD's rosters (the game restarts to change them).";
@@ -1163,6 +1167,12 @@ static void game_page_init(void)
     pcspr_start();
     pcsfx_start();
     pcsong_start();
+    fightrate_start();
+    if (!fightrate_found93() || !fightrate_found96()) {   /* (the row says which files were not found) */
+        static char fl[96];
+        snprintf(fl, sizeof fl, "%s (%s)", cd_opts[CD_FIGHTRATE].label, !fightrate_found93() && !fightrate_found96() ? "no NHLPA 93 or NHL 96 PC found" : !fightrate_found93() ? "no NHLPA 93 cartridge found" : "no NHL 96 PC disc found");
+        cd_opts[CD_FIGHTRATE].label = fl;
+    }
     cd_opts[CD_PCSIREN] = (ob_game_opt){ "pc_goal_siren", "PC goal siren", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's siren in place of the cartridge's) */
     cd_opts[CD_PCHORN] = (ob_game_opt){ "pc_period_horn", "PC end of period horn", cd_off_on, 2, 1, 0, 4 };
     cd_opts[CD_PCSPR] = (ob_game_opt){ "pc_sprites", "PC player sprites", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's skaters and goalies, the cartridge's where the PC has none) */
@@ -1209,6 +1219,8 @@ static void game_page_init(void)
     pv[2][CD_HOLD] = 0;                                                        /* (the PC between-play pause: a taste, off in Recommended) */
     pv[1][CD_ANNOUNCE] = 0;                                                    /* (95 PC's timing: not the Sega CD's) */
     pv[2][CD_ANNOUNCE] = 1;                                                    /* (with the goal, as on the PC, in Recommended) */
+    pv[1][CD_FIGHTRATE] = 0;                                                   /* (the fighters' ratings: not the Sega CD's; on in Recommended, they matter only with Fighting on) */
+    pv[2][CD_FIGHTRATE] = 1;
     pv[1][CD_FIGHT] = 0;                                                       /* (NHL 93's fights: not the Sega CD's; off in Recommended too until tried) */
     pv[1][CD_HATS] = 0;                                                        /* (the SNES's: not the Sega CD's) */
     pv[1][CD_PCSIREN] = pv[1][CD_PCHORN] = 0;                                  /* (the PC games' sounds: not the Sega CD's) */

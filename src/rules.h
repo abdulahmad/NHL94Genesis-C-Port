@@ -42,6 +42,8 @@ enum {
     RULE_SIREN,                 /* the goal siren the rink announcer waits for (RULE_ANNOUNCE 2, mods/hold.c): 1 NHL 95 PC's, its fixed
                                  * 7 seconds (the Game page's PC goal siren row sets it from the file the host has). The cartridge's
                                  * siren plays in the game either way; the host that has the PC's file plays that in its place */
+    RULE_FIGHT_RATINGS,         /* 1: with RULE_FIGHT, each skater's fighting on NHL 93's scale, from NHLPA 93 and NHL 96 PC (the player's own
+                                 * files, the host's in a session: native/fightrate.c); 0 the cartridge's (mods/fight.c fight_rating) */
     RULE_COUNT
 };
 /* the original's values */

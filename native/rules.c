@@ -13,6 +13,7 @@ static const char *const announce_names[3] = { "talks over the face off", "right
 static const char *const view_names[2] = { "classic", "wide" };
 static const char *const view_labels[2] = { "256 wide", "320 wide" };
 static const char *const anthem_names[3] = { "off", "NHL 95 PC", "NHL 96 PC" };
+static const char *const fight_rating_names[2] = { "cartridge", "NHLPA 93 + NHL 96" };   /* (RULE_FIGHT_RATINGS: native/fightrate.c) */
 static const char *const siren_names[2] = { "cartridge", "NHL 95 PC" };
 
 /* the rules */
@@ -34,6 +35,7 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_ANNOUNCE] = { "rules.announce_timing", "Rink announcer: when he speaks", 3, announce_names, NULL, 0, 0, 0, 1, NULL, NULL, NULL },
     [RULE_REFEREE] = { "rules.referee_in_play", "PC referee in play", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_ANTHEM] = { "rules.anthems", "National anthems", 3, anthem_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_FIGHT_RATINGS] = { "rules.fight_ratings", "Fight ratings", 2, fight_rating_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_SIREN] = { "rules.goal_siren", "Goal siren (the announcer waits for it)", 2, siren_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
 
