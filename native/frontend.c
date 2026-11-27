@@ -718,18 +718,20 @@ static ob_host host;
  * session the host's rules hold, so a change there waits for the session's end. */
 static const char *const cd_off_on[2] = { "off", "on" };
 static const char *game_help[64];                /* the Game page's description lines (ob_game_set_help) */
-static const struct { int rule; const char *key; } cd_rows[] = {
-    { RULE_CD_SKATING, "cd_skating" }, { RULE_CD_CORNERS, "cd_corners" }, { RULE_CD_PSBOX, "cd_penalty_shot_box" },
-    { RULE_CD_PASSWORD, "cd_password" }, { RULE_CD_CLEARSHOT, "cd_clear_shots" }, { RULE_CD_COLOURS, "cd_colours" },
-    { RULE_CD_SOUNDS, "cd_sounds" }, { RULE_CD_SONGS, "cd_songs" }, { RULE_CD_PERIOD_END, "cd_period_end" },
-    { RULE_HOLD, "hold_play" },
-    { RULE_FIGHT, "fighting" },                          /* (NHL 93's fighting: group 4) */
-    { RULE_ANNOUNCE, "announce_timing" },                /* (when the rink announcer speaks, and play waits for it: group 4) */
+static const struct { int rule; const char *key; int group; } cd_rows[] = {
+    { RULE_CD_SKATING, "cd_skating", 1 }, { RULE_CD_CORNERS, "cd_corners", 1 }, { RULE_CD_PSBOX, "cd_penalty_shot_box", 1 },
+    { RULE_CD_PASSWORD, "cd_password", 1 }, { RULE_CD_CLEARSHOT, "cd_clear_shots", 1 }, { RULE_CD_COLOURS, "cd_colours", 1 },
+    { RULE_CD_SOUNDS, "cd_sounds", 1 }, { RULE_CD_SONGS, "cd_songs", 1 }, { RULE_CD_PERIOD_END, "cd_period_end", 1 },
+    { RULE_HOLD, "hold_play", 4 },
+    { RULE_FIGHT, "fighting", 4 },                       /* (NHL 93's fighting) */
+    { RULE_ANNOUNCE, "announce_timing", 4 },             /* (when the rink announcer speaks, and play waits for it) */
+    { RULE_PENALTIES, "double_minors", 4 },              /* (NHL 96 Genesis's double minors) */
 };
 #define CD_ROWS ((int)(sizeof cd_rows / sizeof cd_rows[0]))
-#define CD_HOLD (CD_ROWS - 3)                              /* (RULE_HOLD) */
-#define CD_FIGHT (CD_ROWS - 2)                             /* (RULE_FIGHT) */
-#define CD_ANNOUNCE (CD_ROWS - 1)                          /* (the last rule row: RULE_ANNOUNCE) */
+#define CD_HOLD 9                                          /* (RULE_HOLD) */
+#define CD_FIGHT 10                                        /* (RULE_FIGHT) */
+#define CD_ANNOUNCE 11                                     /* (RULE_ANNOUNCE) */
+#define CD_PENALTIES 12                                    /* (RULE_PENALTIES) */
 #define CD_ROSTERS CD_ROWS                                /* (the roster set, the built-in "sega-cd", list entry 1) */
 #define CD_MUSIC (CD_ROWS + 1)                            /* (this machine's sound only: the disc's music, its crowd bed) */
 #define CD_CROWD (CD_ROWS + 2)
@@ -1092,12 +1094,13 @@ static void game_page_init(void)
 {
     static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
                                                   "Sega CD playoff password", "Sega CD shot data fix", "Sega CD uniforms",
-                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "PC between-play pause", "Fighting", "Rink announcer: when he speaks" };
+                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "PC between-play pause", "Fighting", "Rink announcer: when he speaks",
+                                                  "Double minors and majors" };
     for (int k = 0; k < CD_ROWS; k++) {
         char key[64];
         snprintf(key, sizeof key, "rules.%s", cd_rows[k].key);
         int i = option_index(key);
-        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], i >= 0 ? F.o->options[i].names : cd_off_on, i >= 0 ? F.o->options[i].count : 2, i >= 0 && F.opt_values ? F.opt_values[i] : 0, 1, (cd_rows[k].rule == RULE_HOLD || cd_rows[k].rule == RULE_FIGHT || cd_rows[k].rule == RULE_ANNOUNCE) ? 4 : 1 };
+        cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], i >= 0 ? F.o->options[i].names : cd_off_on, i >= 0 ? F.o->options[i].count : 2, i >= 0 && F.opt_values ? F.opt_values[i] : 0, 1, cd_rows[k].group };
     }
     int r = option_index("rules.rosters");
     cd_opts[CD_ROSTERS] = (ob_game_opt){ "cd_rosters", "Sega CD rosters (restarts)", cd_off_on, 2, r >= 0 && F.opt_values && F.opt_values[r] == 1, 1, 2 };
@@ -1140,7 +1143,8 @@ static void game_page_init(void)
             "At a period's end the Sega CD goes straight to the song.",
             "NHL 95 PC's between-play time: play waits a moment after a goal, penalty or penalty shot before the face off, and at every whistle the players and the referee skate from where they were to the face off spot instead of appearing there.",
             "NHL 93's fights: a hard check between two fighters can start one (B low punch, C high punch, A grab).",
-            "When the rink announcer speaks. Right after the goal or penalty, as on NHL 95 PC: play waits until he is done (the goal celebration lasts as long as the speech, with or without the between-play pause). After the goal song: a home goal's speech starts when the song ends. Talks over the face off: the cartridge's pace." };
+            "When the rink announcer speaks. Right after the goal or penalty, as on NHL 95 PC: play waits until he is done (the goal celebration lasts as long as the speech, with or without the between-play pause). After the goal song: a home goal's speech starts when the song ends. Talks over the face off: the cartridge's pace.",
+            "NHL 96 Genesis's double minors: a check that knocks a skater down for Roughing or Cross Check is 4 minutes. NHL rules: a power play goal also ends only the first 2 minutes of a double minor, and never a major." };
         for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];
         game_help[CD_ROSTERS] = "The Sega CD's rosters (the game restarts to change them).";
         game_help[CD_MUSIC] = "Where the songs come from: the cartridge or the Sega CD disc.";
@@ -1209,6 +1213,7 @@ static void game_page_init(void)
     pv[2][CD_HOLD] = 0;                                                        /* (the PC between-play pause: a taste, off in Recommended) */
     pv[1][CD_ANNOUNCE] = 2;                                                    /* (after the goal song: the disc's goal song plays at the goal, then he speaks) */
     pv[2][CD_ANNOUNCE] = 1;                                                    /* (with the goal, as on the PC, in Recommended) */
+    pv[1][CD_PENALTIES] = 0;                                                   /* (NHL 96 Genesis's double minors: not the Sega CD's; off in Recommended, it changes the 94 game) */
     pv[1][CD_FIGHT] = 0;                                                       /* (NHL 93's fights: not the Sega CD's; off in Recommended too until tried) */
     pv[1][CD_HATS] = 0;                                                        /* (the SNES's: not the Sega CD's) */
     pv[1][CD_PCSIREN] = pv[1][CD_PCHORN] = 0;                                  /* (the PC games' sounds: not the Sega CD's) */

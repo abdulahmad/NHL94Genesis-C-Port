@@ -465,7 +465,8 @@ static void hook(int ev, struct Team *tm, int player, int a, int b)
         } else add("andnum.cor");
         add("%d.num", jersey(player, tm));
         add("pause.cor");
-        add(mins == 5 ? "5min.cor" : "2min.cor");
+        if (mins == 4) { add("4.num"); add("minutes.cor"); }   /* (a double minor, RULE_PENALTIES: 95 PC has no clip of its own) */
+        else add(mins == 5 ? "5min.cor" : "2min.cor");
         const char *pc = pen_clip(a);
         if (pc) add("%s.pen", pc);
         add("pause.cor");
