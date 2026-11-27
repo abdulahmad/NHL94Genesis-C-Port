@@ -10,6 +10,7 @@
 #include "symbols_gen.h"
 #include "anim_gen.h"
 #include "native.h"
+#include "../mods/anims.h"
 
 static int checks, fails;
 #define CHECK(c) do { checks++; if (!(c)) { fails++; printf("  FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); } } while (0)
@@ -314,6 +315,114 @@ static void penalties(void)
     classic_rules();
 }
 
+/* NHL 95's moves and the PC goalie (mods/moves.c, mods/goalie.c, mods/anims.c) */
+static void moves(void)
+{
+    classic_rules();
+    moves_state_load(NULL);
+    /* the animations: every list ends, every frame is the cartridge's or a mod frame with a cartridge frame and a PC picture */
+    int bad = 0, modf = 0;
+    for (int n = 0; n < MA_COUNT; n++) {
+        const uint8_t *t = spa_table(MA_SPA(n));
+        for (int d = 0; d < 8; d++) {
+            const uint8_t *l = t + (int16_t)rd16(t + d * 2);
+            int k = 0;
+            for (; k < 12; k++) {
+                uint16_t fr = rd16(l + 4 * k);
+                if (fr >= MODF_BASE) {
+                    modf++;
+                    if (mod_frame(fr) >= MODF_BASE || mod_frame(fr) < 1 || mod_frame_pc(fr) < 0 || mod_frame_pc(fr) >= 1150) bad++;
+                    if (n >= MA_GFALLB && (mod_frame(fr) < SPFGoalie || mod_frame(fr) >= SPFSiren)) bad++;   /* (puckgoalie's save odds) */
+                } else if (fr < 1 || fr >= 0x2D0) bad++;
+                if ((int16_t)rd16(l + 4 * k + 2) < 0) break;
+            }
+            if (k == 12) bad++;
+        }
+    }
+    CHECK(!bad && modf > 0);
+    CHECK(mod_frame_pc(MODF_BASE + 140) >= 0 && mod_frame_pc(MODF_BASE + 141) < 0 && mod_frame(SPFGoalie) == SPFGoalie);
+    CHECK(spa_table(SPAshotf) == rom_ptr(SYM_SPAlist + SPAshotf));
+    struct SortObj *o = sortobj(1), *c = sortobj(8);
+    for (int i = 0; i < 12; i++) { struct SortObj *q = sortobj(i); memset(q, 0, sizeof *q); q->SCnum = (int16_t)i; q->position = 3; q->Xpos = 0x60; q->Ypos = 0x200; }
+    /* 95 PC's fake: B or A early in the wind up */
+    o->SPA = SPAshotf; o->SPAnum = 8; g.sflags = HI(sfssdir);
+    CHECK(!moves_fake_pc(0x40, o));                        /* (the rule off) */
+    rules[RULE_FAKESHOT] = 1;
+    CHECK(!moves_fake_pc(0x20, o) && moves_fake_pc(0x40, o) && o->SPA == MA_SPA(MA_FAKEF_PC) && o->SPAnum == 8 && !(g.sflags & HI(sfssdir)));
+    o->SPA = SPAshotb; o->SPAnum = 0x14; g.sflags = HI(sfssdir);
+    CHECK(!moves_fake_pc(0x10, o));                        /* (too late in the wind up) */
+    /* 95G's fake: A let go in the attacking zone, the wind up of the fake, no shot at its end */
+    rules[RULE_FAKESHOT] = 2;
+    o->pflags = 1 << pfgoal; o->SPA = 0; g.sflags = 0; g.BA_PS_flags = 0; g.puckx[0] = 0; g.pucky = 0x40;
+    CHECK(!moves_fake_g(o));                               /* (outside the zone: a pass) */
+    g.pucky = 0x60;
+    CHECK(moves_fake_g(o) && (g.sflags & HI(sfssdir)) && (o->SPA == MA_SPA(MA_FAKEF_G) || o->SPA == MA_SPA(MA_FAKEB_G)));
+    CHECK(moves_fake_end(o) && !(g.sflags & HI(sfssdir)) && o->SPA == SPAglide && !moves_fake_pending());
+    /* 95G's drop pass: A with the pad back, a quarter speed on the ice; over once someone else has the puck */
+    rules[RULE_DROPPASS] = 2;
+    struct SortObj *pk = sortobj(puckscnum);
+    pk->newpos = 0; pk->newpnum = 1;                       /* (player 1 has the puck) */
+    moves_frame();
+    CHECK(!moves_drop_g(1, o) && moves_drop_g(2, o) && moves_dropping() && (g.sflags & HI(sfspdir)));
+    CHECK(moves_pass_spa(SPApassf) == MA_SPA(MA_DROP_G) && moves_pass_spa(SPAgswing) == SPAgswing);
+    int16_t t = 5;
+    CHECK(moves_drop_time(&t) && t == 20);
+    g.puckvx = 0x1000; g.puckvy = (uint16_t)-0x800; g.puckvz[0] = 0x300;
+    moves_drop_loose();
+    CHECK(g.puckvx == 0x400 && (int16_t)g.puckvy == -0x200 && g.puckvz[0] == 0);
+    uint8_t a[MOVES_STATE_SIZE], b[MOVES_STATE_SIZE];
+    CHECK(moves_state_save(a) == MOVES_STATE_SIZE && moves_state_load(a) == 0 && moves_state_save(b) && !memcmp(a, b, sizeof a));
+    pk->newpos = 0xFF; pk->newpnum = 0xFF;
+    moves_frame();
+    CHECK(!moves_dropping());
+    memcpy(b, a, sizeof b); b[0] = 8; CHECK(moves_state_load(b) < 0);
+    /* 95 PC's block: a pad defender between the shooter and his goal, facing the puck, kneels to a low puck */
+    rules[RULE_SHOTBLOCK] = 1;
+    memset(g.puckcross, 0, sizeof g.puckcross);
+    g.puckcross[1].frames = 20;
+    o->pflags = (1 << pfgoal) | (1 << pfjoycon); o->Xpos = 0; o->Ypos = -0xC0; o->SPA = 0;
+    c->pflags = 1 << pfteam; c->Xpos = 0x40; c->Ypos = -0x90; c->SPA = SPAshotf;
+    sortobj(13)->Xpos = 0; sortobj(13)->Ypos = -0x10C;
+    pk->newpos = 0; pk->newpnum = 8;
+    g.puckx[0] = 0; g.pucky = (uint16_t)-0xA0; g.puckz[0] = 0; g.puckvz[0] = 0;
+    o->facedir = (int16_t)vtoa(0, 0x20);
+    CHECK(moves_block_hold(o) && o->SPA == MA_SPA(MA_BLOCKK) && (o->pflags & (1 << pfalock)) && moves_blocking(o));
+    o->SPA = 0; o->pflags = 1 << pfgoal;
+    g.puckz[0] = 0x10;
+    rules[RULE_SHOTBLOCK] = 0;
+    CHECK(!moves_block_hold(o) && !moves_blocking(o));
+    /* 95G's block: a computer defender in the line from his goal to the carrier's puck, facing it, while the carrier winds up; once */
+    rules[RULE_SHOTBLOCK] = 2;
+    g.sflags = HI(sfssdir);
+    o->pflags = 1 << pfgoal; o->Xpos = 0xD; o->Ypos = -0xA0; o->SPA = 0;
+    g.puckx[0] = 0x10; g.pucky = (uint16_t)-0x80;
+    o->facedir = (int16_t)vtoa(0x10, 0x8B);
+    CHECK(moves_block_cpu(o) && o->SPA == MA_SPA(MA_BLOCK_G) && (o->pflags & (1 << pfalock)));
+    o->SPA = 0; o->pflags = 1 << pfgoal;
+    CHECK(!moves_block_cpu(o));                            /* (one block a shot) */
+    o->pflags = (1 << pfgoal) | (1 << pfjoycon);
+    CHECK(!moves_block_cpu(o) && moves_block_hold(o) && o->SPA == MA_SPA(MA_BLOCK_G));   /* (a pad player: A while he winds up) */
+    g.sflags = 0; o->SPA = 0;
+    /* the PC goalie */
+    struct PuckCross pc = { 0x20, 4 };
+    struct SortObj *gk = sortobj(0);
+    gk->Xpos = 0; gk->position = 0; g.puckvx = 0; g.puckvy = 0x3000; g.puckz[0] = 2; g.puckvz[0] = 0x100;
+    CHECK(goalie_save_spa(SPAgstickr, 3, &pc, gk) == SPAgstickr && goalie_wall_spa(gk, SPAwallright) == SPAwallright);
+    rules[RULE_GOALIE] = 1;
+    CHECK(goalie_save_spa(SPAgstickr, 3, &pc, gk) == MA_SPA(MA_GFALLS) && goalie_save_spa(SPAgstickl, 5, &pc, gk) == MA_SPA(MA_GFALLG));
+    CHECK(goalie_save_spa(SPAgglover, 1, &pc, gk) == SPAgglover);   /* (in front of him: the cartridge's) */
+    g.puckvy = 0x800;
+    CHECK(goalie_save_spa(SPAgstickr, 4, &pc, gk) == MA_SPA(MA_GFALLB));   /* (straight at him, slow) */
+    CHECK(goalie_wall_spa(gk, SPAwallright) == MA_SPA(MA_GWALLR) && goalie_wall_spa(o, SPAwallleft) == SPAwallleft);
+    rules[RULE_GOALIE] = 2;
+    pc.x = 1; g.puckvz[0] = 0x400;
+    CHECK(goalie_save_spa(SPAgglover, 1, &pc, gk) == MA_SPA(MA_GKNEE));
+    g.puckvz[0] = 0x800;
+    CHECK(goalie_save_spa(SPAgglover, 1, &pc, gk) == MA_SPA(MA_GFALLB));
+    moves_state_load(NULL);
+    classic_rules();
+}
+
 int main(void)
 {
     const char *rom = getenv("NHL94_ROM");
@@ -327,6 +436,7 @@ int main(void)
     hold();
     siren();
     penalties();
+    moves();
     printf("rulestest: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }
