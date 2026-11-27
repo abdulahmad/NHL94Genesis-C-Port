@@ -17,6 +17,7 @@ static const char *const fight_rating_names[2] = { "cartridge", "NHLPA 93 + NHL 
 static const char *const siren_names[2] = { "cartridge", "NHL 95 PC" };
 static const char *const penalty_names[3] = { "cartridge", "NHL 96 Genesis", "NHL rules" };   /* (double minors: mods/penalties.c) */
 static const char *const move95_names[3] = { "off", "NHL 95 PC", "NHL 95 Genesis" };   /* (NHL 95's moves: mods/moves.c) */
+static const char *const ticker_names[2] = { "cartridge", "from the pregame" };   /* (RULE_TICKER_HL: mods/ticker.c) */
 static const char *const goalie_names[3] = { "cartridge", "NHL 95 PC", "NHL 95 PC + 96 Genesis" };   /* (mods/goalie.c) */
 
 /* the rules */
@@ -45,6 +46,7 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_DROPPASS] = { "rules.drop_pass", "Drop pass", 3, move95_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_SHOTBLOCK] = { "rules.shot_block", "Shot blocking", 3, move95_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_GOALIE] = { "rules.goalie_anims", "Goalie animations", 3, goalie_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_TICKER_HL] = { "rules.ticker_highlights", "Ticker highlights", 2, ticker_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
 
 /* a choice's value: its number, or (a list's) its index */

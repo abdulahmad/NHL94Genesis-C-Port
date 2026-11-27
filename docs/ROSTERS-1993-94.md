@@ -54,10 +54,23 @@ Anaheim and Florida play their first season. Minnesota is now Dallas (the cartri
 No rating, name list or photo from any cartridge is in this repository. `make.py` reads the cartridges
 you give it only to match names and fit the formula.
 
+## Photos
+
+- **Players with a photo on the NHL 94 cartridge** keep it.
+- **Anyone else with a photo in NHL 95 Genesis** gets that one, read from the same NHL 95 ROM as the ratings. NHL 95 has a
+  photo of each team's six line 1 starters (145 players), and it is grey like the cartridge's photos. About 30 of the
+  players new to these sets have one (Brodeur, Osgood, Arnott, Yashin, Gratton and others), plus returning players the
+  cartridge had no photo of.
+- **Everyone else** shows the cartridge's stock picture, as on the cartridge.
+
+NHL 94 PC and NHL 95 PC were checked first (their KEY.DB names a portrait for each player who has one). Neither has a
+portrait of any player new to these sets: they only have photos for their stars. NHL 95 SNES has colour photos of the same six
+starters a team as NHL 95 Genesis.
+
 ## Saved games and online play
 
 Each roster set keeps its own records file, like any other set. Saved states and online play check the
-rosters. Because new players' ratings come from the NHL 95 ROM when it is there, both players need the
+rosters. Because new players' ratings and photos come from the NHL 95 ROM when it is there, both players need the
 same thing in their game folders: either both with an NHL 95 Genesis ROM or both without one.
 
 ## Making them again

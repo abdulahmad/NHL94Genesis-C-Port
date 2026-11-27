@@ -519,6 +519,33 @@ static void penalties(void)
     classic_rules();
 }
 
+/* RULE_TICKER_HL (mods/ticker.c): the cartridge's InitScores leaves the other games at periods 0-2, so the pregame's UpdateScores
+ * never asks for a highlight; with the rule a game can be at period 3 then, and a close one goes to overtime with gsfhl */
+static void ticker(void)
+{
+    for (int rule = 0; rule <= 1; rule++) {
+        int most = 0, hl = 0;
+        for (uint32_t seed = 1; seed <= 200; seed++) {
+            classic_rules();
+            rules[RULE_TICKER_HL] = (uint8_t)rule;
+            memset(&g, 0, sizeof g);
+            g.seed = seed * 0x9E3779B9u;
+            g.gamelevel = 0;                                 /* (the first round: 8 games) */
+            g.gamenum = 0;
+            for (int k = 0; k < 8; k++) { g.matchups[k].gst1 = (uint16_t)(2 * k); g.matchups[k].gst2 = (uint16_t)(2 * k + 1); }
+            InitScores();
+            for (int k = 1; k < 8; k++) if ((int)g.matchups[k].gsper > most) most = g.matchups[k].gsper;
+            UpdateScores();                                  /* (the pregame's, PeriodOver_sp) */
+            for (int k = 1; k < 8; k++) if (g.matchups[k].gsflags & MU_HIGHLIGHT) { hl++; CHECK(g.matchups[k].gsper == 3); }
+            CHECK(!(g.matchups[0].gsflags & MU_HIGHLIGHT) && g.matchups[0].gsper == 0);   /* (not the game being played) */
+        }
+        CHECK(most == (rule ? 3 : 2));
+        CHECK(rule ? hl > 0 : hl == 0);
+    }
+    classic_rules();
+    CHECK(ticker_init_periods() == 3);
+}
+
 /* NHL 95's moves and the PC goalie (mods/moves.c, mods/goalie.c, mods/anims.c) */
 static void moves(void)
 {
@@ -644,6 +671,7 @@ int main(void)
     fight_ratings();
     penalties();
     moves();
+    ticker();
     printf("rulestest: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }
