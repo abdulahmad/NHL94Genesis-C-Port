@@ -352,6 +352,24 @@ def play_hacks(hacks):
     return bad
 
 
+def rosters_line():
+    """the setup menu's Rosters line: a change powers the console on afresh straight to the setup screen, which must show
+    (2026-11-27: with the EA SPORTS screen skipped, the VDP's vblank interrupt stayed off and the game froze in a black screen)"""
+    script = os.path.join(ROOT, 'out', 'rosters', 'line_input.txt')
+    shot = os.path.join(ROOT, 'out', 'rosters', 'line.ppm')
+    open(script, 'w').write('900:START,910:,1100:DOWN,1110:,1200:RIGHT,1210:\n')
+    r = subprocess.run([NHL94, '--rom', ROM, '--headless', '--rosters-line', '--input', script, '--frames', '1600', '--shot', shot],
+                       cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=300)
+    switched = 'rosters line: 92-93 Sega CD' in r.stderr
+    data = open(shot, 'rb').read() if os.path.exists(shot) else b''
+    lit = data and sum(1 for b in data[-60000:] if b > 32) > 10000
+    if not (switched and lit):
+        print('FAIL the Rosters line: %s' % ('no change seen' if not switched else 'the screen after it is black (frozen)'))
+        return False
+    print('  the Rosters line: changed, and the setup screen is back')
+    return True
+
+
 def main():
     if not os.path.exists(ROM):
         sys.exit('no %s here (link the ROM into the repository)' % os.path.basename(ROM))
@@ -375,7 +393,7 @@ def main():
     for path, d in hacks:
         args += ['--hack', path, os.path.relpath(d, ROOT)]
     r = subprocess.run([os.path.join(ROOT, 'build', 'rosterstest'), ROM] + args, cwd=ROOT)
-    bad = play_hacks(hacks) | (r.returncode != 0) | (not packages) | (not headers()) | (not authors_sheets(hacks))
+    bad = play_hacks(hacks) | (not rosters_line()) | (r.returncode != 0) | (not packages) | (not headers()) | (not authors_sheets(hacks))
     base = os.path.join(ROOT, 'out', 'rosters', 'broken')
     refused = 0
     for name, change, says in BROKEN:
