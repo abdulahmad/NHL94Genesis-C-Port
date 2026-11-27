@@ -10,6 +10,7 @@ void announcer_set(int on);                  /* the Game page: 0 off (the cartri
 void announcer_mix(int16_t *out, int frames, unsigned rate);   /* the voice into a frame of sound */
 int announcer_active(void);                  /* 1 when the voice is on and its clips were read (a game is on) */
 void announcer_stop(void);                   /* quiet at once (pause, leaving the game) */
+int announcer_speaking(void);                /* 1 while he speaks or has clips waiting (the Sega CD's song is lowered under him: native/segacd.c) */
 
 /* testing: a file of clips read in place of the search (the headless --announcer FILE); 1 when it was read */
 int announcer_load_file(const char *path);
