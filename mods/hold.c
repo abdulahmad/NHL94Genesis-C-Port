@@ -249,6 +249,7 @@ static int16_t sk_puckx, sk_pucky;                       /* where the puck lay w
 static uint8_t sk_gate[12];                             /* 1: this place has a new player: the old one leaves by the gate to the bench, the new one comes in by it */
 static int16_t sk_delay[12];                            /* frames each waits at the bench gate before he skates on (the start of a period: one after another) */
 static int sk_pick = SK_PICKUP, sk_pstart, sk_lock;
+static int sk_dark;                                      /* (the face off set up behind the fade from the penalty screen: the view is not the whistle's) */
 static uint16_t sk_view[4];                             /* the view at the whistle (Vpos, Hpos, yc1, xc1): the set up scrolls it to the dot at once, the walk there keeps it */
 /* The bench (a line change between plays, and the start of a period). NHL 95 PC's assbench / assleaveice and asseben are the
  * cartridge's own, moved to its rink: the player going off skates to his team's gate (cartridge x -88h - 8, y 50h for the
@@ -270,7 +271,7 @@ void hold_skate_begin(void)
 {
     sk_cap = 0;
     if (!RULE(RULE_HOLD)) return;
-    if ((g.sflags & HI(sfhor)) && g.gameclock != g.PerTimeTotal) return;   /* (back from the penalty screen: the cartridge's fade, the skaters at the spots, the window as the face off starts) */
+    sk_dark = (g.sflags & HI(sfhor)) != 0;              /* (back from the penalty screen: the cartridge's fade (hold_nofade), the view set up on the dot in the dark) */
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) { sk_from[i].x = pl->Xpos; sk_from[i].y = pl->Ypos; sk_pnum[i] = (int8_t)pl->pnum; sk_delay[i] = 0; sk_frame[i] = pl->frame; sk_f0[i] = (int16_t)(pl->facedir & 7); }
     sk_pick = SK_PICKUP;
@@ -528,7 +529,7 @@ void hold_skate_arm(void)
     sk_t0 = g.Vcount;
     sk_on = 1;
     g.yleader = 0;                                      /* (the PC's drop: the view on the dot, no lead) */
-    if (!pstart) { g.Vpos = sk_view[0]; g.Hpos = sk_view[1]; g.yc1 = sk_view[2]; g.xc1 = sk_view[3]; }   /* (no cut to the dot: the view follows the referee's puck there) */
+    if (!pstart && !sk_dark) { g.Vpos = sk_view[0]; g.Hpos = sk_view[1]; g.yc1 = sk_view[2]; g.xc1 = sk_view[3]; }   /* (no cut to the dot: the view follows the referee's puck there) */
     if (getenv("HOLDLOG")) fprintf(stderr, "hold: skate to the spots, %d frames, at %d (clock %d of %d)\n", sk_dur, g.Vcount, g.gameclock, g.PerTimeTotal);
 }
 
