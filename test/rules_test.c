@@ -312,6 +312,39 @@ static void fight_ratings(void)
     classic_rules();
 }
 
+/* RULE_PENALTIES (mods/penalties.c): check drawn Roughing and Cross Check are 4 minutes; under NHL rules a power play goal
+ * ends only a double minor's first 2 minutes and never a major, and otherwise lets the player out as the cartridge does */
+static void penalties(void)
+{
+    classic_rules();
+    CHECK(pen_minutes(0x1A, 2) == 2 && pen_minutes(0x1C, 2) == 2 && pen_minutes(0x26, 5) == 5);
+    rules[RULE_PENALTIES] = 1;
+    CHECK(pen_minutes(0x1A, 2) == 4 && pen_minutes(0x1C, 2) == 4);
+    CHECK(pen_minutes(0x16, 2) == 2 && pen_minutes(0x20, 2) == 2 && pen_minutes(0x26, 5) == 5 && pen_minutes(0x3A, 0xFF) == 0xFF);
+    for (int mode = 0; mode <= 2; mode++) {
+        rules[RULE_PENALTIES] = (uint8_t)mode;
+        for (int kind = 0; kind < 3; kind++) {           /* 0 a minor, 1 a double minor, 2 a one sided major */
+            memset(&g, 0, sizeof g);
+            struct Team *a1 = team_struct(1), *a2 = team_struct(0);   /* (the away team short handed, the home team scores) */
+            a1->tmap = 4; a2->tmap = 6;
+            static const uint8_t pens[3] = { 0x24, 0x1A, 0x26 };     /* Holding, Roughing, Fighting */
+            g.PenSum[0] = 0; g.PenSum[1] = 0; g.PenSum[2] = (uint8_t)(pens[kind] | 0x80); g.PenSum[3] = 3;   /* (player 3) */
+            g.PenSum[4] = 0; g.PenSum[5] = 0; g.PenSum[6] = 0xA0; g.PenSum[7] = 5;                          /* (player 5: Charging) */
+            g.PenSumLength = 8;
+            a1->tmpdst[3] = (uint16_t)(kind == 0 ? 100 : kind == 1 ? 200 : 250);
+            a1->tmpdst[5] = 110;
+            a1->tmboxlist[0] = 6; a1->tmboxlist[1] = 10; a1->tmboxlist[2] = 0xFF;
+            PenGoalStuff(a1, a2);
+            int nhl = mode == 2;
+            if (kind == 0 || !nhl) CHECK(a1->tmpdst[3] == 0 && a1->tmboxlist[0] == 10 && a1->tmap == 5);   /* (the cartridge's: he is out) */
+            else if (kind == 1) CHECK(a1->tmpdst[3] == 120 && a1->tmboxlist[0] == 6 && a1->tmboxlist[1] == 10 && a1->tmap == 4);
+            else CHECK(a1->tmpdst[3] == 250 && a1->tmpdst[5] == 0 && a1->tmboxlist[0] == 6 && a1->tmboxlist[1] == 0xFF && a1->tmap == 5);
+            CHECK(a2->tmPwrGoals == 1);
+        }
+    }
+    classic_rules();
+}
+
 int main(void)
 {
     const char *rom = getenv("NHL94_ROM");
@@ -325,6 +358,7 @@ int main(void)
     hold();
     siren();
     fight_ratings();
+    penalties();
     printf("rulestest: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

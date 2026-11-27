@@ -42,6 +42,8 @@ enum {
     RULE_SIREN,                 /* the goal siren the rink announcer waits for (RULE_ANNOUNCE 2, mods/hold.c): 1 NHL 95 PC's, its fixed
                                  * 7 seconds (the Game page's PC goal siren row sets it from the file the host has). The cartridge's
                                  * siren plays in the game either way; the host that has the PC's file plays that in its place */
+    RULE_PENALTIES,             /* NHL 96 Genesis's double minors (mods/penalties.c): 1 as 96G, 2 also served as the NHL does (a power
+                                 * play goal ends only a double minor's running 2 minutes, never a major) */
     RULE_FIGHT_RATINGS,         /* 1: with RULE_FIGHT, each skater's fighting on NHL 93's scale, from NHLPA 93 and NHL 96 PC (the player's own
                                  * files, the host's in a session: native/fightrate.c); 0 the cartridge's (mods/fight.c fight_rating) */
     RULE_COUNT
@@ -120,6 +122,12 @@ int referee_get(struct referee_view *v);
 #define REFEREE_STATE_SIZE 22
 size_t referee_state_save(uint8_t *out);
 int referee_state_load(const uint8_t *in);
+
+/* RULE_PENALTIES (mods/penalties.c): pen_minutes, the minutes of penalty pen whose Penaltylist entry has mins (InProgress, the
+ * penalty summary); pen_goal_keep, at a power play goal (PenGoalStuff) for player box of team tm in the box, his tmpdst word st:
+ * -1 he goes out (the cartridge's), -2 not him (the next one), else he stays, the goal counts, and this is his tmpdst now */
+uint8_t pen_minutes(uint16_t pen, uint8_t mins);
+int32_t pen_goal_keep(const struct Team *tm, uint8_t box, uint16_t st);
 
 /* RULE_CD_COLOURS: a uniform's 16 colours (c) as the Sega CD has them, for the cartridge team art
  * (rosters_art) on the side away (0 home, 1 away); a colour changed only where it is the cartridge's */
