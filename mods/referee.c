@@ -30,7 +30,7 @@
  *    then 8 frames before he takes it again. A high, fast puck (over 0Ch, the cartridge's fast speed) knocks him
  *    down.
  *  - where and how he skates: NHL 95 PC's own routines (below, referee_follow): assreffollow's spots put on the
- *    cartridge's rink, skateto every 12 ticks with EvadePlayers, doplayeracc's turn rate (his facing turns a
+ *    cartridge's rink, skateto every 12 ticks (not EvadePlayers: he dodges only out of a fight, assfwatchref), doplayeracc's turn rate (his facing turns a
  *    step of 45 degrees in 5 to 11 ticks, never flipping), playeracc's push and MaxSpeed, dostop / stopna,
  *    updateplayers' glide and checkwallcoll / wallcoll's boards and corners. At a face off he stands 15 off the
  *    dot (assrefatdot) and after the drop waits 24 frames (the drop's frames).
@@ -40,7 +40,8 @@
  *    from the game's state, not the PC's assrefwhistle / assrefgoalpa / assrefdrop / SkateToSpot steps; a puck out
  *    of play is not fetched (assrefgoalpa), he goes to the timekeeper's side for one (mods/hold.c). The PC's stop
  *    at the timekeeper (assrefwhistle to (0A0h, 0)) and his signals (assrefsignal, assrefgoalline) are not done.
- *  - a fight (the PC has none): he watches it from 50h (NHL 93's assfwatch), never between the two.
+ *  - a fight (the PC has none): assfwatchref, NHLPA 93's assfwatch for him: he watches it from 50h, never between the two.
+ *  - no EvadePlayers in play (95 PC's referee sidesteps skaters closing on him; by Abdul's direction he only gets out of a fight).
  *  - his collisions with skaters and the puck are the cartridge's checkcx / puckbody (above). */
 #include <stdio.h>
 #include <stdlib.h>
@@ -199,29 +200,9 @@ void referee_puck(struct SortObj *puck)
     if (puck->Zpos > 0xC && (uint32_t)((int32_t)vx * vx + (int32_t)vy * vy) > 0x9000000) fall();
 }
 
-/* A fight (mods/fight.c; not in 95 PC, which has no fights): the players not in it watch from 50h away (NHL 93's assfwatch: a spot
- * 50h from the fight, xc1 / yc1, on the line from it to them, at most 7Eh across). He does the same (where the boards cut that line,
- * along them, 50h off), so he never stands between the two, and the spot is kept inside the rink (ref_inside) */
 static void ref_inside(int32_t *x, int32_t *y);
-static void fight_spot(const struct SortObj *o, int16_t *tx, int16_t *ty)
-{
-    int16_t fx = (int16_t)g.xc1, fy = (int16_t)g.yc1;
-    int32_t dx = o->Xpos - fx, dy = o->Ypos - fy;
-    if (!dx && !dy) dx = fx > 0 ? -1 : 1;                         /* (on the spot: away from the boards) */
-    uint32_t d = isqrt64((uint64_t)(dx * dx + dy * dy));
-    if (!d) d = 1;
-    int32_t x = dx * 0x50 / (int32_t)d + fx, y = dy * 0x50 / (int32_t)d + fy;
-    if (x > 0x7E || x < -0x7E) {                                  /* (the boards: along them instead, still 50h off) */
-        x = x > 0 ? 0x7E : -0x7E;
-        int32_t gx = x - fx, gy2 = 0x50 * 0x50 - gx * gx;
-        int32_t gy = gy2 > 0 ? (int32_t)isqrt64((uint64_t)gy2) : 0;
-        y = fy + (dy < 0 ? -gy : gy);
-    }
-    ref_inside(&x, &y);
-    *tx = (int16_t)x; *ty = (int16_t)y;
-}
 
-/* ==== NHL 95 PC's skating, for him: assreffollow (4E0BD) -> skateto (5E93B) with EvadePlayers (5E4C4) -> doplayeracc (5E16D) /
+/* ==== NHL 95 PC's skating, for him: assreffollow (4E0BD) -> skateto (5E93B) -> doplayeracc (5E16D) /
  * noturn0 / playeracc (5EDAD) / dostop (5F745) / stopna (5F82A), then updateplayers' (5C40F) glide and checkwallcoll's boards.
  * The same code moves the host's picture of him (native/pcspr.c, the Visual only referee) on its own SortObj: it reads the game
  * and changes nothing of it (no sound, the game's avdgoal scratch put back). The fields of a SortObj it uses: Xpos/Xfrac, Ypos/Yfrac,
@@ -373,60 +354,15 @@ static void ref_doacc(struct SortObj *o, int dir)
     if (s2 > 2) ref_acc(o, o->facedir);
 }
 
-/* EvadePlayers (5E4C4): the skateto routine of assreffollow. Behind a net (|y| over 0F2h (PC), |x| under 32h): round it. Else the
- * nearest of the skaters and the puck (the puck only while none is within 50h; not the nets, sort objects 12 and 13) whose gaps to
- * him a little ahead (the places plus the high bytes of the speeds) are both within 28h: vtoa of the gap (away from it), and by his
- * place across the rink a sidestep of it (near the side boards up or down the ice, in the middle to the side). Two fighters are not
- * in it (not in 95 PC: he watches a fight from 50h, fight_spot). d: skateto's direction; the result: his */
-static int ref_evade(const struct SortObj *p, int d)
-{
-    int x = p->Xpos, y = p->Ypos;
-    if (iabs(y) > PCY(0xF2) && iabs(x) < PCX(0x32)) {
-        if (y > 0) d = p->Yvel > 0 ? (x < 0 ? 7 : 1) : (x < 0 ? 6 : 2);
-        else d = p->Yvel < 0 ? (x < 0 ? 5 : 3) : (x < 0 ? 6 : 2);
-        return d;
-    }
-    int best = 0x64;
-    for (int i = 0; i <= puckscnum; i++) {
-        if (i == 12 || i == 13) continue;
-        if (i == puckscnum && best <= 0x50) continue;
-        const struct SortObj *o = sortobj(i);
-        if (i < 12 && (o->pflags2 & (1 << pf2fight))) continue;
-        int dx = (int16_t)(x - o->Xpos), dy = (int16_t)(y - o->Ypos);
-        int gx = iabs(dx + (p->Xvel >> 8) - (o->Xvel >> 8));
-        if (gx > 0x28) continue;
-        int gy = iabs((p->Yvel >> 8) - (o->Yvel >> 8) + dy);
-        if (gy > 0x28) continue;
-        if (gx + gy >= best) continue;
-        best = gx + gy;
-        d = vtoa((int16_t)dx, (int16_t)dy);
-        if (x < -PCX(0x82)) {
-            if (d <= 4 || d >= 8) continue;
-            d = o->Yvel ? 4 : 0;
-        } else if (x > PCX(0x82)) {
-            if (d <= 0 || d >= 4) continue;
-            d = o->Yvel ? 4 : 0;
-        } else if (x > -PCX(0x64) && x < 0) {
-            if (d <= 0 || d >= 4) continue;
-            d = 8 - d;
-            if (d == 6 && o->Yvel) d = dy < 0 ? 5 : 4;
-            else d = dy <= 0 ? 0 : 7;
-        } else {
-            if (x >= PCX(0x64) || x < 0) continue;
-            if (d <= 4 || d >= 8) continue;
-            d = 8 - d;
-            if (d == 2 && o->Yvel) d = dy >= 0 ? 4 : 3;
-            else d = dy > 0 ? 1 : 0;
-        }
-    }
-    return d;
-}
+/* (95 PC's assreffollow skates with EvadePlayers (5E4C4), which turns him aside from any skater or the puck closing within 28h. It is not
+ * used here: by Abdul's direction he keeps his line in play, as the cartridge's own skaters do, and only steps out of a fight's way,
+ * assfwatchref below) */
 
 /* skateto (5E93B): every 12 ticks (the countdown in temp2's high byte) avdgoal (the game's own, src/logic.c, its scratch put back;
  * the PC's avdgoal leaves a stopped clock's referee alone on his own side of the goal line), the aim led by his speed's high byte,
- * 9 (close enough) within 0Ch, else vtoa of it, then EvadePlayers, kept in temp2's low byte; no direction and still, a step toward
+ * 9 (close enough) within 0Ch, else vtoa of it (no evade routine: see above), kept in temp2's low byte; no direction and still, a step toward
  * the puck (a fight: xc1 / yc1). Every tick doplayeracc with the kept direction */
-static void ref_skateto(struct SortObj *o, int16_t x, int16_t y)
+static void ref_skate(struct SortObj *o, int16_t x, int16_t y, int stop)
 {
     int8_t tk = (int8_t)((uint16_t)o->temp2 >> 8);
     tk = (int8_t)(tk - elapsed);
@@ -442,9 +378,8 @@ static void ref_skateto(struct SortObj *o, int16_t x, int16_t y)
         int px = o->Xpos + (o->Xvel >> 8), py = o->Ypos + (o->Yvel >> 8);
         int a0 = (int16_t)(x - px), a1 = (int16_t)(y - py), dx = iabs((int16_t)(ox - px)), dy = iabs((int16_t)(oy - py));
         int d;
-        if (iabs(a0) <= 0xC && iabs(a1) <= 0xC && (dx <= 0xC || o->Xvel) && (dy <= 0xC || o->Yvel)) d = 9;
+        if (stop || (iabs(a0) <= 0xC && iabs(a1) <= 0xC && (dx <= 0xC || o->Xvel) && (dy <= 0xC || o->Yvel))) d = 9;
         else d = vtoa((int16_t)a0, (int16_t)a1);
-        d = ref_evade(o, d);
         o->temp2 = (int16_t)(((uint16_t)o->temp2 & 0xFF00) | (uint8_t)d);
         if (d > 7 && !(o->Xvel | o->Yvel)) {
             const struct SortObj *pk = sortobj(puckscnum);
@@ -457,28 +392,76 @@ static void ref_skateto(struct SortObj *o, int16_t x, int16_t y)
     ref_doacc(o, (uint8_t)o->temp2);
 }
 
+static void ref_skateto(struct SortObj *o, int16_t x, int16_t y) { ref_skate(o, x, y, 0); }
+
 /* he comes on at x, y: at rest, facing centre ice (StartHL2's facing 2 on the PC's left), skateto's first look at once */
 void referee_skate_start(struct SortObj *o, int16_t x, int16_t y)
 {
     o->Xpos = x; o->Xfrac = 0; o->Ypos = y; o->Yfrac = 0; o->Xvel = o->Yvel = 0;
     o->facedir = x > 0 ? 6 : 2; o->_pad56 = 0;
     o->temp2 = 9; o->temp3 = x; o->temp4 = y;
+    o->temp1 = 0; o->temp5 = 0;                                   /* (not watching a fight) */
     o->position = 1;                                              /* (not a goalie: avdgoal leaves a goalie alone) */
     o->SPA = REF_GLIDE; o->SPAcnt = 0;
+}
+
+/* assfwatchref: a fight (mods/fight.c; 95 PC has none) is the two fighters'; he gets out of it and watches, as every other skater does
+ * with NHLPA 93's assfwatch (logic93.asm): on taking it (temp5 set) and then every 60 frames (temp1 the countdown) a spot 50h from the
+ * fight's centre (xc1, yc1) on the line from it to him, x at most 7Eh across, here kept 8 inside the boards and their corners
+ * (ref_inside; where that leaves him within 48h of it, along the boards to 50h off); on the centre itself, toward the nearer side
+ * boards. He skates there with 95 PC's skating (skateto with no evade
+ * routine, as assfwatch's skateto with rtss); once 48h clear of the centre (temp5 2) he stops and faces the fight, and goes again
+ * if it comes within 40h of him. Back to assreffollow when the fight is over */
+static void assfwatchref(struct SortObj *o)
+{
+    int32_t cx = o->Xpos - (int16_t)g.xc1, cy = o->Ypos - (int16_t)g.yc1, r2 = cx * cx + cy * cy;
+    if (!o->temp5 || (o->temp5 == 2 && r2 < 0x40 * 0x40)) { o->temp5 = 1; o->temp1 = 0; }   /* (new, or the fight come to him: a spot at once) */
+    if (o->temp5 == 1 && r2 >= 0x48 * 0x48) {                    /* (clear of it: he stops there and watches; not assfwatch's, whose */
+        o->temp5 = 2;                                             /*  skater keeps skating to his spot, and with 95 PC's turning would */
+        o->temp2 = (int16_t)((uint16_t)o->temp2 & 0xFF);          /*  circle it at speed) */
+    }
+    if (o->temp5 == 2) { ref_skate(o, o->Xpos, o->Ypos, 1); return; }
+    o->temp1 = (int16_t)(o->temp1 - elapsed);
+    if (o->temp1 < 0) {
+        o->temp1 = (int16_t)(o->temp1 + 0x3C);
+        int32_t fx = (int16_t)g.xc1, fy = (int16_t)g.yc1, dx = o->Xpos - fx, dy = o->Ypos - fy;
+        if (!dx && !dy) dx = fx >= 0 ? 1 : -1;                    /* (on the centre: toward the nearer side boards) */
+        int32_t d = (int32_t)isqrt64((uint64_t)(dx * dx + dy * dy));
+        if (!d) d = 1;
+        int32_t x = dx * 0x50 / d + fx, y = dy * 0x50 / d + fy;
+        if (x > 0x7E) x = 0x7E;
+        if (x < -0x7E) x = -0x7E;
+        ref_inside(&x, &y);
+        int32_t gx = x - fx, gy = y - fy;
+        if (gx * gx + gy * gy < 0x48 * 0x48) {
+            /* (not assfwatch's: a fight by the boards or in a corner, where the line from it to him meets the boards inside 50h, would
+             * leave him in it. Along the boards instead, still 50h off: up or down the ice his side of it, else the other way) */
+            int sg = dy ? (dy < 0 ? -1 : 1) : (fy > 0 ? -1 : 1);
+            for (int k = 0; k < 2; k++, sg = -sg) {
+                int32_t h2 = 0x50 * 0x50 - gx * gx, h = h2 > 0 ? (int32_t)isqrt64((uint64_t)h2) : 0;
+                int32_t ty = fy + sg * h, tx = x;
+                ref_inside(&tx, &ty);
+                if ((tx - fx) * (tx - fx) + (ty - fy) * (ty - fy) >= 0x48 * 0x48) { x = tx; y = ty; break; }
+            }
+        }
+        o->temp3 = (int16_t)x; o->temp4 = (int16_t)y;
+    }
+    ref_skateto(o, o->temp3, o->temp4);
 }
 
 /* assreffollow (4E0BD): the spot by the puck's zone, then skateto there. The puck by the net (|x| under 32h, |y| from 0ACh to the goal
  * line): beside the net behind the goal line (46h, 0EDh); deep in an end (|y| over 62h) with the puck loose or its carrier attacking
  * that end: by the corner on the goal line (78h, 0E8h); else beside the play by the boards (90h), keeping his y till the view is
- * 32h off it. On his own side of the rink always. A fight (not in 95 PC): fight_spot. The clock run out: he glides (doplayeracc 8) */
+ * 32h off it. On his own side of the rink always. A fight: assfwatchref. The clock run out: he glides (doplayeracc 8) */
 void referee_follow(struct SortObj *o)
 {
     const struct SortObj *pk = sortobj(puckscnum);
     int16_t px = pk->Xpos, py = pk->Ypos, cy = (int16_t)g.Vpos;
     int ax = iabs(px), ay = iabs(py), side = o->Xpos > 0;
     if (!g.gameclock) { ref_doacc(o, 8); return; }
-    if (pk->pflags2 & (1 << pf2fight)) { int16_t fx, fy; fight_spot(o, &fx, &fy); o->temp3 = fx; o->temp4 = fy; }
-    else if (ax < PCX(0x32) && ay > PCY(0xAC) && ay < PCY(0xE8)) { o->temp3 = (int16_t)(side ? PCX(0x46) : -PCX(0x46)); o->temp4 = (int16_t)(py > 0 ? PCY(0xED) : -PCY(0xED)); }
+    if (pk->pflags2 & (1 << pf2fight)) { assfwatchref(o); return; }
+    o->temp5 = 0;
+    if (ax < PCX(0x32) && ay > PCY(0xAC) && ay < PCY(0xE8)) { o->temp3 = (int16_t)(side ? PCX(0x46) : -PCX(0x46)); o->temp4 = (int16_t)(py > 0 ? PCY(0xED) : -PCY(0xED)); }
     else if (ay > PCY(0x62) && ((int16_t)puck_carrier() < 0 || (((sortobj((int16_t)puck_carrier())->pflags & (1 << pfgoal)) != 0) ^ (py < 0)))) {
         o->temp3 = (int16_t)(side ? PCX(0x78) : -PCX(0x78)); o->temp4 = (int16_t)(py > 0 ? PCY(0xE8) : -PCY(0xE8));
     } else {
@@ -593,19 +576,22 @@ size_t referee_state_save(uint8_t *out)
         b[0] = ref.nopuck[0]; b[1] = rx.mode; b[2] = rx.drop; b[3] = rx.fall; b[4] = rx.fdir; b[5] = rx.hits; b[6] = rx.faller; b[7] = 0;
         b[8] = (uint8_t)(ref.facedir & 7); b[9] = (uint8_t)ref.temp2; b[10] = (uint8_t)((uint16_t)ref.temp2 >> 8);   /* (version 10: his skating) */
         b[11] = (uint8_t)ref._pad56; b[12] = (uint8_t)(ref._pad56 >> 8); b[13] = (uint8_t)ref.temp4; b[14] = (uint8_t)((uint16_t)ref.temp4 >> 8);
+        b[15] = (uint8_t)ref.temp5; b[16] = (uint8_t)ref.temp1; b[17] = (uint8_t)ref.temp3; b[18] = (uint8_t)((uint16_t)ref.temp3 >> 8);   /* (version 11: his fight watch) */
     }
     return REFEREE_STATE_SIZE;
 }
 
 /* a state's n bytes, or (in NULL) none: a state from before the referee, which starts him off the ice. A state from before his
- * skating (version 6 to 9 of the rules' part: REFEREE_STATE_SIZE_9 bytes) starts it afresh where he is */
+ * skating (version 6 to 9 of the rules' part: REFEREE_STATE_SIZE_9 bytes) starts it afresh where he is; one from before his fight
+ * watch (version 10: REFEREE_STATE_SIZE_10) has him not watching one */
 int referee_state_load(const uint8_t *in, size_t n)
 {
     memset(&ref, 0, sizeof ref);
     memset(&rx, 0, sizeof rx);
     if (!in) return 0;
-    if (n != REFEREE_STATE_SIZE && n != REFEREE_STATE_SIZE_9) return -1;
-    if (n == REFEREE_STATE_SIZE && (in[22] > 7 || (in[23] > 9) || (int8_t)in[24] < -0xC || (int8_t)in[24] > 0xC)) return -1;
+    if (n != REFEREE_STATE_SIZE && n != REFEREE_STATE_SIZE_10 && n != REFEREE_STATE_SIZE_9) return -1;
+    if (n == REFEREE_STATE_SIZE && (in[29] > 2 || in[30] > 0x3C)) return -1;
+    if (n >= REFEREE_STATE_SIZE_10 && (in[22] > 7 || (in[23] > 9) || (int8_t)in[24] < -0xC || (int8_t)in[24] > 0xC)) return -1;
     if (in[15] > 2 || in[16] > REF_DROP || in[17] > REF_FALL || in[18] > 7 || in[19] > 2 || in[20] > 0xB || in[21]) return -1;   /* (a state is checked before it is used) */
     int16_t w[7];
     for (int k = 0; k < 7; k++) w[k] = (int16_t)(in[2 * k] | in[2 * k + 1] << 8);
@@ -615,7 +601,8 @@ int referee_state_load(const uint8_t *in, size_t n)
     int16_t x = ref.Xpos, y = ref.Ypos, vx = ref.Xvel, vy = ref.Yvel;
     referee_skate_start(&ref, x, y);
     ref.Xfrac = (uint16_t)w[1]; ref.Yfrac = (uint16_t)w[3]; ref.Xvel = vx; ref.Yvel = vy;
-    if (n == REFEREE_STATE_SIZE) {
+    if (n == REFEREE_STATE_SIZE) { ref.temp5 = in[29]; ref.temp1 = in[30]; ref.temp3 = (int16_t)(in[31] | in[32] << 8); }
+    if (n >= REFEREE_STATE_SIZE_10) {
         ref.facedir = in[22]; ref.temp2 = (int16_t)(in[23] | in[24] << 8);
         ref._pad56 = (uint16_t)(in[25] | in[26] << 8); ref.temp4 = (int16_t)(in[27] | in[28] << 8);
     }

@@ -139,7 +139,8 @@ int referee_get(struct referee_view *v);
 void referee_skate_start(struct SortObj *o, int16_t x, int16_t y);
 void referee_follow(struct SortObj *o);
 int referee_glide(struct SortObj *o);
-#define REFEREE_STATE_SIZE 29                       /* (version 10 of the rules' part; 9 and before: REFEREE_STATE_SIZE_9) */
+#define REFEREE_STATE_SIZE 33                       /* (version 11 of the rules' part; 10: REFEREE_STATE_SIZE_10; 9 and before: REFEREE_STATE_SIZE_9) */
+#define REFEREE_STATE_SIZE_10 29
 #define REFEREE_STATE_SIZE_9 22
 size_t referee_state_save(uint8_t *out);
 int referee_state_load(const uint8_t *in, size_t n);
