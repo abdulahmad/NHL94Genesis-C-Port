@@ -14,6 +14,7 @@
 #   make rosterstest     roster sets: the cartridge's exported and built again, a 32-team one, broken ones,
 #                       hacks on the 32-team template (../roms or HACKS=) extracted
 #   make scouttest      the Sega CD scouting report: Ron Barr's paragraphs paced by his clips (a made-up disc)
+#   make fightratetest  the fight ratings (native/fightrate.c): name matching, the scales, hostile session blobs
 #   make replaymousetest  the instant replay's mouse gestures (test/replaymouse_test.c, no window)
 #   make sramtest       the window's save RAM beside the program, kept between runs from other folders
 #   make setupoptstest  the setup screen's options kept between runs (out/setup.ini beside the program; never in a session)
@@ -43,6 +44,12 @@ build/rulestest: $(SRC) $(HDR) test/rules_test.c test/hal_null.c native/ratings.
 	$(CC) $(CFLAGS) -Isrc -Itest -Inative -I$(MDRT)/include -o $@ $(SRC) test/rules_test.c test/hal_null.c native/ratings.c
 rulestest: build/rulestest
 	./build/rulestest
+build/fightratetest: test/fightrate_test.c native/fightrate.c native/fightrate.h native/fightrate_pim.inc
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Isrc -Inative -I$(OVERBAR_DIR)/include $(shell pkg-config --cflags sdl2) -o $@ test/fightrate_test.c native/fightrate.c $(SDLLIBS)
+fightratetest: build/fightratetest
+	./build/fightratetest
+.PHONY: fightratetest
 build/replaymousetest: test/replaymouse_test.c native/replaymouse.c native/replaymouse.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -Inative test/replaymouse_test.c native/replaymouse.c -o $@
@@ -91,7 +98,7 @@ NATIVE := $(wildcard native/*.c)
 # VANILLA=1: the game without the host extras (game rules, roster sets, states, online play):
 # build/nhl94-vanilla, its own objects (native/vanilla/stubs.c, docs/VANILLA.md)
 ifeq ($(VANILLA),1)
-NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c romsrc.c art.c banner.c ratings.c state.c net.c menuopts.c),$(NATIVE)) native/vanilla/stubs.c native/vanilla/mods.c
+NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c romsrc.c art.c banner.c ratings.c state.c net.c menuopts.c fightrate.c),$(NATIVE)) native/vanilla/stubs.c native/vanilla/mods.c
 SRC    := $(wildcard src/*.c)
 VFLAGS := -DNHL94_VANILLA                                # (src/rules.h: every RULE() the cartridge's 0)
 BIN    ?= build/nhl94-vanilla$(EXE)

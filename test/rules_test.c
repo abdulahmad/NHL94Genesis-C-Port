@@ -290,6 +290,37 @@ static void siren(void)
     classic_rules();
 }
 
+/* RULE_FIGHT_RATINGS (mods/fight.c fight_rating): the cartridge's value unless both it and RULE_FIGHT are on and the host has ratings;
+ * never for a goalie; the host's value, made even and kept in 0-14 */
+static int fake_rating(const char *name, int cart) { return !strcmp(name, "Bob Probert") ? 14 : !strncmp(name, "Wayne", 5) ? 15 : cart; }
+static void fight_ratings(void)
+{
+    int det = -1, s = -1, la = -1, w = -1;
+    for (int t = 0; t < rosters.teams; t++) {
+        const struct RosterTeam *T = rosters_team((uint16_t)t);
+        for (int k = 0; k < T->players; k++) {
+            const uint8_t *n = T->player[k].name.s + 2;
+            if (!memcmp(n, "Bob Probert", 11)) { det = t; s = k; }
+            if (!memcmp(n, "Wayne Gretzky", 13) && la < 0) { la = t; w = k; }
+        }
+    }
+    CHECK(det >= 0 && la >= 0);
+    if (det < 0 || la < 0) return;
+    uint8_t cart = rosters_team((uint16_t)det)->player[s].rating[LR_HANDED_FIGHTING] & 0xE;
+    fight_rating_hook = fake_rating;
+    CHECK(fight_rating((uint16_t)det, (uint16_t)s, cart) == cart);          /* (both off) */
+    rules[RULE_FIGHT_RATINGS] = 1;
+    CHECK(fight_rating((uint16_t)det, (uint16_t)s, cart) == cart);          /* (Fighting off: nothing changes) */
+    rules[RULE_FIGHT] = 1;
+    CHECK(fight_rating((uint16_t)det, (uint16_t)s, cart) == 14);
+    CHECK(fight_rating((uint16_t)la, (uint16_t)w, 2) == 2);                 /* (15: out of range, the cartridge's) */
+    CHECK(fight_rating((uint16_t)det, 0, 6) == 6);                          /* (a goalie) */
+    rules[RULE_FIGHT_RATINGS] = 0;
+    CHECK(fight_rating((uint16_t)det, (uint16_t)s, cart) == cart);
+    fight_rating_hook = NULL;
+    classic_rules();
+}
+
 /* RULE_PENALTIES (mods/penalties.c): check drawn Roughing and Cross Check are 4 minutes; under NHL rules a power play goal
  * ends only a double minor's first 2 minutes and never a major, and otherwise lets the player out as the cartridge does */
 static void penalties(void)
@@ -443,6 +474,7 @@ int main(void)
     referee();
     hold();
     siren();
+    fight_ratings();
     penalties();
     moves();
     printf("rulestest: %d checks, %d failed\n", checks, fails);

@@ -14,6 +14,8 @@ void checkfight(struct SortObj *a2, struct SortObj *a3) { (void)a2; (void)a3; } 
 int (*fight_cheat_hook)(void);                                                              /* (no fights: never asked) */
 void fightinput(uint16_t d0, uint16_t d1, struct SortObj *o) { (void)d0; (void)d1; (void)o; }
 uint16_t fight_frame_shown(uint16_t fr, int facedir) { (void)facedir; return fr; }
+uint8_t fight_rating(uint16_t team, uint16_t slot, uint8_t cart) { (void)team; (void)slot; return cart; }   /* (the cartridge's own) */
+int (*fight_rating_hook)(const char *name, int cart);
 const uint8_t *spa_table(uint16_t spa) { return rom_ptr(SYM_SPAlist + spa); }              /* (updateanim: SPAlist's entry) */
 
 /* mods/referee.c: NHL 95 PC's referee in play. The cartridge has no referee on the ice. */
