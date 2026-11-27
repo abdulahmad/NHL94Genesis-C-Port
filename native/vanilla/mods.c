@@ -23,6 +23,9 @@ void referee_update(void) {}
 void referee_cx(int16_t x, int16_t y, struct SortObj *o) { (void)x; (void)y; (void)o; }
 void referee_puck(struct SortObj *puck) { (void)puck; }
 int referee_get(struct referee_view *v) { (void)v; return 0; }
+void referee_skate_start(struct SortObj *o, int16_t x, int16_t y) { (void)o; (void)x; (void)y; }
+void referee_follow(struct SortObj *o) { (void)o; }
+int referee_glide(struct SortObj *o) { (void)o; return 0; }
 
 /* mods/hold.c: the between-play pause, the announcer's wait, the anthem and the skate to the spots. The cartridge goes
  * straight back to the face off. */
@@ -45,6 +48,7 @@ int hold_skating(void) { return 0; }
 int hold_skate_ref(void) { return -1; }
 int hold_skate_carry(int *x, int *y) { (void)x; (void)y; return 0; }
 int hold_skate_ref_step(int *x, int *y) { (void)x; (void)y; return 0; }
+int hold_skate_pending(void) { return 0; }
 void hold_tick(void) {}
 int hold_wait(void) { return 0; }
 void hold_reset(void) {}
@@ -72,6 +76,9 @@ int moves_block_hold(struct SortObj *o) { (void)o; return 0; }
 int moves_block_cpu(struct SortObj *o) { (void)o; return 0; }
 void moves_block_try(struct SortObj *o) { (void)o; }
 int moves_blocking(const struct SortObj *o) { (void)o; return 0; }
+
+/* mods/ticker.c: the other games' periods before the pregame. The cartridge's InitScores plays 0-2 (randomd0(3)), so no highlight at the pregame. */
+uint16_t ticker_init_periods(void) { return 3; }
 
 /* mods/goalie.c and mods/anims.c: the PC goalie's animations. The cartridge's goalie saves and hops the boards in its own, and every
  * frame is a cartridge frame. */

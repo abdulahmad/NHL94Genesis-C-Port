@@ -144,9 +144,9 @@ static void referee(void)
 {
     struct referee_view v;
     classic_rules();
-    referee_state_load(NULL);
+    referee_state_load(NULL, 0);
     ram_fill(RAM(PenBuf), 0, sizeof g.PenBuf);
-    g.demoflag = 1; g.sflags = 0; g.gmode = 0; g.gmode2 = 0; g.OptPen = 1; g.PalMode = 0; g.Vpos = 0x40;
+    g.demoflag = 1; g.sflags = 0; g.gmode = 0; g.gmode2 = 0; g.OptPen = 1; g.PalMode = 0; g.Vpos = 0x40; g.gameclock = 100;
     struct SortObj *pk = sortobj(puckscnum);
     memset(pk, 0, sizeof *pk);
     pk->SCnum = puckscnum;
@@ -159,7 +159,7 @@ static void referee(void)
     CHECK(!referee_get(&v));                               /* (the rule off: no referee) */
     rules[RULE_REFEREE] = 1;
     referee_update();
-    CHECK(referee_get(&v) && v.x >> 16 == 0x7C && v.y >> 16 == 0x40 && !v.at_dot && v.fall < 0);
+    CHECK(referee_get(&v) && v.x >> 16 == 0x7A && v.y >> 16 == 0x40 && !v.at_dot && v.fall < 0);   /* (assreffollow's 90h: 7Ah here) */
     for (int k = 0; k < 30; k++) referee_update();          /* (past the drop's wait: he skates) */
     referee_get(&v);
     int16_t rx = (int16_t)(v.x >> 16), ry = (int16_t)(v.y >> 16);
@@ -195,15 +195,19 @@ static void referee(void)
     /* the state */
     uint8_t a[REFEREE_STATE_SIZE], b[REFEREE_STATE_SIZE];
     CHECK(referee_state_save(a) == REFEREE_STATE_SIZE);
-    CHECK(referee_state_load(a) == 0);
+    CHECK(referee_state_load(a, sizeof a) == 0);
     referee_state_save(b);
     CHECK(!memcmp(a, b, sizeof a));
-    for (int k = 14; k < REFEREE_STATE_SIZE; k++) {        /* (each flag byte out of range is refused) */
+    for (int k = 14; k <= 24; k++) {                       /* (each flag byte out of range is refused) */
         memcpy(b, a, sizeof b);
-        b[k] = 0xFF;
-        CHECK(k == 14 || referee_state_load(b) < 0);       /* (byte 14, nopuck, takes any value) */
+        b[k] = k == 24 ? 0x7F : 0xFF;                      /* (24: skateto's countdown, -12 to 12) */
+        CHECK(k == 14 || referee_state_load(b, sizeof b) < 0);   /* (byte 14, nopuck, takes any value) */
     }
-    CHECK(referee_state_load(NULL) == 0 && !referee_get(&v));
+    CHECK(referee_state_load(a, REFEREE_STATE_SIZE_9) == 0);   /* (a state from before his skating: the first 22 bytes, his skating afresh) */
+    referee_state_save(b);
+    CHECK(!memcmp(a, b, 14) && b[15] == a[15]);
+    CHECK(referee_state_load(a, 23) < 0);
+    CHECK(referee_state_load(NULL, 0) == 0 && !referee_get(&v));
     classic_rules();
 }
 
@@ -214,8 +218,8 @@ static void referee_avoid(void)
 {
     struct referee_view v;
     classic_rules();
-    referee_state_load(NULL);
-    g.demoflag = 1; g.sflags = 0; g.gmode = 0; g.gmode2 = 0; g.PalMode = 0; g.Vpos = 0x40;
+    referee_state_load(NULL, 0);
+    g.demoflag = 1; g.sflags = 0; g.gmode = 0; g.gmode2 = 0; g.PalMode = 0; g.Vpos = 0x40; g.gameclock = 100;
     struct SortObj *pk = sortobj(puckscnum);
     memset(pk, 0, sizeof *pk);
     pk->SCnum = puckscnum; pk->asslist[0] = pnorm; pk->newpos = 0xFF; pk->Xpos = 0x20; pk->Ypos = 0x40;
@@ -225,7 +229,7 @@ static void referee_avoid(void)
     for (int k = 0; k < 40; k++) referee_update();          /* (on beside the play, past the drop's wait) */
     referee_get(&v);
     int16_t rx = (int16_t)(v.x >> 16), ry = (int16_t)(v.y >> 16);
-    CHECK(rx == 0x7C && ry == 0x40);
+    CHECK(rx == 0x7A && ry == 0x40);
     /* a dead puck at his feet stays as it was */
     g.gmode = 1 << gmclock;
     pk->Xpos = (int16_t)(rx + 4); pk->Ypos = (int16_t)(ry + 4); pk->Zpos = 0; pk->Xvel = -0x900; pk->Yvel = 0;
@@ -236,9 +240,9 @@ static void referee_avoid(void)
     /* a skater coming at him: he steps aside, and no one runs into him */
     struct SortObj *o = sortobj(3);
     o->position = 3; o->Xpos = (int16_t)(rx - 0x30); o->Ypos = ry; o->Xvel = 0x1800; o->weight = 10;
-    for (int k = 0; k < 12; k++) referee_update();
+    for (int k = 0; k < 40; k++) referee_update();          /* (skateto looks every 12; from rest he turns first, doplayeracc) */
     referee_get(&v);
-    CHECK((v.y >> 16) != ry || (v.x >> 16) != rx);
+    CHECK((v.y >> 16) > ry + 4 && (v.x >> 16) == rx);       /* (by the side boards EvadePlayers sends him up the ice, direction 0) */
     o->position = -1;
     /* a fight beside him at the boards */
     struct SortObj *f1 = sortobj(2), *f2 = sortobj(8);
@@ -258,7 +262,87 @@ static void referee_avoid(void)
     CHECK(dx * dx + dy * dy >= 0x40 * 0x40 && (v.x >> 16) <= 0x7E);   /* (watching from about 50h, not between them) */
     f1->position = f2->position = -1; f1->pflags2 = f2->pflags2 = 0;
     pk->pflags2 = 0; pk->newpos = 0xFF;
-    referee_state_load(NULL);
+    referee_state_load(NULL, 0);
+    classic_rules();
+}
+
+/* RULE_REFEREE: 95 PC's skating (mods/referee.c). The boards: skating into them, along a side or into a corner, he is turned back
+ * as a skater is (checkwallcoll / wallcoll: the side boards at 80h, the ends at 126h, the corners' circles of 40h), never more than a
+ * frame's way past them. The turn: his facing moves a step of 45 degrees at a time, the PC's doplayeracc rate (at least 5 frames a
+ * step, 11 at his top speed: no flip from one way to another). The face off: while it is to be set up (RULE_HOLD, the walk not yet
+ * known) he stays where he is, not put at the dot (gone from the view, then the walk from the dot). The state keeps his skating */
+static void referee_skating(void)
+{
+    struct SortObj o;
+    classic_rules();
+    referee_state_load(NULL, 0);
+    g.demoflag = 1; g.sflags = 0; g.gmode = 0; g.gmode2 = 0; g.PalMode = 0; g.Vpos = 0x40; g.gameclock = 100;
+    elapsed = 1;
+    memset(&o, 0, sizeof o);
+    referee_skate_start(&o, 0x78, 0x40);
+    o.Xvel = 0x1E00;                                       /* (2 a frame into the side boards) */
+    int mx = 0;
+    for (int k = 0; k < 60; k++) { referee_glide(&o); if (o.Xpos > mx) mx = o.Xpos; }
+    CHECK(mx <= 0x80 + 2 && o.Xvel <= 0 && o.Xpos < 0x80);
+    memset(&o, 0, sizeof o);
+    referee_skate_start(&o, 0x50, -0xF0);
+    o.Xvel = 0x1400; o.Yvel = -0x1400;                     /* (into a corner) */
+    int out = 0;
+    for (int k = 0; k < 90; k++) {
+        referee_glide(&o);
+        int qx = o.Xpos - 0x40, qy = -o.Ypos - 0xE6;
+        if (qx > 0 && qy > 0 && qx * qx + qy * qy > 0x42 * 0x42) out++;
+    }
+    CHECK(!out);
+    /* in play: the puck goes from one end to the other, he follows facing his way a step at a time */
+    struct SortObj *pk = sortobj(puckscnum);
+    memset(pk, 0, sizeof *pk);
+    pk->SCnum = puckscnum; pk->asslist[0] = pnorm; pk->newpos = 0xFF; pk->Xpos = 0x20; pk->Ypos = 0x40;
+    for (int i = 0; i < 12; i++) { struct SortObj *q = sortobj(i); memset(q, 0, sizeof *q); q->SCnum = (int16_t)i; q->position = -1; }
+    rules[RULE_REFEREE] = 1;
+    struct referee_view v;
+    int pd = -1, pt = -100, bad = 0, near = 0, turns = 0;
+    for (int k = 0; k < 600; k++) {
+        if (k == 40) { pk->Xpos = -0x60; pk->Ypos = -0xE0; g.Vpos = (uint16_t)-0xC0; }
+        if (k == 300) { pk->Xpos = 0x30; pk->Ypos = 0xD0; g.Vpos = 0xC0; }
+        referee_update();
+        referee_get(&v);
+        if (pd >= 0 && v.dir != pd) {
+            turns++;
+            if (((v.dir - pd) & 7) != 1 && ((pd - v.dir) & 7) != 1) bad++;
+            if (k - pt < 3) near++;
+            pt = k;
+        }
+        pd = v.dir;
+    }
+    CHECK(turns > 2 && !bad && near * 4 < turns);
+    CHECK((v.y >> 16) > 0x80);                              /* (he went up the ice with the play, to its corner: assreffollow) */
+    /* the state */
+    uint8_t a[REFEREE_STATE_SIZE], b[REFEREE_STATE_SIZE];
+    referee_state_save(a);
+    for (int k = 0; k < 7; k++) referee_update();
+    referee_state_save(b);
+    CHECK(referee_state_load(a, sizeof a) == 0);
+    for (int k = 0; k < 7; k++) referee_update();
+    uint8_t c[REFEREE_STATE_SIZE];
+    referee_state_save(c);
+    CHECK(!memcmp(b, c, sizeof b));                        /* (from a state he skates on as he did) */
+    /* the face off is to be set up (RULE_HOLD): he stays */
+    referee_get(&v);
+    int16_t rx = (int16_t)(v.x >> 16), ry = (int16_t)(v.y >> 16);
+    rules[RULE_HOLD] = 1;
+    hold_state_load(NULL);
+    pk->asslist[0] = pfaceoff2; pk->pflags = 1 << pfna; g.fox = (uint16_t)-0x60; g.foy = (uint16_t)-0xA0;
+    referee_update();
+    referee_get(&v);
+    CHECK((int16_t)(v.x >> 16) == rx && (int16_t)(v.y >> 16) == ry && v.at_dot);
+    pk->pflags = 0;                                        /* (set up, no walk: at the dot) */
+    referee_update();
+    referee_get(&v);
+    CHECK((int16_t)(v.x >> 16) == -0x60 - 15 && (int16_t)(v.y >> 16) == -0xA0);
+    rules[RULE_HOLD] = 0;
+    pk->asslist[0] = pnorm;
+    referee_state_load(NULL, 0);
     classic_rules();
 }
 
@@ -313,6 +397,26 @@ static void hold(void)
     CHECK(hold_skate_carry(&x2, &y2) && pk->Zpos < 0 && sh->frame == 0);
     for (int k = 0; k < 500 && hold_skating(); k++) { g.Vcount++; hold_tick(); }
     CHECK(!hold_skating() && sh->frame == SPFpuck && pk->Xpos == 100 && pk->Ypos == 100);   /* (at the dot: the cartridge's shadow again) */
+    /* a puck out of play at the whistle (95 PC's assrefgoalpa: not fetched): he skates to the timekeeper's side for one, none on the ice */
+    for (int i = 0; i < 12; i++) { sortobj(i)->Xpos = 0; sortobj(i)->Ypos = 0; }
+    g.puckx[0] = (uint16_t)-0xB5; g.pucky = (uint16_t)-0x102;
+    hold_skate_begin();
+    for (int i = 0; i < 12; i++) { sortobj(i)->Xpos = 100; sortobj(i)->Ypos = 100; }
+    hold_skate_arm();
+    int pick;
+    hold_skate_puck(&x, &y, &pick);
+    CHECK(hold_skating() && x == 0x78 && y == 0);
+    g.Vcount++; hold_tick();
+    CHECK(pk->Zpos < 0 && sh->frame == 0);
+    x = -0x70 * 256; y = -0x100 * 256;
+    for (int k = 0; k < 20; k++) { x2 = x; hold_skate_ref_step(&x, &y); g.Vcount++; }
+    CHECK(x > x2 && y > -0x100 * 256);                     /* (on his way to it, not out of the rink) */
+    /* a puck against the boards: he reaches it from inside */
+    g.puckx[0] = 0x85; g.pucky = 0x20;
+    hold_skate_begin();
+    hold_skate_arm();
+    hold_skate_puck(&x, &y, &pick);
+    CHECK(x == 0x78 && y == 0x20);
     hold_state_load(NULL);
     classic_rules();
 }
@@ -413,6 +517,33 @@ static void penalties(void)
         }
     }
     classic_rules();
+}
+
+/* RULE_TICKER_HL (mods/ticker.c): the cartridge's InitScores leaves the other games at periods 0-2, so the pregame's UpdateScores
+ * never asks for a highlight; with the rule a game can be at period 3 then, and a close one goes to overtime with gsfhl */
+static void ticker(void)
+{
+    for (int rule = 0; rule <= 1; rule++) {
+        int most = 0, hl = 0;
+        for (uint32_t seed = 1; seed <= 200; seed++) {
+            classic_rules();
+            rules[RULE_TICKER_HL] = (uint8_t)rule;
+            memset(&g, 0, sizeof g);
+            g.seed = seed * 0x9E3779B9u;
+            g.gamelevel = 0;                                 /* (the first round: 8 games) */
+            g.gamenum = 0;
+            for (int k = 0; k < 8; k++) { g.matchups[k].gst1 = (uint16_t)(2 * k); g.matchups[k].gst2 = (uint16_t)(2 * k + 1); }
+            InitScores();
+            for (int k = 1; k < 8; k++) if ((int)g.matchups[k].gsper > most) most = g.matchups[k].gsper;
+            UpdateScores();                                  /* (the pregame's, PeriodOver_sp) */
+            for (int k = 1; k < 8; k++) if (g.matchups[k].gsflags & MU_HIGHLIGHT) { hl++; CHECK(g.matchups[k].gsper == 3); }
+            CHECK(!(g.matchups[0].gsflags & MU_HIGHLIGHT) && g.matchups[0].gsper == 0);   /* (not the game being played) */
+        }
+        CHECK(most == (rule ? 3 : 2));
+        CHECK(rule ? hl > 0 : hl == 0);
+    }
+    classic_rules();
+    CHECK(ticker_init_periods() == 3);
 }
 
 /* NHL 95's moves and the PC goalie (mods/moves.c, mods/goalie.c, mods/anims.c) */
@@ -534,11 +665,13 @@ int main(void)
     sega_cd();
     referee();
     referee_avoid();
+    referee_skating();
     hold();
     siren();
     fight_ratings();
     penalties();
     moves();
+    ticker();
     printf("rulestest: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

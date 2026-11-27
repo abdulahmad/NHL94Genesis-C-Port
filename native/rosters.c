@@ -1679,17 +1679,52 @@ struct season_player { const char *name, *cart, *n95; uint8_t number; char pos; 
 struct season_team { uint8_t players, goalies, forwards; uint8_t lines[8][7]; const struct season_player *pl; };
 #include "rosters9394.inc"
 
-/* the cartridge's player of this name (pool: its teams): his team and roster slot, or 0 */
-static int cart_player(const struct team *pool, int teams, const char *name, int *ft, int *fi)
+/* the team's pictures as the cartridge lists them: its line 1 starters' first (G, LD, RD, LW, C, RW, a stock picture for one
+ * with none, as DrawPlayerPicture would pick it), then the others'. The setup screen shows a team's first six (FeaturedPictures). */
+static void starters_first(struct team *T, const uint8_t line1[7])
+{
+    __typeof__(T->pic[0]) pic[PICTURES];
+    int n = 0, used[PICTURES] = { 0 };
+    for (int k = 0; k < 6; k++) {
+        int slot = line1[k] - 1, j;
+        if (slot < 0 || slot >= T->players) continue;
+        for (j = 0; j < T->pics && T->pic[j].slot != slot; j++) {}
+        if (j < T->pics) { if (!used[j]) { used[j] = 1; pic[n++] = T->pic[j]; } continue; }
+        int f = T->pl[slot].nib[LR_HANDED_FIGHTING] & 1;
+        uint32_t a = picture_named(k == 0 ? (f ? "NoPicGoalie1" : "NoPicGoalie2") : (f ? "NoPicSkater2" : "NoPicSkater1"));
+        if (a && n < PICTURES) { pic[n].pic = a; pic[n].photo = -1; pic[n++].slot = (uint8_t)slot; }
+    }
+    for (int j = 0; j < T->pics && n < PICTURES; j++) if (!used[j]) pic[n++] = T->pic[j];
+    memcpy(T->pic, pic, sizeof pic[0] * (size_t)n);
+    T->pics = n;
+}
+
+/* team t's player i has a photo in its list (a card, not a stock picture) */
+static int carded(const struct team *T, int i)
+{
+    for (int k = 0; k < T->pics; k++) {
+        const char *pn = picture_name(T->pic[k].pic);
+        if (T->pic[k].slot == i && !(pn && !strncmp(pn, "NoPic", 5))) return 1;
+    }
+    return 0;
+}
+
+/* the cartridge's player of this name at this position (pool: its teams): his team and roster slot, or 0. Two of a name:
+ * the one who plays the position (Stephane Richer, the Devils' forward, not the Bruins' defenceman), then the one with a
+ * photo (John Vanbiesbrouck: the Rangers' card, not Florida's stock picture). */
+static int cart_player(const struct team *pool, int teams, const char *name, char pos, int *ft, int *fi)
 {
     char want[32], k[32];
+    int best = -1;
     rom95g_key(name, want, sizeof want);
     for (int t = 0; t < teams; t++)
         for (int i = 0; i < pool[t].players; i++) {
             rom95g_key(pool[t].pl[i].name, k, sizeof k);
-            if (!strcmp(k, want)) { *ft = t; *fi = i; return 1; }
+            if (strcmp(k, want)) continue;
+            int score = 2 * (pool[t].pl[i].pos == pos) + carded(&pool[t], i);
+            if (score > best) { best = score; *ft = t; *fi = i; }
         }
-    return 0;
+    return best >= 0;
 }
 
 static int season_folder(struct folder *L, int set)
@@ -1708,10 +1743,12 @@ static int season_folder(struct folder *L, int set)
             const struct season_player *R = &S->pl[i];
             struct player *P = &T->pl[T->players];
             int ft, fi;
-            if (R->cart && cart_player(pool, 28, R->cart, &ft, &fi)) {
-                *P = pool[ft].pl[fi];                     /* (his ratings, and his photo) */
-                for (int k = 0; k < pool[ft].pics && T->pics < PICTURES; k++)
-                    if (pool[ft].pic[k].slot == fi) { T->pic[T->pics] = pool[ft].pic[k]; T->pic[T->pics++].slot = (uint8_t)T->players; }
+            if (R->cart && cart_player(pool, 28, R->cart, R->pos, &ft, &fi)) {
+                *P = pool[ft].pl[fi];                     /* (his ratings, and his photo: not a stock picture in his team's list, */
+                for (int k = 0; k < pool[ft].pics && T->pics < PICTURES; k++) {   /*  Kurri's, Anaheim's: his NHL 95 one, if any, below) */
+                    const char *pn = picture_name(pool[ft].pic[k].pic);
+                    if (pool[ft].pic[k].slot == fi && !(pn && !strncmp(pn, "NoPic", 5))) { T->pic[T->pics] = pool[ft].pic[k]; T->pic[T->pics++].slot = (uint8_t)T->players; }
+                }
             } else {
                 memset(P, 0, sizeof *P);
                 snprintf(P->name, sizeof P->name, "%s", R->name);
@@ -1728,7 +1765,7 @@ static int season_folder(struct folder *L, int set)
                 if (!L->photo && !(L->photo = calloc(PHOTOS_MAX, sizeof *L->photo))) return fail("out of memory");
                 if (L->photos < PHOTOS_MAX) {
                     struct photo *F = &L->photo[L->photos];
-                    snprintf(F->name, sizeof F->name, "NHL95_%s_%d", T->abbr, T->players);
+                    snprintf(F->name, sizeof F->name, "NHL95_%.8s_%d", T->abbr, T->players);
                     memcpy(F->px, px, sizeof F->px);
                     T->pic[T->pics].pic = 0;
                     T->pic[T->pics].photo = (int16_t)L->photos++;
@@ -1740,6 +1777,7 @@ static int season_folder(struct folder *L, int set)
             P->start = R->start;
             T->players++;
         }
+        starters_first(T, S->lines[0]);
         T->goalies = S->goalies;
         T->forwards = S->forwards;
         memcpy(T->line, S->lines, sizeof T->line);

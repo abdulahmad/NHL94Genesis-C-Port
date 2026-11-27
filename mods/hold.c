@@ -547,8 +547,45 @@ void hold_skate_place(void)
     SprSort();
 }
 
-/* where the puck lay at the whistle (valid with hold_skate_ref() >= 0); the referee reaches it at SK_PICKUP of the 256 */
-void hold_skate_puck(int *x, int *y, int *pickup) { *x = sk_puckx; *y = sk_pucky; *pickup = sk_pick; }
+/* NHL 95 PC's assrefgoalpa (4ED7C) does not fetch a puck out of play (past |x| 0A0h or |y| 112h, the PC's rink): assrefwhistle
+ * (4E8EF) takes the referee to the timekeeper (0A0h, 0) and assrefdrop (4F5BF) has him skate to the dot with the puck it gives him
+ * (puckc 10h, puckz -100: not on the ice). Here a puck past the cartridge's boards (88h, 12Ah) at the whistle: he skates to the
+ * timekeeper's side (TK_X, 0) instead of to it, with no puck on the ice, and from there carries one to the dot. Before, he skated
+ * out of the rink to where it lay (PR #167's walk, then #193's for the game's referee) */
+#define TK_X 0x78
+static int sk_oop(void) { return !sk_pstart && (sk_puckx > 0x88 || sk_puckx < -0x88 || sk_pucky > 0x12A || sk_pucky < -0x12A); }
+static void pick_spot(int *x, int *y)
+{
+    if (sk_oop()) { *x = TK_X; *y = 0; return; }
+    *x = sk_puckx; *y = sk_pucky;
+    /* (a puck against the boards: he reaches it from 8 inside a skater's limits, checkwallcoll's 80h, 126h and corner circles of 40h
+     * about +-40h, +-0E6h, not from in the boards) */
+    const int lx = 0x80 - 8, ly = 0x126 - 8, cx = 0x40, cy = 0xE6, r = 0x40 - 8;
+    if (*x > lx) *x = lx;
+    if (*x < -lx) *x = -lx;
+    if (*y > ly) *y = ly;
+    if (*y < -ly) *y = -ly;
+    int ax = *x < 0 ? -*x : *x, ay = *y < 0 ? -*y : *y;
+    if (ax > cx && ay > cy) {
+        double qx = ax - cx, qy = ay - cy, d = sqrt(qx * qx + qy * qy);
+        if (d > r) { ax = cx + (int)(qx * r / d); ay = cy + (int)(qy * r / d); *x = *x < 0 ? -ax : ax; *y = *y < 0 ? -ay : ay; }
+    }
+}
+
+/* where the referee picks the puck up (where it lay at the whistle, or the timekeeper's for one out of play; valid with
+ * hold_skate_ref() >= 0); he reaches it at SK_PICKUP of the 256 */
+void hold_skate_puck(int *x, int *y, int *pickup) { pick_spot(x, y); *pickup = sk_pick; }
+
+/* 1 while the face off is to be set up and its walk is not yet known: the puck's assignment is the face off's, new (pfna: its set
+ * up, puckfaceoff2's, runs in the next pass, hold_skate_begin to hold_skate_arm). The referee stays where he is till then */
+int hold_skate_pending(void)
+{
+    if (!RULE(RULE_HOLD)) return 0;
+    if (sk_cap) return 1;
+    const struct SortObj *pk = sortobj(puckscnum);
+    int asn = pk->asslist[pk->assnum & 7];
+    return (asn == pfaceoff || asn == pfaceoff2) && PFLAG(pk, pfna);
+}
 
 /* 1 while the skaters come on at the start of a period (the referee too: he starts at the puck's place, hold_skate_puck) */
 int hold_skate_pstart(void) { return sk_on && sk_pstart; }
@@ -575,7 +612,9 @@ int hold_skate_carry(int *x, int *y)
     if (!sk_on || sk_pstart) return 0;
     int pr = hold_skate_ref();
     if (pr < sk_pick || pr >= 256) return 0;
-    int sx = sk_puckx * 256, sy = sk_pucky * 256, ex = ref_spot_x() * 256, ey = (int16_t)g.foy * 256;
+    int sx, sy, ex = ref_spot_x() * 256, ey = (int16_t)g.foy * 256;
+    pick_spot(&sx, &sy);
+    sx *= 256; sy *= 256;
     int k = pr - sk_pick, kn = 256 - sk_pick;
     *x = sx + (ex - sx) * k / kn;
     *y = sy + (ey - sy) * k / kn;
@@ -600,8 +639,10 @@ int hold_skate_ref_step(int *x, int *y)
     if (pr >= 256) { *x = ex; *y = ey; return 1; }
     int t = (int16_t)(g.Vcount - sk_t0), tp = (sk_pick * sk_dur + 255) / 256, n = tp - t;   /* (tp: the first frame he has it) */
     if (n < 1) n = 1;
-    *x += (sk_puckx * 256 - *x) / n;
-    *y += (sk_pucky * 256 - *y) / n;
+    int px, py;
+    pick_spot(&px, &py);
+    *x += (px * 256 - *x) / n;
+    *y += (py * 256 - *y) / n;
     return 1;
 }
 
@@ -709,9 +750,12 @@ static void skate_pose(void)
         ST_W(g.puckz[0]);
         hand = t < sk_dur;
     } else if (t < sk_dur && t * 256 / sk_dur < sk_pick) {      /* (the referee is still on his way to the puck where it lay) */
-        pk->Xpos = sk_puckx; pk->Ypos = sk_pucky;
-        g.puckx[0] = (uint16_t)sk_puckx; g.pucky = (uint16_t)sk_pucky;
-        g.puckz[0] = 0;
+        int qx, qy;
+        pick_spot(&qx, &qy);
+        pk->Xpos = (int16_t)qx; pk->Ypos = (int16_t)qy;
+        g.puckx[0] = (uint16_t)qx; g.pucky = (uint16_t)qy;
+        if (sk_oop()) { ST_W(g.puckz[0]); hand = 1; }           /* (out of play: the timekeeper's puck, not on the ice till he has it) */
+        else g.puckz[0] = 0;
     } else if (t < sk_dur && hold_skate_carry(&rx, &ry)) {   /* the referee carries the puck to the dot (the host's picture of him follows it) */
         pk->Xpos = (int16_t)(rx / 256); pk->Ypos = (int16_t)(ry / 256);
         g.puckx[0] = (uint16_t)pk->Xpos; g.pucky = (uint16_t)pk->Ypos;
@@ -746,8 +790,10 @@ static void skate_pose(void)
         } else {                                        /* (he skates to where the puck lay, from about where the view was at the whistle) */
             int tp = (sk_pick * sk_dur + 255) / 256, k = t < tp ? t : tp;
             if (tp < 1) tp = 1;
-            tx = (int16_t)sk_view[3] + (sk_puckx - (int16_t)sk_view[3]) * k / tp;
-            ty = (int16_t)sk_view[2] + (sk_pucky - (int16_t)sk_view[2]) * k / tp;
+            int qx, qy;
+            pick_spot(&qx, &qy);
+            tx = (int16_t)sk_view[3] + (qx - (int16_t)sk_view[3]) * k / tp;
+            ty = (int16_t)sk_view[2] + (qy - (int16_t)sk_view[2]) * k / tp;
         }
         g.yleader = 0;
         int vh = view_hpos();
