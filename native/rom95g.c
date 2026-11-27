@@ -81,8 +81,10 @@ static int read_at(const uint8_t *b, uint32_t a)
 
 /* the photos (NHL95Genesis src/graphics95.asm, src/front/scout95.asm GetPlayerPicture): a team's line 1 starters (G, LD, RD,
  * LW, C, RW: six bytes at its block's fourth offset word, his place on the team + 1) have the pictures FeaturedPicIdx names
- * (six bytes a team, 28 teams), of FeaturedPictures (the longs after it, at an even address). A picture is 94's: no palette or
- * map of its own (8 zero bytes), its tile count ($24), 36 tiles of 3-bit rows, the photos' map (the 36 in order). */
+ * (six bytes a team, 28 teams), of FeaturedPictures (the longs after it, at an even address). A picture is 94's: the offsets of a
+ * palette and a map of its own (0 and 0: none), its tile count, its tiles of 3-bit rows. With no map of its own the photos'
+ * common one is the 36 tiles in order; with one (11 of them: Graves, Tkachuk ...) its 6 x 6 entries name the tiles. The
+ * game draws every photo with PicturePalette's colours, so a picture's own palette is never used. */
 static void read_photos(const uint8_t *b, uint32_t a, const int first[TEAMS95 + 1])
 {
     R.photos = 0;
@@ -102,11 +104,22 @@ static void read_photos(const uint8_t *b, uint32_t a, const int first[TEAMS95 + 
             int i = first[t] + b[st + k] - 1;
             uint32_t pic = be32(b + list + 4 * b[idx + 6 * t + k]);
             if (i < first[t] || i >= first[t + 1] || R.photo[i] >= 0 || R.photos == PHOTOS95) continue;
-            if (pic + 10 + 36 * 24 > ROM95 || be32(b + pic) || be32(b + pic + 4) || be16(b + pic + 8) != 36) continue;
+            if (pic + 10 > ROM95) continue;
+            unsigned count = be16(b + pic + 8);
+            uint32_t mo = be32(b + pic + 4);
+            if (!count || count > 36 || pic + 10 + count * 24 > ROM95) continue;
+            if (!mo ? be32(b + pic) || count != 36 : mo & 1 || pic + mo + 4 + 72 > ROM95 || be16(b + pic + mo) != 6 || be16(b + pic + mo + 2) != 6) continue;
+            unsigned tile[36];                            /* (a map of its own: its 6 x 6 entries' tiles; else the 36 in order) */
+            int bad = 0;
+            for (int m = 0; m < 36; m++) {
+                tile[m] = mo ? (be16(b + pic + mo + 4 + 2 * m) & 0x7FF) : (unsigned)m;
+                bad |= tile[m] >= count;
+            }
+            if (bad) continue;
             uint8_t *px = R.px[R.photos];
             for (int y = 0; y < PHOTO95; y++)
                 for (int c = 0; c < PHOTO95; c++) {
-                    const uint8_t *row = b + pic + 10 + ((y / 8 * 6 + c / 8) * 8 + y % 8) * 3;
+                    const uint8_t *row = b + pic + 10 + (tile[y / 8 * 6 + c / 8] * 8 + y % 8) * 3;
                     uint32_t v = (uint32_t)row[0] << 16 | (uint32_t)row[1] << 8 | row[2];
                     px[y * PHOTO95 + c] = (uint8_t)(5 + (v >> (21 - 3 * (c % 8)) & 7));
                 }
