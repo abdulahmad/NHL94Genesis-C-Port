@@ -144,6 +144,7 @@ int rosters_session_entry(void);
 int rom95g_have(void);
 int rom95g_ratings(const char *name, uint8_t nib[14]);   /* (by name: 1 found) */
 void rom95g_key(const char *s, char *out, size_t size);
+int rom95g_photo(const char *name, uint8_t px[48 * 48]);   /* (his NHL 95 photo, 48 x 48, colours 5 to 12: 1 found) */
 #define ROSTERS_BUILTINS 3
 /* the setup menu's Rosters line (menuopts.c): want it, its value's words, a change (-1, 1) asked for on it */
 void menuopts_rosters_line(int want, const char *(*word)(void), void (*change)(int));

@@ -1721,6 +1721,20 @@ static int season_folder(struct folder *L, int set)
                     for (int k = 0; k < 14; k++) if (k != LR_HANDED_FIGHTING && k != LR_CHECKING && k != LR_STICK_HANDLING) P->nib[k] = n95[k];
                 }
             }
+            int pictured = 0;
+            for (int k = 0; k < T->pics; k++) pictured |= T->pic[k].slot == T->players;
+            uint8_t px[ART_LOGO * ART_LOGO];
+            if (!pictured && T->pics < PICTURES && rom95g_photo(R->n95 ? R->n95 : R->name, px)) {   /* (no 94 card: his NHL 95 one) */
+                if (!L->photo && !(L->photo = calloc(PHOTOS_MAX, sizeof *L->photo))) return fail("out of memory");
+                if (L->photos < PHOTOS_MAX) {
+                    struct photo *F = &L->photo[L->photos];
+                    snprintf(F->name, sizeof F->name, "NHL95_%s_%d", T->abbr, T->players);
+                    memcpy(F->px, px, sizeof F->px);
+                    T->pic[T->pics].pic = 0;
+                    T->pic[T->pics].photo = (int16_t)L->photos++;
+                    T->pic[T->pics++].slot = (uint8_t)T->players;
+                }
+            }
             P->number = R->number;
             P->pos = R->pos;
             P->start = R->start;
@@ -1744,6 +1758,8 @@ static int build_builtin(const char *dir, struct built *B, char *name, size_t na
     err_line = 0;
     if (r == 0) r = build(&L, rom_cart, B);
     if (name) snprintf(name, name_size, "%s", L.name);
+    free(L.photo);                                        /* (the 1993-94 sets' NHL 95 photos) */
+    L.photo = NULL;
     atomic_flag_clear(&reading);
     return r;
 }
@@ -2178,6 +2194,8 @@ void rosters_about(int i, char *text, size_t size)
             about_teams(A, L.t, L.teams, L.playoff_teams);
             about[i] = A;
         }
+        free(L.photo);                                    /* (the 1993-94 sets' NHL 95 photos) */
+        L.photo = NULL;
         atomic_flag_clear(&reading);
     }
     if (!A) { snprintf(text, size, "%s", i == 0 ? "The cartridge's teams: once its ROM is chosen\n" : ""); return; }

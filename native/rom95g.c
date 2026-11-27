@@ -22,7 +22,15 @@
 #define TEAMS95 26                              /* (the All-Star teams' players are the clubs') */
 #define PLAYERS95 1024
 
-static struct { int tried, have; int n; char name[PLAYERS95][28]; uint8_t nib[PLAYERS95][14]; char path[600]; } R;
+#define PHOTO95 48                              /* (a photo: 48 x 48, colours 5 to 12 of the photos' palette, as rosters.c's) */
+#define PHOTOS95 160
+
+static struct {
+    int tried, have; int n; char name[PLAYERS95][28]; uint8_t nib[PLAYERS95][14]; char path[600];
+    int16_t photo[PLAYERS95];                   /* his photo in px, -1 none */
+    int photos;
+    uint8_t px[PHOTOS95][PHOTO95 * PHOTO95];
+} R;
 
 static unsigned be16(const uint8_t *p) { return (unsigned)(p[0] << 8 | p[1]); }
 static uint32_t be32(const uint8_t *p) { return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3]; }
@@ -36,8 +44,10 @@ void rom95g_key(const char *s, char *out, size_t size)
 }
 
 /* the team table at a, if it is one (28 longs, each to a block of six small offset words): its players into R */
+static void read_photos(const uint8_t *b, uint32_t a, const int first[TEAMS95 + 1]);
 static int read_at(const uint8_t *b, uint32_t a)
 {
+    int first[TEAMS95 + 1];
     for (int t = 0; t < 28; t++) {
         uint32_t p = be32(b + a + 4 * t);
         if (!p || p & 1 || p + 16 > ROM95) return 0;
@@ -46,6 +56,7 @@ static int read_at(const uint8_t *b, uint32_t a)
     R.n = 0;
     for (int t = 0; t < TEAMS95; t++) {
         uint32_t p = be32(b + a + 4 * t), q = p + be16(b + p);
+        first[t] = R.n;
         for (int i = 0; i < 40 && q + 2 < ROM95; i++) {
             unsigned len = be16(b + q);
             if (len <= 2) break;
@@ -56,12 +67,52 @@ static int read_at(const uint8_t *b, uint32_t a)
                 raw[len - 2] = 0;
                 rom95g_key(raw, R.name[R.n], sizeof R.name[0]);
                 for (int k = 0; k < 14; k++) R.nib[R.n][k] = (uint8_t)(b[q + len + 1 + k / 2] >> (k & 1 ? 0 : 4) & 15);
+                R.photo[R.n] = -1;
                 R.n++;
             }
             q += len + 8;
         }
     }
-    return R.n > 400;
+    first[TEAMS95] = R.n;
+    if (R.n <= 400) return 0;
+    read_photos(b, a, first);
+    return 1;
+}
+
+/* the photos (NHL95Genesis src/graphics95.asm, src/front/scout95.asm GetPlayerPicture): a team's line 1 starters (G, LD, RD,
+ * LW, C, RW: six bytes at its block's fourth offset word, his place on the team + 1) have the pictures FeaturedPicIdx names
+ * (six bytes a team, 28 teams), of FeaturedPictures (the longs after it, at an even address). A picture is 94's: no palette or
+ * map of its own (8 zero bytes), its tile count ($24), 36 tiles of 3-bit rows, the photos' map (the 36 in order). */
+static void read_photos(const uint8_t *b, uint32_t a, const int first[TEAMS95 + 1])
+{
+    R.photos = 0;
+    uint32_t idx = 0;
+    for (uint32_t x = 0x200; x + 28 * 6 + 4 * PHOTOS95 < ROM95 && !idx; x++) {   /* (FeaturedPicIdx: team t's six are 6t to 6t + 5) */
+        int ok = 1;
+        for (int t = 0; t < TEAMS95 && ok; t++)
+            for (int k = 0; k < 6 && ok; k++) ok = b[x + 6 * t + k] / 6 == t;
+        if (ok) idx = x;
+    }
+    if (!idx) return;
+    uint32_t list = (idx + 28 * 6 + 1) & ~1u;
+    for (int t = 0; t < TEAMS95; t++) {
+        uint32_t p = be32(b + a + 4 * t), st = p + be16(b + p + 6);
+        if (st + 6 > ROM95) continue;
+        for (int k = 0; k < 6; k++) {
+            int i = first[t] + b[st + k] - 1;
+            uint32_t pic = be32(b + list + 4 * b[idx + 6 * t + k]);
+            if (i < first[t] || i >= first[t + 1] || R.photo[i] >= 0 || R.photos == PHOTOS95) continue;
+            if (pic + 10 + 36 * 24 > ROM95 || be32(b + pic) || be32(b + pic + 4) || be16(b + pic + 8) != 36) continue;
+            uint8_t *px = R.px[R.photos];
+            for (int y = 0; y < PHOTO95; y++)
+                for (int c = 0; c < PHOTO95; c++) {
+                    const uint8_t *row = b + pic + 10 + ((y / 8 * 6 + c / 8) * 8 + y % 8) * 3;
+                    uint32_t v = (uint32_t)row[0] << 16 | (uint32_t)row[1] << 8 | row[2];
+                    px[y * PHOTO95 + c] = (uint8_t)(5 + (v >> (21 - 3 * (c % 8)) & 7));
+                }
+            R.photo[i] = (int16_t)R.photos++;
+        }
+    }
 }
 
 static int try_file(const char *path)
@@ -118,7 +169,7 @@ int rom95g_have(void)
 #endif
     if (!ok) ok = try_dir(".");
     R.have = ok;
-    if (ok) fprintf(stderr, "1993-94 rosters: NHL 95's ratings from %s (%d players)\n", R.path, R.n);
+    if (ok) fprintf(stderr, "1993-94 rosters: NHL 95's ratings from %s (%d players, %d photos)\n", R.path, R.n, R.photos);
     return ok;
 }
 
@@ -128,5 +179,15 @@ int rom95g_ratings(const char *name, uint8_t nib[14])
     if (!rom95g_have()) return 0;
     rom95g_key(name, k, sizeof k);
     for (int i = 0; i < R.n; i++) if (!strcmp(R.name[i], k)) { memcpy(nib, R.nib[i], 14); return 1; }
+    return 0;
+}
+
+int rom95g_photo(const char *name, uint8_t px[48 * 48])
+{
+    char k[32];
+    if (!rom95g_have()) return 0;
+    rom95g_key(name, k, sizeof k);
+    for (int i = 0; i < R.n; i++)
+        if (!strcmp(R.name[i], k) && R.photo[i] >= 0) { memcpy(px, R.px[R.photo[i]], sizeof R.px[0]); return 1; }
     return 0;
 }
