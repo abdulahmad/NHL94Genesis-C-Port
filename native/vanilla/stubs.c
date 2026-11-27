@@ -87,3 +87,7 @@ void native_net_close(void) {}
 /* the setup screen's options: the cartridge's at every power on, as it has them */
 void menuopts_use(const char *file) { (void)file; }
 void menuopts_power_on(void) { setup_options_hook = NULL; }
+void menuopts_rosters_line(int want, const char *(*word)(void), void (*change)(int)) { (void)want; (void)word; (void)change; }   /* (the cartridge's menu) */
+void menuopts_setup_fast(int on) { (void)on; }
+int rosters_list(const char *const **names, const char *const **labels) { static const char *const n[1] = { "cartridge" }; *names = n; *labels = n; return 1; }
+const char *rosters_list_dir(int i, char *out, size_t size) { (void)i; (void)out; (void)size; return NULL; }

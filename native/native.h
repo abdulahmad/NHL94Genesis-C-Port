@@ -143,7 +143,10 @@ int rosters_session_entry(void);
 int rom95g_have(void);
 int rom95g_ratings(const char *name, uint8_t nib[14]);   /* (by name: 1 found) */
 void rom95g_key(const char *s, char *out, size_t size);
-#define ROSTERS_BUILTINS 3                       /* (the roster sets built from the cartridge: the Sega CD's, 1993-94 opening night's and trade deadline's: list entries 1-3) */
+#define ROSTERS_BUILTINS 3
+/* the setup menu's Rosters line (menuopts.c): want it, its value's words, a change (-1, 1) asked for on it */
+void menuopts_rosters_line(int want, const char *(*word)(void), void (*change)(int));
+void menuopts_setup_fast(int on);                        /* (the next power on straight to the setup screen) */                       /* (the roster sets built from the cartridge: the Sega CD's, 1993-94 opening night's and trade deadline's: list entries 1-3) */
 int rosters_next_is_cartridge(void);
 void rosters_power_on(void);             /* (a roster set that will not build: the cartridge's, and why on stderr) */
 uint64_t rosters_hash(void);             /* this game's roster set: its checksum (0 the cartridge's) */

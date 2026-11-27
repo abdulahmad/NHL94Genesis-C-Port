@@ -610,6 +610,25 @@ static void script_source(void *user, uint16_t b[MDRT_PADS])
 /* the console powered on again in place (mdrt_power_on done: the host's reset, MDRT_NET_RESET, or a
  * script's RESET alone): the game from its power on as native_game starts it, by the same rules and
  * roster set, at the wait of the frame the reset was given for, everything after it as on a new console */
+void native_power_on_again(void);
+/* --rosters-line (headless): the setup menu's Rosters line, its value the roster set in play; a change powers the console on
+ * again in place with the next (or the one before), straight to the setup screen, as the window's does with a new console */
+static int rosters_line, rosters_line_at;
+static const char *headless_rosters_word(void)
+{
+    static const char *const word[1 + ROSTERS_BUILTINS] = { "92-93 Cart", "92-93 Sega CD", "93-94 Opening", "93-94 Deadline" };
+    return word[rosters_line_at];
+}
+static void headless_rosters_change(int d2)
+{
+    char dir[600];
+    rosters_line_at = (rosters_line_at + d2 + 1 + ROSTERS_BUILTINS) % (1 + ROSTERS_BUILTINS);
+    rosters_next(rosters_list_dir(rosters_line_at, dir, sizeof dir));
+    fprintf(stderr, "rosters line: %s (frame %ld)\n", headless_rosters_word(), (long)mdrt_frame_count(native_m));
+    menuopts_setup_fast(1);
+    restart_at(native_power_on_again);
+}
+
 void native_power_on_again(void)
 {
     rules_power_on();
@@ -901,6 +920,7 @@ int main(int argc, char **argv)
         }
         else if (!strcmp(argv[i], "--hashes") && i + 1 < argc) hashes_path = argv[++i];
         else if (!strcmp(argv[i], "--setup-options") && i + 1 < argc) setup_opts = argv[++i];
+        else if (!strcmp(argv[i], "--rosters-line")) rosters_line = 1;   /* (headless: the setup menu's Rosters line, a change there powers on again with them) */
         else if (!strcmp(argv[i], "--state") && i + 1 < argc) { state_file = argv[++i]; state_given = 1; }
         else if (!strcmp(argv[i], "--record") && i + 1 < argc) record_dir = argv[++i];
         else if (!strcmp(argv[i], "--watch") && i + 1 < argc) {
@@ -971,6 +991,11 @@ int main(int argc, char **argv)
     static char opts_beside[1100];
     if (!headless && !setup_opts) setup_opts = beside_program("out/setup.ini", opts_beside, sizeof opts_beside);
     if (setup_opts) { make_parent(setup_opts); menuopts_use(setup_opts); }   /* (headless: only when --setup-options names a file) */
+    if (rosters_line && headless) {
+        const char *const *names, *const *labels;
+        rosters_list(&names, &labels);                    /* (the built-in sets' places on the list) */
+        menuopts_rosters_line(1, headless_rosters_word, headless_rosters_change);
+    }
     if (sram) make_parent(sram);                          /* (a copy run outside the repository has no out/) */
     if (state_file) make_parent(state_file);
     int inputs = 0;

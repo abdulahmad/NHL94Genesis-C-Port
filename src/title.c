@@ -48,6 +48,11 @@ static void screen_layout(void)
 void TitleScreen(void)
 {
     static const uint8_t font[8] = { 0x0D, 0x10, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF };
+    if (setup_fast) {                                     /* (the host's change of rosters: straight to the setup screen, the seed as the title takes it) */
+        uint16_t hi = vdp_hv16();
+        g.seed = (uint32_t)hi << 16 | vdp_hv16();
+        return;
+    }
     if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 2);
     if (cd_title_hook && cd_title_hook(CD_TITLE_LICENSE)) {   /* (the Sega CD's: its license page before the title, no song yet) */
         cd_license();

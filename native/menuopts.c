@@ -130,3 +130,33 @@ void menuopts_power_on(void)
         if (menuopts_read(v)) { memcpy(last, v, sizeof last); have_last = 1; }
     }
 }
+
+/* ---- the setup menu's Rosters line (src/optsetup.c setup_rosters_*), for the window (frontend.c) ---- */
+static const char *(*rl_word)(void);
+static void (*rl_change)(int);
+static struct Text rl_text(void)
+{
+    static uint8_t s[2][32];
+    static int k;
+    const char *w = rl_word ? rl_word() : "";
+    size_t n = strlen(w);
+    if (n > 24) n = 24;
+    k ^= 1;                                               /* (two buffers: the one printing is never the one written) */
+    size_t len = (2 + n + 1) & ~(size_t)1;               /* (a String: its length word, itself counted, made even) */
+    s[k][0] = 0;
+    s[k][1] = (uint8_t)len;
+    memcpy(s[k] + 2, w, n);
+    s[k][2 + n] = 0;
+    return (struct Text){ s[k], 0 };
+}
+static void rl_hook(int16_t d2) { if (rl_change) rl_change(d2); }
+
+void menuopts_rosters_line(int want, const char *(*word)(void), void (*change)(int))
+{
+    rl_word = word;
+    rl_change = change;
+    setup_rosters_text = rl_text;
+    setup_rosters_hook = rl_hook;
+    setup_rosters_want = (uint8_t)(want != 0);
+}
+void menuopts_setup_fast(int on) { setup_fast = (uint8_t)(on != 0); }

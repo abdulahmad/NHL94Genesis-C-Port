@@ -168,6 +168,7 @@ void DrawPlayoffSprite(void)
  * the fades-only vblank, for $50 x 4 frames or until a button. */
 void HiScoreScreen(void)
 {
+    if (setup_fast) return;                               /* (the host's change of rosters: straight to the setup screen) */
     if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 1);
     g.VBint = SYM_vb2;
     g.disflags &= (uint16_t)~HI(df32c);

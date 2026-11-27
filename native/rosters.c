@@ -2171,6 +2171,15 @@ void rosters_about(int i, char *text, size_t size)
         free(T);
         cart = A;
     }
+    if (i >= 1 && i <= ROSTERS_BUILTINS && !A && rom_cart) {   /* (a built-in one: made from the cartridge when first asked) */
+        static struct folder L;
+        while (atomic_flag_test_and_set(&reading)) {}
+        if (builtin_folder(&L, i - 1) == 0 && (A = calloc(1, sizeof *A))) {
+            about_teams(A, L.t, L.teams, L.playoff_teams);
+            about[i] = A;
+        }
+        atomic_flag_clear(&reading);
+    }
     if (!A) { snprintf(text, size, "%s", i == 0 ? "The cartridge's teams: once its ROM is chosen\n" : ""); return; }
     LINE("Teams\t%d (%d cup)\n", A->teams, A->playoff_teams);
     if (!rom_cart) { LINE("Ratings\tonce the cartridge's ROM is chosen\n"); return; }

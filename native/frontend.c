@@ -728,7 +728,7 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_HOLD (CD_ROWS - 3)                              /* (RULE_HOLD) */
 #define CD_FIGHT (CD_ROWS - 2)                             /* (RULE_FIGHT) */
 #define CD_ANNOUNCE (CD_ROWS - 1)                          /* (the last rule row: RULE_ANNOUNCE) */
-#define CD_ROSTERS CD_ROWS                                /* (the roster set, the built-in "sega-cd", list entry 1) */
+#define CD_ROSTERS CD_ROWS                                /* (the roster set: the cartridge's, or a built-in one, list entries 1-3) */
 #define CD_MUSIC (CD_ROWS + 1)                            /* (this machine's sound only: the disc's music, its crowd bed) */
 #define CD_CROWD (CD_ROWS + 2)
 #define CD_SFX (CD_ROWS + 3)
@@ -760,7 +760,8 @@ static const struct { int rule; const char *key; } cd_rows[] = {
 #define CD_CROWD_PCVOL (CD_ROWS + 29)
 #define CD_SPLIT (CD_ROWS + 30)                          /* (the movie's 50/50 demo: the disc's own left, the enhanced right) */
 #define CD_PCREFPHYS (CD_ROWS + 31)                        /* (the referee and the skaters, as NHL 95 PC's: off, the picture's alone (visual), or in play (RULE_REFEREE)) */
-#define CD_OPTS (CD_ROWS + 32)
+#define CD_ROSTERMENU (CD_ROWS + 32)                      /* (a Rosters line on the game's own setup menu: setup_rosters_line) */
+#define CD_OPTS (CD_ROWS + 33)
 #define CROWD_VOLS 40                                     /* (the crowd volumes: 5% to 200% in steps of 5%) */
 #define CROWD_VOL_100 19                                  /* (the choice for 100%) */
 static int crowd_vol_of(int idx) { int v = ob_game_get(&host, idx); return 5 * ((v < 0 ? 0 : v >= CROWD_VOLS ? CROWD_VOLS - 1 : v) + 1); }
@@ -795,6 +796,30 @@ static int option_index(const char *key)
 {
     for (int i = 0; i < F.o->noptions; i++) if (F.o->options[i].key && !strcmp(F.o->options[i].key, key)) return i;
     return -1;
+}
+
+/* the setup menu's Rosters line (src/optsetup.c setup_rosters_*): there while the Game page's "Rosters in the game's menu" is
+ * on, never online. A change there is the Game page's Rosters row's: the console powers on again with them, straight to the
+ * setup screen (setup_fast). The game's thread asks (roster_menu_req, the choice + 1); the window's acts. */
+static int rosters_menu_on;
+static SDL_atomic_t roster_menu_req;
+static void rosters_menu_set(int on) { rosters_menu_on = on != 0; }
+static int rosters_now(void)
+{
+    int i = option_index("rules.rosters"), v = i >= 0 && F.opt_values ? F.opt_values[i] : 0;
+    return v >= 0 && v <= ROSTERS_BUILTINS ? v : 0;
+}
+static const char *rosters_menu_word(void)
+{
+    static const char *const word[1 + ROSTERS_BUILTINS] = { "92-93 Cart", "92-93 Sega CD", "93-94 Opening", "93-94 Deadline" };
+    return word[rosters_now()];
+}
+static void rosters_menu_change(int d2)
+{
+    int v = rosters_now() + d2;
+    if (v < 0) v = ROSTERS_BUILTINS;
+    if (v > ROSTERS_BUILTINS) v = 0;
+    SDL_AtomicSet(&roster_menu_req, v + 1);
 }
 
 static void rule_from_row(const char *bare, int rule, int value);
@@ -835,10 +860,11 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_PCLOGO) { pcspr_logo_set(value); return; }
     if (index == CD_PCANTHEM) { pcsong_set(value); anthem_rule_sync(1); return; }
     if (index == CD_WIDESCREEN) { host.widescreen = value != 0; return; }   /* (hook_frame keeps the two rows alike) */
+    if (index == CD_ROSTERMENU) { rosters_menu_set(value); return; }
     if (index == CD_ROSTERS && F.opt_values) {             /* a roster set plays from a power on: the console's, now */
         int i = option_index("rules.rosters");
         if (i < 0) return;
-        int now = F.opt_values[i], v = value ? 1 : now == 1 ? 0 : now;
+        int now = F.opt_values[i], v = value >= 0 && value <= ROSTERS_BUILTINS ? value : 0;
         if (v == now) return;
         F.opt_values[i] = v;
         mdrt_settings_set(F.set, "rules.rosters", F.o->options[i].names[v]);
@@ -1077,7 +1103,11 @@ static void game_page_init(void)
         cd_opts[k] = (ob_game_opt){ cd_rows[k].key, labels[k], i >= 0 ? F.o->options[i].names : cd_off_on, i >= 0 ? F.o->options[i].count : 2, i >= 0 && F.opt_values ? F.opt_values[i] : 0, 1, (cd_rows[k].rule == RULE_HOLD || cd_rows[k].rule == RULE_FIGHT || cd_rows[k].rule == RULE_ANNOUNCE) ? 4 : 1 };
     }
     int r = option_index("rules.rosters");
-    cd_opts[CD_ROSTERS] = (ob_game_opt){ "cd_rosters", "Sega CD rosters (restarts)", cd_off_on, 2, r >= 0 && F.opt_values && F.opt_values[r] == 1, 1, 2 };
+    static const char *const roster_sets[1 + ROSTERS_BUILTINS] = { "cartridge (1992-93 trade deadline)", "Sega CD (1992-93 after the expansion draft)",
+                                                                    "1993-94 opening night", "1993-94 trade deadline" };
+    int rv = r >= 0 && F.opt_values ? F.opt_values[r] : 0;
+    cd_opts[CD_ROSTERS] = (ob_game_opt){ "rosters", "Rosters (restarts)", roster_sets, 1 + ROSTERS_BUILTINS, rv >= 0 && rv <= ROSTERS_BUILTINS ? rv : 0, 1, 2 };
+    cd_opts[CD_ROSTERMENU] = (ob_game_opt){ "rosters_menu", "Rosters in the game's menu", cd_off_on, 2, 0, 0, 2 };
     static const char *const music[2] = { "cartridge", "Sega CD" }, *const crowd[3] = { "cartridge", "Sega CD", "both" };
     cd_opts[CD_MUSIC] = (ob_game_opt){ "cd_music", "Music", music, 2, 0, 0, 3 };
     (void)crowd;
@@ -1119,7 +1149,8 @@ static void game_page_init(void)
             "NHL 93's fights: a hard check between two fighters can start one (B low punch, C high punch, A grab).",
             "When the rink announcer speaks. Right after the goal or penalty, as on NHL 95 PC: play waits until he is done (the goal celebration lasts as long as the speech, with or without the between-play pause). After the goal song: a home goal's speech starts when the song ends. Talks over the face off: the cartridge's pace." };
         for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];
-        game_help[CD_ROSTERS] = "The Sega CD's rosters (the game restarts to change them).";
+        game_help[CD_ROSTERS] = "Who plays: the cartridge's rosters (1992-93 at the trade deadline), the Sega CD's (1992-93 after the expansion draft), or 1993-94's on opening night or after the trade deadline (the game restarts to change them).";
+        game_help[CD_ROSTERMENU] = "A Rosters line on the game's own setup menu, under Play Mode, to choose the rosters there (not in an online game).";
         game_help[CD_MUSIC] = "Where the songs come from: the cartridge or the Sega CD disc.";
         game_help[CD_CROWD] = "The cartridge's crowd noise, which swells with the crowd meter.";
         game_help[CD_CROWD_CARTVOL] = "How loud the cartridge's crowd is.";
@@ -1200,7 +1231,9 @@ static void game_page_init(void)
     pv[2][CD_ANNOUNCER] = 1;                                                  /* (on in Recommended; it does nothing without 95 PC's files) */
     pv[2][CD_PCPHOTOS] = 1;
     pv[1][CD_WIDESCREEN] = 0;                                                  /* (16:9 in Recommended; the cartridge's and the disc's 4:3) */
-    pv[2][CD_WIDESCREEN] = 1;                                                    /* (Abdul: on in Recommended) */
+    pv[2][CD_WIDESCREEN] = 1;
+    pv[0][CD_ROSTERS] = pv[2][CD_ROSTERS] = 0; pv[1][CD_ROSTERS] = 1;          /* (the cartridge's rosters but in Sega CD, the disc's) */
+    pv[0][CD_ROSTERMENU] = pv[1][CD_ROSTERMENU] = 0; pv[2][CD_ROSTERMENU] = 1;  /* (the menu line: Recommended's only; the originals' menus as they were) */                                                    /* (Abdul: on in Recommended) */
     static const int disc_look[] = { CD_VOICE, CD_SCREENS, CD_TITLE, CD_INTRO, CD_SFX, CD_PHOTOS, CD_CAREER };
     for (size_t k = 0; k < sizeof disc_look / sizeof *disc_look; k++) pv[2][disc_look[k]] = 1;
     pv[0][CD_CROWD] = pv[2][CD_CROWD] = 1; pv[1][CD_CROWD] = 0;                 /* (the cartridge's bed: on in Cartridge and Recommended, off on the Sega CD) */
@@ -1488,7 +1521,11 @@ int mdrt_sdl_run(mdrt_config *cfg, const mdrt_sdl_options *o, mdrt_game_fn game,
     while (!SDL_AtomicGet(&F.quit)) {
         test_aid_tick();
         if (native_net_window_poll()) restart_console(1);
-        if (cd_restart) { cd_restart = 0; if (!F.session) restart_console(0); }   /* (the Game page's roster set) */
+        {   int v = SDL_AtomicSet(&roster_menu_req, 0);   /* (the setup menu's Rosters line: as the Game page's row, then straight back to the menu) */
+            if (v > 0 && !F.session) { ob_game_set(&host, CD_ROSTERS, v - 1); cd_changed(NULL, CD_ROSTERS, v - 1); if (cd_restart) menuopts_setup_fast(1); }
+        }
+        if (cd_restart) { cd_restart = 0; if (!F.session) restart_console(0); else menuopts_setup_fast(0); }   /* (the Game page's roster set) */
+        menuopts_rosters_line(rosters_menu_on && !native_net_on() && !F.session, rosters_menu_word, rosters_menu_change);
         ob_plat_pump();
         ob_pads_tick();
         if (SDL_AtomicSet(&screen_changed, 0)) ob_pads_mouse_fresh();

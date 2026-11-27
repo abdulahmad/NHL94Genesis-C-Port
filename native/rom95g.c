@@ -7,7 +7,9 @@
  *
  * Found once, at the first ask: NHL95G_ROM, else a file beside the program or in the folder the game
  * runs from with "95" in its name (.bin .md .gen .smd) of 2 MB whose team table reads well. */
+#ifndef ROM95G_NO_SDL                                    /* (make rosterstest: no window, the working folder only) */
 #include <SDL.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -109,9 +111,11 @@ int rom95g_have(void)
     R.tried = 1;
     const char *env = getenv("NHL95G_ROM");
     int ok = env && *env && try_file(env);
+#ifndef ROM95G_NO_SDL
     char *base = SDL_GetBasePath();
     if (!ok && base) ok = try_dir(base);
     if (base) SDL_free(base);
+#endif
     if (!ok) ok = try_dir(".");
     R.have = ok;
     if (ok) fprintf(stderr, "1993-94 rosters: NHL 95's ratings from %s (%d players)\n", R.path, R.n);
