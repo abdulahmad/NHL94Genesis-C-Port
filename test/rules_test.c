@@ -207,12 +207,15 @@ static void referee(void)
     referee_state_save(b);
     CHECK(!memcmp(a, b, 14) && b[15] == a[15]);
     CHECK(referee_state_load(a, 23) < 0);
+    CHECK(referee_state_load(a, REFEREE_STATE_SIZE_10) == 0);   /* (version 10: before his fight watch) */
+    memcpy(b, a, sizeof b); b[29] = 3; CHECK(referee_state_load(b, sizeof b) < 0);
+    memcpy(b, a, sizeof b); b[30] = 0x3D; CHECK(referee_state_load(b, sizeof b) < 0);
     CHECK(referee_state_load(NULL, 0) == 0 && !referee_get(&v));
     classic_rules();
 }
 
-/* RULE_REFEREE: he keeps out of the way (95 PC's EvadePlayers for his assreffollow): a skater in his way turns him aside; a fight is
- * the fighters' (he does not collide with them, and watches from 50h away as the others do, NHL 93's assfwatch); a dead puck (the
+/* RULE_REFEREE: in play he keeps his line (no EvadePlayers: a skater coming at him does not turn him aside); a fight is the fighters'
+ * (he does not collide with them, and gets out of it to watch from 50h away as the others do, NHLPA 93's assfwatch: assfwatchref); a dead puck (the
  * clock stopped) does not bounce off him (bounced every 8 frames, it went along at his feet) */
 static void referee_avoid(void)
 {
@@ -237,12 +240,12 @@ static void referee_avoid(void)
     CHECK(pk->Xvel == -0x900 && pk->Yvel == 0);
     g.gmode = 0;
     pk->Xpos = 0x20; pk->Ypos = 0x40; pk->Xvel = 0;
-    /* a skater coming at him: he steps aside, and no one runs into him */
+    /* a skater coming at him: he does not dodge (Abdul: only out of a fight) */
     struct SortObj *o = sortobj(3);
     o->position = 3; o->Xpos = (int16_t)(rx - 0x30); o->Ypos = ry; o->Xvel = 0x1800; o->weight = 10;
-    for (int k = 0; k < 40; k++) referee_update();          /* (skateto looks every 12; from rest he turns first, doplayeracc) */
+    for (int k = 0; k < 40; k++) referee_update();
     referee_get(&v);
-    CHECK((v.y >> 16) > ry + 4 && (v.x >> 16) == rx);       /* (by the side boards EvadePlayers sends him up the ice, direction 0) */
+    CHECK((v.y >> 16) == ry && (v.x >> 16) == rx);
     o->position = -1;
     /* a fight beside him at the boards */
     struct SortObj *f1 = sortobj(2), *f2 = sortobj(8);
@@ -260,6 +263,27 @@ static void referee_avoid(void)
     referee_get(&v);
     int dx = (int)(v.x >> 16) - 0x70, dy = (int)(v.y >> 16) - 0x40;
     CHECK(dx * dx + dy * dy >= 0x40 * 0x40 && (v.x >> 16) <= 0x7E);   /* (watching from about 50h, not between them) */
+    /* on the fight's centre in mid ice: out toward the nearer side boards, 50h; back to assreffollow when it is over */
+    g.xc1 = (uint16_t)-0x20; g.yc1 = 0x10;
+    {
+        uint8_t st[REFEREE_STATE_SIZE];
+        referee_state_save(st);
+        st[0] = (uint8_t)-0x20; st[1] = 0xFF; st[4] = 0x10; st[5] = 0; st[6] = 0; st[7] = 0; st[8] = 0; st[9] = 0; st[10] = 0; st[11] = 0;   /* (him on the centre, still) */
+        st[2] = 0; st[3] = 0;
+        st[29] = 0;                                        /* (not watching yet: a spot at once) */
+        CHECK(referee_state_load(st, sizeof st) == 0);
+    }
+    for (int k = 0; k < 120; k++) referee_update();
+    referee_get(&v);
+    dx = (int)(v.x >> 16) + 0x20; dy = (int)(v.y >> 16) - 0x10;
+    CHECK(dx < -0x40 && dy * dy < 0x10 * 0x10);
+    uint8_t st2[REFEREE_STATE_SIZE];
+    referee_state_save(st2);
+    CHECK(st2[29] == 2 && (v.vx | v.vy) == 0);  /* (clear of it: stopped, watching; kept in the state) */
+    pk->pflags2 = 0;
+    referee_update();
+    referee_state_save(st2);
+    CHECK(st2[29] == 0);
     f1->position = f2->position = -1; f1->pflags2 = f2->pflags2 = 0;
     pk->pflags2 = 0; pk->newpos = 0xFF;
     referee_state_load(NULL, 0);
