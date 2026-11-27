@@ -55,6 +55,8 @@ enum {
                                  * NHL 96 Genesis's straight on blocks and low catches */
     RULE_FIGHT_RATINGS,         /* 1: with RULE_FIGHT, each skater's fighting on NHL 93's scale, from NHLPA 93 and NHL 96 PC (the player's own
                                  * files, the host's in a session: native/fightrate.c); 0 the cartridge's (mods/fight.c fight_rating) */
+    RULE_TICKER_HL,             /* 1: ticker highlights from the pregame (mods/ticker.c): InitScores plays 0-3 periods of the other games, not
+                                 * 0-2, so the pregame's UpdateScores can send a close game to overtime and DoHiLights plays it there */
     RULE_COUNT
 };
 /* the original's values */
@@ -171,6 +173,9 @@ int moves_state_load(const uint8_t *in);
  * against his facing); goalie_wall_spa, the hop over the boards (assbench, asseben) */
 uint16_t goalie_save_spa(uint16_t spa, int16_t d3, const struct PuckCross *pc, const struct SortObj *gk);
 uint16_t goalie_wall_spa(const struct SortObj *o, uint16_t spa);
+
+/* RULE_TICKER_HL (mods/ticker.c): InitScores's randomd0 range, the other games' periods before the pregame (the cartridge's 3: 0-2) */
+uint16_t ticker_init_periods(void);
 
 /* mods/anims.c: the animations the PC's pictures need. Their frames are numbered from MODF_BASE (below the 1024 a replay keeps): mod_frame
  * is the cartridge's frame a mod frame stands for (its art, its hot spot, its save odds; any other frame is itself), mod_frame_pc the PC's

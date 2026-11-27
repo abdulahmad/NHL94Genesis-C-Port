@@ -73,6 +73,9 @@ int moves_block_cpu(struct SortObj *o) { (void)o; return 0; }
 void moves_block_try(struct SortObj *o) { (void)o; }
 int moves_blocking(const struct SortObj *o) { (void)o; return 0; }
 
+/* mods/ticker.c: the other games' periods before the pregame. The cartridge's InitScores plays 0-2 (randomd0(3)), so no highlight at the pregame. */
+uint16_t ticker_init_periods(void) { return 3; }
+
 /* mods/goalie.c and mods/anims.c: the PC goalie's animations. The cartridge's goalie saves and hops the boards in its own, and every
  * frame is a cartridge frame. */
 uint16_t goalie_save_spa(uint16_t spa, int16_t d3, const struct PuckCross *pc, const struct SortObj *gk) { (void)d3; (void)pc; (void)gk; return spa; }
