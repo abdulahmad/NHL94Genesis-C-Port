@@ -88,6 +88,7 @@ const uint8_t *spa_table(uint16_t spa)
         fight_spa_init();
         return fight_spa_tab[(spa - FIGHT_SPA) / SPA_STRIDE];
     }
+    if (spa >= MOD_SPA) return mod_spa_table(spa);       /* (NHL 95's moves and the PC goalie, mods/anims.c) */
     return rom_ptr(SYM_SPAlist + spa);
 }
 

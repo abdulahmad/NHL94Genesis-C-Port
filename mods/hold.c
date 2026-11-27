@@ -12,6 +12,8 @@
 #include "rules.h"
 #include "anim_gen.h"
 #include "view.h"
+#include "rom.h"
+#include "symbols_gen.h"
 
 #define PFLAG(o, b) ((o)->pflags & (1 << (b)))
 
@@ -160,10 +162,33 @@ static int goal_sound_busy(void)
     return 0;
 }
 
+/* song n's length in frames as the cartridge plays it: its stream's delays (ProcessOneMusicTrack runs once a vblank: the first delay + 1,
+ * then each event's next delay), to its end (status 0; a loop counts once). The ROM's, so every machine counts the same */
+static int song_frames(uint16_t n)
+{
+    if (n < 0x30 || n > 0x7A) return 0;
+    uint32_t e = rd32(rom_ptr(SYM_SoundStreamTable + (uint16_t)(n << 2)));
+    if ((int32_t)e < 0) return 0;
+    long t = m8(e) + 1;
+    for (int k = 0; k < 40000 && m8(e + 1) != 0 && t < 60 * 120; k++, e += 4) t += m8(e + 4);
+    return (int)(t < 60 * 120 ? t : 60 * 120);
+}
+
+/* RULE_CD_SONGS: the home goal song started with the siren (src/collide.c checkgoal: hold_siren's frame), and the stoppage's
+ * stop_current_song (Stop4Pen) ends its stream that frame, as the disc's cdrequest leaves the disc's track playing: the frames of the
+ * song still to come (its stream's own length from then), 0 none. The goal's speech waits for those as it waits for the cartridge's song */
+static int cd_goal_song_left(struct Team *tm)
+{
+    if (!RULE(RULE_CD_SONGS) || tm != team_struct(0)) return 0;
+    int len = song_frames(g.SongNum), gone = (int16_t)(g.Vcount - siren.t0);
+    return gone >= 0 && gone < len ? len - gone : 0;
+}
+
 void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a2)
 {
-    if (getenv("HOLDLOG")) fprintf(stderr, "hold: frame %d goal, song playing %d, delay %d\n", g.Vcount, song_playing(), (int16_t)g.songdelay);
-    if (!goal_sound_busy()) {                              /* no siren or song going or coming: the speech now */
+    int cd_left = cd_goal_song_left(tm);
+    if (getenv("HOLDLOG")) fprintf(stderr, "hold: frame %d goal, song playing %d, delay %d, the disc's goal song %d frames more\n", g.Vcount, song_playing(), (int16_t)g.songdelay, cd_left);
+    if (!goal_sound_busy() && !cd_left) {                 /* no siren or song going or coming: the speech now */
         if (pa_hook) pa_hook(PA_GOAL, tm, player, a1, a2);
         hold_for(frames);
         return;
@@ -171,6 +196,10 @@ void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a
     sg.on = 1;
     sg.started = 0;
     sg.limit = (uint16_t)(g.Vcount + 600);          /* (a song that never starts: 10 s at most) */
+    if (cd_left) {                                  /* (the disc's song: until its end, the siren too; 2: wait for the limit) */
+        sg.started = 2;
+        sg.limit = (uint16_t)(g.Vcount + (cd_left > 60 * 90 ? 60 * 90 : cd_left));
+    }
     sg.frames = frames;
     sg.tm = tm; sg.player = player; sg.a1 = a1; sg.a2 = a2;
     pending = 1;
@@ -249,6 +278,7 @@ static int16_t sk_puckx, sk_pucky;                       /* where the puck lay w
 static uint8_t sk_gate[12];                             /* 1: this place has a new player: the old one leaves by the gate to the bench, the new one comes in by it */
 static int16_t sk_delay[12];                            /* frames each waits at the bench gate before he skates on (the start of a period: one after another) */
 static int sk_pick = SK_PICKUP, sk_pstart, sk_lock;
+static int sk_dark;                                      /* (the face off set up behind the fade from the penalty screen: the view is not the whistle's) */
 static uint16_t sk_view[4];                             /* the view at the whistle (Vpos, Hpos, yc1, xc1): the set up scrolls it to the dot at once, the walk there keeps it */
 /* The bench (a line change between plays, and the start of a period). NHL 95 PC's assbench / assleaveice and asseben are the
  * cartridge's own, moved to its rink: the player going off skates to his team's gate (cartridge x -88h - 8, y 50h for the
@@ -270,7 +300,7 @@ void hold_skate_begin(void)
 {
     sk_cap = 0;
     if (!RULE(RULE_HOLD)) return;
-    if ((g.sflags & HI(sfhor)) && g.gameclock != g.PerTimeTotal) return;   /* (back from the penalty screen: the cartridge's fade, the skaters at the spots, the window as the face off starts) */
+    sk_dark = (g.sflags & HI(sfhor)) != 0;              /* (back from the penalty screen: the cartridge's fade (hold_nofade), the view set up on the dot in the dark) */
     struct SortObj *pl = sortobj(0);
     for (int i = 0; i < 12; i++, pl++) { sk_from[i].x = pl->Xpos; sk_from[i].y = pl->Ypos; sk_pnum[i] = (int8_t)pl->pnum; sk_delay[i] = 0; sk_frame[i] = pl->frame; sk_f0[i] = (int16_t)(pl->facedir & 7); }
     sk_pick = SK_PICKUP;
@@ -528,7 +558,7 @@ void hold_skate_arm(void)
     sk_t0 = g.Vcount;
     sk_on = 1;
     g.yleader = 0;                                      /* (the PC's drop: the view on the dot, no lead) */
-    if (!pstart) { g.Vpos = sk_view[0]; g.Hpos = sk_view[1]; g.yc1 = sk_view[2]; g.xc1 = sk_view[3]; }   /* (no cut to the dot: the view follows the referee's puck there) */
+    if (!pstart && !sk_dark) { g.Vpos = sk_view[0]; g.Hpos = sk_view[1]; g.yc1 = sk_view[2]; g.xc1 = sk_view[3]; }   /* (no cut to the dot: the view follows the referee's puck there) */
     if (getenv("HOLDLOG")) fprintf(stderr, "hold: skate to the spots, %d frames, at %d (clock %d of %d)\n", sk_dur, g.Vcount, g.gameclock, g.PerTimeTotal);
 }
 
@@ -787,8 +817,13 @@ void hold_tick(void)
     }
     if (!sg.on) return;
     int playing = goal_sound_busy();
-    if (playing) sg.started = 1;
-    if (!(sg.started && !playing) && (int16_t)(sg.limit - g.Vcount) > 0) return;
+    if (sg.started == 2) {                              /* (the disc's goal song: its length, then the siren if it is still on) */
+        if ((int16_t)(sg.limit - g.Vcount) > 0) return;
+        if (playing) { sg.started = 1; sg.limit = (uint16_t)(g.Vcount + 600); return; }
+    } else {
+        if (playing) sg.started = 1;
+        if (!(sg.started && !playing) && (int16_t)(sg.limit - g.Vcount) > 0) return;
+    }
     if (getenv("HOLDLOG")) fprintf(stderr, "hold: frame %d speech starts (started %d)\n", g.Vcount, sg.started);
     sg.on = 0;                                          /* the song is over: the speech, and the wait for it */
     if (pa_hook) pa_hook(PA_GOAL, sg.tm, sg.player, sg.a1, sg.a2);
@@ -851,7 +886,7 @@ int hold_state_load(const uint8_t *in)
     const uint8_t *spots = p;
     p += 12 * 6;
     int fs = hs_r8(&p), so = hs_r8(&p), sst = hs_r8(&p), sl = hs_r16(&p), sf = hs_r16(&p), stm = hs_r8(&p), spl = hs_r16(&p), sa1 = hs_r16(&p), sa2 = hs_r16(&p);
-    if (!flag(fs) || !flag(so) || !flag(sst) || sf < 0 || sf > 900 || !flag(stm) || spl < 0 || spl > 31 || sa1 < -1 || sa1 > 31 || sa2 < -1 || sa2 > 31) return -1;
+    if (!flag(fs) || !flag(so) || sst < 0 || sst > 2 || sf < 0 || sf > 900 || !flag(stm) || spl < 0 || spl > 31 || sa1 < -1 || sa1 > 31 || sa2 < -1 || sa2 > 31) return -1;
     int kc = hs_r8(&p), ko = hs_r8(&p), kd = hs_r16(&p), kt0 = hs_r16(&p);
     if (!flag(kc) || !flag(ko) || kd < 0 || kd > 400 || (ko && kd < 24)) return -1;
     const uint8_t *walk = p;

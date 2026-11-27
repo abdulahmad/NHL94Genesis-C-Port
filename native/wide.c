@@ -14,6 +14,8 @@
  *   any other screen                                       the planes and sprites past the edges
  *
  * Sprites are drawn past the screen's edges too (the Zamboni comes in from the side). */
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "wide.h"
 #include "whiteice.h"
@@ -401,6 +403,136 @@ int wide_frame(const mdrt_vdp *v, const uint32_t *pic, int w, int h, int pitch, 
         for (int x = 0; x < M; x++) { o[x] = wide_rgb(v, idx[x]); o[w + M + x] = wide_rgb(v, idx[w + M + x]); }
     }
     return ow;
+}
+
+/* ---- the overlay windows on the 16:9 rink ------------------------------------------------------------
+ * The wide view places plane A's overlays for 256 and shifts them VIEW_SHIFT to the middle of the 320, so a window drawn
+ * near a side of the 4:3 picture (the face off window, the referee's window and its call under it, the goal box, the
+ * injury box, the line change box at the top) stands 32 pixels further from that side. The clock and score boxes keep
+ * their gaps in the game itself (view_box_col); these move here, in the picture only: each window (a run of plane A's
+ * cells above the boxes' rows, joined side by side or one above the other) nearer one side of the 256 than the other
+ * moves 32 pixels out to that side, so it keeps the gap it has on the 4:3 screen. One about as far from both stays in
+ * the middle. The high priority sprites wholly inside a moved window (the face off window's two men and the referee)
+ * move with it. Nothing of the game changes: a 4:3 screen of the same game (wide_crop) shows the windows where the
+ * cartridge has them, and every machine plays the same frames. */
+#define WW_ROWS VIEW_BOX_ROW
+#define WW_COLS 32
+#define WW_NEAR 2                                         /* (a window this much nearer one side than the other stays put) */
+struct ww_win { int x0, x1, y0, y1, dir; };
+static int ww_scan(const mdrt_vdp *v, struct ww_win *wins, int max, int8_t lab[WW_ROWS][WW_COLS], int pc_of[WW_ROWS][WW_COLS], uint32_t *tbl)
+{
+    if (mdrt_vdp_width(v) != 320 || !wide_rink_frame(320) || !view_shift() || !(v->s.reg[1] & 0x40)) return 0;
+    if ((v->s.reg[11] & 3) != 2 || (v->s.reg[11] & 4) || (v->s.reg[17] & 0x1F) || (v->s.reg[18] & 0x1F)) return 0;   /* (the wide view's: a scroll by 8 lines, no window plane) */
+    static const int cells[4] = { 32, 64, 32, 128 };
+    int pw = cells[v->s.reg[16] & 3], ph = cells[(v->s.reg[16] >> 4) & 3];
+    int vs = v->s.vsram[0] & 0x3FF;
+    if (vs & 7) return 0;
+    uint32_t ta = (uint32_t)(v->s.reg[2] & 0x38) << 10, hs = (uint32_t)(v->s.reg[13] & 0x3F) << 10;
+    *tbl = ta;
+    static uint8_t occ[WW_ROWS][WW_COLS];
+    for (int r = 0; r < WW_ROWS; r++) {
+        int sh = vword(v, hs + (uint32_t)(r * 8 * 4)) & 0x3FF;
+        for (int x = 0; x < WW_COLS; x++) {
+            lab[r][x] = -1;
+            occ[r][x] = 0;
+            if (sh & 7) continue;
+            int pc = (x + 4 - sh / 8) & (pw - 1), pr = (r + vs / 8) & (ph - 1);
+            pc_of[r][x] = pr * pw + pc;
+            uint16_t e = vword(v, ta + (uint32_t)(pc_of[r][x] << 1));
+            const uint8_t *t = v->s.vram + ((uint32_t)(e & 0x7FF) << 5);
+            for (int k = 0; k < 32 && !occ[r][x]; k++) occ[r][x] = t[k] != 0;
+        }
+    }
+    int n = 0;
+    static int stack[WW_ROWS * WW_COLS];
+    for (int r = 0; r < WW_ROWS; r++)
+        for (int x = 0; x < WW_COLS; x++) {
+            if (!occ[r][x] || lab[r][x] >= 0) continue;
+            if (n >= max) return n;
+            struct ww_win *w = &wins[n];
+            *w = (struct ww_win){ x, x, r, r, 0 };
+            int sp = 0;
+            stack[sp++] = r * WW_COLS + x;
+            lab[r][x] = (int8_t)n;
+            while (sp) {
+                int c = stack[--sp], cr = c / WW_COLS, cx = c % WW_COLS;
+                if (cx < w->x0) w->x0 = cx;
+                if (cx > w->x1) w->x1 = cx;
+                if (cr < w->y0) w->y0 = cr;
+                if (cr > w->y1) w->y1 = cr;
+                static const int d[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+                for (int k = 0; k < 4; k++) {
+                    int nr = cr + d[k][1], nx = cx + d[k][0];
+                    if (nr < 0 || nr >= WW_ROWS || nx < 0 || nx >= WW_COLS || !occ[nr][nx] || lab[nr][nx] >= 0) continue;
+                    lab[nr][nx] = (int8_t)n;
+                    stack[sp++] = nr * WW_COLS + nx;
+                }
+            }
+            int left = w->x0, right = WW_COLS - 1 - w->x1;
+            w->dir = left + WW_NEAR < right ? -1 : right + WW_NEAR < left ? 1 : 0;
+            n++;
+        }
+    return n;
+}
+
+const mdrt_vdp *wide_windows(const mdrt_vdp *v, int *from, int *to)
+{
+    static struct ww_win wins[64];
+    static int8_t lab[WW_ROWS][WW_COLS];
+    static int pc_of[WW_ROWS][WW_COLS];
+    static mdrt_vdp W;
+    uint32_t ta = 0;
+    int n = ww_scan(v, wins, 64, lab, pc_of, &ta), moved = 0;
+    *from = 240; *to = 0;
+    for (int i = 0; i < n; i++) {
+        if (!wins[i].dir) continue;
+        if (!moved) W = *v;
+        moved = 1;
+        if (wins[i].y0 * 8 < *from) *from = wins[i].y0 * 8;
+        if (wins[i].y1 * 8 + 8 > *to) *to = wins[i].y1 * 8 + 8;
+    }
+    if (getenv("WIDE_WIN_LOG"))
+        for (int i = 0; i < n; i++) fprintf(stderr, "window %d: cols %d-%d rows %d-%d -> %d\n", i, wins[i].x0, wins[i].x1, wins[i].y0, wins[i].y1, wins[i].dir);
+    if (!moved) return v;
+    static const int cells[4] = { 32, 64, 32, 128 };
+    int pw = cells[v->s.reg[16] & 3];
+    for (int r = 0; r < WW_ROWS; r++)                    /* (all of a moved window's cells out first: one may land where another was) */
+        for (int x = 0; x < WW_COLS; x++)
+            if (lab[r][x] >= 0 && wins[lab[r][x]].dir) {
+                uint32_t a = ta + (uint32_t)(pc_of[r][x] << 1);
+                W.s.vram[a & 0xFFFF] = 0x07; W.s.vram[(a + 1) & 0xFFFF] = 0xFF;   /* (the blank the game's eraser writes) */
+            }
+    for (int r = 0; r < WW_ROWS; r++)
+        for (int x = 0; x < WW_COLS; x++)
+            if (lab[r][x] >= 0 && wins[lab[r][x]].dir) {
+                int dir = wins[lab[r][x]].dir, pc = pc_of[r][x] % pw, row = pc_of[r][x] - pc;
+                uint32_t a = ta + (uint32_t)(pc_of[r][x] << 1), b = ta + (uint32_t)((row + ((pc + 4 * dir) & (pw - 1))) << 1);
+                W.s.vram[b & 0xFFFF] = v->s.vram[a & 0xFFFF];
+                W.s.vram[(b + 1) & 0xFFFF] = v->s.vram[(a + 1) & 0xFFFF];
+            }
+    uint32_t sat = (uint32_t)(v->s.reg[5] & 0x7E) << 9;
+    for (int e = 0, k = 0; k < 80; k++) {                 /* (the sprites, as the VDP walks them) */
+        const uint8_t *c = v->sat + e * 8;
+        uint32_t s = sat + (uint32_t)e * 8;
+        int y = ((c[0] << 8 | c[1]) & 0x3FF) - 128, sh = ((c[2] & 3) + 1) * 8, sw = (((c[2] >> 2) & 3) + 1) * 8;
+        int rawx = vword(v, s + 6) & 0x1FF, x = rawx - 128;
+        if (v->s.vram[(s + 4) & 0xFFFF] & 0x80)
+            for (int i = 0; i < n; i++) {
+                const struct ww_win *w = &wins[i];
+                if (!w->dir || x < (w->x0 + 4) * 8 || x + sw > (w->x1 + 5) * 8 || y < w->y0 * 8 || y + sh > (w->y1 + 1) * 8) continue;
+                int nx = (rawx + 32 * w->dir) & 0x1FF;
+                W.s.vram[(s + 6) & 0xFFFF] = (uint8_t)(nx >> 8);
+                W.s.vram[(s + 7) & 0xFFFF] = (uint8_t)nx;
+                if (y < *from) *from = y;
+                if (y + sh > *to) *to = y + sh;
+                break;
+            }
+        e = c[3] & 0x7F;
+        if (!e || e >= 80) break;
+    }
+    if (*from < 0) *from = 0;
+    if (*to > mdrt_vdp_height(v)) *to = mdrt_vdp_height(v);
+    return &W;
 }
 
 /* ---- the wide rink on a 4:3 screen (a session's, played wide for a 16:9 player) ------------------------

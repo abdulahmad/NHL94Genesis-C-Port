@@ -16,6 +16,8 @@ static const char *const anthem_names[3] = { "off", "NHL 95 PC", "NHL 96 PC" };
 static const char *const fight_rating_names[2] = { "cartridge", "NHLPA 93 + NHL 96" };   /* (RULE_FIGHT_RATINGS: native/fightrate.c) */
 static const char *const siren_names[2] = { "cartridge", "NHL 95 PC" };
 static const char *const penalty_names[3] = { "cartridge", "NHL 96 Genesis", "NHL rules" };   /* (double minors: mods/penalties.c) */
+static const char *const move95_names[3] = { "off", "NHL 95 PC", "NHL 95 Genesis" };   /* (NHL 95's moves: mods/moves.c) */
+static const char *const goalie_names[3] = { "cartridge", "NHL 95 PC", "NHL 95 PC + 96 Genesis" };   /* (mods/goalie.c) */
 
 /* the rules */
 const mdrt_sdl_option rule_options[RULE_COUNT] = {
@@ -39,6 +41,10 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_FIGHT_RATINGS] = { "rules.fight_ratings", "Fight ratings", 2, fight_rating_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_SIREN] = { "rules.goal_siren", "Goal siren (the announcer waits for it)", 2, siren_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_PENALTIES] = { "rules.double_minors", "Double minors and majors", 3, penalty_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_FAKESHOT] = { "rules.fake_shot", "Fake shot", 3, move95_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_DROPPASS] = { "rules.drop_pass", "Drop pass", 3, move95_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_SHOTBLOCK] = { "rules.shot_block", "Shot blocking", 3, move95_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_GOALIE] = { "rules.goalie_anims", "Goalie animations", 3, goalie_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
 
 /* a choice's value: its number, or (a list's) its index */
@@ -217,9 +223,9 @@ const char *rules_arg(const char *arg)
  * none in a netplay session, whose states stay in memory and whose hash the peers compare), then
  * (version 6) the referee's REFEREE_STATE_SIZE bytes (RULE_REFEREE: mods/referee.c), then (version 7) the
  * pause's HOLD_STATE_SIZE (RULE_HOLD, the anthems: mods/hold.c), then (version 8) the goal siren's
- * HOLD_SIREN_SIZE (RULE_SIREN: mods/hold.c). The
+ * HOLD_SIREN_SIZE (RULE_SIREN: mods/hold.c), then (version 9) NHL 95's moves' MOVES_STATE_SIZE (mods/moves.c). The
  * roster set's tables are in the ROM the state's RAM points into, so a state loads with its own
- * roster set or not at all. Version 8 is this layout; version 7 is it without the siren (none then); version 6 without the pause (none then),
+ * roster set or not at all. Version 9 is this layout; version 8 is it without the moves (none then); version 7 is it without the siren (none then); version 6 without the pause (none then),
  * version 5 without the referee too (he starts off the ice). Version 4 (before the game's own extras
  * were taken out) held 24 rules and 64 bytes of plus/minus stats; it loads when those extras are at
  * their original values (OLD4: each old rule's place now, or -1 and the original value it needs). */
@@ -240,7 +246,7 @@ size_t rules_state_save(void *user, uint8_t *out)
     size_t n = strlen(dir) > 255 ? 255 : strlen(dir), at = 2 + RULE_COUNT;
     if (out) {
         uint64_t h = rosters_hash();
-        out[0] = 8;
+        out[0] = 9;
         out[1] = RULE_COUNT;
         memcpy(out + 2, rules, RULE_COUNT);
         for (int k = 0; k < 8; k++) out[at + k] = (uint8_t)(h >> (56 - 8 * k));
@@ -249,17 +255,19 @@ size_t rules_state_save(void *user, uint8_t *out)
         referee_state_save(out + at + 9 + n);
         hold_state_save(out + at + 9 + n + REFEREE_STATE_SIZE);
         hold_siren_save(out + at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE);
+        moves_state_save(out + at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE + HOLD_SIREN_SIZE);
     }
-    return at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE + HOLD_SIREN_SIZE;
+    return at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE + HOLD_SIREN_SIZE + MOVES_STATE_SIZE;
 }
 
 /* where the roster set's part starts in a state's part, or 0 when it is not this build's */
 static size_t roster_part(const uint8_t *in, size_t size)
 {
-    if (size < 2 || in[0] < 4 || in[0] > 8) return 0;
+    if (size < 2 || in[0] < 4 || in[0] > 9) return 0;
     if (in[0] == 4 ? in[1] > OLD4_COUNT : in[1] > RULE_COUNT) return 0;
     size_t at = 2u + in[1] + (in[0] == 4 ? 64u : 0u);       /* (version 4: the plus/minus stats) */
-    size_t tail = (in[0] >= 6 ? REFEREE_STATE_SIZE : 0) + (in[0] >= 7 ? HOLD_STATE_SIZE : 0) + (in[0] >= 8 ? HOLD_SIREN_SIZE : 0);   /* (version 6: the referee; 7: the pause; 8: the siren) */
+    size_t tail = (in[0] >= 6 ? REFEREE_STATE_SIZE : 0) + (in[0] >= 7 ? HOLD_STATE_SIZE : 0) + (in[0] >= 8 ? HOLD_SIREN_SIZE : 0)
+                  + (in[0] >= 9 ? MOVES_STATE_SIZE : 0);   /* (version 6: the referee; 7: the pause; 8: the siren; 9: NHL 95's moves) */
     return size >= at + 9 && size - tail >= at + 9 && size == at + 9 + in[at + 8] + tail ? at : 0;
 }
 
@@ -298,6 +306,8 @@ int rules_state_load(void *user, const uint8_t *in, size_t size)
     const uint8_t *referee = in[0] >= 6 ? in + at + 9 + in[at + 8] : NULL;   /* (before version 6: none, he starts off the ice) */
     const uint8_t *siren = in[0] >= 8 ? referee + REFEREE_STATE_SIZE + HOLD_STATE_SIZE : NULL;   /* (before version 8: none) */
     if (siren && siren[0] > 1) { fprintf(stderr, "the state: the goal siren's part is not one of this game's\n"); return -1; }
+    const uint8_t *moves = in[0] >= 9 ? siren + HOLD_SIREN_SIZE : NULL;   /* (before version 9: none) */
+    if (moves && (moves[0] & 0xF8)) { fprintf(stderr, "the state: the moves' part is not one of this game's\n"); return -1; }
     if (referee && referee_state_load(referee) < 0) { fprintf(stderr, "the state: the referee's part is not one of this game's\n"); return -1; }
     const uint8_t *pause = in[0] >= 7 ? referee + REFEREE_STATE_SIZE : NULL;   /* (before version 7: none, no pause) */
     if (pause && hold_state_load(pause) < 0) { fprintf(stderr, "the state: the pause's part is not one of this game's\n"); return -1; }
@@ -306,5 +316,6 @@ int rules_state_load(void *user, const uint8_t *in, size_t size)
     memcpy(rules, v, sizeof rules);
     if (!pause) hold_state_load(NULL);                     /* (a state from before the pause was kept: every machine that loads it starts without) */
     hold_siren_load(siren);                                /* (checked above; before version 8: no siren counted) */
+    moves_state_load(moves);                               /* (checked above; before version 9: no move under way) */
     return 0;
 }

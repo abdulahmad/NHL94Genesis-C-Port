@@ -699,6 +699,11 @@ static void write_ppm(const char *path)
     if (live_shots && live_have) { v = &live_vdp; w = live_w; h = live_h; memcpy(px, live_px, sizeof px); }
     else mdrt_vdp_render(v, px, 320);
     if (screen_frame) { w = 320; h = 224; }
+    if (shots_wide && !screen_frame) {                    /* (16:9: the overlay windows keep their 4:3 gaps, wide.c) */
+        int from, to;
+        const mdrt_vdp *mv = wide_windows(v, &from, &to);
+        if (mv != v) { if (from < to) mdrt_vdp_render_lines(mv, px, 320, from, to); v = (mdrt_vdp *)mv; }
+    }
     for (int i = 0; i < h; i++)
         for (int x = 0; x < w; x++) pic[i * 320 + x] = screen_frame ? screen_px[i * 320 + x] : 0xFF000000u | mdrt_vdp_rgb(px[i * 320 + x], 1);
     if (!screen_frame) pcspr_present(v, px, 320, pic, w, h, 320);
