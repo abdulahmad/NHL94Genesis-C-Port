@@ -234,7 +234,7 @@ static void hold(void)
     CHECK(hold_state_load(a) == 0 && hold_skating() && hold_skate_carry(&x2, &y2) && x2 == x && y2 == y);   /* (the same walk) */
     hold_state_save(b);
     CHECK(!memcmp(a, b, sizeof a));
-    static const int flags[] = { 2, 3, 4, 7, 82, 83, 84, 89, 96, 97, 324, 325, 334 };
+    static const int flags[] = { 2, 3, 4, 7, 82, 83, 84, 89, 96, 97, 324, 325 };
     for (size_t k = 0; k < sizeof flags / sizeof flags[0]; k++) {
         memcpy(b, a, sizeof b);
         b[flags[k]] = flags[k] == 84 ? 3 : 2;                  /* (byte 84, the goal speech's wait: 2 is the Sega CD goal song's, mods/hold.c) */
@@ -242,6 +242,8 @@ static void hold(void)
         CHECK(hold_state_load(b) < 0);
     }
     memcpy(b, a, sizeof b); b[84] = 2; CHECK(hold_state_load(b) == 0);   /* (the speech waiting for the disc's goal song) */
+    memcpy(b, a, sizeof b); b[334] = 4; CHECK(hold_state_load(b) < 0);                /* (the face off's flags: held back by the anthem 1, the window after the skate 2) */
+    memcpy(b, a, sizeof b); b[334] = 2; CHECK(hold_state_load(b) == 0);
     memcpy(b, a, sizeof b); b[98] = 0x91; b[99] = 1; CHECK(hold_state_load(b) < 0);   /* (a walk of more than 400 frames, EZ_CAP) */
     memcpy(b, a, sizeof b); b[322] = 1; CHECK(hold_state_load(b) < 0);                /* (the puck picked up at 1 of 256) */
     memcpy(b, a, sizeof b); b[335] = 13; CHECK(hold_state_load(b) < 0);               /* (13 held back face off men) */

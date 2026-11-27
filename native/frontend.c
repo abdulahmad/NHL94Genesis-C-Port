@@ -321,18 +321,29 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     static uint32_t pic[320 * 240];
     if (w > 320) w = 320;
     if (h > 240) h = 240;
+    const mdrt_vdp *vdp = mdrt_get_vdp(F.m);
+    if (host.widescreen) {                                /* (16:9: the overlay windows keep their 4:3 gaps, wide.c) */
+        static uint16_t moved[320 * 240];
+        int from, to;
+        const mdrt_vdp *mv = wide_windows(vdp, &from, &to);
+        if (mv != vdp) {
+            for (int y = 0; y < h; y++) memcpy(moved + y * 320, px + (long)y * pitch, (size_t)w * 2);
+            if (from < to) mdrt_vdp_render_lines(mv, moved, 320, from, to);
+            vdp = mv; px = moved; pitch = 320;
+        }
+    }
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++) pic[y * 320 + x] = 0xFF000000u | mdrt_vdp_rgb(px[y * pitch + x], MDRT_RGB_GPGX);
-    if (w <= 320 && h <= 240) pcspr_present(mdrt_get_vdp(F.m), px, pitch, pic, w, h, 320);   /* (NHL 95 PC's skater sprites, when on) */
+    if (w <= 320 && h <= 240) pcspr_present(vdp, px, pitch, pic, w, h, 320);   /* (NHL 95 PC's skater sprites, when on) */
     if (w <= 320 && h <= 240) whiteice_present(pic, w, h, 320);                  /* (white ice, when on) */
     if (w <= 320 && h <= 240) hats_present(pic, w, h, 320);                      /* (the SNES's hat trick hats, when on) */
-    if (w <= 320 && h <= 240) cardcolor_present(mdrt_get_vdp(F.m), pic, w, h, 320);   /* (the players' photos in colour, when on) */
+    if (w <= 320 && h <= 240) cardcolor_present(vdp, pic, w, h, 320);   /* (the players' photos in colour, when on) */
     int cd = w <= 320 && h <= 224 && segacd_present(pic, w, h);   /* (the Sega CD's opening screens, when they are on) */
     if (cd) { w = 320; h = 224; }
     SDL_LockMutex(F.lock);
     F.wide = host.widescreen;
     rules_widescreen(host.widescreen);           /* (the wide rink from the next power on: rules.c) */
-    if (F.wide) w = wide_frame(mdrt_get_vdp(F.m), pic, w, h, 320, F.picture, WIDE_MAX_W, cd);   /* (the sides: wide.c) */
+    if (F.wide) w = wide_frame(vdp, pic, w, h, 320, F.picture, WIDE_MAX_W, cd);   /* (the sides: wide.c) */
     else if (!cd && native_net_on() && (wide_rink_frame(w) || wide_hor_frame(w))) wide_crop_follow(), w = wide_crop(mdrt_get_vdp(F.m), pic, h, 320, F.picture, WIDE_MAX_W);   /* (a 16:9 player's wide rink, here 4:3) */
     else for (int y = 0; y < h; y++) memcpy(F.picture + y * WIDE_MAX_W, pic + y * 320, (size_t)w * 4);
     {   /* a new picture width (the 320-wide screens and the 256-wide ones, or the wide rink's: the window's shape changes): the old picture
