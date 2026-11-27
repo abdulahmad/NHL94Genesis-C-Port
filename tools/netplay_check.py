@@ -49,6 +49,8 @@ the setup screen), EA's 4 Way Play in the ports (the solo run's --four-way).
            (the PC siren's fixed length) and RULE_HOLD; the host alone has NHL 95 PC's files (--pc-siren --pc-crowd: its siren,
            horn and crowd bed from build/NHL95.iso; the guest plays the cartridge's), which must change only the sound. A goal
            in the away net is forced at vblank 200 on every machine (HOLDTEST, the game's own test aid)
+  ticker   host and join, 25 ms +-15, 5% lost, delay 1: the host's RULE_TICKER_HL (the other games' 0-3 periods before the
+           pregame, mods/ticker.c), drawn on the game's own seed on every machine
 
     tools/netplay_check.py [NAME...]
 """
@@ -83,6 +85,7 @@ SCENARIOS = [
      '25,15,5,1', 7, [1, 1]),
     ('siren', 7000, ['--rule', 'announce_timing=2', '--rule', 'goal_siren=1', '--rule', 'hold_play=on', '--pc-siren', '--pc-crowd'],
      'join', 1, '25,15,5,1', 8, [1, 1]),
+    ('ticker', 6000, ['--rule', 'ticker_highlights=1'], 'join', 1, '25,15,5,1', 9, [1, 1]),
 ]
 NEEDS = {'rosters': 'out/rosters/thirty-two', 'siren': 'build/NHL95.iso'}
 ENVS = {'siren': {'HOLDTEST': 'goal:200,away'}}           # (every machine's, and the solo run's: the same forced goal)

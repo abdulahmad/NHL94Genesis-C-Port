@@ -407,7 +407,7 @@ void InitScores(void)
         if ((uint16_t)d1 == g.gamenum) continue;
         if (a0->gsflags & MU_SERIES_OVER) continue;
         a0->gsper = 0;
-        for (int16_t d0 = (int16_t)randomd0(3); d0 > 0; d0--) SetScore(a0);
+        for (int16_t d0 = (int16_t)randomd0(ticker_init_periods()); d0 > 0; d0--) SetScore(a0);   /* (3; RULE_TICKER_HL: mods/ticker.c) */
     }
 }
 
