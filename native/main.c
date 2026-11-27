@@ -100,6 +100,7 @@
 #include "wide.h"
 #include "rules.h"
 #include "view.h"
+#include "replaymouse.h"
 #include "mdrt/platform_sdl2.h"
 
 static const char *sides_shot_path;                       /* --sides-shot FILE: the select-sides screen (frontend.c) at the end */
@@ -601,6 +602,36 @@ static void holdtest_frame(void)
     }
 }
 
+/* NHL94_TEST_REPLAYCAM="PASS:DX,DY ..." or "PASS=X,Y ..." (a headless run): the mouse's right drag in the instant replay without a window: at
+ * that pass of the replay (its pad reads, counted from its start) the pointer is dragged DX, DY picture pixels (the ice moves
+ * with it), through replaymouse.c and replaycam.c as the window's gestures go; each one logs the camera (replaycam_state) */
+static const char *testcam_spec;
+static void testcam_pass(unsigned entries)
+{
+    static unsigned seen, first;
+    if (entries != seen) { seen = entries; first = native_replay_passes; testcam_spec = getenv("NHL94_TEST_REPLAYCAM"); }
+    unsigned pass = native_replay_passes - first;
+    char line[200];
+    while (testcam_spec && *testcam_spec) {
+        char *end;
+        unsigned at = (unsigned)strtoul(testcam_spec, &end, 10);
+        int dx, dy, n = 0;
+        if ((*end != ':' && *end != '=') || pass < at) break;
+        if (sscanf(end + 1, "%d,%d%n", &dx, &dy, &n) != 2) { testcam_spec = NULL; break; }
+        if (*end == '=') { dx = (int16_t)g.Hpos - dx; dy = dy - (int16_t)g.Vpos; }   /* (PASS=X,Y: the drag that puts the view's middle at rink X, Y) */
+        testcam_spec = end + 1 + n;
+        while (*testcam_spec == ' ') testcam_spec++;
+        rm_down(RM_RIGHT, 0, 0, 0, 0, 1);
+        rm_motion(dx, dy, 0, 0, 1);
+        rm_up(RM_RIGHT, dx, dy, 0);
+        replaycam_pass(entries);
+        replaycam_state(line, sizeof line);
+        fprintf(stderr, "TEST replaycam pass %u frame %ld drag %d,%d: %s\n", pass, (long)mdrt_frame_count(native_m), dx, dy, line);
+        return;
+    }
+    replaycam_pass(entries);
+}
+
 static void script_source(void *user, uint16_t b[MDRT_PADS])
 {
     long frame = (long)mdrt_frame_count(user);
@@ -1086,6 +1117,7 @@ int main(int argc, char **argv)
     if (pccrowd_cli) { pcsong_start(); pcsong_wait(); pcsong_rock_set(1); }   /* (the PC crowd's organ and rock cues at the whistles) */
     if (pclogo_cli) { if (!pcspr_cli && !pcref_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-logos: no NHL 95 PC files found\n"); return 2; } } pcspr_logo_set(pclogo_cli); }
     if (pcref_cli) { if (!pcspr_cli) { pcspr_start(); pcspr_wait(); if (!pcspr_found()) { fprintf(stderr, "--pc-ref: no NHL 95 PC sprite files found\n"); return 2; } } pcspr_ref_set(1); pcspr_ref_phys_set(pcref_cli == 2); }
+    if (headless && getenv("NHL94_TEST_REPLAYCAM")) native_replay_pass_hook = testcam_pass;   /* (test aid: the replay's right drag) */
     if (getenv("HOLDTEST")) {
         const char *h = getenv("HOLDTEST"), *q;
         if ((q = strstr(h, "goal:"))) holdtest_goal = atoi(q + 5);
