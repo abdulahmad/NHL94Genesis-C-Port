@@ -46,3 +46,8 @@ int hold_skate_ref_step(int *x, int *y) { (void)x; (void)y; return 0; }
 void hold_tick(void) {}
 int hold_wait(void) { return 0; }
 void hold_reset(void) {}
+
+/* mods/penalties.c: NHL 96 Genesis's double minors. The cartridge's penalties are its Penaltylist's minutes, and a power
+ * play goal lets out the first player in the box who is not matched (PenGoalStuff). */
+uint8_t pen_minutes(uint16_t pen, uint8_t mins) { (void)pen; return mins; }
+int32_t pen_goal_keep(const struct Team *tm, uint8_t box, uint16_t st) { (void)tm; (void)box; (void)st; return -1; }
