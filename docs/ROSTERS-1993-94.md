@@ -14,7 +14,7 @@ They are an option. Off, the game plays the cartridge's rosters, as it always di
   deadline. A change restarts the game.
 - **Game options > Rosters in the game's menu**: puts a **Rosters** line second on the game's own setup
   screen, under Play Mode. Left and right on it change the rosters. The game restarts straight back to
-  the setup screen, with no EA SPORTS, high score or title screens. It is on in the Recommended preset
+  the setup screen, with no EA SPORTS, high score or title screens, and the title song playing as it would. It is on in the Recommended preset
   and off in the Cartridge and Sega CD presets. The line is not shown during online play.
 - Command line, for development: `--rosters @1993-94-opening` or `--rosters @1993-94-deadline`, and
   `--check-rosters` on either.
@@ -56,12 +56,19 @@ you give it only to match names and fit the formula.
 
 ## Photos
 
-- **Players with a photo on the NHL 94 cartridge** keep it.
+- **Players with a photo on the NHL 94 cartridge** keep it. A player the cartridge lists with a stock picture (Jari Kurri,
+  Anaheim's and Florida's starters) has no photo there, so he is treated as having none.
 - **Anyone else with a photo in NHL 95 Genesis** gets that one, read from the same NHL 95 ROM as the ratings. NHL 95 has a
-  photo of each team's six line 1 starters (145 players), and it is grey like the cartridge's photos. About 30 of the
-  players new to these sets have one (Brodeur, Osgood, Arnott, Yashin, Gratton and others), plus returning players the
-  cartridge had no photo of.
-- **Everyone else** shows the cartridge's stock picture, as on the cartridge.
+  photo of each team's six line 1 starters (156 pictures; 11 of them, such as Adam Graves's, have a tile map of their own),
+  and it is grey like the cartridge's photos. In these sets that is 43 players: 6 new to the game (Daigle, Gratton,
+  Larionov, Pronger, Smolinski, Yashin) and 37 who are on the cartridge without a photo (Kurri, Graves, Zubov, Hasek ...).
+- **Everyone else** shows the cartridge's stock picture, as on the cartridge. That includes 27 opening night starters and
+  33 trade deadline starters, among them Brodeur, Osgood, Lidstrom and Renberg.
+- A team's pictures are listed as the cartridge lists them: its six line 1 starters first (goalie, defence, left wing,
+  centre, right wing, with a stock picture for one who has no photo), then the others. The setup screen shows the first
+  six, so it shows the starters, as on the cartridge.
+- A name the cartridge has twice is matched by position, then by photo: Stephane Richer is the Devils' forward, not the
+  Bruins' defenceman, and John Vanbiesbrouck keeps his Rangers card rather than Florida's stock picture.
 
 NHL 94 PC and NHL 95 PC were checked first (their KEY.DB names a portrait for each player who has one). Neither has a
 portrait of any player new to these sets: they only have photos for their stars. NHL 95 SNES has colour photos of the same six
