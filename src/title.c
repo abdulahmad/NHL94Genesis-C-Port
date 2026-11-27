@@ -51,6 +51,11 @@ void TitleScreen(void)
     if (setup_fast) {                                     /* (the host's change of rosters: straight to the setup screen, the seed as the title takes it) */
         uint16_t hi = vdp_hv16();
         g.seed = (uint32_t)hi << 16 | vdp_hv16();
+        g.VBint = SYM_vb2;                                /* (and the VDP as the EA SPORTS screen leaves it: its vblank interrupt on, */
+        screen_layout();                                  /*  else nothing would run the next screen's fade) */
+        memset(g.palfadenew, 0, sizeof g.palfadenew);
+        CopyPaletteToCRAM();
+        setVram_0();
         return;
     }
     if (cd_event_hook) cd_event_hook(CD_EV_SCREEN, 2);
