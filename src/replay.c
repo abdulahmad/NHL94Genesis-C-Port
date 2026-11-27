@@ -303,7 +303,7 @@ void adda43(uint32_t *frame)
 }
 
 /* replay94.asm:UpdateCameraPos. Camera object a5 = object a3's x / y (negated for the reverse
- * angle), Hpos / Vpos clamped to the rink. */
+ * angle), Hpos / Vpos clamped to the rink (the wide view: Hpos to VIEW_HPOS, the reach of its 320 picture). */
 void UpdateCameraPos(const struct RinkObj *o, struct RinkObj *cam)
 {
     int16_t d0 = o->Xpos, d1 = o->Ypos;
@@ -311,8 +311,8 @@ void UpdateCameraPos(const struct RinkObj *o, struct RinkObj *cam)
     cam->Xpos = d0;
     if (g.sflags4 & HI(7)) d1 = (int16_t)-d1;
     cam->Ypos = d1;
-    if (!(d0 < 0x3C)) d0 = 0x3C;
-    if (!(d0 > -0x3C)) d0 = -0x3C;
+    if (!(d0 < view_hpos())) d0 = view_hpos();           /* (the wide view's rink: less far, as ClampReplayView) */
+    if (!(d0 > -view_hpos())) d0 = (int16_t)-view_hpos();
     g.Hpos = (uint16_t)d0;
     if (!(d1 < 0x100)) d1 = 0x100;
     if (!(d1 > -0xC8)) d1 = -0xC8;
