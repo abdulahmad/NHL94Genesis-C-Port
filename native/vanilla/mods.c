@@ -14,6 +14,8 @@ void checkfight(struct SortObj *a2, struct SortObj *a3) { (void)a2; (void)a3; } 
 int (*fight_cheat_hook)(void);                                                              /* (no fights: never asked) */
 void fightinput(uint16_t d0, uint16_t d1, struct SortObj *o) { (void)d0; (void)d1; (void)o; }
 uint16_t fight_frame_shown(uint16_t fr, int facedir) { (void)facedir; return fr; }
+uint8_t fight_rating(uint16_t team, uint16_t slot, uint8_t cart) { (void)team; (void)slot; return cart; }   /* (the cartridge's own) */
+int (*fight_rating_hook)(const char *name, int cart);
 const uint8_t *spa_table(uint16_t spa) { return rom_ptr(SYM_SPAlist + spa); }              /* (updateanim: SPAlist's entry) */
 
 /* mods/referee.c: NHL 95 PC's referee in play. The cartridge has no referee on the ice. */
@@ -51,3 +53,30 @@ void hold_reset(void) {}
  * play goal lets out the first player in the box who is not matched (PenGoalStuff). */
 uint8_t pen_minutes(uint16_t pen, uint8_t mins) { (void)pen; return mins; }
 int32_t pen_goal_keep(const struct Team *tm, uint8_t box, uint16_t st) { (void)tm; (void)box; (void)st; return -1; }
+
+/* mods/moves.c: NHL 95's fake shot, drop pass and shot block. The cartridge has none: a wind up goes on, A let go passes, A held changes
+ * lines, a pass is its own, a hold with no one in reach is a hook, check4check only checks, and a stick on the puck steals or catches. */
+void moves_frame(void) {}
+int moves_fake_pc(uint16_t d1, struct SortObj *o) { (void)d1; (void)o; return 0; }
+int moves_fake_g(struct SortObj *o) { (void)o; return 0; }
+int moves_fake_pending(void) { return 0; }
+uint16_t moves_shot_spa(uint16_t spa) { return spa; }
+int moves_fake_end(struct SortObj *o) { (void)o; return 0; }
+int moves_drop_g(uint16_t d3, struct SortObj *o) { (void)d3; (void)o; return 0; }
+int moves_dropping(void) { return 0; }
+uint16_t moves_pass_spa(uint16_t spa) { return spa; }
+int moves_drop_time(int16_t *t) { (void)t; return 0; }
+void moves_drop_loose(void) {}
+int moves_scatter(struct SortObj *o, struct SortObj *rcv) { (void)o; (void)rcv; return 0; }
+int moves_block_hold(struct SortObj *o) { (void)o; return 0; }
+int moves_block_cpu(struct SortObj *o) { (void)o; return 0; }
+void moves_block_try(struct SortObj *o) { (void)o; }
+int moves_blocking(const struct SortObj *o) { (void)o; return 0; }
+
+/* mods/goalie.c and mods/anims.c: the PC goalie's animations. The cartridge's goalie saves and hops the boards in its own, and every
+ * frame is a cartridge frame. */
+uint16_t goalie_save_spa(uint16_t spa, int16_t d3, const struct PuckCross *pc, const struct SortObj *gk) { (void)d3; (void)pc; (void)gk; return spa; }
+uint16_t goalie_wall_spa(const struct SortObj *o, uint16_t spa) { (void)o; return spa; }
+uint16_t mod_frame(uint16_t fr) { return fr; }
+int mod_frame_pc(uint16_t fr) { (void)fr; return -1; }
+const uint8_t *mod_spa_table(uint16_t spa) { return rom_ptr(SYM_SPAlist + spa); }

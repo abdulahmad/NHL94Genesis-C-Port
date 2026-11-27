@@ -1054,7 +1054,9 @@ void puckstick(struct SortObj *p, struct SortObj *puck, uint32_t dsq)
     if (p->position == 0 && (g.gmode & (1 << gmhl)))
         return;                                            /* the goalie lets the highlight shot in */
     p->pflags &= (uint8_t)~(1 << pfdoff);
+    int blk = moves_blocking(p);                           /* (RULE_SHOTBLOCK 1: NHL 95 PC's block, mods/moves.c) */
     if ((int16_t)puck_carrier() >= 0) {
+        if (blk) return;
         struct SortObj *car = sortobj((int16_t)puck_carrier());
         if (!((car->pflags ^ p->pflags) & (1 << pfteam)))
             return;                                        /* no stealing from a teammate */
@@ -1080,6 +1082,13 @@ void puckstick(struct SortObj *p, struct SortObj *puck, uint32_t dsq)
     }
     if (p->position == 0 && dsq > 0x40)
         return;
+    if (blk) {                                             /* (the block's stick turns it away) */
+        p->nopuck[0] = 8;
+        sfx(6);
+        a2touchpuck(p, puck);
+        deflect(puck);
+        return;
+    }
     if (p->pflags3 & (1 << pf3onetimer)) {
         if (dsq > 0x64) {
             if (dsq <= 0x144 && p->SPAnum < 0x18)
@@ -1215,7 +1224,7 @@ void puckgoalie(struct SortObj *gk, struct SortObj *puck, int16_t dx, int16_t dy
     const uint8_t *tbl = saveodds;
     if (gk->attribute & HI(3))
         d2 ^= 2;
-    uint16_t fr = gk->frame, base = SPFGoalie;
+    uint16_t fr = mod_frame(gk->frame), base = SPFGoalie;   /* (a mod frame: its cartridge frame's odds, mods/anims.c) */
     if ((int16_t)fr >= SPFSiren) {
         base = SPFghighr;
         tbl = saveodds3;
@@ -1594,7 +1603,7 @@ void setplayer(uint16_t roster, struct SortObj *o)
     o->handed[0] = (uint8_t)((r[LR_HANDED_FIGHTING] & 1) ^ 1);   /* 1 = left handed */
     if (o->handed[0] == 0)
         o->attribute |= HI(3);
-    o->fighting = r[LR_HANDED_FIGHTING] & 0xE;
+    o->fighting = fight_rating(tm->tmteam, (uint16_t)(idx >> 1), r[LR_HANDED_FIGHTING] & 0xE);   /* (the cartridge's, unless RULE_FIGHT_RATINGS) */
     g.TempWord2 = 0xA; d3 = AttributeCalc(r[LR_STICK_HANDLING], o);
     o->stickhand = ClampNibble((uint8_t)(d3 + g.PPBonus + g.PKBonus + g.HmAwBonus));
     g.TempWord2 = 0xB; d3 = AttributeCalc(r[LR_SHOT_ACCURACY], o);

@@ -35,6 +35,7 @@
 #include "announcer.h"
 #include "pcsfx.h"
 #include "pcsong.h"
+#include "fightrate.h"
 #include "whiteice.h"
 #include "hats.h"
 #include "pcspr.h"
@@ -735,14 +736,22 @@ static const struct { int rule; const char *key; int group; } cd_rows[] = {
     { RULE_CD_SOUNDS, "cd_sounds", 1 }, { RULE_CD_SONGS, "cd_songs", 1 }, { RULE_CD_PERIOD_END, "cd_period_end", 1 },
     { RULE_HOLD, "hold_play", 4 },
     { RULE_FIGHT, "fighting", 4 },                       /* (NHL 93's fighting) */
+    { RULE_FIGHT_RATINGS, "fight_ratings", 4 },          /* (the fighters' ratings from NHLPA 93 and NHL 96 PC) */
     { RULE_ANNOUNCE, "announce_timing", 4 },             /* (when the rink announcer speaks, and play waits for it) */
     { RULE_PENALTIES, "double_minors", 4 },              /* (NHL 96 Genesis's double minors) */
+    { RULE_FAKESHOT, "fake_shot", 4 },                   /* (NHL 95's moves, PC or Genesis style each: mods/moves.c) */
+    { RULE_DROPPASS, "drop_pass", 4 },
+    { RULE_SHOTBLOCK, "shot_block", 4 },
+    { RULE_GOALIE, "goalie_anims", 4 },                  /* (the PC goalie's saves and hop: mods/goalie.c) */
 };
 #define CD_ROWS ((int)(sizeof cd_rows / sizeof cd_rows[0]))
 #define CD_HOLD 9                                          /* (RULE_HOLD) */
 #define CD_FIGHT 10                                        /* (RULE_FIGHT) */
-#define CD_ANNOUNCE 11                                     /* (RULE_ANNOUNCE) */
-#define CD_PENALTIES 12                                    /* (RULE_PENALTIES) */
+#define CD_FIGHTRATE 11                                    /* (RULE_FIGHT_RATINGS) */
+#define CD_ANNOUNCE 12                                     /* (RULE_ANNOUNCE) */
+#define CD_PENALTIES 13                                    /* (RULE_PENALTIES) */
+#define CD_FAKESHOT 14                                     /* (RULE_FAKESHOT, then RULE_DROPPASS, RULE_SHOTBLOCK, RULE_GOALIE) */
+#define CD_GOALIE 17
 #define CD_ROSTERS CD_ROWS                                /* (the roster set, the built-in "sega-cd", list entry 1) */
 #define CD_MUSIC (CD_ROWS + 1)                            /* (this machine's sound only: the disc's music, its crowd bed) */
 #define CD_CROWD (CD_ROWS + 2)
@@ -1105,8 +1114,8 @@ static void game_page_init(void)
 {
     static const char *const labels[CD_ROWS] = { "Sega CD skating", "Sega CD corner bounce", "Sega CD penalty shot box",
                                                   "Sega CD playoff password", "Sega CD shot data fix", "Sega CD uniforms",
-                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "PC between-play pause", "Fighting", "Rink announcer: when he speaks",
-                                                  "Double minors and majors" };
+                                                  "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "PC between-play pause", "Fighting", "Fight ratings", "Rink announcer: when he speaks",
+                                                  "Double minors and majors", "Fake shot", "Drop pass", "Shot blocking", "Goalie animations" };
     for (int k = 0; k < CD_ROWS; k++) {
         char key[64];
         snprintf(key, sizeof key, "rules.%s", cd_rows[k].key);
@@ -1154,8 +1163,13 @@ static void game_page_init(void)
             "At a period's end the Sega CD goes straight to the song.",
             "NHL 95 PC's between-play time: play waits a moment after a goal, penalty or penalty shot before the face off, and at every whistle the players and the referee skate from where they were to the face off spot instead of appearing there.",
             "NHL 93's fights: a hard check between two fighters can start one (B low punch, C high punch, A grab).",
+            "Who fights, and how hard, when Fighting is on. Cartridge: the 94 cartridge's fighting values, which only a handful of players are high enough in to start a fight. NHLPA 93 + NHL 96: every skater's rating from your NHLPA 93 cartridge and NHL 96 PC disc, by name (in both: the two together), on NHL 93's scale; a player in neither gets one from his penalty minutes or the cartridge's value. Online, the host's files decide.",
             "When the rink announcer speaks. Right after the goal or penalty, as on NHL 95 PC: play waits until he is done (the goal celebration lasts as long as the speech, with or without the between-play pause). After the goal song: a home goal's speech starts when the song ends. Talks over the face off: the cartridge's pace.",
-            "NHL 96 Genesis's double minors: a check that knocks a skater down for Roughing or Cross Check is 4 minutes. NHL rules: a power play goal also ends only the first 2 minutes of a double minor, and never a major." };
+            "NHL 96 Genesis's double minors: a check that knocks a skater down for Roughing or Cross Check is 4 minutes. NHL rules: a power play goal also ends only the first 2 minutes of a double minor, and never a major.",
+            "NHL 95's fake shot. NHL 95 PC: press B or A early in the wind up and he pulls the puck back. NHL 95 Genesis: let go of A with the puck in the attacking zone and he winds up a shot that does not go.",
+            "NHL 95's drop pass. NHL 95 PC: a pass to a team-mate trailing you in the attacking zone is left on the ice for him. NHL 95 Genesis: press A with the pad pulled back.",
+            "NHL 95's shot blocks. NHL 95 PC: A with no one in reach dives, slides or kneels in front of a shot, and defenders do it themselves. NHL 95 Genesis: A while a shooter winds up (or just after the shot) kneels to block, and defenders in the shot's line do it too.",
+            "The goalie in NHL 95 PC's animations: falling back, dropping to the stick or glove side, and his own hop over the boards. With 96 Genesis: also its straight on blocks and knee catches. The pictures need NHL 95 PC's files; without them the cartridge's look." };
         for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];
         game_help[CD_ROSTERS] = "The Sega CD's rosters (the game restarts to change them).";
         game_help[CD_MUSIC] = "Where the songs come from: the cartridge or the Sega CD disc.";
@@ -1178,6 +1192,12 @@ static void game_page_init(void)
     pcspr_start();
     pcsfx_start();
     pcsong_start();
+    fightrate_start();
+    if (!fightrate_found93() || !fightrate_found96()) {   /* (the row says which files were not found) */
+        static char fl[96];
+        snprintf(fl, sizeof fl, "%s (%s)", cd_opts[CD_FIGHTRATE].label, !fightrate_found93() && !fightrate_found96() ? "no NHLPA 93 or NHL 96 PC found" : !fightrate_found93() ? "no NHLPA 93 cartridge found" : "no NHL 96 PC disc found");
+        cd_opts[CD_FIGHTRATE].label = fl;
+    }
     cd_opts[CD_PCSIREN] = (ob_game_opt){ "pc_goal_siren", "PC goal siren", cd_off_on, 2, 1, 0, 4 };   /* (NHL 95 PC's siren in place of the cartridge's) */
     cd_opts[CD_PCHORN] = (ob_game_opt){ "pc_period_horn", "PC end of period horn", cd_off_on, 2, 1, 0, 4 };
     cd_opts[CD_PCSPR] = (ob_game_opt){ "pc_sprites", "PC player sprites", cd_off_on, 2, 0, 0, 4 };   /* (NHL 95 PC's skaters and goalies, the cartridge's where the PC has none) */
@@ -1194,7 +1214,7 @@ static void game_page_init(void)
     static const char *const shape[2] = { "4:3", "16:9" };
     cd_opts[CD_WIDESCREEN] = (ob_game_opt){ "widescreen", "Widescreen", shape, 2, host.widescreen ? 1 : 0, 0, 4 };   /* (each machine its own: wide.c) */
     cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 1, 0, 4 };
-        game_help[CD_ANNOUNCER] = "NHL 95 PC's rink announcer: goals, penalties, last minute.";
+        game_help[CD_ANNOUNCER] = "NHL 95 PC's rink announcer: goals, penalties, last minute. The Sega CD's music is turned down while he speaks, and he waits for Ron Barr.";
         game_help[CD_PCSIREN] = "NHL 95 PC's goal siren, from your NHL 95 PC files, in place of the cartridge's.";
         game_help[CD_PCHORN] = "NHL 95 PC's horn at the end of a period, from your NHL 95 PC files.";
         game_help[CD_PCSPR] = "NHL 95 PC's skaters and goalies, from your NHL 95 PC files.";
@@ -1219,12 +1239,15 @@ static void game_page_init(void)
     pv[1][CD_SPLIT] = 0;                                                       /* (the 50/50 demo: off in every preset) */
     pv[1][CD_VOICE] = 1;
     pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
-    pv[1][CD_ANNOUNCER] = 0;                                                  /* (95 PC's voice: not the Sega CD's) */
+    pv[1][CD_ANNOUNCER] = 1;                                                  /* (95 PC's voice with the disc's sound, Abdul: they work together; it does nothing without 95 PC's files) */
     pv[1][CD_HOLD] = 0;                                                        /* (95 PC's pause: not the Sega CD's) */
     pv[2][CD_HOLD] = 0;                                                        /* (the PC between-play pause: a taste, off in Recommended) */
-    pv[1][CD_ANNOUNCE] = 0;                                                    /* (95 PC's timing: not the Sega CD's) */
+    pv[1][CD_ANNOUNCE] = 2;                                                    /* (after the goal song: the disc's goal song plays at the goal, then he speaks) */
     pv[2][CD_ANNOUNCE] = 1;                                                    /* (with the goal, as on the PC, in Recommended) */
+    pv[1][CD_FIGHTRATE] = 0;                                                   /* (the fighters' ratings: not the Sega CD's; on in Recommended, they matter only with Fighting on) */
+    pv[2][CD_FIGHTRATE] = 1;
     pv[1][CD_PENALTIES] = 0;                                                   /* (NHL 96 Genesis's double minors: not the Sega CD's; off in Recommended, it changes the 94 game) */
+    for (int k = CD_FAKESHOT; k <= CD_GOALIE; k++) pv[1][k] = 0;              /* (NHL 95's moves and the PC goalie: not the Sega CD's; off in Recommended too, they change the 94 game) */
     pv[1][CD_FIGHT] = 0;                                                       /* (NHL 93's fights: not the Sega CD's; off in Recommended too until tried) */
     pv[1][CD_HATS] = 0;                                                        /* (the SNES's: not the Sega CD's) */
     pv[1][CD_PCSIREN] = pv[1][CD_PCHORN] = 0;                                  /* (the PC games' sounds: not the Sega CD's) */

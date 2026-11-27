@@ -10,6 +10,7 @@
 #include <stdint.h>
 struct Team;
 struct SortObj;
+struct PuckCross;
 
 enum {
     RULE_WEIGHT_FIX,            /* 1: a check's weights summed in full (the original's 8-bit sum wraps,
@@ -44,6 +45,16 @@ enum {
                                  * siren plays in the game either way; the host that has the PC's file plays that in its place */
     RULE_PENALTIES,             /* NHL 96 Genesis's double minors (mods/penalties.c): 1 as 96G, 2 also served as the NHL does (a power
                                  * play goal ends only a double minor's running 2 minutes, never a major) */
+    RULE_FAKESHOT,              /* the fake shot (mods/moves.c): 1 NHL 95 PC's (B or A early in the wind up), 2 NHL 95 Genesis's (A let go
+                                 * in the attacking zone) */
+    RULE_DROPPASS,              /* the drop pass (mods/moves.c): 1 NHL 95 PC's (a pass to a trailing team-mate when the lane ahead is
+                                 * shut), 2 NHL 95 Genesis's (A with the pad pulled back) */
+    RULE_SHOTBLOCK,             /* blocking shots (mods/moves.c): 1 NHL 95 PC's (dives, slides and knee blocks), 2 NHL 95 Genesis's (the
+                                 * kneeling block) */
+    RULE_GOALIE,                /* the goalie's PC animations (mods/goalie.c): 1 NHL 95 PC's saves and hop over the boards, 2 also
+                                 * NHL 96 Genesis's straight on blocks and low catches */
+    RULE_FIGHT_RATINGS,         /* 1: with RULE_FIGHT, each skater's fighting on NHL 93's scale, from NHLPA 93 and NHL 96 PC (the player's own
+                                 * files, the host's in a session: native/fightrate.c); 0 the cartridge's (mods/fight.c fight_rating) */
     RULE_COUNT
 };
 /* the original's values */
@@ -126,6 +137,49 @@ int referee_state_load(const uint8_t *in);
  * -1 he goes out (the cartridge's), -2 not him (the next one), else he stays, the goal counts, and this is his tmpdst now */
 uint8_t pen_minutes(uint16_t pen, uint8_t mins);
 int32_t pen_goal_keep(const struct Team *tm, uint8_t box, uint16_t st);
+
+/* RULE_FAKESHOT, RULE_DROPPASS, RULE_SHOTBLOCK (mods/moves.c), NHL 95's moves. moves_frame once a game frame (95G's CheckNewCarrier and
+ * ShotTimer); moves_fake_pc in doinput_ispc's shot mode (d1 the new presses: 1 the wind up became a fake); moves_fake_g where A let go
+ * passes (1: a fake shot or nothing, no pass); moves_fake_pending in SetShotMode (1: a 95G fake is starting, skip the penalty shot
+ * box), moves_shot_spa the wind up it starts, moves_fake_end at doshot (1: the fake ends there, no shot); moves_drop_g where A is
+ * pressed (d3 the held pad: 1 a drop pass starts); moves_dropping in dopass (1: a 95G drop pass), moves_pass_spa its swing,
+ * moves_drop_time in passtoa0 (t the eighths of a second to the meeting, 1 a drop), moves_drop_loose for a drop to nobody,
+ * moves_scatter (1: the pass was dropped to rcv, dopass ends); moves_block_hold in Holdplayer with no impact (1: a block started),
+ * moves_block_cpu at check4check's start and moves_block_try at its end; moves_blocking in puckstick (1: his stick deflects the puck,
+ * no steal, no catch). The state's bytes: MOVES_STATE_SIZE (moves_state_load(NULL): none, a state from before them) */
+void moves_frame(void);
+int moves_fake_pc(uint16_t d1, struct SortObj *o);
+int moves_fake_g(struct SortObj *o);
+int moves_fake_pending(void);
+uint16_t moves_shot_spa(uint16_t spa);
+int moves_fake_end(struct SortObj *o);
+int moves_drop_g(uint16_t d3, struct SortObj *o);
+int moves_dropping(void);
+uint16_t moves_pass_spa(uint16_t spa);
+int moves_drop_time(int16_t *t);
+void moves_drop_loose(void);
+int moves_scatter(struct SortObj *o, struct SortObj *rcv);
+int moves_block_hold(struct SortObj *o);
+int moves_block_cpu(struct SortObj *o);
+void moves_block_try(struct SortObj *o);
+int moves_blocking(const struct SortObj *o);
+#define MOVES_STATE_SIZE 6
+size_t moves_state_save(uint8_t *out);
+int moves_state_load(const uint8_t *in);
+
+/* RULE_GOALIE (mods/goalie.c): goalie_save_spa, the save goaliesave starts (spa the cartridge's, d3 the way to where the puck crosses
+ * against his facing); goalie_wall_spa, the hop over the boards (assbench, asseben) */
+uint16_t goalie_save_spa(uint16_t spa, int16_t d3, const struct PuckCross *pc, const struct SortObj *gk);
+uint16_t goalie_wall_spa(const struct SortObj *o, uint16_t spa);
+
+/* mods/anims.c: the animations the PC's pictures need. Their frames are numbered from MODF_BASE (below the 1024 a replay keeps): mod_frame
+ * is the cartridge's frame a mod frame stands for (its art, its hot spot, its save odds; any other frame is itself), mod_frame_pc the PC's
+ * picture (-1: none). Their animations are MOD_SPA and up (mod_spa_table, which spa_table asks) */
+#define MODF_BASE 0x360
+#define MOD_SPA 0x5000u
+uint16_t mod_frame(uint16_t fr);
+int mod_frame_pc(uint16_t fr);
+const uint8_t *mod_spa_table(uint16_t spa);
 
 /* RULE_CD_COLOURS: a uniform's 16 colours (c) as the Sega CD has them, for the cartridge team art
  * (rosters_art) on the side away (0 home, 1 away); a colour changed only where it is the cartridge's */

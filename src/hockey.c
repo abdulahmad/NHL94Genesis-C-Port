@@ -184,6 +184,7 @@ void DoGameFrame(void)
     elapsed = d7;
     if (hat_hook) hat_hook(HAT_FRAME, d7);
     hold_tick();
+    moves_frame();                                        /* (NHL 95's moves: 95G's CheckNewCarrier and shot timer, mods/moves.c) */
     if (test_frame_hook) test_frame_hook();
     periodicevents();
     updateplayers();
