@@ -1179,7 +1179,7 @@ static void game_page_init(void)
     static const char *const shape[2] = { "4:3", "16:9" };
     cd_opts[CD_WIDESCREEN] = (ob_game_opt){ "widescreen", "Widescreen", shape, 2, host.widescreen ? 1 : 0, 0, 4 };   /* (each machine its own: wide.c) */
     cd_opts[CD_PCPHOTOS] = (ob_game_opt){ "pc_photos", "Colour player photos", cd_off_on, 2, 1, 0, 4 };
-        game_help[CD_ANNOUNCER] = "NHL 95 PC's rink announcer: goals, penalties, last minute.";
+        game_help[CD_ANNOUNCER] = "NHL 95 PC's rink announcer: goals, penalties, last minute. The Sega CD's music is turned down while he speaks, and he waits for Ron Barr.";
         game_help[CD_PCSIREN] = "NHL 95 PC's goal siren, from your NHL 95 PC files, in place of the cartridge's.";
         game_help[CD_PCHORN] = "NHL 95 PC's horn at the end of a period, from your NHL 95 PC files.";
         game_help[CD_PCSPR] = "NHL 95 PC's skaters and goalies, from your NHL 95 PC files.";
@@ -1204,10 +1204,10 @@ static void game_page_init(void)
     pv[1][CD_SPLIT] = 0;                                                       /* (the 50/50 demo: off in every preset) */
     pv[1][CD_VOICE] = 1;
     pv[1][CD_PCPHOTOS] = 0;                                                    /* (not the disc's: the PC games') */
-    pv[1][CD_ANNOUNCER] = 0;                                                  /* (95 PC's voice: not the Sega CD's) */
+    pv[1][CD_ANNOUNCER] = 1;                                                  /* (95 PC's voice with the disc's sound, Abdul: they work together; it does nothing without 95 PC's files) */
     pv[1][CD_HOLD] = 0;                                                        /* (95 PC's pause: not the Sega CD's) */
     pv[2][CD_HOLD] = 0;                                                        /* (the PC between-play pause: a taste, off in Recommended) */
-    pv[1][CD_ANNOUNCE] = 0;                                                    /* (95 PC's timing: not the Sega CD's) */
+    pv[1][CD_ANNOUNCE] = 2;                                                    /* (after the goal song: the disc's goal song plays at the goal, then he speaks) */
     pv[2][CD_ANNOUNCE] = 1;                                                    /* (with the goal, as on the PC, in Recommended) */
     pv[1][CD_FIGHT] = 0;                                                       /* (NHL 93's fights: not the Sega CD's; off in Recommended too until tried) */
     pv[1][CD_HATS] = 0;                                                        /* (the SNES's: not the Sega CD's) */

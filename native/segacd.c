@@ -27,6 +27,7 @@
 #include "segacd.h"
 #include "pcsfx.h"
 #include "cardcolor.h"
+#include "announcer.h"
 #include "overbar/cdimage.h"
 
 #define SONG_GAIN 0.70f                     /* the disc's tracks against the FM chip's mix */
@@ -34,6 +35,9 @@
 #define VOICE_GAIN 0.85f
 #define VOICE_RATE 16276                    /* the RF5C164 at frequency $0400 (32552 Hz x $400 / $800) */
 #define CROWD_LIVE 20                       /* frames the crowd bed keeps going after the game's last updatesound */
+#define DUCK 0.35f                          /* a song's level while NHL 95 PC's rink announcer speaks over it (native/announcer.c) */
+#define DUCK_S 0.25                         /* seconds the song takes to go down to it, or back up */
+#define MISS_MAX 30                         /* the mixer's calls a song's track may fail to read before it counts as ended */
 
 static struct {
     SDL_atomic_t music, crowd;              /* the Game page's rows (segacd_set_music / _crowd) */
@@ -45,6 +49,8 @@ static struct {
     int song_on_cd;                         /* the game's song is the disc's now: its FM notes are dropped */
     uint8_t fx_slot[8];                     /* a track slot's effect is the disc's: its FM notes and samples are dropped */
     int crowd_live;                         /* frames left of the game's crowd (updatesound) */
+    float duck;                             /* the song's level under the rink announcer, 1 none (the mixer's) */
+    int miss;                               /* the mixer's reads of the song's track that failed in a row */
     uint8_t ym_addr;                        /* the YM2612's part 1 address latch (the relay's last) */
     SDL_atomic_t voice;                     /* the Ron Barr row: 0 off, 1 on (the music held back), 2 on over the music */
     int16_t *clip;                          /* the clip playing (16276 Hz mono), NULL none */
@@ -135,6 +141,7 @@ void segacd_set_intro(int v) { SDL_AtomicSet(&S.intro, v); }
 void segacd_set_photos(int v) { SDL_AtomicSet(&S.photos, v); }
 void segacd_set_session(int on) { SDL_AtomicSet(&S.session, on); }
 int segacd_opening(void) { return S.screen >= 1 && S.screen <= 5; }
+int segacd_voice_busy(void) { return S.clip != NULL; }
 
 /* (cd_picture_hook) the disc's photo of the card's player, by his team's abbreviation and his name */
 static void plain(const struct RosterText *t, char *s, int cap)
@@ -204,16 +211,25 @@ static int crowd_bits(void)
     return (v & 1) | (cd ? 2 : 0);
 }
 
-static void play(int track, int loop, int bed)
+/* SEGACD_LOG: each start and stop of a disc track, where it was and why (the game's frame; the mixer's calls are the sound thread's) */
+static int cd_log(void) { static int log = -1; if (log < 0) log = SDL_getenv("SEGACD_LOG") != NULL; return log; }
+static void play_why(int track, int loop, int bed, const char *why)
 {
     if (S.track == track && S.loop == loop) { S.bed = bed; return; }   /* (the same song asked again: it goes on) */
+    if (cd_log()) fprintf(stderr, "segacd: frame %ld track %d (at %.1f s) -> %d%s (%s)\n", native_frames(), S.track, S.at / OB_CD_RATE, track, loop ? " looped" : "", why);
     S.frames = ob_cd_track_frames(S.cd, track);
     S.track = S.frames > 0 ? track : 0;
     S.loop = loop;
     S.bed = bed;
     S.at = 0;
+    S.miss = 0;
 }
-static void stop(void) { S.track = 0; S.bed = 0; }
+static void stop_why(const char *why)
+{
+    if (cd_log() && S.track) fprintf(stderr, "segacd: frame %ld track %d stopped at %.1f s (%s)\n", native_frames(), S.track, S.at / OB_CD_RATE, why);
+    S.track = 0;
+    S.bed = 0;
+}
 
 /* ---- Ron Barr: the disc's clip of a scouting paragraph ----
  * The script is the cartridge's ScoutTextScript, a paragraph a line; the disc keeps it at the start
@@ -359,24 +375,24 @@ void segacd_event(int ev, uint16_t n)
     case CD_EV_SONG: {
         S.song_on_cd = 0;
         if (n == 0x7A && SDL_AtomicGet(&S.voice) == 1 && segacd_disc()) {   /* Ron Barr alone, as on the disc: no song */
-            if (S.track && !S.bed) stop();
+            if (S.track && !S.bed) stop_why("Ron Barr");
             S.song_on_cd = 1;
             return;
         }
         if (!music_on()) return;
         int track = n >= 0x30 && n <= 0x77 ? n - 0x29 : n == 0x78 ? 4 : n == 0x79 ? 5 : n == 0x7A ? 3 : 0;
         if (!track || ob_cd_track_frames(S.cd, track) <= 0) return;   /* (not on this disc: the FM song) */
-        play(track, n >= 0x78, 0);
+        play_why(track, n >= 0x78, 0, "song");
         S.song_on_cd = 1;
         break;
     }
     case CD_EV_STOP:                          /* stop_current_song: the looped songs pause; the organ plays out */
         S.song_on_cd = 0;
-        if (S.track && S.loop && !S.bed) stop();
+        if (S.track && S.loop && !S.bed) stop_why("stop_current_song");
         break;
     case CD_EV_TURNOFF:                       /* p_turnoff (pause, the full silences, leaving the scouting report): all of it */
         S.song_on_cd = 0;
-        stop();
+        stop_why("p_turnoff");
         voice_stop();
         segacd_sfx_stop();
         break;
@@ -417,7 +433,7 @@ void segacd_event(int ev, uint16_t n)
         break;
     case CD_EV_CROWD:
         S.crowd_live = CROWD_LIVE;
-        if ((crowd_bits() & 2) && !S.track) play(2, 1, 1);
+        if ((crowd_bits() & 2) && !S.track) play_why(2, 1, 1, "crowd");
         break;
     }
 }
@@ -517,11 +533,13 @@ void segacd_mix(int16_t *out, int frames, unsigned rate)
         }
     }
     if (S.clip && !SDL_AtomicGet(&S.voice)) voice_stop();
-    if (S.crowd_live > 0 && --S.crowd_live == 0 && S.bed) stop();   /* (the game's crowd stopped: the menus) */
-    if (S.bed && !(crowd_bits() & 2)) stop();
-    if (S.track && !S.bed && !music_on()) { stop(); S.song_on_cd = 0; }
+    if (S.crowd_live > 0 && --S.crowd_live == 0 && S.bed) stop_why("no crowd");   /* (the game's crowd stopped: the menus) */
+    if (S.bed && !(crowd_bits() & 2)) stop_why("crowd row off");
+    if (S.track && !S.bed && !music_on()) { stop_why("music row off"); S.song_on_cd = 0; }
+    if (S.duck <= 0) S.duck = 1;
     if (!S.track || !S.cd || !rate) return;
     float gain = S.bed ? BED_GAIN * (float)SDL_AtomicGet(&vol_cd) / 100.0f : SONG_GAIN;
+    float duck_to = !S.bed && announcer_speaking() ? DUCK : 1.0f, duck_step = (float)(1.0 / (DUCK_S * rate));   /* (the bed is not lowered: he speaks over the crowd) */
     double step = (double)OB_CD_RATE / rate;
     int16_t buf[2 * 1100];
     int i = 0;
@@ -530,19 +548,28 @@ void segacd_mix(int16_t *out, int frames, unsigned rate)
         int want = (int)((frames - i) * step) + 2;
         if (want > 1024) want = 1024;
         long got = ob_cd_track_read(S.cd, S.track, at, buf, want);
-        if (got < 2) {                                             /* its end */
-            if (S.loop) { S.at = 0; if (at == 0) { stop(); break; } continue; }
-            stop();
-            if (S.crowd_live > 0 && (crowd_bits() & 2)) play(2, 1, 1);   /* the organ done: the crowd bed again */
+        if (got < 2 && at + 2 < S.frames && ++S.miss < MISS_MAX) {   /* (a read that failed short of the end: this frame without it, not the song's end) */
+            if (cd_log()) fprintf(stderr, "segacd: frame %ld track %d: no read at %.1f s (%d)\n", native_frames(), S.track, S.at / OB_CD_RATE, S.miss);
             break;
         }
+        if (got < 2) {                                             /* its end */
+            S.miss = 0;
+            if (S.loop) { S.at = 0; if (at == 0) { stop_why("empty"); break; } continue; }
+            stop_why("end");
+            if (S.crowd_live > 0 && (crowd_bits() & 2)) play_why(2, 1, 1, "song over: crowd");   /* the organ done: the crowd bed again */
+            break;
+        }
+        S.miss = 0;
         for (; i < frames; i++) {
             double f = S.at - at;
             int j = (int)f;
             if (j + 1 >= got) break;
             double frac = f - j;
+            if (S.duck > duck_to) { S.duck -= duck_step; if (S.duck < duck_to) S.duck = duck_to; }
+            else if (S.duck < duck_to) { S.duck += duck_step; if (S.duck > duck_to) S.duck = duck_to; }
+            float k = S.bed ? gain : gain * S.duck;
             for (int c = 0; c < 2; c++) {
-                float s = (float)(buf[2 * j + c] + (buf[2 * j + 2 + c] - buf[2 * j + c]) * frac) * gain + out[2 * i + c];
+                float s = (float)(buf[2 * j + c] + (buf[2 * j + 2 + c] - buf[2 * j + c]) * frac) * k + out[2 * i + c];
                 out[2 * i + c] = (int16_t)(s > 32767 ? 32767 : s < -32768 ? -32768 : s);
             }
             S.at += step;
