@@ -182,12 +182,14 @@ static int faces_in_one(const char *dir)
     return got;
 }
 
-/* the faces in dir and in its faces/ (EA-NHL-Tools keeps them there) */
+/* the faces in dir's faces/ (EA-NHL-Tools keeps them there), then any loose in dir: a face in both is faces/'s, the
+ * newer layout's (an older copy left loose beside it is not read) */
 static int faces_in(const char *dir)
 {
     char sub[1216];                                    /* (dir is at most 1200) */
     snprintf(sub, sizeof sub, "%s/faces", dir);
-    return faces_in_one(dir) + faces_in_one(sub);
+    int got = faces_in_one(sub);
+    return got + faces_in_one(dir);
 }
 
 static int finder(void *arg)
