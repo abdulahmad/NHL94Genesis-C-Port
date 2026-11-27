@@ -221,6 +221,22 @@ static uint8_t *slurp(const char *path, long *size)
 }
 
 /* the VIV under dir: loose, else in a disc image's data track (the disc's file may sit in a folder) */
+/* the bank just read is NHL 95 PC's (its goal call's clips: "goalnum.cor"), not another game's XBRUCE2.VIV: NHL 94 PC's (an
+ * NHL94PC folder beside the program, for the centre ice logos) has its own words ("NUMBER.MSC", "ONE.BRU", "MTL.CTY"), none of
+ * which this file says, so every clip would be missing and nothing heard. Not one: the clips are let go and the search goes on */
+static int bank_95(const char *where)
+{
+    struct clip key;
+    memcpy(key.name, "GOALNUM.COR", 12);
+    if (A.nclips && bsearch(&key, A.clips, (size_t)A.nclips, sizeof *A.clips, clip_cmp)) return 1;
+    fprintf(stderr, "Rink announcer: %s is not NHL 95 PC's (%d clips, no goalnum.cor: NHL 94 PC's?), skipped\n", where, A.nclips);
+    for (int i = 0; i < A.nclips; i++) free(A.clips[i].pcm);
+    free(A.clips);
+    A.clips = NULL;
+    A.nclips = 0;
+    return 0;
+}
+
 static int find_in(const char *dir)
 {
     static char list[LISTMAX][PATHMAX];
@@ -231,6 +247,7 @@ static int find_in(const char *dir)
             uint8_t *b = slurp(list[i], &size);
             int ok = b && parse(b, size);
             free(b);
+            if (ok && !bank_95(list[i])) ok = 0;
             if (ok) {
                 char *bar = strdup(list[i]);                   /* (Ron Barr's, beside it, for the highlight lines) */
                 if (bar) {
@@ -259,6 +276,7 @@ static int find_in(const char *dir)
                     long size = ob_cd_read_file(cd, ob_cd_file_name(cd, f), &b);
                     int ok = size > 0 && parse(b, size);
                     free(b);
+                    if (ok && !bank_95(list[i])) ok = 0;
                     if (ok)
                         for (int f2 = 0; ob_cd_file_name(cd, f2); f2++)
                             if (ieq(base_name(ob_cd_file_name(cd, f2)), "XRBARR2.VIV")) {
