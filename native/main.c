@@ -562,7 +562,7 @@ static uint16_t script_buttons(int pad, long frame)
 }
 static long script_reset = -1;          /* alone: the frame a script's RESET was given for (the console powers on again at its wait) */
 
-/* HOLDTEST=goal:FRAME,pen:FRAME,fight:FRAME (a headless run): at that vblank in a game in play the puck is put into a net (",away": the other), a penalty queued on
+/* HOLDTEST=goal:FRAME,pen:FRAME,fight:FRAME (a headless run; HOLDFIGHTAT=X,Y puts the fight there): at that vblank in a game in play the puck is put into a net (",away": the other), a penalty queued on
  * a home skater, or a home and a visiting skater put together for a fight (checkfight; with --rule fighting=2 it always starts),
  * and every change of the stoppage wait is logged with its frame: tests the announcer and the face off wait
  * (mods/hold.c) at the game's own call sites. */
@@ -587,6 +587,7 @@ static void holdtest_frame(void)
     if (holdtest_fight >= 0 && now >= holdtest_fight && g.gmode == 0) {      /* (fight:FRAME: a home and a visiting skater collide hard (with --rule fighting=2, NHL 92's roll, always a fight)) */
         struct SortObj *a = sortobj_at(team_struct(0)->tmsort) + 2, *b = sortobj_at(team_struct(1)->tmsort) + 2;
         holdtest_fight = -1;
+        if (getenv("HOLDFIGHTAT")) { int fx, fy; if (sscanf(getenv("HOLDFIGHTAT"), "%d,%d", &fx, &fy) == 2) { a->Xpos = (int16_t)fx; a->Ypos = (int16_t)fy; } }   /* (HOLDFIGHTAT=X,Y: the fight there) */
         b->Xpos = (int16_t)(a->Xpos + 12); b->Ypos = a->Ypos;
         a->impact = b->impact = 0x7FFF;
         fprintf(stderr, "holdtest: frame %d fight forced (%d against %d)\n", now, a->SCnum, b->SCnum);

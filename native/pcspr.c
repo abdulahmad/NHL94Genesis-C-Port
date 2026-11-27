@@ -672,7 +672,17 @@ static void ref_live(void)
         if (R.wasfo) { R.wasfo = 0; R.drop = 24; }                           /* (the puck is dropped: the referee's drop) */
         int rx = R.x / 256, ry = R.y / 256, tx, ty;
         int ax = px < 0 ? -px : px, ay = py < 0 ? -py : py;
-        if (ax < 0x32 && ay > 0xAC && ay < 0xE8) { tx = rx > 0 ? 0x46 : -0x46; ty = py > 0 ? 0xED : -0xED; }          /* behind the net */
+        if (pk->pflags2 & (1 << pf2fight)) {                                                                        /* a fight: watching it from 50h (NHL 93's assfwatch), */
+            int fx_ = (int16_t)g.xc1, fy_ = (int16_t)g.yc1, gx = rx - fx_, gy = ry - fy_;                           /* never between the two (mods/referee.c) */
+            double gl = sqrt((double)gx * gx + (double)gy * gy);
+            if (gl < 1) { gx = fx_ > 0 ? -1 : 1; gy = 0; gl = 1; }
+            tx = fx_ + (int)(gx * 0x50 / gl); ty = fy_ + (int)(gy * 0x50 / gl);
+            if (tx > 0x7E || tx < -0x7E) {                                                                          /* (the boards: along them, 50h off) */
+                tx = tx > 0 ? 0x7E : -0x7E;
+                double r2 = 0x50 * 0x50 - (double)(tx - fx_) * (tx - fx_);
+                ty = fy_ + (gy < 0 ? -1 : 1) * (int)(r2 > 0 ? sqrt(r2) : 0);
+            }
+        } else if (ax < 0x32 && ay > 0xAC && ay < 0xE8) { tx = rx > 0 ? 0x46 : -0x46; ty = py > 0 ? 0xED : -0xED; }   /* behind the net */
         else if (ax > 0x62 && ay > 0x80) { tx = rx > 0 ? 0x6A : -0x6A; ty = py > 0 ? 0xE8 : -0xE8; }              /* in a corner */
         else { tx = rx > 0 ? 0x7C : -0x7C; ty = (ry - cy < 0 ? cy - ry : ry - cy) > 0x32 ? cy : ry; }          /* beside the play */
         int dx = tx * 256 - R.x, dy = ty * 256 - R.y;
@@ -698,7 +708,7 @@ static void ref_live(void)
     if (getenv("PCREF_AT")) { int ax, ay; if (sscanf(getenv("PCREF_AT"), "%d,%d", &ax, &ay) == 2) { R.sx = ax; R.sy = ay; } }   /* (a test: the referee put there) */
     R.sy = y;
     R.valid = 1;
-    if (getenv("PCREF_LOG") && (!(g.Vcount & 63) || getenv("PCREF_ALL"))) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos);
+    if (getenv("PCREF_LOG") && (!(g.Vcount & 63) || getenv("PCREF_ALL"))) fprintf(stderr, "ref: rink %d,%d screen %d,%d dir %d t %d fo %d puck %d,%d view %d,%d vblank %u\n", R.x / 256, R.y / 256, R.sx, R.sy, R.dir, R.t, fo, px, py, (int16_t)g.Hpos, (int16_t)g.Vpos, (unsigned)g.Vcount);
 }
 
 /* The instant replay: the cartridge has no referee in its recorded frames, so the picture keeps its own beside them. Each tick of the game

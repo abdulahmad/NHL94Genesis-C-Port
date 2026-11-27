@@ -156,6 +156,7 @@ static void pair(struct SortObj *o, struct SortObj *p, int16_t x, int16_t dy)
 void referee_cx(int16_t x, int16_t y, struct SortObj *o)
 {
     if (rx.mode != 2 || !active()) return;
+    if (o->pflags2 & (1 << pf2fight)) return;                    /* (a fight is the two fighters': he never comes between them) */
     int16_t dy = (int16_t)(ref.Ypos - y);
     if (dy > 0x10 || dy < -0x10) return;
     ref.weight = REF_WEIGHT;
@@ -167,6 +168,8 @@ void referee_puck(struct SortObj *puck)
 {
     if (rx.mode != 2 || !active()) return;
     if ((int16_t)puck_carrier() >= 0) return;                    /* (a carried puck goes where its carrier takes it) */
+    if (g.gmode & (1 << gmclock)) return;                         /* (a dead puck is not played: the PC's referee picks it up, here the walk to the dot,
+                                                                     mods/hold.c; bounced off him every 8 frames it went along at his feet) */
     if (ref.nopuck[0]) return;
     int16_t d0 = (int16_t)(ref.Xpos - puck->Xpos), d1 = (int16_t)(ref.Ypos - puck->Ypos);
     if (d0 > 8 || d0 < -8 || d1 > 8 || d1 < -8) return;
@@ -184,6 +187,69 @@ void referee_puck(struct SortObj *puck)
     puckflip(d0, puck);
     if (logging()) fprintf(stderr, "referee: the puck bounces off him at %d,%d, now %d,%d (vblank %u)\n", ref.Xpos, ref.Ypos, puck->Xvel, puck->Yvel, (unsigned)g.Vcount);
     if (puck->Zpos > 0xC && (uint32_t)((int32_t)vx * vx + (int32_t)vy * vy) > 0x9000000) fall();
+}
+
+/* A fight (mods/fight.c): the players not in it watch from 50h away (NHL 93's assfwatch: a spot 50h from the fight, xc1 / yc1, on
+ * the line from it to them, at most 7Eh across). He does the same (where the boards cut that line, along them, 50h off), so he never stands between the two (the beside the play spot is
+ * at the boards, at the view's y: a fight along the boards had him in the middle of it) */
+static void fight_spot(int16_t *tx, int16_t *ty)
+{
+    int16_t fx = (int16_t)g.xc1, fy = (int16_t)g.yc1;
+    int32_t dx = ref.Xpos - fx, dy = ref.Ypos - fy;
+    if (!dx && !dy) dx = fx > 0 ? -1 : 1;                         /* (on the spot: away from the boards) */
+    uint32_t d = isqrt64((uint64_t)(dx * dx + dy * dy));
+    if (!d) d = 1;
+    int32_t x = dx * 0x50 / (int32_t)d + fx, y = dy * 0x50 / (int32_t)d + fy;
+    if (x > 0x7E || x < -0x7E) {                                  /* (the boards: along them instead, still 50h off) */
+        x = x > 0 ? 0x7E : -0x7E;
+        int32_t gx = x - fx, gy2 = 0x50 * 0x50 - gx * gx;
+        int32_t gy = gy2 > 0 ? (int32_t)isqrt64((uint64_t)gy2) : 0;
+        y = fy + (dy < 0 ? -gy : gy);
+    }
+    *tx = (int16_t)x; *ty = (int16_t)y;
+}
+
+/* 95 PC's EvadePlayers, which his assreffollow skates with (skateto's evade routine): every skater (not the fighters, and not one out
+ * of play) and the puck, their gaps to him a little ahead (the places plus the high bytes of the speeds); the nearest within 28h on
+ * both axes (the puck only when no skater is within 50h) turns his way aside. The PC's turns him to one of 8 directions from that
+ * gap by where he is on the rink; here the speed he wants (wx, wy, at most m) is turned to the side of the gap and away from it, and
+ * kept off the boards he stands by. Integers only: every machine of a session moves him alike */
+#define EVADE_GAP 0x28
+static void evade(int32_t *wx, int32_t *wy, int32_t m)
+{
+    int best = 0x64, bx = 0, by = 0;
+    for (int i = 0; i <= puckscnum; i++) {
+        if (i >= 12 && i != puckscnum) continue;
+        const struct SortObj *q = sortobj(i);
+        if (i < 12 && (q->position < 0 || (q->pflags & (1 << pfnc)) || (q->pflags2 & ((1 << 5) | (1 << pf2fight))))) continue;
+        if (i == puckscnum && ((int16_t)puck_carrier() >= 0 || best <= 0x50)) continue;
+        int gx = ref.Xpos + (ref.Xvel >> 8) - q->Xpos - (q->Xvel >> 8);
+        int gy = ref.Ypos + (ref.Yvel >> 8) - q->Ypos - (q->Yvel >> 8);
+        if (gx > EVADE_GAP || gx < -EVADE_GAP || gy > EVADE_GAP || gy < -EVADE_GAP) continue;
+        int d = (gx < 0 ? -gx : gx) + (gy < 0 ? -gy : gy);
+        if (d >= best) continue;
+        best = d; bx = gx; by = gy;
+    }
+    if (best >= 0x64) return;
+    if (!bx && !by) bx = ref.Xpos > 0 ? -1 : 1;
+    uint32_t bl = isqrt64((uint64_t)((int64_t)bx * bx + (int64_t)by * by));
+    int32_t ux = (int32_t)((int64_t)bx * m / (int32_t)bl), uy = (int32_t)((int64_t)by * m / (int32_t)bl);   /* (away from it, at his top speed) */
+    int64_t ahead = (int64_t)*wx * -bx + (int64_t)*wy * -by;      /* (his way toward it) */
+    int32_t sx = ux, sy = uy;
+    if (ahead > 0) {                                              /* (it is in his way: round it, to the side it is not on) */
+        int32_t px = -*wy, py = *wx;
+        if ((int64_t)px * bx + (int64_t)py * by < 0) { px = -px; py = -py; }
+        uint32_t pl = isqrt64((uint64_t)((int64_t)px * px + (int64_t)py * py));
+        if (pl) { px = (int32_t)((int64_t)px * m / (int32_t)pl); py = (int32_t)((int64_t)py * m / (int32_t)pl); }
+        sx = (px + ux) / 2; sy = (py + uy) / 2;
+    } else {                                                      /* (beside or behind him: on his way, and a step off it) */
+        sx = (*wx + ux) / 2; sy = (*wy + uy) / 2;
+    }
+    if ((ref.Xpos >= 0x76 && sx > 0) || (ref.Xpos <= -0x76 && sx < 0)) { sy += (sy >= 0 ? 1 : -1) * (sx < 0 ? -sx : sx); sx = 0; }   /* (not into the boards: along them) */
+    if ((ref.Ypos >= 0x100 && sy > 0) || (ref.Ypos <= -0x100 && sy < 0)) { sx += (sx >= 0 ? 1 : -1) * (sy < 0 ? -sy : sy); sy = 0; }
+    uint32_t l = isqrt64((uint64_t)((int64_t)sx * sx + (int64_t)sy * sy));
+    if ((int32_t)l > m) { sx = (int32_t)((int64_t)sx * m / (int32_t)l); sy = (int32_t)((int64_t)sy * m / (int32_t)l); }
+    *wx = sx; *wy = sy;
 }
 
 /* once a pass, after the skaters (updateplayers) */
@@ -226,7 +292,8 @@ void referee_update(void)
     } else {
         int16_t rx_ = ref.Xpos, ry = ref.Ypos, tx, ty;
         int16_t ax = px < 0 ? (int16_t)-px : px, ay = py < 0 ? (int16_t)-py : py;
-        if (ax < 0x32 && ay > 0xAC && ay < 0xE8) { tx = rx_ > 0 ? 0x46 : -0x46; ty = py > 0 ? 0xED : -0xED; }       /* behind the net */
+        if (pk->pflags2 & (1 << pf2fight)) fight_spot(&tx, &ty);                                                /* a fight: watching it */
+        else if (ax < 0x32 && ay > 0xAC && ay < 0xE8) { tx = rx_ > 0 ? 0x46 : -0x46; ty = py > 0 ? 0xED : -0xED; }  /* behind the net */
         else if (ax > 0x62 && ay > 0x80) { tx = rx_ > 0 ? 0x6A : -0x6A; ty = py > 0 ? 0xE8 : -0xE8; }           /* in a corner */
         else { tx = rx_ > 0 ? 0x7C : -0x7C; ty = (ry - cy < 0 ? cy - ry : ry - cy) > 0x32 ? cy : ry; }       /* beside the play */
         int32_t dx = (int32_t)(((uint32_t)(uint16_t)tx << 16)) - POS32(ref.Xpos, ref.Xfrac);
@@ -234,6 +301,7 @@ void referee_update(void)
         int32_t wx = dx / (12 * K), wy = dy / (12 * K), m = 2 * 65536 / K;   /* (the speed he wants: easing in, at most 2 a frame) */
         uint32_t l = isqrt64((uint64_t)((int64_t)wx * wx + (int64_t)wy * wy));
         if ((int32_t)l > m) { wx = (int32_t)((int64_t)wx * m / (int32_t)l); wy = (int32_t)((int64_t)wy * m / (int32_t)l); }
+        evade(&wx, &wy, m);                                       /* (out of the skaters' way, and the puck's: 95 PC's EvadePlayers) */
         ref.Xvel = (int16_t)(ref.Xvel + (wx - ref.Xvel) / 6);
         ref.Yvel = (int16_t)(ref.Yvel + (wy - ref.Yvel) / 6);
     }
@@ -252,7 +320,7 @@ void referee_update(void)
     g.collflag = 0;
     for (int i = 0; i < 12; i++) {                                /* (checkplcoll for SortCords 10h) */
         struct SortObj *q = sortobj(i);
-        if (q->position < 0 || (q->pflags & (1 << pfnc)) || (q->pflags2 & (1 << 5))) continue;
+        if (q->position < 0 || (q->pflags & (1 << pfnc)) || (q->pflags2 & ((1 << 5) | (1 << pf2fight)))) continue;
         int16_t gy = (int16_t)(q->Ypos - ref.Ypos);
         if (gy > 0x10 || gy < -0x10) continue;
         pair(&ref, q, ref.Xpos, gy);
