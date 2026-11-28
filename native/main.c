@@ -59,7 +59,10 @@
  * machines; pads 3 or 4 played: 4 Way Play), --net-sim a simulated network for tests. --hashes FILE (headless) writes a line a frame
  * at its wait, the frame and hashes of work RAM, the VDP, Z80 RAM and save RAM, then the simulation's
  * (mdrt_sim_hash: all a state holds, which netplay's desync checks compare), frames a rollback plays
- * again included (tools/netplay_check.py compares the last of each with a solo run's).
+ * again included (tools/netplay_check.py compares the last of each with a solo run's). --play-hashes FILE (headless) writes a
+ * line a frame of the play alone: the frame, a hash of the rink's objects (all but their pictures: attribute, frame, oldframe and
+ * their sprites' VRAM), the teams and the clock, and the game's camera (Hpos, Vpos), none of which the picture changes (16:9's
+ * wide picture plays as 4:3 does: netplay_check.py's wide).
  * Headless, the save RAM is a new cartridge's unless --sram FILE names one (read at power on and
  * written back if the game changed it); a player's out/nhl94.srm is never touched otherwise.
  * The setup screen's options (period length, penalties, line changes ...) are kept between runs in the
@@ -121,6 +124,7 @@ static long restart_frame = -1;         /* --restart-at */
 static long load_at_frame = -1, net_load_frame = -1;   /* --load-at, --net-load */
 static const char *load_at_path, *net_load_path;
 static FILE *hashes;                    /* --hashes: a line a frame at its wait, frames played again included */
+static FILE *play_hashes;               /* --play-hashes: the same frames, the play alone */
 static int restarting;
 static long run_offset;                 /* the game's frames less the console's, from the game's first frame */
 static int run_known;                   /* (run_offset taken, since native_game began) */
@@ -796,6 +800,16 @@ void native_frame_done(long frame, int wait)
                 (unsigned long long)fnv(FNV0, z80_ram, 0x2000), (unsigned long long)fnv(FNV0, s->bytes, s->size),
                 (unsigned long long)mdrt_sim_hash(native_m));
     }
+    if (play_hashes) {                                    /* (the play: the objects but for their pictures, the teams, the clock, the camera) */
+        uint64_t h = FNV0;
+        for (int i = 0; i < 16; i++) {
+            const uint8_t *o = (const uint8_t *)sortobj(i);
+            size_t at = offsetof(struct SortObj, Ypos);   /* (Xpos and Xfrac, then from Ypos on: not attribute to VRchar) */
+            h = fnv(fnv(h, o, offsetof(struct SortObj, attribute)), o + at, sizeof(struct SortObj) - at);
+        }
+        h = fnv(fnv(h, (const uint8_t *)&g.teams, sizeof g.teams), (const uint8_t *)&g.gameclock, sizeof g.gameclock);
+        fprintf(play_hashes, "%ld %016llx %d %d\n", run, (unsigned long long)h, (int16_t)g.Hpos, (int16_t)g.Vpos);
+    }
     for (int i = 0; i < nwatch; i++) {
         uint16_t v = r16(ram_at(watch[i]), 0);
         if (v != watched[i] || frame == 1) printf("nhl94: frame %ld: $%06X = $%04X\n", frame, (unsigned)watch[i], v);
@@ -894,7 +908,7 @@ int main(int argc, char **argv)
     int sram_given = 0, state_given = 0;
     const char *setup_opts = NULL;                       /* --setup-options FILE: the setup screen's options kept there (the window: out/setup.ini beside it) */
     int scale = 0, aspect = 0, headless = 0;
-    const char *hashes_path = NULL;
+    const char *hashes_path = NULL, *play_hashes_path = NULL;
     mdrt_net_options netopt;
     char err[256];
     mdrt_net_options_init(&netopt);
@@ -959,6 +973,7 @@ int main(int argc, char **argv)
             if (why) { fprintf(stderr, "--rule %s: %s\n", argv[i], why); return 2; }
         }
         else if (!strcmp(argv[i], "--hashes") && i + 1 < argc) hashes_path = argv[++i];
+        else if (!strcmp(argv[i], "--play-hashes") && i + 1 < argc) play_hashes_path = argv[++i];
         else if (!strcmp(argv[i], "--setup-options") && i + 1 < argc) setup_opts = argv[++i];
         else if (!strcmp(argv[i], "--rosters-line")) rosters_line = 1;   /* (headless: the setup menu's Rosters line, a change there powers on again with them) */
         else if (!strcmp(argv[i], "--state") && i + 1 < argc) { state_file = argv[++i]; state_given = 1; }
@@ -1001,7 +1016,7 @@ int main(int argc, char **argv)
                             "       [--rule NAME=VALUE ...] (the game rules: native/rules.c) [--rosters DIR] (rosters.c)\n"
                             "       [--fight-ratings [@sega-cd | DIR]] (each skater's fight rating: fightrate.c)\n"
                             "       [--check-rosters DIR] [--export-rosters DIR] [--extract-rom HACK DIR] [--pack-rosters DIR FILE.zip]\n"
-                            "       [--art-check | --art-map] (the art map: art.c) [--hashes FILE]\n"
+                            "       [--art-check | --art-map] (the art map: art.c) [--hashes FILE] [--play-hashes FILE]\n"
                             "       [--smooth | --original | --speed smooth|original] (Original: the cartridge's slowdown)\n"
                             "       %s (netplay: net.c)\n", argv[0], MDRT_NET_USAGE);
             return 2;
@@ -1151,6 +1166,7 @@ int main(int argc, char **argv)
     if (segacd_sfx_flag) { segacd_set_sfx(1); segacd_sfx_wait(); }
     if (golden_path && !(golden = fopen(golden_path, "w"))) { fprintf(stderr, "cannot write %s\n", golden_path); return 1; }
     if (hashes_path && !(hashes = fopen(hashes_path, "w"))) { fprintf(stderr, "cannot write %s\n", hashes_path); return 1; }
+    if (play_hashes_path && !(play_hashes = fopen(play_hashes_path, "w"))) { fprintf(stderr, "cannot write %s\n", play_hashes_path); return 1; }
     c.platform = (mdrt_platform){ .present = live_shots ? live_present : golden ? golden_present : NULL, .audio = wav_audio };
     if (script_requests) c.platform.requests = script_request;
     mdrt *m = mdrt_new(&c);
@@ -1191,6 +1207,7 @@ int main(int argc, char **argv)
     if (wav) { wav_header(c.audio_rate); fclose(wav); }
     if (golden) fclose(golden);
     if (hashes) fclose(hashes);
+    if (play_hashes) fclose(play_hashes);
     mdrt_free(m);
     if (art_check) {
         printf("art check: %lu bytes taken by DMA from the game's data, %lu in no piece of art (the first at $%06X), %d pieces overlapping\n",

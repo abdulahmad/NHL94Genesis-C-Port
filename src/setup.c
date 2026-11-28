@@ -284,8 +284,8 @@ void view_rink_resume(void)
 {
     if (!view_wide()) return;
     view_rink_mode();
-    if ((int16_t)g.Hpos > VIEW_HPOS) g.Hpos = VIEW_HPOS;  /* (and the camera within the wide rink) */
-    if ((int16_t)g.Hpos < -VIEW_HPOS) g.Hpos = (uint16_t)-VIEW_HPOS;
+    if ((int16_t)g.Hpos > view_hpos()) g.Hpos = (uint16_t)view_hpos();   /* (and the camera within the game's reach: wide play's, or the cartridge's) */
+    if ((int16_t)g.Hpos < -view_hpos()) g.Hpos = (uint16_t)-view_hpos();
     DoFill(0x20, (uint16_t)(g.maps[0].vram + 0x40), 0x7FF);
     DoFill(0x20, (uint16_t)(g.maps[0].vram + 0xC0), 0x7FF);
 }

@@ -1,10 +1,15 @@
 /* The wide view (RULE_VIEW): the rink 320 pixels wide (40 columns) instead of the cartridge's
  * 256. What the game places for 256 (plane A's overlays and scoreboard, the sprites) moves
  * VIEW_SHIFT to the right, to the middle; the rink, 384 pixels wide, shows all but 64 of them,
- * so the camera moves VIEW_HPOS either way instead of $3C; and players count as off screen
- * VIEW_SHIFT further out. The pause screen (the window plane, which cannot scroll) is 256 wide as
- * on the cartridge, as are the screens away from the rink. A rule, not a setting of the window:
- * the computer's players and a pad's goalie go by what is on screen. */
+ * so the picture's camera (view_cam) goes VIEW_HPOS either way instead of $3C. The pause screen
+ * (the window plane, which cannot scroll) is 256 wide as on the cartridge, as are the screens away
+ * from the rink.
+ *
+ * RULE_VIEW 1 (what 16:9 Widescreen gives) is the picture alone: the game plays by the cartridge's
+ * 256, its camera (Hpos) going $3C either way and its players off screen where the cartridge's
+ * are (a pad's goalie taken as on the cartridge); only the picture is wide. RULE_VIEW 2 ("wide
+ * play", an option of its own) also plays by the 320: the camera goes VIEW_HPOS, and players
+ * count as off screen VIEW_SHIFT further out. */
 #pragma once
 #include "game.h"
 #include "rules.h"
@@ -13,11 +18,24 @@
 #define VIEW_SHIFT 32
 #define VIEW_HPOS 0x20
 
+/* the picture is the wide view's (RULE_VIEW 1 or 2) */
 static inline int view_wide(void) { return RULE(RULE_VIEW) != 0; }
-/* the extra room each side, for what counts as on screen */
+/* the game plays by the wide view (RULE_VIEW 2): its camera's reach and what counts as on screen */
+static inline int view_play_wide(void) { return RULE(RULE_VIEW) == 2; }
+/* the picture's extra room each side, for what is drawn (sprites, the crowd, the arrows) */
 static inline int16_t view_more(void) { return view_wide() ? VIEW_SHIFT : 0; }
-/* the camera's reach either way (Hpos) */
-static inline int16_t view_hpos(void) { return view_wide() ? VIEW_HPOS : 0x3C; }
+/* the game's extra room each side, for what counts as on screen in play (a pad's goalie) */
+static inline int16_t view_play_more(void) { return view_play_wide() ? VIEW_SHIFT : 0; }
+/* the game's camera's reach either way (Hpos): the cartridge's $3C unless the game plays by the wide view */
+static inline int16_t view_hpos(void) { return view_play_wide() ? VIEW_HPOS : 0x3C; }
+/* the picture's camera: the game's Hpos, kept within the wide picture's reach (VIEW_HPOS) in the wide view.
+ * What is drawn on the rink goes by this; what is played, by Hpos */
+static inline int16_t view_cam(void)
+{
+    int16_t h = (int16_t)g.Hpos;
+    if (!view_wide()) return h;
+    return h > VIEW_HPOS ? VIEW_HPOS : h < -VIEW_HPOS ? (int16_t)-VIEW_HPOS : h;
+}
 /* the shift of what is placed for 256: while the rink is up and not paused */
 static inline int16_t view_shift(void)
 {

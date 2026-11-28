@@ -303,7 +303,8 @@ void adda43(uint32_t *frame)
 }
 
 /* replay94.asm:UpdateCameraPos. Camera object a5 = object a3's x / y (negated for the reverse
- * angle), Hpos / Vpos clamped to the rink (the wide view: Hpos to VIEW_HPOS, the reach of its 320 picture). */
+ * angle), Hpos / Vpos clamped to the rink (wide play: Hpos to VIEW_HPOS, the reach of its 320 picture; the wide picture
+ * alone keeps the cartridge's, and view_cam keeps the picture within it). */
 void UpdateCameraPos(const struct RinkObj *o, struct RinkObj *cam)
 {
     int16_t d0 = o->Xpos, d1 = o->Ypos;
@@ -311,7 +312,7 @@ void UpdateCameraPos(const struct RinkObj *o, struct RinkObj *cam)
     cam->Xpos = d0;
     if (g.sflags4 & HI(7)) d1 = (int16_t)-d1;
     cam->Ypos = d1;
-    if (!(d0 < view_hpos())) d0 = view_hpos();           /* (the wide view's rink: less far, as ClampReplayView) */
+    if (!(d0 < view_hpos())) d0 = view_hpos();           /* (wide play's rink: less far, as ClampReplayView) */
     if (!(d0 > -view_hpos())) d0 = (int16_t)-view_hpos();
     g.Hpos = (uint16_t)d0;
     if (!(d1 < 0x100)) d1 = 0x100;
@@ -406,7 +407,7 @@ uint16_t RestoreReplayFrame(uint32_t frame, struct RinkObj *cam)
 /* replay94.asm:ClampReplayView. Clamp Hpos to -$3C..$3C and Vpos to -$C8..$100. */
 void ClampReplayView(void)
 {
-    if (view_hpos() < (int16_t)g.Hpos) g.Hpos = (uint16_t)view_hpos();   /* (the wide view's rink: less far) */
+    if (view_hpos() < (int16_t)g.Hpos) g.Hpos = (uint16_t)view_hpos();   /* (wide play's rink: less far) */
     else if (!(-view_hpos() <= (int16_t)g.Hpos)) g.Hpos = (uint16_t)-view_hpos();
     if (0x100 < (int16_t)g.Vpos) g.Vpos = 0x100;
     else if (!(-0xC8 <= (int16_t)g.Vpos)) g.Vpos = (uint16_t)-0xC8;

@@ -100,7 +100,7 @@ static void sso_arrow(const struct RinkObj *a0, struct SpriteHead *a3, uint16_t 
     if (g.sflags & HI(sfhor)) {
         int16_t t = d0; d0 = (int16_t)-d1; d1 = (int16_t)(t - 0xC5);
     } else {
-        d0 = (int16_t)(d0 - (int16_t)g.Hpos);
+        d0 = (int16_t)(d0 - view_cam());                  /* (the picture's camera: view.h) */
         d1 = (int16_t)(d1 - (int16_t)g.Vpos);
     }
     unsigned d2 = 0;
@@ -241,7 +241,7 @@ void setvideo(void)
 void updatescroll(struct Vid *v)
 {
     if (g.sflags & HI(sfhor)) return;
-    g.Hscroll = (uint16_t)(-0x40 - (int16_t)g.Hpos + view_shift());
+    g.Hscroll = (uint16_t)(-0x40 - view_cam() + view_shift());   /* (the picture's camera: view.h) */
     int16_t d1 = (int16_t)g.Vpos;
     g.Vscroll = (uint16_t)-d1;
     int16_t d4 = (int16_t)g.Oldrow;
@@ -360,7 +360,7 @@ void showcrowd(struct Vid *v)
 {
     if (g.sflags4 & HI(4)) return;
     const uint8_t *a1 = rom_ptr(ART(CrowdFrameList) + rd32(rom_ptr(ART(CrowdFrameList)) + 4));
-    int16_t d4 = (int16_t)g.Hpos, d5 = (int16_t)g.Vpos;
+    int16_t d4 = view_cam(), d5 = (int16_t)g.Vpos;   /* (the picture's camera: view.h) */
     if (g.sflags & HI(sfhor)) { d4 = -0x40; d5 = 0x100; }
     uint8_t pb = (uint8_t)(g.PBnum >> 8);
     for (int pass = 0; pass < 2; pass++) {
@@ -620,7 +620,7 @@ void find3d(int16_t *x, int16_t *y, int16_t z)
     if (g.sflags & HI(sfhor)) {
         int16_t t = d0; d0 = (int16_t)-d1; d1 = (int16_t)(t - 0xC5);
     } else {
-        d0 = (int16_t)(d0 - (int16_t)g.Hpos);
+        d0 = (int16_t)(d0 - view_cam());                  /* (the picture's camera: view.h) */
         d1 = (int16_t)(d1 - (int16_t)g.Vpos);
     }
     if (d0 > 0x90 + view_more() || d0 < -0x90 - view_more()) { *x = d0; *y = 0x4E20; return; }

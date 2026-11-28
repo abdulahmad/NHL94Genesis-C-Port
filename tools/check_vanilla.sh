@@ -3,15 +3,14 @@
 #   tools/check_vanilla.sh [--no-build]
 # Fails when
 #   1. src/ (the cartridge's game) includes a host header (native/, Overbar, PulseMan, SDL) or reads a setting
-#      (getenv, the settings file) outside the mod files still listed in MOD_FILES below;
+#      (getenv, the settings file);
 #   2. src/ reads a rule other than through RULE() (src/rules.h), which the vanilla build compiles out;
 #   3. make VANILLA=1 nhl94 (the game with the extras left out) does not build.
-# MOD_FILES are customizations that still live in src/ and are moving out to their own layer; the list only shrinks.
+# The customizations live in mods/ (docs/VANILLA.md), none in src/ any more: every file of src/ is checked.
 set -uo pipefail
 cd "$(dirname "$0")/.."
-MOD_FILES='mods/hold.c'
 bad=0
-game=$(ls src/*.c src/*.h | grep -vxF -f <(tr ' ' '\n' <<< "$MOD_FILES"))
+game=$(ls src/*.c src/*.h)
 if grep -nE '#include *[<"](SDL|native\.h|overbar/|mdrt/|optionsui\.h|announcer\.h|pcspr\.h|pcsfx\.h|segacd\.h|hats\.h|wide\.h|whiteice\.h|stands\.h|cardcolor)' $game; then
     echo "vanilla: src/ includes a host header (above)"; bad=1
 fi

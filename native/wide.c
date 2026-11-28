@@ -536,16 +536,19 @@ const mdrt_vdp *wide_windows(const mdrt_vdp *v, int *from, int *to)
     return &W;
 }
 
-/* ---- the wide rink on a 4:3 screen (a session's, played wide for a 16:9 player) ------------------------
- * The middle 256 of the 320, panning with a camera of the picture's own that follows the game's target
- * (xc1) as the cartridge's does (checkwindow: a dead zone of $28, a 1/16 step, its reach $3C), kept inside
- * the wide picture. Plane A (the overlays and the boxes, which the wide view places for 256 and shifts) is
- * put back where the cartridge has it: 32 in, and the boxes' rows from the screen's edges. Only the
- * picture: the game plays the wide rink as every machine does */
+/* ---- the wide rink on a 4:3 screen (a session's, drawn wide for a 16:9 player) -------------------------
+ * The middle 256 of the 320. With the wide picture alone (RULE_VIEW 1) the game's camera is the cartridge's,
+ * so the 256 shown is the cartridge's own view: Hpos, which is never more than $3C - VIEW_HPOS from the
+ * picture's camera (view_cam). In wide play (RULE_VIEW 2) the game's camera goes only VIEW_HPOS: the 256
+ * pans with a camera of its own that follows the game's target (xc1) as the cartridge's does (checkwindow:
+ * a dead zone of $28, a 1/16 step, its reach $3C), kept inside the wide picture. Plane A (the overlays and
+ * the boxes, which the wide view places for 256 and shifts) is put back where the cartridge has it: 32 in,
+ * and the boxes' rows from the screen's edges. Only the picture: every machine plays the same game */
 static int cam, cam_known;
 void wide_crop_follow(void)
 {
-    int hp = (int16_t)g.Hpos, t = (int16_t)g.xc1;
+    int hp = view_cam(), t = (int16_t)g.xc1;
+    if (!view_play_wide()) { cam = (int16_t)g.Hpos; cam_known = 1; return; }   /* (the picture alone: the game's camera is the cartridge's) */
     if (!cam_known) { cam = hp; cam_known = 1; }
     int d = t - cam, to = cam;
     if (d > 0x28) to = t - 0x28;
@@ -563,7 +566,7 @@ int wide_crop(const mdrt_vdp *v, const uint32_t *pic, int h, int pitch, uint32_t
         for (int y = 0; y < h; y++) memcpy(out + (long)y * opitch, pic + (long)y * pitch + 32, 256 * 4);
         return 256;
     }
-    int hp = (int16_t)g.Hpos;
+    int hp = view_cam();                                  /* (the wide picture's middle) */
     if (!cam_known) wide_crop_follow();
     int x0 = 32 + cam - hp, boxes = view_boxes();
     static uint8_t idx[WIDE_MAX_W], am[WIDE_MAX_W];

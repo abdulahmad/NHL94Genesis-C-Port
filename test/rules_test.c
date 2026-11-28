@@ -10,6 +10,7 @@
 #include "symbols_gen.h"
 #include "anim_gen.h"
 #include "native.h"
+#include "view.h"
 #include "../mods/anims.h"
 
 static int checks, fails;
@@ -796,6 +797,128 @@ static void moves(void)
     classic_rules();
 }
 
+/* the host's side of the rules (native/rules.c, linked in): the menus' defaults, the Widescreen setting and the state's part. Its
+ * host calls stand in here: no netplay session unless net_on, the cartridge's roster set */
+static int net_on;
+int native_net_on(void) { return net_on; }
+int native_net_session(uint8_t *v, int *sent, int *host) { (void)v; (void)sent; (void)host; return 0; }
+const char *native_net_identity(const char *setup) { (void)setup; return ""; }
+void clock_set_original(int on) { (void)on; }
+int rosters_list(const char *const **names, const char *const **labels) { static const char *const n[1] = { "cartridge" }; *names = n; *labels = n; return 1; }
+const char *rosters_list_dir(int i, char *out, size_t size) { (void)i; (void)out; (void)size; return NULL; }
+void rosters_next(const char *dir) { (void)dir; }
+int rosters_session_entry(void) { return 0; }
+uint64_t rosters_hash(void) { return 0; }
+const char *rosters_dir(void) { return ""; }
+int rosters_use(const char *dir, uint64_t hash) { (void)dir; (void)hash; return 0; }
+const char *rosters_error(void) { return ""; }
+
+/* every rule's default is the original's: a new install (settings.ini and the menus at their defaults) plays the cartridge's game,
+ * the rink announcer's timing ("talks over the face off") among them; Recommended and the other presets pick their own */
+static void defaults(void)
+{
+    for (int i = 0; i < RULE_COUNT; i++) {
+        if (rule_options[i].def != rule_classic[i]) printf("  %s defaults to %d\n", rule_options[i].key, rule_options[i].def);
+        CHECK(rule_options[i].def == rule_classic[i]);
+    }
+    CHECK(rule_options[RULE_ANNOUNCE].def == 0);
+    int v[RULE_COUNT];
+    for (int i = 0; i < RULE_COUNT; i++) v[i] = rule_options[i].def;
+    rules_next(v, NULL);
+    CHECK(rules_classic());
+    rules_power_on();
+    CHECK(!memcmp(rules, rule_classic, sizeof rules));
+}
+
+/* the wide view (src/view.h): 16:9 makes the picture wide (RULE_VIEW 1) and nothing of the play. The game's camera keeps the
+ * cartridge's reach ($3C) and a pad's goalie is off screen where the cartridge's is; the picture's camera (view_cam) stays within
+ * the wide picture. Wide play (2), an option of its own, plays by the 320, and 16:9 leaves it so. A state from before version 14,
+ * whose 1 was played by the wide view, loads as wide play */
+static void wide_view(void)
+{
+    int v[RULE_COUNT] = { 0 };
+    net_on = 0;
+    rules_next(v, NULL);
+    rules_widescreen(1);
+    rules_power_on();
+    CHECK(rules[RULE_VIEW] == 1 && view_wide() && !view_play_wide());
+    uint8_t sent[RULE_COUNT];
+    rules_next_send(sent);
+    CHECK(sent[RULE_VIEW] == 1);
+    v[RULE_VIEW] = 2;
+    rules_next(v, NULL);
+    rules_power_on();
+    CHECK(rules[RULE_VIEW] == 2 && view_play_wide());
+    rules_next_send(sent);
+    CHECK(sent[RULE_VIEW] == 2);
+    v[RULE_VIEW] = 0;
+    rules_next(v, NULL);
+    net_on = 1;                                            /* (a session: the host's settings say it) */
+    rules_power_on();
+    CHECK(rules[RULE_VIEW] == 0);
+    net_on = 0;
+    rules_widescreen(0);
+    rules_power_on();
+    CHECK(rules[RULE_VIEW] == 0);
+    CHECK(rules_arg("view=wide play") == NULL && rules_arg("view=wide") == NULL && rules_arg("view=3") != NULL && rules_arg("view=0") == NULL);
+
+    /* the game's camera: the target far to the right, the view followed until it stops */
+    static const int reach[3] = { 0x3C, 0x3C, VIEW_HPOS }, pic[3] = { 0x3C, VIEW_HPOS, VIEW_HPOS };
+    for (int view = 0; view < 3; view++) {
+        classic_rules();
+        rules[RULE_VIEW] = (uint8_t)view;
+        g.sflags |= HI(sfslock);
+        g.xc1 = 0x100; g.yc1 = 0; g.Hpos = 0; g.Vpos = 0;
+        for (int k = 0; k < 200; k++) checkwindow();
+        CHECK((int16_t)g.Hpos == reach[view] && view_cam() == pic[view]);
+        g.xc1 = (uint16_t)-0x100;
+        for (int k = 0; k < 400; k++) checkwindow();
+        CHECK((int16_t)g.Hpos == -reach[view] && view_cam() == -pic[view]);
+        g.sflags &= (uint16_t)~HI(sfslock);
+    }
+
+    /* a pad's goalie $80 right of the view's middle: off screen on the cartridge's 256 (the computer takes him over), on it in
+     * wide play's 320 */
+    for (int view = 0; view < 3; view++) {
+        classic_rules();
+        rules[RULE_VIEW] = (uint8_t)view;
+        struct SortObj *gk = sortobj(0);
+        memset(gk, 0, sizeof *gk);
+        gk->pflags = 1 << pfjoycon | 1 << pfalock;          /* (pfalock: no further than the test) */
+        gk->Xpos = 0x80; gk->Ypos = 0x100;                    /* (not in front of his net: no stoppage) */
+        g.Hpos = 0; g.Vpos = 0x100;
+        assgoaliectrl(&g.teams[0], gk);
+        CHECK(!(gk->pflags3 & (1 << pf3gctrl)) == (view == 2));
+    }
+    rules[RULE_VIEW] = 1;
+    CHECK(view_play_more() == 0 && view_more() == VIEW_SHIFT);
+    rules[RULE_VIEW] = 2;
+    CHECK(view_play_more() == VIEW_SHIFT && view_hpos() == VIEW_HPOS);
+    rules[RULE_VIEW] = 0;
+    CHECK(view_play_more() == 0 && view_more() == 0 && view_hpos() == 0x3C);
+
+    /* the state's part: version 14 keeps 1 and 2; version 13's 1 (the wide view played by) loads as 2 */
+    classic_rules();
+    hold_state_load(NULL);
+    referee_state_load(NULL, 0);
+    moves_state_load(NULL);
+    static uint8_t st[4096];
+    for (int view = 0; view < 3; view++) {
+        classic_rules();
+        rules[RULE_VIEW] = (uint8_t)view;
+        size_t n = rules_state_save(NULL, NULL);
+        CHECK(n <= sizeof st && rules_state_save(NULL, st) == n && st[0] == 14);
+        classic_rules();
+        CHECK(rules_state_load(NULL, st, n) == 0 && rules[RULE_VIEW] == view);
+        st[0] = 13;
+        classic_rules();
+        CHECK(rules_state_load(NULL, st, n) == 0 && rules[RULE_VIEW] == (view ? 2 : 0));
+    }
+    st[0] = 15;
+    CHECK(rules_state_load(NULL, st, rules_state_save(NULL, NULL)) < 0);
+    classic_rules();
+}
+
 int main(void)
 {
     const char *rom = getenv("NHL94_ROM");
@@ -815,6 +938,8 @@ int main(void)
     penalties();
     moves();
     ticker();
+    defaults();
+    wide_view();
     printf("rulestest: %d checks, %d failed\n", checks, fails);
     return fails != 0;
 }

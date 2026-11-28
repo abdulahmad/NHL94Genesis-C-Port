@@ -299,7 +299,8 @@ static int begin_match(char *err, size_t errsize)
         free(match_set);
         if (!(match_set = malloc(room_set_size))) { snprintf(err, errsize, "out of memory"); return -1; }
         memcpy(match_set, room_set, room_set_size);
-        match_set[6 + RULE_VIEW] = 1;                    /* (after "N94S", its version and the rules' count) */
+        if (!match_set[6 + RULE_VIEW]) match_set[6 + RULE_VIEW] = 1;   /* (after "N94S", its version and the rules' count: the wide picture,
+                                                                    * which changes nothing of the play; the host's wide play stays) */
         m.settings = match_set;
     }
     if (ob_net_match_begin(net, &m, err, (int)errsize)) return -1;

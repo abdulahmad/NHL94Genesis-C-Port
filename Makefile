@@ -39,9 +39,9 @@ build/captest: $(SRC) $(HDR) $(TESTSRC) test/replay.h test/ports.h
 	$(CC) $(CFLAGS) -Isrc -Itest -o $@ $(SRC) $(TESTSRC)
 
 # the game rules on the game's routines, RAM set up by hand (test/rules_test.c)
-build/rulestest: $(SRC) $(HDR) test/rules_test.c test/hal_null.c native/ratings.c
+build/rulestest: $(SRC) $(HDR) test/rules_test.c test/hal_null.c native/ratings.c native/rules.c
 	@mkdir -p build
-	$(CC) $(CFLAGS) -Isrc -Itest -Inative -I$(MDRT)/include -o $@ $(SRC) test/rules_test.c test/hal_null.c native/ratings.c
+	$(CC) $(CFLAGS) -Isrc -Itest -Inative -I$(MDRT)/include -o $@ $(SRC) test/rules_test.c test/hal_null.c native/ratings.c native/rules.c
 rulestest: build/rulestest
 	./build/rulestest
 build/fightratetest: test/fightrate_test.c native/fightrate.c native/fightrate.h native/fightrate_pim.inc
