@@ -51,8 +51,8 @@ enum {
                                  * shut), 2 NHL 95 Genesis's (A with the pad pulled back) */
     RULE_SHOTBLOCK,             /* blocking shots (mods/moves.c): 1 NHL 95 PC's (dives, slides and knee blocks), 2 NHL 95 Genesis's (the
                                  * kneeling block) */
-    RULE_GOALIE,                /* the goalie's PC animations (mods/goalie.c): 1 NHL 95 PC's saves and hop over the boards, 2 also
-                                 * NHL 96 Genesis's straight on blocks and low catches */
+    RULE_GOALIE,                /* the goalie's saves (mods/goalie.c): goaliesave by 1 NHL 95 PC's rules, 2 NHL 96 Genesis's, 3 NHL 95
+                                 * Genesis's, 4 NHL 96 PC's (and the goalie's own hop over the boards, but in 3) */
     RULE_FIGHT_RATINGS,         /* 1: with RULE_FIGHT, each skater's fighting on NHL 93's scale, from NHLPA 93 and NHL 96 PC (the player's own
                                  * files, the host's in a session: native/fightrate.c); 0 the cartridge's (mods/fight.c fight_rating) */
     RULE_TICKER_HL,             /* 1: ticker highlights from the pregame (mods/ticker.c): InitScores plays 0-3 periods of the other games, not
@@ -190,9 +190,9 @@ int moves_blocking(const struct SortObj *o);
 size_t moves_state_save(uint8_t *out);
 int moves_state_load(const uint8_t *in);
 
-/* RULE_GOALIE (mods/goalie.c): goalie_save_spa, the save goaliesave starts (spa the cartridge's, d3 the way to where the puck crosses
- * against his facing); goalie_wall_spa, the hop over the boards (assbench, asseben) */
-uint16_t goalie_save_spa(uint16_t spa, int16_t d3, const struct PuckCross *pc, const struct SortObj *gk);
+/* RULE_GOALIE (mods/goalie.c): goalie_save, another game's goaliesave (1 when it made the save; 0 the cartridge's makes it);
+ * goalie_wall_spa, the hop over the boards (assbench, asseben) */
+int goalie_save(const struct PuckCross *pc, int16_t goalline, struct SortObj *gk);
 uint16_t goalie_wall_spa(const struct SortObj *o, uint16_t spa);
 
 /* RULE_TICKER_HL (mods/ticker.c): InitScores's randomd0 range, the other games' periods before the pregame (the cartridge's 3: 0-2) */

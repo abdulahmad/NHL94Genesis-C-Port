@@ -19,7 +19,7 @@ static const char *const penalty_names[3] = { "cartridge", "NHL 96 Genesis", "NH
 static const char *const move95_names[3] = { "off", "NHL 95 PC", "NHL 95 Genesis" };   /* (NHL 95's moves: mods/moves.c) */
 static const char *const ticker_names[2] = { "cartridge", "from the pregame" };   /* (RULE_TICKER_HL: mods/ticker.c) */
 static const char *const pencall_names[2] = { "cartridge", "PC referee" };   /* (RULE_PENCALL: mods/referee.c) */
-static const char *const goalie_names[3] = { "cartridge", "NHL 95 PC", "NHL 95 PC + 96 Genesis" };   /* (mods/goalie.c) */
+static const char *const goalie_names[5] = { "NHL 94 Genesis", "NHL 95 PC", "NHL 96 Genesis", "NHL 95 Genesis", "NHL 96 PC" };   /* (mods/goalie.c; the numbers kept from the first two) */
 
 /* the rules */
 const mdrt_sdl_option rule_options[RULE_COUNT] = {
@@ -46,7 +46,7 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_FAKESHOT] = { "rules.fake_shot", "Fake shot", 3, move95_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_DROPPASS] = { "rules.drop_pass", "Drop pass", 3, move95_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_SHOTBLOCK] = { "rules.shot_block", "Shot blocking", 3, move95_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
-    [RULE_GOALIE] = { "rules.goalie_anims", "Goalie animations", 3, goalie_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_GOALIE] = { "rules.goalie_anims", "Goalie saves", 5, goalie_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_TICKER_HL] = { "rules.ticker_highlights", "Ticker highlights", 2, ticker_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_PENCALL] = { "rules.penalty_call", "Penalty call", 2, pencall_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
