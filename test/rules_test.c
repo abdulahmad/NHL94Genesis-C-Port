@@ -758,7 +758,7 @@ static void moves(void)
         }
     }
     CHECK(!bad && modf > 0);
-    CHECK(mod_frame_pc(MODF_BASE + 140) >= 0 && mod_frame_pc(MODF_BASE + 141) < 0 && mod_frame(SPFGoalie) == SPFGoalie);
+    CHECK(mod_frame_pc(MODF_BASE + 156) >= 0 && mod_frame_pc(MODF_BASE + 157) < 0 && mod_frame(SPFGoalie) == SPFGoalie);
     CHECK(spa_table(SPAshotf) == rom_ptr(SYM_SPAlist + SPAshotf));
     struct SortObj *o = sortobj(1), *c = sortobj(8);
     for (int i = 0; i < 12; i++) { struct SortObj *q = sortobj(i); memset(q, 0, sizeof *q); q->SCnum = (int16_t)i; q->position = 3; q->Xpos = 0x60; q->Ypos = 0x200; }
@@ -857,6 +857,50 @@ static void moves(void)
     g.sflags = 0; g.puckz[0] = 4; gk->Xpos = 0;
     CHECK(goalie_save(&pc, 0x108, gk) && (gk->SPA == SPAghighr || gk->SPA == SPAgglovel2));   /* (a raised puck: the high saves) */
     CHECK(goalie_wall_spa(gk, SPAwallright) == SPAwallright);   /* (95 Genesis has no goalie hop) */
+    /* the hop over the boards: NHL 95 PC's first table for directions 0-3, the reverse for 4-7 */
+    {
+        const uint8_t *wt = spa_table(MA_SPA(MA_GWALLR));
+        CHECK(rd16(wt + rd16(wt + 3 * 2)) == rd16(wt + rd16(wt)) && rd16(wt + rd16(wt + 4 * 2)) != rd16(wt + rd16(wt)));
+    }
+    /* the PC goalie's poke check and knee hold (values 1 and 4) */
+    rules[RULE_GOALIE] = 1;
+    gk->pflags = 0; gk->pflags2 = 0; gk->Xpos = 0; gk->Ypos = 0xC0; gk->SPA = 0;
+    g.puckx[0] = 0x10; g.pucky = 0xB0;
+    set_puck_carrier(7);                                   /* (an opponent has it, 16 or so from him) */
+    goalie_state_load(NULL);
+    int pokes = 0;
+    for (int k = 0; k < 400 && !pokes; k++) pokes = goalie_poke(gk);
+    CHECK(pokes && gk->SPA == MA_SPA(MA_GPOKE) && (gk->pflags2 & 2));
+    gk->pflags2 = 0;
+    CHECK(!goalie_poke(gk));                               /* (240 ticks before the next) */
+    {
+        uint8_t ga[GOALIE_STATE_SIZE], gb[GOALIE_STATE_SIZE];
+        CHECK(goalie_state_save(ga) == GOALIE_STATE_SIZE && (ga[0] | ga[1]) != 0);
+        goalie_state_load(ga); goalie_state_save(gb);
+        CHECK(!memcmp(ga, gb, sizeof ga));
+    }
+    int16_t was = elapsed; elapsed = 0xF0;
+    goalie_tick(gk);
+    elapsed = was;
+    set_puck_carrier(1);                                   /* (his own team's: no poke) */
+    for (int k = 0; k < 400; k++) if (goalie_poke(gk)) { pokes = 0; break; }
+    CHECK(pokes);
+    struct SortObj *att = sortobj(8);
+    gk->SCnum = 0; set_puck_carrier(0);                    /* (he has it; an attacker 10 from the puck) */
+    att->position = 2; att->pflags2 = 0; att->Xpos = 0x10; att->Ypos = 0xA6;
+    CHECK(goalie_kneehold(gk) && gk->SPA == MA_SPA(MA_GKNEEHOLD));
+    gk->temp5 = 1; g.gmode &= (uint16_t)~(1 << gmclock); g.BA_PS_flags = HI(2);
+    was = elapsed; elapsed = 2;
+    goalie_busy(gk);
+    elapsed = was;
+    CHECK(gk->temp5 < 0 && (g.BA_PS_flags & HI(4)));      /* (his hold count runs on while he kneels) */
+    g.BA_PS_flags = 0;
+    att->Xpos = 0x60;
+    CHECK(!goalie_kneehold(gk));
+    rules[RULE_GOALIE] = 3;
+    att->Xpos = 0x10;
+    CHECK(!goalie_kneehold(gk) && !goalie_poke(gk));       /* (95 Genesis has neither) */
+    goalie_state_load(NULL); att->Xpos = 0; att->Ypos = 0; att->position = 0;
     set_puck_carrier((uint16_t)-1); gk->SPA = 0; gk->Xpos = 0;
     moves_state_load(NULL);
     classic_rules();
@@ -962,7 +1006,8 @@ static void wide_view(void)
     rules[RULE_VIEW] = 0;
     CHECK(view_play_more() == 0 && view_more() == 0 && view_hpos() == 0x3C);
 
-    /* the state's part: version 14 keeps 1 and 2; version 13's 1 (the wide view played by) loads as 2 */
+    /* the state's part: version 15 keeps 1 and 2; version 14 is it without the goalie's part; version 13's 1 (the wide view played by)
+     * loads as 2 */
     classic_rules();
     hold_state_load(NULL);
     referee_state_load(NULL, 0);
@@ -972,14 +1017,17 @@ static void wide_view(void)
         classic_rules();
         rules[RULE_VIEW] = (uint8_t)view;
         size_t n = rules_state_save(NULL, NULL);
-        CHECK(n <= sizeof st && rules_state_save(NULL, st) == n && st[0] == 14);
+        CHECK(n <= sizeof st && rules_state_save(NULL, st) == n && st[0] == 15);
         classic_rules();
         CHECK(rules_state_load(NULL, st, n) == 0 && rules[RULE_VIEW] == view);
+        st[0] = 14;
+        classic_rules();
+        CHECK(rules_state_load(NULL, st, n - GOALIE_STATE_SIZE) == 0 && rules[RULE_VIEW] == view && rules_state_load(NULL, st, n) < 0);
         st[0] = 13;
         classic_rules();
-        CHECK(rules_state_load(NULL, st, n) == 0 && rules[RULE_VIEW] == (view ? 2 : 0));
+        CHECK(rules_state_load(NULL, st, n - GOALIE_STATE_SIZE) == 0 && rules[RULE_VIEW] == (view ? 2 : 0));
     }
-    st[0] = 15;
+    st[0] = 16;
     CHECK(rules_state_load(NULL, st, rules_state_save(NULL, NULL)) < 0);
     classic_rules();
 }

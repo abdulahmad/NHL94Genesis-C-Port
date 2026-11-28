@@ -85,6 +85,10 @@ uint16_t ticker_init_periods(void) { return 3; }
 /* mods/goalie.c and mods/anims.c: other games' goalie saves. The cartridge's goaliesave makes every save, the goalie hops the boards in
  * his own, and every frame is a cartridge frame. */
 int goalie_save(const struct PuckCross *pc, int16_t goalline, struct SortObj *gk) { (void)pc; (void)goalline; (void)gk; return 0; }
+void goalie_tick(struct SortObj *o) { (void)o; }
+void goalie_busy(struct SortObj *o) { (void)o; }
+int goalie_kneehold(struct SortObj *o) { (void)o; return 0; }
+int goalie_poke(struct SortObj *o) { (void)o; return 0; }
 uint16_t goalie_wall_spa(const struct SortObj *o, uint16_t spa) { (void)o; return spa; }
 uint16_t mod_frame(uint16_t fr) { return fr; }
 int mod_frame_pc(uint16_t fr) { (void)fr; return -1; }
