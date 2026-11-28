@@ -54,11 +54,13 @@
 
 #define REF_WEIGHT 7                                   /* (95 PC's findpc: SortCords[SCref].weight = 7) */
 #define REF_FALL 48                                    /* (SPAreffallback: 10 + 28 + 10 ticks) */
-#define REF_DROP 24                                    /* (the puck drop's frames before he skates) */
+#define REF_DROP 24                                    /* (SPArefdrop: 8, 8 and 8 ticks) */
+#define REF_DROP_AT 0x11                               /* (puckfaceoff2 51BDB gives him SPArefdrop when the puck's countdown (temp1) is 11h: 17 ticks
+                                                        * before the drop, so he is held 7 after it) */
 #define PEN_REFEREE 0x1A                               /* (PenRoughing: the cartridge's nearest to 95 PC's 16h, Abuse of Official) */
 
 static struct SortObj ref;                             /* (only the fields below are his: Xpos ... impact, nopuck[0]) */
-static struct referee_extra { uint8_t mode, drop, fall, fdir, hits, faller, call, sig, st; uint16_t ct; } rx;   /* mode 0 off the ice, 1 at the dot, 2 in play;
+static struct referee_extra { uint8_t mode, drop, fall, fdir, hits, faller, call, sig, st, abuse; uint16_t ct; } rx;   /* mode 0 off the ice, 1 at the dot, 2 in play;
                                                                  * call (RULE_PENCALL): 0 none, 1 skating to the spot, 2 turning to face the call, 3 the
                                                                  * signal (sig, st its frames), 4 made; ct the frames since the whistle */
 
@@ -123,6 +125,7 @@ static void checked(struct SortObj *a3, int16_t impact)
         rx.hits = 0;
         if (logging()) fprintf(stderr, "referee: third knock down, penalty on %d%s (vblank %u)\n", a3->SCnum, (g.gmode & (1 << gmclock)) ? " (the clock is stopped: none)" : "", (unsigned)g.Vcount);
         AddPenalty(PEN_REFEREE, a3);
+        if (!(g.gmode & (1 << gmclock))) rx.abuse = 1;            /* (the call is the referee's own: SPArefabuseoff, not roughing's) */
     }
     rx.faller = (uint8_t)a3->SCnum;
     fall();
@@ -413,20 +416,22 @@ void referee_skate_start(struct SortObj *o, int16_t x, int16_t y)
  * cartridge's penalty screen is that overlay: chkprogress waits for pencall_ready, then cuts to it with no fade (and the face off
  * set up cuts back: hold_nofade). The cartridge's penalty number (a word offset into Penaltylist) is the PC's RefPen times 2 for
  * roughing (9) to holding (12h); its fights are called with roughing's signal and the penalty shot versions with SPArefpenshot. */
-static const uint8_t sig_len[REF_SIGS] = { 60, 96, 60, 60, 60, 60, 72, 72, 68 };   /* (frames.asm: the pictures' ticks, the last held) */
-static int call_pen(void)                                         /* the first queued penalty with minutes (Penaltylist's byte 1), or -1 */
+static const uint8_t sig_len[REF_SIGS] = { 60, 96, 60, 60, 60, 60, 72, 72, 68, 72 };   /* (frames.asm: the pictures' ticks, the last held) */
+static int call_pen(void)                                         /* the first queued penalty with minutes (Penaltylist's byte 1) or a penalty shot, or -1 */
 {
     const uint8_t *t = rom_ptr(SYM_Penaltylist);
     for (const uint8_t *a = g.PenBuf; a < g.PenBuf + sizeof g.PenBuf - 1 && (a[0] | a[1]); a += 2) {
         uint16_t pen = a[0];
-        if ((int8_t)(t + rd16(t + pen))[penmins] > 0) return pen;
+        if ((int8_t)(t + rd16(t + pen))[penmins] > 0 || pen >= 0x2E) return pen;   /* (the penalty shot versions, 2Eh on, have minutes FFh: 95 PC's
+                                                                          * RefPen 26, SPArefpenshot. Before, its signal never played) */
     }
     return -1;
 }
 static int sig_of(int pen)
 {
     switch (pen >> 1) {
-    case 0x09: case 0x0D: case 0x13: case 0x14: return REF_SIG_ROUGH;      /* (roughing, both; fighting: the PC has no fight) */
+    case 0x09: case 0x0D: case 0x13: case 0x14: return pen == PEN_REFEREE && rx.abuse ? REF_SIG_ABUSE : REF_SIG_ROUGH;   /* (roughing, both; fighting: the PC has no
+                                                                         * fight; the third knock down of the referee: 95 PC's RefPen 22, Abuse of Official) */
     case 0x0B: return REF_SIG_CHARGE;
     case 0x0C: return REF_SIG_SLASH;
     case 0x0E: return REF_SIG_XCHECK;
@@ -527,6 +532,100 @@ static void assfwatchref(struct SortObj *o)
     ref_skateto(o, o->temp3, o->temp4);
 }
 
+/* a step every 8 ticks toward facing want (temp1 the countdown), from rest: 1 once he faces it (assrefgoalline, assrefpenshot) */
+static int ref_face(struct SortObj *o, int want)
+{
+    if (o->Xvel | o->Yvel) { ref_skate(o, o->Xpos, o->Ypos, 1); return 0; }   /* (stopping first: SkateToSpot's stop there) */
+    o->temp1 = (int16_t)(o->temp1 - elapsed);
+    if (o->temp1 >= 0) return (o->facedir & 7) == want;
+    o->temp1 = (int16_t)(o->temp1 + 8);
+    int r = (want - o->facedir) & 7;
+    if (!r) return 1;
+    o->facedir = (int16_t)((o->facedir + (r < 5 ? 1 : -1)) & 7); o->_pad56 = 0;
+    ref_anim(o, REF_GLIDE);
+    return 0;
+}
+
+/* a goal: the puck in the net as the cartridge's Goal puts it (6, 110h), no one's (pnothing) */
+static int goal_on(void)
+{
+    const struct SortObj *pk = sortobj(puckscnum);
+    return pk->asslist[pk->assnum & 7] == pnothing && iabs(pk->Xpos) == 6 && iabs(pk->Ypos) == 0x110;
+}
+
+/* NHL 95 PC's assrefgoalline (4F7D0; a goal: SetPA gives it): to the goal line of the puck's end on his side (x 32h, y E6h), there a
+ * step every 8 ticks toward the centre dot and, facing it, the point (SPArefpointgoa, 8 + 24 ticks), then assrefsignal / assrefgoalpa
+ * hold him (the glide) till the puck is fetched: here the walk between plays (mods/hold.c), from where he stands. temp5 20h, 21h */
+static void assrefgoalline(struct SortObj *o)
+{
+    const struct SortObj *pk = sortobj(puckscnum);
+    if (o->temp5 != 0x20 && o->temp5 != 0x21) {
+        o->temp5 = 0x20; o->temp1 = 0;
+        o->temp3 = (int16_t)(o->Xpos > 0 ? PCX(0x32) : -PCX(0x32));
+        o->temp4 = (int16_t)(pk->Ypos > 0 ? PCY(0xE6) : -PCY(0xE6));
+    }
+    if (o->temp5 == 0x21) { ref_skate(o, o->Xpos, o->Ypos, 1); return; }
+    if (iabs(o->Ypos - o->temp4) > 0xC || iabs(o->Ypos) > iabs(o->temp4) || iabs(o->Xpos - o->temp3) > 0xC) { ref_skateto(o, o->temp3, o->temp4); return; }
+    if (!ref_face(o, vtoa((int16_t)-o->Xpos, (int16_t)-o->Ypos) & 7)) return;
+    o->temp5 = 0x21;
+    ref_anim(o, REF_POINT);
+}
+
+/* a penalty shot (the cartridge's: BA_PS_flags bit 2, not the shootout): NHL 95 PC's assrefpenshot (52FB0). He skates to centre ice,
+ * turns there a step every 8 ticks the way he came, puts the puck down (SPArefpickup, 12 ticks), skates to his place beside it (96h,
+ * 10h toward the shooter's end), faces 6 and stays for the shot. The PC holds the shooter till then (and whistles, sfx A4h); the
+ * cartridge's does not wait: he starts at centre with the puck as the cartridge puts it there (behind its black), puts it down and
+ * skates aside, bumping no one on the way. temp5 10h to 14h, temp3 / temp4 his spot, temp1 the turns' countdown or the put down's */
+static int ps_on(void) { return (g.BA_PS_flags & HI(2)) && !(g.gmode2 & HI(0)); }
+static void assrefpenshot(struct SortObj *o)
+{
+    if (o->temp5 < 0x10 || o->temp5 > 0x14) {
+        const struct SortObj *sh = sortobj((int16_t)g.BA_Sktr_SCnum);
+        o->temp5 = 0x10; o->temp1 = 0; o->temp4 = 0;
+        o->Xpos = o->Ypos = 0; o->Xfrac = o->Yfrac = 0; o->Xvel = o->Yvel = 0;   /* (the cartridge does not wait for him: he is at centre with
+                                                         * the puck as its penalty shot's set up (behind its black) puts the puck there) */
+        o->temp3 = (int16_t)(vtoa(sh->Xpos, sh->Ypos) & 7);   /* (facing the shooter: his spot is 0, 0 till he puts the puck down) */
+    }
+    switch (o->temp5) {
+    case 0x10:
+    case 0x13: {
+        int16_t tx = o->temp5 == 0x10 ? 0 : o->temp3;
+        int dx = tx - o->Xpos, dy = o->temp4 - o->Ypos;
+        if (iabs(dx) > 8 || iabs(dy) > 8) {
+            int16_t kick = (int16_t)cartv(0x640);       /* (SkateToSpot: a far axis under 640h gets 640h toward the spot) */
+            if (iabs(dx) >= 8 && iabs(o->Xvel) < kick) o->Xvel = dx > 0 ? kick : (int16_t)-kick;
+            if (iabs(dy) >= 8 && iabs(o->Yvel) < kick) o->Yvel = dy > 0 ? kick : (int16_t)-kick;
+            ref_skateto(o, tx, o->temp4);
+            if (iabs(dx) < 0x19 && iabs(dy) < 0x19) {      /* (SkateToSpot: within 19h, speeds over 9C4h lose a quarter) */
+                int16_t lim = (int16_t)cartv(0x9C4);
+                if (iabs(o->Xvel) > lim) o->Xvel = (int16_t)(o->Xvel - o->Xvel / 4);
+                if (iabs(o->Yvel) > lim) o->Yvel = (int16_t)(o->Yvel - o->Yvel / 4);
+            }
+            return;
+        }
+        o->Xpos = tx; o->Ypos = o->temp4; o->Xfrac = o->Yfrac = 0; o->Xvel = o->Yvel = 0;   /* (within 8: put on it, stopped) */
+        if (!ref_face(o, o->temp5 == 0x10 ? o->temp3 & 7 : 6)) return;
+        if (o->temp5 == 0x13) { o->temp5 = 0x14; return; }
+        o->temp5 = 0x11; o->temp1 = 13;                 /* (SPArefpickup: 12 ticks) */
+        ref_anim(o, REF_PICKUP);
+        return;
+    }
+    case 0x11:
+        o->Xvel = o->Yvel = 0;
+        o->temp1 = (int16_t)(o->temp1 - elapsed);
+        if (o->temp1 > 0) return;
+        o->temp5 = 0x13; o->temp1 = 0;
+        { int32_t x = PCX(0x96), y = (((g.gmode & (1 << gmdir)) == 0) ^ (g.BA_Team != 0)) ? -PCY(10) : PCY(10);
+          ref_inside(&x, &y);                            /* (8 inside the boards, as his other spots) */
+          o->temp3 = (int16_t)x; o->temp4 = (int16_t)y; }
+        ref_anim(o, REF_GLIDE);
+        return;
+    default:
+        ref_skate(o, o->Xpos, o->Ypos, 1);
+        return;
+    }
+}
+
 /* assreffollow (4E0BD): the spot by the puck's zone, then skateto there. The puck by the net (|x| under 32h, |y| from 0ACh to the goal
  * line): beside the net behind the goal line (46h, 0EDh); deep in an end (|y| over 62h) with the puck loose or its carrier attacking
  * that end: by the corner on the goal line (78h, 0E8h); else beside the play by the boards (90h), keeping his y till the view is
@@ -538,6 +637,8 @@ void referee_follow(struct SortObj *o)
     int ax = iabs(px), ay = iabs(py), side = o->Xpos > 0;
     if (!g.gameclock) { ref_doacc(o, 8); return; }
     if (pk->pflags2 & (1 << pf2fight)) { assfwatchref(o); return; }
+    if (goal_on()) { assrefgoalline(o); return; }
+    if (ps_on()) { assrefpenshot(o); return; }
     o->temp5 = 0;
     if (ax < PCX(0x32) && ay > PCY(0xAC) && ay < PCY(0xE8)) { o->temp3 = (int16_t)(side ? PCX(0x46) : -PCX(0x46)); o->temp4 = (int16_t)(py > 0 ? PCY(0xED) : -PCY(0xED)); }
     else if (ay > PCY(0x62) && ((int16_t)puck_carrier() < 0 || (((sortobj((int16_t)puck_carrier())->pflags & (1 << pfgoal)) != 0) ^ (py < 0)))) {
@@ -559,6 +660,7 @@ void referee_follow_spot(int side, int *x, int *y)
     int16_t px = pk->Xpos, py = pk->Ypos;
     int ax = iabs(px), ay = iabs(py);
     int32_t tx, ty;
+    if (goal_on()) { *x = side ? PCX(0x32) : -PCX(0x32); *y = py > 0 ? PCY(0xE6) : -PCY(0xE6); return; }   /* (a goal: at the goal line, assrefgoalline) */
     if (ax < PCX(0x32) && ay > PCY(0xAC) && ay < PCY(0xE8)) { tx = side ? PCX(0x46) : -PCX(0x46); ty = py > 0 ? PCY(0xED) : -PCY(0xED); }
     else if (ay > PCY(0x62) && ((int16_t)puck_carrier() < 0 || (((sortobj((int16_t)puck_carrier())->pflags & (1 << pfgoal)) != 0) ^ (py < 0)))) {
         tx = side ? PCX(0x78) : -PCX(0x78); ty = py > 0 ? PCY(0xE8) : -PCY(0xE8);
@@ -840,12 +942,12 @@ void referee_update(void)
             ref.facedir = fx > 0 ? 6 : 2; ref._pad56 = 0; ref.temp2 = 9;
             ref_anim(&ref, REF_GLIDE);
         }
-        rx.mode = 1; rx.drop = 0; rx.fall = 0;
+        rx.mode = 1; rx.drop = (uint8_t)referee_drop_at_dot(); rx.fall = 0;
         return;
     }
     int16_t cy = (int16_t)g.Vpos;
     if (rx.mode == 0) { referee_skate_start(&ref, (int16_t)(pk->Xpos > 0 ? PCX(0x90) : -PCX(0x90)), cy); rx.fall = 0; }
-    if (rx.mode == 1) { rx.drop = REF_DROP; ref.temp4 = ref.Ypos; }
+    if (rx.mode == 1) { rx.drop = REF_DROP - REF_DROP_AT - 1; ref.temp4 = ref.Ypos; }   /* (the drop's last 7 ticks) */
     rx.mode = 2;
     ref.SCnum = 0x10;
     ref.weight = REF_WEIGHT;
@@ -854,17 +956,18 @@ void referee_update(void)
     ref.impact = (int16_t)(ref.impact - elapsed * 2);
     if (ref.impact < 0) ref.impact = 0;
     if (rx.fall) rx.fall = (uint8_t)(rx.fall > elapsed ? rx.fall - elapsed : 0);   /* (down: he slides, as a skater does on the ice) */
-    else if (rx.drop) { rx.drop--; ref.Xvel = ref.Yvel = 0; }
+    else if (rx.drop) { rx.drop = (uint8_t)(rx.drop > elapsed ? rx.drop - elapsed : 0); ref.Xvel = ref.Yvel = 0; }   /* (vblanks: the PC's ticks) */
     else if (call_on()) assrefsignal(&ref);                       /* (RULE_PENCALL: the penalty call, NHL 95 PC's assrefsignal) */
     else referee_follow(&ref);
-    if (!call_on()) rx.call = 0;                                    /* (assreffollow: 95 PC's skating, above) */
+    if (!call_on()) { rx.call = 0; if (call_pen() < 0) rx.abuse = 0; }                                    /* (assreffollow: 95 PC's skating, above) */
     int16_t ox = ref.Xpos, oy = ref.Ypos;
     uint16_t oxf = ref.Xfrac, oyf = ref.Yfrac;
     if (referee_glide(&ref) == 2) sfx(0x20);                      /* (SFXplayerwall, as wallcoll plays it for a skater) */
     if (ref.Xpos == ox && ref.Ypos == oy) return;
     uint16_t cf = g.collflag;                                     /* (his own checkcoll: the game's flag as it was after) */
     g.collflag = 0;
-    for (int i = 0; i < 12; i++) {                                /* (checkplcoll for SortCords 10h) */
+    for (int i = 0; i < 12 && (ref.temp5 < 0x10 || ref.temp5 > 0x13); i++) {   /* (checkplcoll for SortCords 10h; not on his way to his place
+                                                                   * at a penalty shot: the cartridge's shooter does not wait for him) */
         struct SortObj *q = sortobj(i);
         if (q->position < 0 || (q->pflags & (1 << pfnc)) || (q->pflags2 & ((1 << 5) | (1 << pf2fight)))) continue;
         int16_t gy = (int16_t)(q->Ypos - ref.Ypos);
@@ -873,6 +976,17 @@ void referee_update(void)
     }
     if (g.collflag) { ref.Xpos = ox; ref.Xfrac = oxf; ref.Ypos = oy; ref.Yfrac = oyf; }
     g.collflag = cf;
+}
+
+/* at the dot: the ticks left of his drop (SPArefdrop from the face off's countdown at 11h: puckfaceoff2), 0 before it */
+int referee_drop_at_dot(void)
+{
+    const struct SortObj *pk = sortobj(puckscnum);
+    if (pk->asslist[pk->assnum & 7] != pfaceoff2 || (pk->pflags & (1 << pfna)) || hold_skating()) return 0;
+    int t = pk->temp1;
+    if (t > REF_DROP_AT) return 0;
+    if (t < 0) t = 0;
+    return REF_DROP - (REF_DROP_AT - t);
 }
 
 int referee_get(struct referee_view *v)
@@ -901,7 +1015,7 @@ size_t referee_state_save(uint8_t *out)
         int16_t w[7] = { ref.Xpos, (int16_t)ref.Xfrac, ref.Ypos, (int16_t)ref.Yfrac, ref.Xvel, ref.Yvel, ref.impact };
         for (int k = 0; k < 7; k++) { out[2 * k] = (uint8_t)w[k]; out[2 * k + 1] = (uint8_t)((uint16_t)w[k] >> 8); }
         uint8_t *b = out + 14;
-        b[0] = ref.nopuck[0]; b[1] = rx.mode; b[2] = rx.drop; b[3] = rx.fall; b[4] = rx.fdir; b[5] = rx.hits; b[6] = rx.faller; b[7] = 0;
+        b[0] = ref.nopuck[0]; b[1] = rx.mode; b[2] = rx.drop; b[3] = rx.fall; b[4] = rx.fdir; b[5] = rx.hits; b[6] = rx.faller; b[7] = rx.abuse;
         b[8] = (uint8_t)(ref.facedir & 7); b[9] = (uint8_t)ref.temp2; b[10] = (uint8_t)((uint16_t)ref.temp2 >> 8);   /* (version 10: his skating) */
         b[11] = (uint8_t)ref._pad56; b[12] = (uint8_t)(ref._pad56 >> 8); b[13] = (uint8_t)ref.temp4; b[14] = (uint8_t)((uint16_t)ref.temp4 >> 8);
         b[15] = (uint8_t)ref.temp5; b[16] = (uint8_t)ref.temp1; b[17] = (uint8_t)ref.temp3; b[18] = (uint8_t)((uint16_t)ref.temp3 >> 8);   /* (version 11: his fight watch) */
@@ -919,20 +1033,23 @@ int referee_state_load(const uint8_t *in, size_t n)
     memset(&rx, 0, sizeof rx);
     if (!in) return 0;
     if (n != REFEREE_STATE_SIZE && n != REFEREE_STATE_SIZE_11 && n != REFEREE_STATE_SIZE_10 && n != REFEREE_STATE_SIZE_9) return -1;
-    if (n >= REFEREE_STATE_SIZE_11 && (in[29] > 2 || in[30] > 0x3C)) return -1;
+    if (n >= REFEREE_STATE_SIZE_11 && ((in[29] > 2 && (in[29] < 0x10 || in[29] > 0x14) && in[29] != 0x20 && in[29] != 0x21) || in[30] > 0x3C)) return -1;   /* (temp5: the fight watch 0-2,
+                                                                         * the penalty shot 10h-14h, the goal line 20h-21h) */
     if (n == REFEREE_STATE_SIZE && (in[33] > 4 || in[34] >= REF_SIGS)) return -1;
     if (n >= REFEREE_STATE_SIZE_10 && (in[22] > 7 || (in[23] > 9) || (int8_t)in[24] < -0xC || (int8_t)in[24] > 0xC)) return -1;
-    if (in[15] > 2 || in[16] > REF_DROP || in[17] > REF_FALL || in[18] > 7 || in[19] > 2 || in[20] > 0xB || in[21]) return -1;   /* (a state is checked before it is used) */
+    if (in[15] > 2 || in[16] > REF_DROP || in[17] > REF_FALL || in[18] > 7 || in[19] > 2 || in[20] > 0xB || in[21] > 1) return -1;   /* (a state is checked before it is used) */
     int16_t w[7];
     for (int k = 0; k < 7; k++) w[k] = (int16_t)(in[2 * k] | in[2 * k + 1] << 8);
     ref.Xpos = w[0]; ref.Xfrac = (uint16_t)w[1]; ref.Ypos = w[2]; ref.Yfrac = (uint16_t)w[3];
     ref.Xvel = w[4]; ref.Yvel = w[5]; ref.impact = w[6];
-    ref.nopuck[0] = in[14]; rx.mode = in[15]; rx.drop = in[16]; rx.fall = in[17]; rx.fdir = in[18]; rx.hits = in[19]; rx.faller = in[20];
+    ref.nopuck[0] = in[14]; rx.mode = in[15]; rx.drop = in[16]; rx.fall = in[17]; rx.fdir = in[18]; rx.hits = in[19]; rx.faller = in[20]; rx.abuse = in[21];
     int16_t x = ref.Xpos, y = ref.Ypos, vx = ref.Xvel, vy = ref.Yvel;
     referee_skate_start(&ref, x, y);
     ref.Xfrac = (uint16_t)w[1]; ref.Yfrac = (uint16_t)w[3]; ref.Xvel = vx; ref.Yvel = vy;
     if (n >= REFEREE_STATE_SIZE_11) { ref.temp5 = in[29]; ref.temp1 = in[30]; ref.temp3 = (int16_t)(in[31] | in[32] << 8); }
     if (n == REFEREE_STATE_SIZE) { rx.call = in[33]; rx.sig = in[34]; rx.st = in[35]; rx.ct = (uint16_t)(in[36] | in[37] << 8); if (rx.call == 3) ref.SPA = REF_SIGNAL; }
+    if (ref.temp5 == 0x21) ref.SPA = REF_POINT;
+    if (ref.temp5 == 0x11) ref.SPA = REF_PICKUP;
     if (n >= REFEREE_STATE_SIZE_10) {
         ref.facedir = in[22]; ref.temp2 = (int16_t)(in[23] | in[24] << 8);
         ref._pad56 = (uint16_t)(in[25] | in[26] << 8); ref.temp4 = (int16_t)(in[27] | in[28] << 8);

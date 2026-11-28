@@ -28,6 +28,7 @@ int referee_get(struct referee_view *v) { (void)v; return 0; }
 void referee_skate_start(struct SortObj *o, int16_t x, int16_t y) { (void)o; (void)x; (void)y; }
 void referee_follow(struct SortObj *o) { (void)o; }
 int referee_glide(struct SortObj *o) { (void)o; return 0; }
+int referee_drop_at_dot(void) { return 0; }
 
 /* mods/hold.c: the between-play pause, the announcer's wait, the anthem and the skate to the spots. The cartridge goes
  * straight back to the face off. */

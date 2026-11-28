@@ -72,6 +72,7 @@ static struct {
     int init, x, y, vx, vy;                 /* the rink position and velocity in 1/256 pixels */
     int dir, t, wasfo, drop, fall;          /* fall: the frames into his fall (RULE_REFEREE), -1 standing; t: the frames into his picture */
     int anim;                               /* his picture: REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL / R, REF_SIGNAL (src/rules.h) */
+    int armup;                              /* a delayed penalty with the clock running: the arm up pictures (SPAarmupglide ...) */
     int sig;                                /* REF_SIGNAL: the call (REF_SIG_ROUGH ...) */
     int sx, sy, valid;                      /* the sprite table position of the last frame */
 } R;
@@ -651,6 +652,8 @@ static void ref_live(void)
     struct referee_view gv;
     R.valid = 0;
     R.fall = -1;
+    R.armup = (g.gmode & (1 << gmpendel)) && !(g.gmode & (1 << gmclock));   /* (95 PC: refsignal, or the clock running and a delayed penalty (gmpendel);
+                                                                         * the cartridge has no delayed offside, the PC's gmode2 bit 7) */
     if (getenv("PCREF_LOG") && !(g.Vcount & 255)) fprintf(stderr, "ref? on %d found %d ingame %d hor %d gm2 %d\n", SDL_AtomicGet(&R.on), SDL_AtomicGet(&P.found), in_game(), !!(g.sflags & HI(sfhor)), g.gmode2 & 1);
     if (!ref_on() || !SDL_AtomicGet(&P.found) || !g.demoflag || (g.sflags & HI(sfhor)) || (g.gmode2 & 1)) { R.init = 0; return; }
     const struct SortObj *pk = sortobj(puckscnum);
@@ -661,7 +664,7 @@ static void ref_live(void)
     int ax_, ay_, ad_, am_, vis = 0;
     if (hold_anthem_ref(&ax_, &ay_, &ad_, &am_)) {                           /* (the anthem: at the side with the players in their lines) */
         R.x = ax_ * 256; R.y = ay_ * 256; R.vx = R.vy = 0;
-        R.dir = ad_; R.t = am_ ? R.t + 1 : 0; R.anim = am_ ? REF_SKATE : REF_GLIDE; R.wasfo = 1; R.drop = 0; R.init = 1;
+        R.dir = ad_; R.t = am_ ? (R.anim == am_ ? R.t + 1 : 0) : 0; R.anim = am_ ? am_ : REF_GLIDE; R.wasfo = 1; R.drop = 0; R.init = 1;   /* (skating, or braking: SPArefstop) */
     } else if (fo) {
         int ox = R.x, oy = R.y, walk = hold_skate_ref() >= 0, put = 0, posed = 0, full = referee_get(&gv);
         static int was_walk, ws_x, ws_y, ws_vx, ws_vy;                       /* (where the picture's own referee set off on the walk, his speed) */
@@ -691,7 +694,7 @@ static void ref_live(void)
             R.anim = REF_GLIDE; R.t = 0;
         }
         R.vx = R.vy = 0;
-        R.wasfo = 1; R.drop = 0; R.init = 1;
+        R.wasfo = 1; R.drop = referee_drop_at_dot(); R.init = 1;              /* (SPArefdrop from the countdown at 11h: puckfaceoff2) */
     } else if (referee_get(&gv)) {                                          /* (RULE_REFEREE: in play, where the game has him) */
         R.x = gv.x / 256; R.y = gv.y / 256; R.vx = gv.vx / 256; R.vy = gv.vy / 256;
         R.wasfo = 0; R.drop = gv.drop; R.init = 1;
@@ -704,10 +707,11 @@ static void ref_live(void)
             referee_skate_start(&VO, (int16_t)(R.x / 256), (int16_t)(R.y / 256));
             VO.facedir = (int16_t)R.dir;
         }
-        if (R.wasfo) { R.wasfo = 0; R.drop = 24; }                           /* (the puck is dropped: the referee's drop, then he skates from there) */
-        if (R.drop > 0) { R.drop--; VO.Xvel = VO.Yvel = 0; }
+        if (R.wasfo) { R.wasfo = 0; R.drop = 7; }                            /* (the puck is dropped: the last 7 ticks of the referee's drop, then he skates from there) */
+        if (R.drop > 0) { R.drop -= elapsed; if (R.drop < 0) R.drop = 0; VO.Xvel = VO.Yvel = 0; }   /* (vblanks: the PC's ticks, whatever the game's passes) */
         else referee_follow(&VO);
-        if (SDL_AtomicGet(&R.phys) && !rules[RULE_REFEREE]) {
+        if (SDL_AtomicGet(&R.phys) && !rules[RULE_REFEREE] && (VO.temp5 < 0x10 || VO.temp5 > 0x13)) {   /* (not on his way to his place at a
+                                                                             * penalty shot: mods/referee.c assrefpenshot) */
             int K = g.PalMode ? 0x16 : 0x11;
             vo_to_r();
             if (ref_bump()) {
@@ -736,7 +740,7 @@ static void ref_live(void)
 #define REP_FRAME 0x62
 #define REP_END 0xFFFFAF54u
 #define REP_N ((REP_END - RAM_BASE) / REP_FRAME)
-static struct { int8_t have, fo; int8_t dir, anim; int16_t fall, drop; int32_t x, y, t; } REP[REP_N];
+static struct { int8_t have, fo; int8_t dir, anim, armup; int16_t fall, drop; int32_t x, y, t; } REP[REP_N];
 static struct { int on, slot, fo; } RPL = { 0, -1, 0 };
 static __typeof__(R) R_before;                                   /* (the referee at the record point, while the replay is on) */
 
@@ -763,7 +767,7 @@ static void ref_tick(void)
         if (k >= 0) {
             const struct SortObj *pk = sortobj(puckscnum);
             int asn = pk->asslist[pk->assnum & 7];
-            REP[k].have = (int8_t)R.valid; REP[k].x = R.x; REP[k].y = R.y; REP[k].dir = (int8_t)R.dir; REP[k].anim = (int8_t)R.anim; REP[k].t = R.t;
+            REP[k].have = (int8_t)R.valid; REP[k].x = R.x; REP[k].y = R.y; REP[k].dir = (int8_t)R.dir; REP[k].anim = (int8_t)R.anim; REP[k].armup = (int8_t)R.armup; REP[k].t = R.t;
             REP[k].fall = (int16_t)R.fall; REP[k].drop = (int16_t)R.drop; REP[k].fo = (int8_t)(asn == pfaceoff || asn == pfaceoff2);
         }
         return;
@@ -778,7 +782,7 @@ static void ref_tick(void)
     if (k < 0 || !REP[k].have) { RPL.slot = k; return; }
     RPL.slot = k;
     R.x = rev ? -REP[k].x : REP[k].x; R.y = rev ? -REP[k].y : REP[k].y;
-    R.dir = rev ? (REP[k].dir + 4) & 7 : REP[k].dir; R.t = REP[k].t; R.anim = REP[k].anim; R.fall = REP[k].fall; R.drop = REP[k].drop; RPL.fo = REP[k].fo;
+    R.dir = rev ? (REP[k].dir + 4) & 7 : REP[k].dir; R.t = REP[k].t; R.anim = REP[k].anim; R.armup = REP[k].armup; R.fall = REP[k].fall; R.drop = REP[k].drop; RPL.fo = REP[k].fo;
     int16_t x = (int16_t)(R.x / 256), y = (int16_t)(R.y / 256);
     find3d(&x, &y, 0);
     if (y == 0x4E20) return;
@@ -796,13 +800,13 @@ static int ref_frame(void)
     int d = R.dir & 7;
     int fo = RPL.on ? RPL.fo : asn == pfaceoff || asn == pfaceoff2;   /* (the replay: as he was in the frame on show) */
     if (hold_anthem_time() >= 0 && !RPL.on) return idle_ref(hold_anthem_time());                                  /* (the anthem: the referee's standing picture) */
-    if (fo && R.t == 0 && R.anim == REF_GLIDE) return (d >= 3 && d <= 6) ? 711 : 703;   /* (still: skating to the dot, he is not) */   /* (SPAreffowait) */
     if (R.fall >= 0) return 787 + 3 * d + (R.fall < 10 ? 0 : R.fall < 38 ? 1 : 2);     /* (SPAreffallback: 10, 28, 10 ticks) */
     if (R.drop > 0) {                                                                    /* (SPArefdrop: 8 ticks each) */
         int k = (24 - R.drop) / 8;
         if (d >= 3 && d <= 6) return k == 0 ? 845 : k == 1 ? 846 : 711;
         return k == 0 ? 843 : k == 1 ? 844 : 703;
     }
+    if (fo && R.t == 0 && R.anim == REF_GLIDE) return (d >= 3 && d <= 6) ? 711 : 703;   /* (still: skating to the dot, he is not) */   /* (SPAreffowait) */
     int b = 5 * ((8 - d) & 7);
     static const int o[4] = { 2, 3, 0, 1 };
     if (R.anim == REF_SIGNAL) {                                                          /* (RULE_PENCALL: refsigspa_m2's signal, frames.asm) */
@@ -815,11 +819,25 @@ static int ref_frame(void)
             { 847, 12, 861, 12, 862, 24, 847, 0 },                                       /* (SPAreftrip) */
             { 847, 12, 857, 48, 847, 0 },                                                /* (SPArefinterfer) */
             { 847, 12, 856, 48, 847, 0 },                                                /* (SPArefhold) */
-            { 847, 12, 711, 12, 712, 24, 711, 8, 847, 0 } };                             /* (SPArefpenshot) */
+            { 847, 12, 711, 12, 712, 24, 711, 8, 847, 0 },                               /* (SPArefpenshot) */
+            { 847, 12, 858, 48, 847, 0 } };                                              /* (SPArefabuseoff) */
         const int16_t *l = sp[R.sig >= 0 && R.sig < REF_SIGS ? R.sig : 0];
         int t = R.t;
         for (; l[1] && t >= l[1]; l += 2) t -= l[1];
         return l[0];
+    }
+    if (R.armup) {                                                                       /* (doplayeracc / noturn0 / dostop: SPAarmup..., frames.asm) */
+        static const int16_t ag[8] = { 715, 750, 745, 740, 737, 730, 725, 720 };
+        static const int16_t as[8][4] = { { 718, 719, 716, 717 }, { 753, 754, 752, 751 }, { 748, 749, 746, 747 }, { 743, 744, 741, 742 },
+                                          { 738, 735, 736, 739 }, { 733, 734, 731, 732 }, { 728, 729, 726, 727 }, { 723, 724, 721, 722 } };
+        switch (R.anim) {
+        case REF_SKATE: return as[d][(R.t / 10) & 3];                                    /* (SPAarmupskate: 10 ticks a frame) */
+        case REF_STOP: return 827 + 2 * d + ((R.t / 4) & 1);                             /* (SPAarmupstop) */
+        case REF_TURNL: return 811 + d;                                                  /* (SPAarmupturnl) */
+        case REF_TURNR: return 819 + d;                                                  /* (SPAarmupturnr) */
+        case REF_GLIDE: return ag[d];                                                    /* (SPAarmupglide) */
+        default: break;
+        }
     }
     switch (R.anim) {                                                                    /* (95 PC's frames.asm) */
     case REF_SKATE: return 651 + b + o[(R.t / 10) & 3];                                  /* (SPArefskate: 10 ticks a frame) */
@@ -827,7 +845,8 @@ static int ref_frame(void)
     case REF_TURNL: return 755 + d;                                                      /* (SPArefturnl) */
     case REF_TURNR: return 763 + d;                                                      /* (SPArefturnr) */
     case REF_PICKUP: return 691 + ((8 - d) & 7);                                         /* (SPArefpickup: one picture, 12 ticks) */
-    case REF_POINT: return 699 + 2 * d + (R.t >= 9);                                     /* (SPArefpointgoa: 8 ticks, then the point held 24) */
+    case REF_POINT: if (R.t >= 34) return 650 + b;                                       /* (SPArefpointgoa: 8 ticks, then the point held 24; then the glide */
+        return 699 + 2 * d + (R.t >= 9);                                                 /*  assrefgoalpa holds) */
     default: return 650 + b;                                                             /* (SPArefglide) */
     }
 }

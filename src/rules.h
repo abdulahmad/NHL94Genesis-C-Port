@@ -103,7 +103,8 @@ void hold_skate_puck(int *x, int *y, int *pickup);  /* where the referee picks u
 int hold_skate_pstart(void);                         /* 1 while the skaters (and the referee) come on at the start of a period */
 int hold_skating(void);                             /* 1 while the skaters walk to the spots (the drop's time waits for them) */
 int hold_nofade(void);                             /* RULE_HOLD, a face off in the middle of play: no fade to black (1); RULE_PENCALL, back from the penalty screen: a cut (2) */
-int hold_anthem_ref(int *x, int *y, int *dir, int *moving);   /* the anthem's referee: its place on the rink (1 while the anthem and the skate to the spots last) */
+int hold_anthem_ref(int *x, int *y, int *dir, int *moving);   /* the anthem's referee: its place on the rink (1 while the anthem and the skate to the spots last);
+                                                                 * moving: 0 standing, else his picture (REF_SKATE, REF_STOP) */
 /* RULE_ANNOUNCE 2: a goal's speech (pa_hook PA_GOAL with these arguments) starts when the goal song has ended; the face off waits for
  * both. frames is the speech's length. hold_tick is called every game frame. */
 void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a2);
@@ -146,7 +147,7 @@ struct referee_view {
 enum { REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL, REF_TURNR, REF_SIGNAL, REF_PICKUP, REF_POINT };   /* (SPArefglide, SPArefskate, SPArefstop, SPArefturnl / r; the
                                                                              * call's signal, SPArefrough ... by referee_view's sig: refsigspa; SPArefpickup; SPArefpointgoa) */
 enum { REF_SIG_ROUGH, REF_SIG_CHARGE, REF_SIG_SLASH, REF_SIG_XCHECK, REF_SIG_HOOK, REF_SIG_TRIP, REF_SIG_INTERFER, REF_SIG_HOLD,
-       REF_SIG_PENSHOT, REF_SIGS };                 /* (NHL 95 PC's SPArefrough, charge, slash, xcheck, hook, trip, interfer, hold, penshot) */
+       REF_SIG_PENSHOT, REF_SIG_ABUSE, REF_SIGS };  /* (NHL 95 PC's SPArefrough, charge, slash, xcheck, hook, trip, interfer, hold, penshot, abuseoff) */
 int referee_call_made(void);                        /* RULE_PENCALL: the call made, the penalty screen cut to (till the face off) */
 int pencall_ready(void);                            /* RULE_PENCALL (chkprogress): 0 the cartridge's way; -1 the referee is still making the call;
                                                      * 1 he has made it: cut to the penalty screen (no fade) */
@@ -167,6 +168,7 @@ int referee_walk_from(int *x, int *y, int *vx, int *vy, int *dir);
 void referee_follow_spot(int side, int *x, int *y);
 void referee_rates(int far, int *acc, int *top, int *brake);
 int referee_way(int ax, int ay, int bx, int by, int *wx, int *wy, int n);   /* his way between plays round the nets: corners, b last; the count */
+int referee_drop_at_dot(void);                                             /* at the dot: the ticks left of his drop (from the face off's countdown), 0 before it */
 int referee_in_net(int x, int y, int16_t *c, int16_t *s);                  /* in a net's frame (the cartridge's oval): 1, the way out */
 #define REFEREE_STATE_SIZE 38                       /* (version 12 of the rules' part; 11: REFEREE_STATE_SIZE_11; 10: REFEREE_STATE_SIZE_10; 9 and before: REFEREE_STATE_SIZE_9) */
 #define REFEREE_STATE_SIZE_11 33

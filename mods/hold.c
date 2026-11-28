@@ -659,7 +659,7 @@ static int rw_anth(int t, int tx, int ty, int *x, int *y, int *dir, int *moving)
     if (t < 0) return rleg_len(&l);
     if (t >= rleg_len(&l)) { *x = tx; *y = ty; *moving = 0; return 0; }
     rleg_pose(&l, t, &p);
-    *x = p.x / 256; *y = p.y / 256; *dir = p.dir; *moving = p.anim != REF_GLIDE;
+    *x = p.x / 256; *y = p.y / 256; *dir = p.dir; *moving = p.anim == REF_GLIDE ? 0 : p.anim;   /* (REF_SKATE, or REF_STOP braking: dostop) */
     return 0;
 }
 

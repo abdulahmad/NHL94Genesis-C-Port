@@ -422,6 +422,19 @@ static void referee_skating(void)
     classic_rules();
 }
 
+/* the referee's drop (95 PC's puckfaceoff2: SPArefdrop when the face off's countdown is 11h, 17 ticks before the puck drops, 7 after) */
+static void refdrop(void)
+{
+    struct SortObj *pk = sortobj(puckscnum);
+    struct SortObj keep = *pk;
+    pk->assnum = 0; pk->asslist[0] = pfaceoff2; pk->pflags = 0;
+    pk->temp1 = 0x12; CHECK(referee_drop_at_dot() == 0);
+    pk->temp1 = 0x11; CHECK(referee_drop_at_dot() == 24);
+    pk->temp1 = 0; CHECK(referee_drop_at_dot() == 7);
+    pk->pflags = 1 << pfna; CHECK(referee_drop_at_dot() == 0);   /* (the set up, not the countdown) */
+    *pk = keep;
+}
+
 /* a puck out of play at the whistle (RULE_HOLD): NHL 95 PC's assrefwhistle takes him to the timekeeper's side, turns him to facing 2 a
  * step every 8 ticks and has him point (SPArefpointgoa, 8 and 24 ticks), then assrefdrop to the dot. Before, he only glided there */
 static void refpoint(void)
@@ -999,6 +1012,7 @@ int main(void)
     referee_skating();
     refnet();
     refpoint();
+    refdrop();
     hold();
     siren();
     fight_ratings();
