@@ -568,11 +568,11 @@ static uint16_t script_buttons(int pad, long frame)
 }
 static long script_reset = -1;          /* alone: the frame a script's RESET was given for (the console powers on again at its wait) */
 
-/* HOLDTEST=goal:FRAME,pen:FRAME,fight:FRAME (a headless run; HOLDFIGHTAT=X,Y puts the fight there): at that vblank in a game in play the puck is put into a net (",away": the other), a penalty queued on
+/* HOLDTEST=goal:FRAME,pen:FRAME,ps:FRAME,fight:FRAME (a headless run; HOLDFIGHTAT=X,Y puts the fight there): at that vblank in a game in play the puck is put into a net (",away": the other), a penalty queued on
  * a home skater (HOLDPUCKAT=X,Y: the puck put there then), or a home and a visiting skater put together for a fight (checkfight; with --rule fighting=2 it always starts),
  * and every change of the stoppage wait is logged with its frame: tests the announcer and the face off wait
  * (mods/hold.c) at the game's own call sites. */
-static int holdtest_goal = -1, holdtest_pen = -1, holdtest_fight = -1, holdtest_last = -1;
+static int holdtest_goal = -1, holdtest_pen = -1, holdtest_fight = -1, holdtest_ps = -1, holdtest_last = -1;
 static long holdtest_fired = -1;                          /* (the console frame the goal was forced at) */
 static void holdtest_frame(void)
 {
@@ -598,6 +598,15 @@ static void holdtest_frame(void)
         a->impact = b->impact = 0x7FFF;
         fprintf(stderr, "holdtest: frame %d fight forced (%d against %d)\n", now, a->SCnum, b->SCnum);
         checkfight(a, b);
+    }
+    if (holdtest_ps >= 0 && now >= holdtest_ps && g.gmode == 0) {   /* (ps:FRAME: a visitor on a breakaway hooked by a home skater: a penalty shot, PenShotChk) */
+        struct SortObj *a = sortobj_at(team_struct(0)->tmsort) + 2, *b = sortobj_at(team_struct(1)->tmsort) + 2;
+        holdtest_ps = -1;
+        b->pflags3 |= 1 << pf3break;
+        if (!g.OptPen) g.OptPen = 1;                     /* (penalties on: a penalty shot needs them, getBAplayerInfo) */
+        uint16_t pen = PenShotChk((uint16_t)(getenv("HOLDPEN") ? atoi(getenv("HOLDPEN")) : 0x1E), b, a);
+        fprintf(stderr, "holdtest: frame %d penalty shot forced (penalty %d)\n", now, pen);
+        AddPenalty(pen, a);
     }
     if (holdtest_pen >= 0 && now >= holdtest_pen && g.gmode == 0) {
         holdtest_pen = -1;
@@ -1115,7 +1124,7 @@ int main(int argc, char **argv)
         o.net_pads = 4;                                   /* (up to four players online: 4 Way Play) */
         if (netopt.on) { fprintf(stderr, "netplay in the window: its Online page (` or F11); --host / --join / --peer are for --headless\n"); return 2; }
         if (inputs) frontend_script = script_source;      /* (test aid: the window's own path, the pads from the script) */
-        if (getenv("HOLDTEST")) { const char *h = getenv("HOLDTEST"), *q; if ((q = strstr(h, "goal:"))) holdtest_goal = atoi(q + 5); if ((q = strstr(h, "pen:"))) holdtest_pen = atoi(q + 4); test_frame_hook = holdtest_frame; }   /* (test aid: the forced goal in the window too) */
+        if (getenv("HOLDTEST")) { const char *h = getenv("HOLDTEST"), *q; if ((q = strstr(h, "goal:"))) holdtest_goal = atoi(q + 5); if ((q = strstr(h, "pen:"))) holdtest_pen = atoi(q + 4); if ((q = strstr(h, "ps:"))) holdtest_ps = atoi(q + 3); test_frame_hook = holdtest_frame; }   /* (test aid: the forced goal in the window too) */
         int r = mdrt_sdl_run(&c, &o, native_game, NULL);
         native_net_close();
         return r;
@@ -1144,6 +1153,7 @@ int main(int argc, char **argv)
         const char *h = getenv("HOLDTEST"), *q;
         if ((q = strstr(h, "goal:"))) holdtest_goal = atoi(q + 5);
         if ((q = strstr(h, "pen:"))) holdtest_pen = atoi(q + 4);
+        if ((q = strstr(h, "ps:"))) holdtest_ps = atoi(q + 3);
         if ((q = strstr(h, "fight:"))) holdtest_fight = atoi(q + 6);
         test_frame_hook = holdtest_frame;
     }
