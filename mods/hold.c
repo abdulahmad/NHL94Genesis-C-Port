@@ -2,8 +2,10 @@
  * goal number 99, assisted by number 4 and number 7"); the cartridge goes straight back to the face off. Two rules ask
  * for the wait: RULE_HOLD (the between-play time of the PC game, announcer or not) and RULE_ANNOUNCE (the rink
  * announcer's speech must finish). Either way the face off's drop waits until that long has passed since the stoppage
- * began (the clips' lengths in 95 PC's XBRUCE2.VIV, fixed here: the game must not depend on whether a machine has the
- * file). What the game already spends on the replay and the face off set up counts towards it.
+ * began (the line's own length, from its clips' lengths in 95 PC's XBRUCE2.VIV, fixed in mods/pascript.c: the game must not
+ * depend on whether a machine has the file). What the game already spends on the replay and the face off set up counts towards
+ * it. Before, each call's wait was a guess (a goal 3.7 s and 2.6 s and 2 s for the assists, a penalty 6.2 s and 3.5 s more for the
+ * time, a penalty shot 7.5 s) where the PC's lines are 2.7 s to 6 s.
  * RULE_ANNOUNCE 2: a home goal's speech starts after the goal song, and the wait covers the song and then the speech. */
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +45,25 @@ void hold_for(int frames)
     if (pending && (int16_t)(until - g.Vcount) > 0) until = (uint16_t)(until + frames);
     else until = (uint16_t)(g.Vcount + frames);
     pending = 1;
+}
+
+/* the stoppage's wait for the announcer (95 PC's assrefdrop waits for PaSpeechBusy): the line's own length, mods/pascript.c. A goal's
+ * and a penalty shot's take over from what was being said (PaGoal, PaPenaltyShot); a penalty's follow it (QueuePenaltyClips) */
+static int pa_last = -1;                                /* (the team of the penalty said last in a run of them: "and number" for the next) */
+void hold_speech(int ev, struct Team *tm, int player, int a, int b)
+{
+    struct pa_line l;
+    pa_script(ev, tm, player, a, b, &pa_last, &l);
+    int f = pa_line_frames(&l);
+    if (getenv("HOLDLOG")) { fprintf(stderr, "hold: frame %d speech %d, %d frames:", g.Vcount, ev, f); for (int i = 0; i < l.n; i++) fprintf(stderr, " %s", l.clip[i]); fprintf(stderr, "\n"); }
+    if (ev == PA_GOAL && RULE(RULE_ANNOUNCE) == 2) { hold_goal_after_song(f, tm, player, a, b); return; }   /* (the siren and the song first) */
+    if (pa_hook) pa_hook(ev, tm, player, a, b);
+    if (ev == PA_PENALTY) hold_for(f);
+    else if (ev == PA_GOAL || ev == PA_PENSHOT) {
+        if (!wanted()) return;
+        if (!pending || (int16_t)(until - g.Vcount) < f) until = (uint16_t)(g.Vcount + f);   /* (it takes over: from now) */
+        pending = 1;
+    }
 }
 
 /* the anthem before the first face off (RULE_ANTHEM: src/logic.c asks with the rule's fixed length): the drop waits for it */
@@ -679,24 +700,27 @@ size_t hold_walk_save(uint8_t *out)
 {
     if (out) {
         uint8_t *p = hs_w8(out, rw.on); p = hs_w8(p, rw.side); p = hs_w16(p, rw.sx); p = hs_w16(p, rw.sy); p = hs_w16(p, rw.v0);
-        hs_w8(p, (uint8_t)rw.f0);
+        p = hs_w8(p, (uint8_t)rw.f0); hs_w8(p, (uint8_t)pa_last);   /* (version 16: the last penalty said's team) */
     }
     return HOLD_WALK_SIZE;
 }
-int hold_walk_check(const uint8_t *in)
+int hold_walk_check(const uint8_t *in, size_t n)
 {
     if (!in) return 0;
+    if (n != HOLD_WALK_SIZE && n != HOLD_WALK_SIZE_13) return -1;
     const uint8_t *p = in;
     int on = hs_r8(&p), side = hs_r8(&p), x = hs_r16(&p), y = hs_r16(&p), v = hs_r16(&p), f = (int8_t)hs_r8(&p);
-    return on > 1 || side > 1 || x < -0x200 || x > 0x200 || y < -0x200 || y > 0x200 || v < 0 || v > 0x3000 || f < -1 || f > 7 ? -1 : 0;
+    int pl = n == HOLD_WALK_SIZE ? (int8_t)hs_r8(&p) : -1;
+    return on > 1 || side > 1 || x < -0x200 || x > 0x200 || y < -0x200 || y > 0x200 || v < 0 || v > 0x3000 || f < -1 || f > 7 || pl < -1 || pl > 1 ? -1 : 0;
 }
-void hold_walk_load(const uint8_t *in)
+void hold_walk_load(const uint8_t *in, size_t n)
 {
-    rw.on = 0; rw.side = 0; rw.sx = rw.sy = rw.v0 = 0; rw.f0 = -1;
+    rw.on = 0; rw.side = 0; rw.sx = rw.sy = rw.v0 = 0; rw.f0 = -1; pa_last = -1;
     if (!in) return;
     const uint8_t *p = in;
     rw.on = (uint8_t)hs_r8(&p); rw.side = (uint8_t)hs_r8(&p); rw.sx = (int16_t)hs_r16(&p); rw.sy = (int16_t)hs_r16(&p); rw.v0 = (int16_t)hs_r16(&p);
     rw.f0 = (int8_t)hs_r8(&p);
+    if (n == HOLD_WALK_SIZE) pa_last = (int8_t)hs_r8(&p);
 }
 
 /* an animation's frames in a direction (updateanim: each step lasts its time + 1) */

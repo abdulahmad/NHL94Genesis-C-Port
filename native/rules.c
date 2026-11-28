@@ -229,9 +229,9 @@ const char *rules_arg(const char *arg)
  * none in a netplay session, whose states stay in memory and whose hash the peers compare), then
  * (version 6) the referee's REFEREE_STATE_SIZE bytes (RULE_REFEREE: mods/referee.c), then (version 7) the
  * pause's HOLD_STATE_SIZE (RULE_HOLD, the anthems: mods/hold.c), then (version 8) the goal siren's
- * HOLD_SIREN_SIZE (RULE_SIREN: mods/hold.c), then (version 9) NHL 95's moves' MOVES_STATE_SIZE (mods/moves.c), then (version 13) the referee's walk's HOLD_WALK_SIZE (mods/hold.c), then (version 15) the goalie's GOALIE_STATE_SIZE (mods/goalie.c). The
+ * HOLD_SIREN_SIZE (RULE_SIREN: mods/hold.c), then (version 9) NHL 95's moves' MOVES_STATE_SIZE (mods/moves.c), then (version 13) the referee's walk's HOLD_WALK_SIZE (mods/hold.c, with the announcer's from version 16), then (version 15) the goalie's GOALIE_STATE_SIZE (mods/goalie.c). The
  * roster set's tables are in the ROM the state's RAM points into, so a state loads with its own
- * roster set or not at all. Version 15 is this layout; version 14 is it without the goalie's part (none then); version 13 is it with RULE_VIEW's 1 the wide view played by (now 2,
+ * roster set or not at all. Version 16 is this layout; version 15 is it with the walk's part before the announcer's (HOLD_WALK_SIZE_13 bytes); version 14 is that without the goalie's part (none then); version 13 is that with RULE_VIEW's 1 the wide view played by (now 2,
  * "wide play": a state from before loads as it was played; 1 is now the wide picture alone); version 12 is it without the referee's walk (none then); version 11 is it with the referee's part before his penalty call (REFEREE_STATE_SIZE_11 bytes); version 10 is it with the referee's part before his fight watch (REFEREE_STATE_SIZE_10 bytes); version 9 is it with the referee's part before his skating (REFEREE_STATE_SIZE_9 bytes); version 8 is it without the moves (none then); version 7 is it without the siren (none then); version 6 without the pause (none then),
  * version 5 without the referee too (he starts off the ice). Version 4 (before the game's own extras
  * were taken out) held 24 rules and 64 bytes of plus/minus stats; it loads when those extras are at
@@ -253,7 +253,7 @@ size_t rules_state_save(void *user, uint8_t *out)
     size_t n = strlen(dir) > 255 ? 255 : strlen(dir), at = 2 + RULE_COUNT;
     if (out) {
         uint64_t h = rosters_hash();
-        out[0] = 15;
+        out[0] = 16;
         out[1] = RULE_COUNT;
         memcpy(out + 2, rules, RULE_COUNT);
         for (int k = 0; k < 8; k++) out[at + k] = (uint8_t)(h >> (56 - 8 * k));
@@ -270,17 +270,20 @@ size_t rules_state_save(void *user, uint8_t *out)
 }
 
 /* the referee's part of a version's state (6 to 9: before his skating; 10: before his fight watch; 11: before his penalty call; 12 on: REFEREE_STATE_SIZE) */
+/* the walk's part of a version's state (13 to 15: the referee's walk; 16: and the announcer's last penalty's team) */
+static size_t walk_size(int v) { return v >= 16 ? HOLD_WALK_SIZE : v >= 13 ? HOLD_WALK_SIZE_13 : 0; }
+
 static size_t ref_size(int v) { return v >= 12 ? REFEREE_STATE_SIZE : v == 11 ? REFEREE_STATE_SIZE_11 : v == 10 ? REFEREE_STATE_SIZE_10 : v >= 6 ? REFEREE_STATE_SIZE_9 : 0; }
 
 /* where the roster set's part starts in a state's part, or 0 when it is not this build's */
 static size_t roster_part(const uint8_t *in, size_t size)
 {
-    if (size < 2 || in[0] < 4 || in[0] > 15) return 0;
+    if (size < 2 || in[0] < 4 || in[0] > 16) return 0;
     if (in[0] == 4 ? in[1] > OLD4_COUNT : in[1] > RULE_COUNT) return 0;
     size_t at = 2u + in[1] + (in[0] == 4 ? 64u : 0u);       /* (version 4: the plus/minus stats) */
     size_t tail = ref_size(in[0]) + (in[0] >= 7 ? HOLD_STATE_SIZE : 0) + (in[0] >= 8 ? HOLD_SIREN_SIZE : 0)
-                  + (in[0] >= 9 ? MOVES_STATE_SIZE : 0) + (in[0] >= 13 ? HOLD_WALK_SIZE : 0)
-                  + (in[0] >= 15 ? GOALIE_STATE_SIZE : 0);   /* (version 6: the referee; 7: the pause; 8: the siren; 9: NHL 95's moves; 13: the referee's walk; 15: the goalie's poke wait) */
+                  + (in[0] >= 9 ? MOVES_STATE_SIZE : 0) + walk_size(in[0])
+                  + (in[0] >= 15 ? GOALIE_STATE_SIZE : 0);   /* (version 6: the referee; 7: the pause; 8: the siren; 9: NHL 95's moves; 13: the referee's walk; 15: the goalie's poke wait; 16: the announcer's) */
     return size >= at + 9 && size - tail >= at + 9 && size == at + 9 + in[at + 8] + tail ? at : 0;
 }
 
@@ -324,8 +327,8 @@ int rules_state_load(void *user, const uint8_t *in, size_t size)
     const uint8_t *moves = in[0] >= 9 ? siren + HOLD_SIREN_SIZE : NULL;   /* (before version 9: none) */
     if (moves && (moves[0] & 0xF8)) { fprintf(stderr, "the state: the moves' part is not one of this game's\n"); return -1; }
     const uint8_t *walk = in[0] >= 13 ? moves + MOVES_STATE_SIZE : NULL;   /* (before version 13: none, he walks from the puck) */
-    const uint8_t *goalie = in[0] >= 15 ? walk + HOLD_WALK_SIZE : NULL;   /* (before version 15: none, no poke waited on) */
-    if (hold_walk_check(walk) < 0) { fprintf(stderr, "the state: the referee's walk's part is not one of this game's\n"); return -1; }
+    const uint8_t *goalie = in[0] >= 15 ? walk + walk_size(in[0]) : NULL;   /* (before version 15: none, no poke waited on) */
+    if (hold_walk_check(walk, walk_size(in[0])) < 0) { fprintf(stderr, "the state: the referee's walk's part is not one of this game's\n"); return -1; }
     if (referee && referee_state_load(referee, ref_size(in[0])) < 0) { fprintf(stderr, "the state: the referee's part is not one of this game's\n"); return -1; }
     const uint8_t *pause = in[0] >= 7 ? referee + ref_size(in[0]) : NULL;   /* (before version 7: none, no pause) */
     if (pause && hold_state_load(pause) < 0) { fprintf(stderr, "the state: the pause's part is not one of this game's\n"); return -1; }
@@ -335,7 +338,7 @@ int rules_state_load(void *user, const uint8_t *in, size_t size)
     if (!pause) hold_state_load(NULL);                     /* (a state from before the pause was kept: every machine that loads it starts without) */
     hold_siren_load(siren);                                /* (checked above; before version 8: no siren counted) */
     moves_state_load(moves);                               /* (checked above; before version 9: no move under way) */
-    hold_walk_load(walk);                                  /* (checked above; before version 13: from the puck) */
+    hold_walk_load(walk, walk_size(in[0]));                /* (checked above; before version 13: from the puck) */
     goalie_state_load(goalie);                             /* (before version 15: no poke waited on) */
     return 0;
 }

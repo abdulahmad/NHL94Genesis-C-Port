@@ -242,8 +242,7 @@ void InProgress(void)
                 remaining++;
                 next_same = (PFLAG(sortobj(r[1] & 0x7F), pfteam) != 0) == (PFLAG(pl, pfteam) != 0);
             }
-            if (pa_hook) pa_hook(PA_PENALTY, a2, pl->pnum, pen, (int)(uint8_t)d2 | remaining << 8 | next_same << 16);
-            hold_for((hold_wait() ? 276 : 372) + (remaining ? 0 : 210));   /* 4.6 s for "and number n, 2 minutes, name", else 6.2 s; 3.5 s more for "at 12 minutes 30 seconds" */
+            hold_speech(PA_PENALTY, a2, pl->pnum, pen, (int)(uint8_t)d2 | remaining << 8 | next_same << 16);   /* (the announcer, and the wait for him) */
         }
         SetPA(pen);
         USBoard();

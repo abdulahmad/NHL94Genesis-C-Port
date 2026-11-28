@@ -33,6 +33,7 @@ int referee_drop_at_dot(void) { return 0; }
 /* mods/hold.c: the between-play pause, the announcer's wait, the anthem and the skate to the spots. The cartridge goes
  * straight back to the face off. */
 void hold_for(int frames) { (void)frames; }
+void hold_speech(int ev, struct Team *tm, int player, int a, int b) { if (pa_hook) pa_hook(ev, tm, player, a, b); }   /* (the voice only: no wait) */
 void hold_anthem(int frames) { (void)frames; }
 int hold_anthem_pending(void) { return 0; }
 int hold_anthem_frames(int set, int home_art) { (void)set; (void)home_art; return 0; }
