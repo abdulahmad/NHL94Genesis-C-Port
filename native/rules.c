@@ -227,9 +227,9 @@ const char *rules_arg(const char *arg)
  * none in a netplay session, whose states stay in memory and whose hash the peers compare), then
  * (version 6) the referee's REFEREE_STATE_SIZE bytes (RULE_REFEREE: mods/referee.c), then (version 7) the
  * pause's HOLD_STATE_SIZE (RULE_HOLD, the anthems: mods/hold.c), then (version 8) the goal siren's
- * HOLD_SIREN_SIZE (RULE_SIREN: mods/hold.c), then (version 9) NHL 95's moves' MOVES_STATE_SIZE (mods/moves.c). The
+ * HOLD_SIREN_SIZE (RULE_SIREN: mods/hold.c), then (version 9) NHL 95's moves' MOVES_STATE_SIZE (mods/moves.c), then (version 13) the referee's walk's HOLD_WALK_SIZE (mods/hold.c). The
  * roster set's tables are in the ROM the state's RAM points into, so a state loads with its own
- * roster set or not at all. Version 12 is this layout; version 11 is it with the referee's part before his penalty call (REFEREE_STATE_SIZE_11 bytes); version 10 is it with the referee's part before his fight watch (REFEREE_STATE_SIZE_10 bytes); version 9 is it with the referee's part before his skating (REFEREE_STATE_SIZE_9 bytes); version 8 is it without the moves (none then); version 7 is it without the siren (none then); version 6 without the pause (none then),
+ * roster set or not at all. Version 13 is this layout; version 12 is it without the referee's walk (none then); version 11 is it with the referee's part before his penalty call (REFEREE_STATE_SIZE_11 bytes); version 10 is it with the referee's part before his fight watch (REFEREE_STATE_SIZE_10 bytes); version 9 is it with the referee's part before his skating (REFEREE_STATE_SIZE_9 bytes); version 8 is it without the moves (none then); version 7 is it without the siren (none then); version 6 without the pause (none then),
  * version 5 without the referee too (he starts off the ice). Version 4 (before the game's own extras
  * were taken out) held 24 rules and 64 bytes of plus/minus stats; it loads when those extras are at
  * their original values (OLD4: each old rule's place now, or -1 and the original value it needs). */
@@ -250,7 +250,7 @@ size_t rules_state_save(void *user, uint8_t *out)
     size_t n = strlen(dir) > 255 ? 255 : strlen(dir), at = 2 + RULE_COUNT;
     if (out) {
         uint64_t h = rosters_hash();
-        out[0] = 12;
+        out[0] = 13;
         out[1] = RULE_COUNT;
         memcpy(out + 2, rules, RULE_COUNT);
         for (int k = 0; k < 8; k++) out[at + k] = (uint8_t)(h >> (56 - 8 * k));
@@ -260,8 +260,9 @@ size_t rules_state_save(void *user, uint8_t *out)
         hold_state_save(out + at + 9 + n + REFEREE_STATE_SIZE);
         hold_siren_save(out + at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE);
         moves_state_save(out + at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE + HOLD_SIREN_SIZE);
+        hold_walk_save(out + at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE + HOLD_SIREN_SIZE + MOVES_STATE_SIZE);
     }
-    return at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE + HOLD_SIREN_SIZE + MOVES_STATE_SIZE;
+    return at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE + HOLD_SIREN_SIZE + MOVES_STATE_SIZE + HOLD_WALK_SIZE;
 }
 
 /* the referee's part of a version's state (6 to 9: before his skating; 10: before his fight watch; 11: before his penalty call; 12: REFEREE_STATE_SIZE) */
@@ -270,11 +271,11 @@ static size_t ref_size(int v) { return v >= 12 ? REFEREE_STATE_SIZE : v == 11 ? 
 /* where the roster set's part starts in a state's part, or 0 when it is not this build's */
 static size_t roster_part(const uint8_t *in, size_t size)
 {
-    if (size < 2 || in[0] < 4 || in[0] > 12) return 0;
+    if (size < 2 || in[0] < 4 || in[0] > 13) return 0;
     if (in[0] == 4 ? in[1] > OLD4_COUNT : in[1] > RULE_COUNT) return 0;
     size_t at = 2u + in[1] + (in[0] == 4 ? 64u : 0u);       /* (version 4: the plus/minus stats) */
     size_t tail = ref_size(in[0]) + (in[0] >= 7 ? HOLD_STATE_SIZE : 0) + (in[0] >= 8 ? HOLD_SIREN_SIZE : 0)
-                  + (in[0] >= 9 ? MOVES_STATE_SIZE : 0);   /* (version 6: the referee; 7: the pause; 8: the siren; 9: NHL 95's moves) */
+                  + (in[0] >= 9 ? MOVES_STATE_SIZE : 0) + (in[0] >= 13 ? HOLD_WALK_SIZE : 0);   /* (version 6: the referee; 7: the pause; 8: the siren; 9: NHL 95's moves; 13: the referee's walk) */
     return size >= at + 9 && size - tail >= at + 9 && size == at + 9 + in[at + 8] + tail ? at : 0;
 }
 
@@ -315,6 +316,8 @@ int rules_state_load(void *user, const uint8_t *in, size_t size)
     if (siren && siren[0] > 1) { fprintf(stderr, "the state: the goal siren's part is not one of this game's\n"); return -1; }
     const uint8_t *moves = in[0] >= 9 ? siren + HOLD_SIREN_SIZE : NULL;   /* (before version 9: none) */
     if (moves && (moves[0] & 0xF8)) { fprintf(stderr, "the state: the moves' part is not one of this game's\n"); return -1; }
+    const uint8_t *walk = in[0] >= 13 ? moves + MOVES_STATE_SIZE : NULL;   /* (before version 13: none, he walks from the puck) */
+    if (hold_walk_check(walk) < 0) { fprintf(stderr, "the state: the referee's walk's part is not one of this game's\n"); return -1; }
     if (referee && referee_state_load(referee, ref_size(in[0])) < 0) { fprintf(stderr, "the state: the referee's part is not one of this game's\n"); return -1; }
     const uint8_t *pause = in[0] >= 7 ? referee + ref_size(in[0]) : NULL;   /* (before version 7: none, no pause) */
     if (pause && hold_state_load(pause) < 0) { fprintf(stderr, "the state: the pause's part is not one of this game's\n"); return -1; }
@@ -324,5 +327,6 @@ int rules_state_load(void *user, const uint8_t *in, size_t size)
     if (!pause) hold_state_load(NULL);                     /* (a state from before the pause was kept: every machine that loads it starts without) */
     hold_siren_load(siren);                                /* (checked above; before version 8: no siren counted) */
     moves_state_load(moves);                               /* (checked above; before version 9: no move under way) */
+    hold_walk_load(walk);                                  /* (checked above; before version 13: from the puck) */
     return 0;
 }
