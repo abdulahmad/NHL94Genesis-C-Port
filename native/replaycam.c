@@ -7,8 +7,9 @@
  *   free     (a double click on the ice: a glide there; the right drag) as its .scrl: sfscrl set, $20 clear, the
  *            camera's Zpos 0, PadControlBits' top nibble $E, the camera object at the place, UpdateCameraPos
  *
- * The click is in picture pixels from the picture's middle. The picture's middle is the view's (Hpos, Vpos): the
- * sprites are at Xpos - Hpos + 0x100 and 0xF0 - (Ypos - Vpos) (find3d), 128 and 112 on the screen; the 16:9
+ * The click is in picture pixels from the picture's middle. The picture's middle is the view's (view_cam, Vpos: the
+ * game's Hpos, kept within the wide picture in the wide view): the sprites are at Xpos - view_cam + 0x100 and
+ * 0xF0 - (Ypos - Vpos) (find3d), 128 and 112 on the screen; the 16:9
  * window's sides, or the wide view's view_shift, keep the 256 rink in the middle of the picture either way. */
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +30,7 @@ static void camera_to(int16_t x, int16_t y, struct RinkObj *cam)
     if (g.sflags4 & HI(7)) { x = (int16_t)-x; y = (int16_t)-y; }
     cam->Xpos = x;
     cam->Ypos = y;
-    if (!(x < view_hpos())) x = view_hpos();             /* (the wide view's rink: less far, as the game's) */
+    if (!(x < view_hpos())) x = view_hpos();             /* (wide play's rink: less far, as the game's) */
     if (!(x > -view_hpos())) x = (int16_t)-view_hpos();
     g.Hpos = (uint16_t)x;
     if (!(y < 0x100)) y = 0x100;
@@ -48,8 +49,9 @@ static void go_free(struct RinkObj *cam)
 }
 
 /* where the free camera may be: as far as the view goes (no travel with nothing moving). The view's reach is the
- * game's own (UpdateCameraPos, checkwindow): Hpos -$3C..$3C on the cartridge's 256, -VIEW_HPOS..VIEW_HPOS in the
- * wide view (its 320, or the 16:9 replay's 256 with 32 of plane B each side), Vpos -$C8..$100; past them the
+ * game's own (UpdateCameraPos, checkwindow): Hpos -$3C..$3C on the cartridge's 256 and with the wide picture alone
+ * (view_cam keeps that picture within its 320), -VIEW_HPOS..VIEW_HPOS in wide play (its 320, or the 16:9 replay's 256
+ * with 32 of plane B each side), Vpos -$C8..$100; past them the
  * picture shows the plane's columns past the rink's 48 (never written) or the stands' last rows */
 static int16_t clampx(int v) { int h = view_hpos(); return (int16_t)(v > h ? h : v < -h ? -h : v); }
 static int16_t clampy(int v) { return (int16_t)(v > 0x100 ? 0x100 : v < -0xC8 ? -0xC8 : v); }
@@ -63,7 +65,7 @@ void replaycam_pass(unsigned entries)
     if (native_net_on()) { glide.on = 0; return; }      /* (an online session: none, see above) */
     if (glide.on && (!(g.sflags & HI(sfscrl)) || (g.sflags3 & 0x20))) glide.on = 0;   /* (the d-pad, or B+A, took the camera) */
     if (got && c.pick) {
-        int rx = (int16_t)g.Hpos + c.x, ry = (int16_t)g.Vpos - c.y, best = PICK_R * PICK_R + 1, at = -1;
+        int rx = view_cam() + c.x, ry = (int16_t)g.Vpos - c.y, best = PICK_R * PICK_R + 1, at = -1;
         for (int i = 0; i < 12; i++) {                  /* the players, as the d-pad's search */
             const struct SortObj *o = sortobj(i);
             if ((int16_t)o->frame <= 0) continue;
@@ -135,6 +137,6 @@ int replaycam_state(char *line, int size)
 void replaycam_player_at(int i, int *x, int *y)
 {
     const struct SortObj *o = sortobj(i);
-    *x = o->Xpos - (int16_t)g.Hpos;
+    *x = o->Xpos - view_cam();
     *y = -(o->Ypos + BODY_UP - (int16_t)g.Vpos);
 }

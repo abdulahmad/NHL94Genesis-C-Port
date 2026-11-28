@@ -82,7 +82,7 @@ void AddArenaAnimSprite(uint8_t **sat, uint16_t *link)
     const uint8_t *a0 = a1;
     int16_t n = (int16_t)(((rd16(a0 + d0 * 2 + 2) - rd16(a0 + d0 * 2)) >> 3) - 1);
     a0 += rd16(a0 + d0 * 2);
-    int16_t x0 = (int16_t)((int16_t)g.Hpos + 0xC0 - 0x90), x1 = (int16_t)((int16_t)g.Hpos + 0xC0 + 0x80);
+    int16_t x0 = (int16_t)(view_cam() + 0xC0 - 0x90), x1 = (int16_t)(view_cam() + 0xC0 + 0x80);   /* (the picture's camera: view.h) */
     int16_t y0 = (int16_t)(0x170 - (int16_t)g.Vpos - 0x80), y1 = (int16_t)(0x170 - (int16_t)g.Vpos + 0x70);
     uint8_t *a6 = *sat;
     uint16_t d6 = *link;

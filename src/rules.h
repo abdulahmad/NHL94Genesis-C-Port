@@ -15,8 +15,9 @@ struct PuckCross;
 enum {
     RULE_WEIGHT_FIX,            /* 1: a check's weights summed in full (the original's 8-bit sum wraps,
                                  * so a heavy skater checked by a lighter pad player falls easily) */
-    RULE_VIEW,                  /* 1: the rink 320 wide (src/view.h): the camera moves less, players
-                                 * count as off screen further out (a pad takes its goalie later) */
+    RULE_VIEW,                  /* the rink 320 wide (src/view.h): 1 the picture alone (16:9 Widescreen gives it; the game plays
+                                 * by the cartridge's 256), 2 "wide play": the camera moves less, players count as off screen
+                                 * further out (a pad takes its goalie later) */
     /* the Sega CD's changes to the game (NHL94Genesis docs/segacd_differences.md), each 0 the
      * cartridge's, 1 the disc's: the overlay's Game page sets them */
     RULE_CD_SKATING,            /* playeracc adds the crowd meter boost twice (+4, not +2) */

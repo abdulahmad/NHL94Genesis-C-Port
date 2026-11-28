@@ -811,6 +811,7 @@ static void crowd_apply(void)
     pcsfx_set_crowd_vol(crowd_vol_of(CD_CROWD_PCVOL));
 }
 static ob_game_opt cd_opts[CD_OPTS];
+static int page_setting_up;                               /* (1 while ob_game_set_ops tells cd_changed each row's first value) */
 static const char *const cd_logo_pc[3] = { "Cartridge", "NHL 95 PC", "NHL 94 PC" };
 /* the Widescreen rows (the Game page's, Overbar's Scaling page's) are one setting: the Scaling page's change shown on the Game page */
 static void wide_rows_sync(void)
@@ -897,9 +898,13 @@ static void cd_changed(void *ctx, int index, int value)
     if (index == CD_CAREER) { segacd_set_career(value, ending); return; }
     if (index == CD_PCPHOTOS) { cardcolor_set(value); return; }
     if (index == CD_SFX) { segacd_set_sfx(value); return; }
-    if (index == CD_ANNOUNCER) {                          /* (turned on while the timing says "talks over the face off": the PC's, right after the goal) */
+    if (index == CD_ANNOUNCER) {                          /* (turned on by the player while the timing says "talks over the face off": the PC's, right
+                                                           * after the goal. Not when the page is set up: the row is on by default, the timing off) */
         announcer_set(value);
-        if (value && ob_game_get(&host, CD_ANNOUNCE) == 0) ob_game_set(&host, CD_ANNOUNCE, 1);
+        if (value && !page_setting_up && ob_game_get(&host, CD_ANNOUNCE) == 0) {
+            ob_game_set(&host, CD_ANNOUNCE, 1);
+            rule_from_row("announce_timing", RULE_ANNOUNCE, 1);
+        }
         return;
     }
     if (index == CD_PCSIREN) { pcsfx_set_goal(value); siren_rule_sync(1); return; }
@@ -1254,7 +1259,8 @@ static void game_page_init(void)
     cd_opts[CD_FIGHTCHEAT] = (ob_game_opt){ "debug_fight_cheat", "Debug: type FIGHT for a fight", fight_cheat, 2, 0, 0, 4 };
     cd_opts[CD_PCLOGO] = (ob_game_opt){ "pc_centre_logo", "Centre ice logo", cd_logo_pc, 3, 1, 0, 4 };   /* (the cartridge's crest or NHL 95 PC's) */
     static const char *const anthem_of[3] = { "Off", "NHL 95 PC", "NHL 96 PC" };
-    cd_opts[CD_PCANTHEM] = (ob_game_opt){ "pc_anthems", "National anthems", anthem_of, 3, 1, 0, 4 };   /* (NHL 95 PC's FM songs or NHL 96 PC's recordings, played before the first face off) */
+    cd_opts[CD_PCANTHEM] = (ob_game_opt){ "pc_anthems", "National anthems", anthem_of, 3, 0, 0, 4 };   /* (NHL 95 PC's FM songs or NHL 96 PC's recordings, played before the
+                                                                                                         * first face off; off by default: RULE_ANTHEM's wait changes the game, on in Recommended) */
     cd_opts[CD_HATS] = (ob_game_opt){ "snes_hats", "Hat trick hats", cd_off_on, 2, 1, 0, 4 };   /* (NHL 94 SNES: hats on the ice after a home skater's third goal) */
     cd_opts[CD_WHITEICE] = (ob_game_opt){ "white_ice", "White ice", cd_off_on, 2, 0, 0, 4 };   /* (the PC games' white rink in place of the cartridge's pale cyan) */
     static const char *const shape[2] = { "4:3", "16:9" };
@@ -1329,7 +1335,9 @@ static void game_page_init(void)
     for (int k = 0; k < CD_ROWS; k++) if (!strcmp(cd_rows[k].key, "cd_clear_shots")) pv[2][k] = 1;   /* (the one fix) */
     static const ob_game_preset presets[3] = { { "Recommended", pv[2] }, { "Cartridge", pv[0] }, { "Sega CD", pv[1] } };
     ob_game_ops ops = { NULL, cd_opts, CD_OPTS, cd_changed, NULL, presets, 3 };
+    page_setting_up = 1;
     ob_game_set_ops(&host, &ops);
+    page_setting_up = 0;
 }
 
 static void shell_controllers(void) { ob_pads_setup_open(-1); }

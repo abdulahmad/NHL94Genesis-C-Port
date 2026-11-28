@@ -54,6 +54,10 @@ the setup screen), EA's 4 Way Play in the ports (the solo run's --four-way).
   pencall  host and join, 25 ms +-15, 5% lost, delay 1: the host's RULE_PENCALL with RULE_REFEREE and RULE_HOLD (the referee
            skates to the timekeeper's side and signals the call, then the cut to the penalty screen, mods/referee.c); a
            hooking penalty is forced at vblank 300 on every machine (HOLDTEST, HOLDPEN); the host alone draws the PC referee
+  wide     host and join, 25 ms +-15, 5% lost, delay 1: a 4:3 host and a 16:9 guest (--widescreen). The session draws the wide
+           picture (RULE_VIEW 1) on both, as a 16:9 solo run does; and the play (--play-hashes: the objects, the teams, the
+           clock, the game's camera) of each machine and of that solo run is a 4:3 solo run's, frame for frame
+  widehost the same with a 16:9 host and a 4:3 guest
 
     tools/netplay_check.py [NAME...]
 """
@@ -91,11 +95,16 @@ SCENARIOS = [
     ('ticker', 6000, ['--rule', 'ticker_highlights=1'], 'join', 1, '25,15,5,1', 9, [1, 1]),
     ('pencall', 7000, ['--rule', 'penalty_call=1', '--rule', 'referee_in_play=on', '--rule', 'hold_play=on', '--pc-ref'], 'join', 1,
      '25,15,5,1', 10, [1, 1]),
+    ('wide', 6000, [], 'join', 1, '25,15,5,1', 11, [1, 1]),
+    ('widehost', 6000, ['--widescreen'], 'join', 1, '25,15,5,1', 12, [1, 1]),
 ]
 NEEDS = {'rosters': 'out/rosters/thirty-two', 'siren': 'build/NHL95.iso'}
 ENVS = {'siren': {'HOLDTEST': 'goal:200,away'}, 'pencall': {'HOLDTEST': 'pen:300', 'HOLDPEN': '30'}}           # (every machine's, and the solo run's: the same forced goal)
 RESETS = {'reset': 3600}                                  # (the host's pad 1 resets the console at this frame)
 LOADS = {'load': (4000, 3000)}                            # (the host loads from this frame a state the solo run saved at that)
+GUESTS = {'wide': ['--widescreen']}                       # (a guest's own options: its picture)
+SOLOS = {'wide': ['--widescreen']}                        # (the solo run's, beyond the host's: the session's picture is wide)
+PLAY = {'wide', 'widehost'}                               # (the play of every machine as a 4:3 solo run's: --play-hashes)
 
 
 def entries(path):
@@ -136,6 +145,17 @@ def pad2(seed, last):
         out.append((frame, '+'.join(b)))
         frame += r.randint(4, 40)
     return out
+
+
+def play_lines(path):
+    """the last line of each frame of --play-hashes: the play's hash and the game's camera"""
+    lines = {}
+    with open(path) as f:
+        for line in f:
+            x = line.split()
+            if len(x) == 4:
+                lines[int(x[0])] = x[1:]
+    return lines
 
 
 def last_lines(path):
@@ -197,7 +217,7 @@ def scenario(k, s):
     d = os.path.join(OUT, name)
     os.makedirs(d, exist_ok=True)
     for f in os.listdir(d):                               # (the last run's)
-        if f.endswith(('.hashes', '.log', '.srm', '.state')):
+        if f.endswith(('.hashes', '.log', '.srm', '.state', '.play')):
             os.remove(os.path.join(d, f))
     if seed is None:                                      # (4 Way Play: the lockstep vector's four scripts)
         pads = [entries(os.path.join(SCRIPTS, 'four_way_p%d.txt' % (j + 1))) for j in range(4)]
@@ -237,13 +257,19 @@ def scenario(k, s):
             mine = opts + load
         else:
             role = ['--join', '127.0.0.1:%d' % ports[0]]
-            mine = []
+            mine = GUESTS.get(name, [])
         err = open(os.path.join(d, w + '.log'), 'w')
-        procs.append((subprocess.Popen(base + role + here + mine + ['--hashes', os.path.join(d, w + '.hashes')], cwd=ROOT, env=env,
+        play = ['--play-hashes', os.path.join(d, w + '.play')] if name in PLAY else []
+        procs.append((subprocess.Popen(base + role + here + mine + ['--hashes', os.path.join(d, w + '.hashes')] + play, cwd=ROOT, env=env,
                                        stdout=subprocess.DEVNULL, stderr=err), err, w))
     solo_args = [NHL94, '--headless', '--frames', str(frames)] + solo_ins + ['--hashes', os.path.join(d, 'solo.hashes')] + opts + \
-        (['--four-way'] if total > 2 else [])
+        SOLOS.get(name, []) + (['--four-way'] if total > 2 else []) + (['--play-hashes', os.path.join(d, 'solo.play')] if name in PLAY else [])
     solo = None if load else subprocess.Popen(solo_args, cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    narrow = None                                         # (the play's reference: a 4:3 solo run of the same buttons and rules)
+    if name in PLAY:
+        narrow = subprocess.Popen([NHL94, '--headless', '--frames', str(frames)] + solo_ins + [o for o in opts if o != '--widescreen'] +
+                                  ['--play-hashes', os.path.join(d, 'narrow.play')], cwd=ROOT, env=env, stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.PIPE, text=True)
     bad = []
     for p, err, w in procs:
         try:
@@ -276,6 +302,23 @@ def scenario(k, s):
         return name, 'the solo run failed: ' + solo_err[-200:], []
     ref = last_lines(os.path.join(d, 'solo.hashes'))
     report = []
+    if narrow:
+        try:
+            narrow_err = narrow.communicate(timeout=limit)[1]
+        except subprocess.TimeoutExpired:
+            narrow.kill()
+            narrow.communicate()
+            narrow_err = 'a hang'
+        if narrow.returncode != 0:
+            return name, 'the 4:3 solo run failed: ' + narrow_err[-200:], []
+        want = play_lines(os.path.join(d, 'narrow.play'))
+        for w in ['solo'] + list(who):
+            got = play_lines(os.path.join(d, w + '.play'))
+            same = sum(1 for f in range(1, frames + 1) if got.get(f) == want.get(f))
+            if same != frames:
+                first = next(f for f in range(1, frames + 1) if got.get(f) != want.get(f))
+                bad.append('%s: the play at frame %d is not the 4:3 solo run\'s' % (w, first))
+            report.append('%s: the play %d/%d as the 4:3 solo run' % ('the 16:9 solo run' if w == 'solo' else 'machine ' + w, same, frames))
     for w in who:
         log = open(os.path.join(d, w + '.log')).read()
         got = last_lines(os.path.join(d, w + '.hashes'))

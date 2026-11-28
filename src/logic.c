@@ -500,7 +500,7 @@ void checkwindow(void)
         if (d0 <= 0x28) move = 0;
         else {
             d1 = (int16_t)(d3 - 0x28);
-            if (!(d1 <= view_hpos())) d1 = view_hpos();   /* (the wide view's rink: less far) */
+            if (!(d1 <= view_hpos())) d1 = view_hpos();   /* (wide play's rink: less far; the wide picture alone keeps $3C) */
         }
     } else {
         d1 = (int16_t)(d3 + 0x28);
@@ -1954,7 +1954,7 @@ void assgoaliectrl(struct Team *tm, struct SortObj *o)
         d0 = (int16_t)(d0 - (int16_t)g.Hpos);
         d1 = (int16_t)(d1 - (int16_t)g.Vpos);
         o->pflags3 &= (uint8_t)~(1 << pf3gctrl);
-        if (d0 >= 0x74 + view_more() || d0 <= -0x74 - view_more() || d1 >= 0x64 || d1 <= -0x64)   /* (off screen) */
+        if (d0 >= 0x74 + view_play_more() || d0 <= -0x74 - view_play_more() || d1 >= 0x64 || d1 <= -0x64)   /* (off screen: the cartridge's 256, or the 320 in wide play) */
             o->pflags3 |= 1 << pf3gctrl;
         if (o->pflags3 & (1 << pf3gctrl)) { checkanim(tm, o); return; }
     }

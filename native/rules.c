@@ -10,8 +10,8 @@
 static const char *const off_on[2] = { "off", "on" };
 static const char *const fight_names[4] = { "off", "NHL 93", "NHL 92", "hybrid" };   /* (fighting: mods/fight.c) */
 static const char *const announce_names[3] = { "talks over the face off", "right after the goal", "after the goal song" };
-static const char *const view_names[2] = { "classic", "wide" };
-static const char *const view_labels[2] = { "256 wide", "320 wide" };
+static const char *const view_names[3] = { "classic", "wide", "wide play" };   /* (src/view.h: wide the picture alone, wide play the game too) */
+static const char *const view_labels[3] = { "256 wide", "320 wide (the picture)", "320 wide (played by it)" };
 static const char *const anthem_names[3] = { "off", "NHL 95 PC", "NHL 96 PC" };
 static const char *const fight_rating_names[2] = { "cartridge", "NHLPA 93 + NHL 96" };   /* (RULE_FIGHT_RATINGS: native/fightrate.c) */
 static const char *const siren_names[2] = { "cartridge", "NHL 95 PC" };
@@ -24,7 +24,7 @@ static const char *const goalie_names[3] = { "cartridge", "NHL 95 PC", "NHL 95 P
 /* the rules */
 const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_WEIGHT_FIX] = { "rules.weight_fix", "Weight bug fix", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
-    [RULE_VIEW] = { "rules.view", "Rink view", 2, view_names, view_labels, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_VIEW] = { "rules.view", "Rink view", 3, view_names, view_labels, 0, 0, 0, 0, NULL, NULL, NULL },
     /* the Sega CD's changes (the overlay's Game page: native/frontend.c) */
     [RULE_CD_SKATING] = { "rules.cd_skating", "Sega CD skating", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_CD_CORNERS] = { "rules.cd_corners", "Sega CD corner bounce", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
@@ -37,7 +37,7 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_CD_PERIOD_END] = { "rules.cd_period_end", "Sega CD period end", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_FIGHT] = { "rules.fighting", "Fighting", 4, fight_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_HOLD] = { "rules.hold_play", "PC between-play pause", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
-    [RULE_ANNOUNCE] = { "rules.announce_timing", "Rink announcer: when he speaks", 3, announce_names, NULL, 0, 0, 0, 1, NULL, NULL, NULL },
+    [RULE_ANNOUNCE] = { "rules.announce_timing", "Rink announcer: when he speaks", 3, announce_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },   /* (the cartridge's by default: Recommended picks right after the goal) */
     [RULE_REFEREE] = { "rules.referee_in_play", "PC referee in play", 2, off_on, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_ANTHEM] = { "rules.anthems", "National anthems", 3, anthem_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_FIGHT_RATINGS] = { "rules.fight_ratings", "Fight ratings", 2, fight_rating_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
@@ -147,8 +147,10 @@ void rules_next(const int *values, void *user)
     }
 }
 
-/* the Widescreen setting at 16:9: the rink is the wide view (320), so the game fills the screen. Not a
- * rule of its own: a session plays by the host's (native_net_settings sends it), a check by Classic */
+/* the Widescreen setting at 16:9: the rink's picture is the wide view's (320, RULE_VIEW 1), so the game fills the
+ * screen. The picture alone: the game plays by the cartridge's 256 (src/view.h), unless the rule itself asks for wide
+ * play (2), which 16:9 leaves as it is. Not a rule of its own: a session draws wide when any of its machines is 16:9
+ * (native_net_settings sends it), a check by Classic */
 static volatile int widescreen;
 void rules_widescreen(int on) { widescreen = on; }
 int rules_widescreen_on(void) { return widescreen; }
@@ -156,7 +158,7 @@ int rules_widescreen_on(void) { return widescreen; }
 void rules_power_on(void)
 {
     memcpy(rules, next, sizeof rules);
-    if (widescreen && !native_net_on()) rules[RULE_VIEW] = 1;   /* (in a session the host's settings say it) */
+    if (widescreen && !native_net_on() && !rules[RULE_VIEW]) rules[RULE_VIEW] = 1;   /* (in a session the host's settings say it) */
 }
 
 void rules_next_get(uint8_t *v) { memcpy(v, next, sizeof next); }
@@ -164,7 +166,7 @@ void rules_next_get(uint8_t *v) { memcpy(v, next, sizeof next); }
 void rules_next_send(uint8_t *v)
 {
     rules_next_get(v);
-    if (widescreen) v[RULE_VIEW] = 1;
+    if (widescreen && !v[RULE_VIEW]) v[RULE_VIEW] = 1;   /* (the wide picture; wide play stays) */
 }
 
 int rules_next_set(const uint8_t *v, int count)
@@ -229,7 +231,8 @@ const char *rules_arg(const char *arg)
  * pause's HOLD_STATE_SIZE (RULE_HOLD, the anthems: mods/hold.c), then (version 8) the goal siren's
  * HOLD_SIREN_SIZE (RULE_SIREN: mods/hold.c), then (version 9) NHL 95's moves' MOVES_STATE_SIZE (mods/moves.c). The
  * roster set's tables are in the ROM the state's RAM points into, so a state loads with its own
- * roster set or not at all. Version 12 is this layout; version 11 is it with the referee's part before his penalty call (REFEREE_STATE_SIZE_11 bytes); version 10 is it with the referee's part before his fight watch (REFEREE_STATE_SIZE_10 bytes); version 9 is it with the referee's part before his skating (REFEREE_STATE_SIZE_9 bytes); version 8 is it without the moves (none then); version 7 is it without the siren (none then); version 6 without the pause (none then),
+ * roster set or not at all. Version 13 is this layout; version 12 is it with RULE_VIEW's 1 the wide view played by (now 2,
+ * "wide play": a state from before loads as it was played; 1 is now the wide picture alone); version 11 is it with the referee's part before his penalty call (REFEREE_STATE_SIZE_11 bytes); version 10 is it with the referee's part before his fight watch (REFEREE_STATE_SIZE_10 bytes); version 9 is it with the referee's part before his skating (REFEREE_STATE_SIZE_9 bytes); version 8 is it without the moves (none then); version 7 is it without the siren (none then); version 6 without the pause (none then),
  * version 5 without the referee too (he starts off the ice). Version 4 (before the game's own extras
  * were taken out) held 24 rules and 64 bytes of plus/minus stats; it loads when those extras are at
  * their original values (OLD4: each old rule's place now, or -1 and the original value it needs). */
@@ -250,7 +253,7 @@ size_t rules_state_save(void *user, uint8_t *out)
     size_t n = strlen(dir) > 255 ? 255 : strlen(dir), at = 2 + RULE_COUNT;
     if (out) {
         uint64_t h = rosters_hash();
-        out[0] = 12;
+        out[0] = 13;
         out[1] = RULE_COUNT;
         memcpy(out + 2, rules, RULE_COUNT);
         for (int k = 0; k < 8; k++) out[at + k] = (uint8_t)(h >> (56 - 8 * k));
@@ -264,13 +267,13 @@ size_t rules_state_save(void *user, uint8_t *out)
     return at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE + HOLD_SIREN_SIZE + MOVES_STATE_SIZE;
 }
 
-/* the referee's part of a version's state (6 to 9: before his skating; 10: before his fight watch; 11: before his penalty call; 12: REFEREE_STATE_SIZE) */
+/* the referee's part of a version's state (6 to 9: before his skating; 10: before his fight watch; 11: before his penalty call; 12 on: REFEREE_STATE_SIZE) */
 static size_t ref_size(int v) { return v >= 12 ? REFEREE_STATE_SIZE : v == 11 ? REFEREE_STATE_SIZE_11 : v == 10 ? REFEREE_STATE_SIZE_10 : v >= 6 ? REFEREE_STATE_SIZE_9 : 0; }
 
 /* where the roster set's part starts in a state's part, or 0 when it is not this build's */
 static size_t roster_part(const uint8_t *in, size_t size)
 {
-    if (size < 2 || in[0] < 4 || in[0] > 12) return 0;
+    if (size < 2 || in[0] < 4 || in[0] > 13) return 0;
     if (in[0] == 4 ? in[1] > OLD4_COUNT : in[1] > RULE_COUNT) return 0;
     size_t at = 2u + in[1] + (in[0] == 4 ? 64u : 0u);       /* (version 4: the plus/minus stats) */
     size_t tail = ref_size(in[0]) + (in[0] >= 7 ? HOLD_STATE_SIZE : 0) + (in[0] >= 8 ? HOLD_SIREN_SIZE : 0)
@@ -306,9 +309,11 @@ int rules_state_load(void *user, const uint8_t *in, size_t size)
                 continue;
             }
         }
-        int x = valid(in[0] == 4 ? old4[i].now : i, in[2 + i]);
+        int r = in[0] == 4 ? old4[i].now : i;
+        int x = valid(r, in[2 + i]);
         if (x < 0) { fprintf(stderr, "the state: a rule out of range\n"); return -1; }
-        v[in[0] == 4 ? old4[i].now : i] = (uint8_t)x;
+        if (r == RULE_VIEW && in[0] < 13 && x == 1) x = 2;   /* (before version 13 the wide view was played by: wide play) */
+        v[r] = (uint8_t)x;
     }
     const uint8_t *referee = in[0] >= 6 ? in + at + 9 + in[at + 8] : NULL;   /* (before version 6: none, he starts off the ice) */
     const uint8_t *siren = in[0] >= 8 ? referee + ref_size(in[0]) + HOLD_STATE_SIZE : NULL;   /* (before version 8: none) */
