@@ -420,7 +420,11 @@ static void hold(void)
     hold_tick();                                           /* (in his hand: neither the puck nor its shadow on the ice) */
     CHECK(hold_skate_carry(&x2, &y2) && pk->Zpos < 0 && sh->frame == 0);
     for (int k = 0; k < 500 && hold_skating(); k++) { g.Vcount++; hold_tick(); }
-    CHECK(!hold_skating() && sh->frame == SPFpuck && pk->Xpos == 100 && pk->Ypos == 100);   /* (at the dot: the cartridge's shadow again) */
+    CHECK(!hold_skating() && sh->frame == 0 && pk->Xpos == 100 && pk->Ypos == 100 && (int16_t)g.puckz[0] < 0);   /* (at the dot, still in his hand: no shadow, as 95 PC) */
+    pk->Xpos = 50; g.puckz[0] = 0; hold_tick();
+    CHECK(sh->frame == 0);                                 /* (a puck on the ice away from the dot, as one over the glass: its frame 0 is the game's own) */
+    pk->Xpos = 100; hold_tick();
+    CHECK(sh->frame == SPFpuck);                           /* (dropped at the dot: the cartridge's shadow again) */
     /* a puck out of play at the whistle (95 PC's assrefgoalpa: not fetched): he skates to the timekeeper's side for one, none on the ice */
     for (int i = 0; i < 12; i++) { sortobj(i)->Xpos = 0; sortobj(i)->Ypos = 0; }
     g.puckx[0] = (uint16_t)-0xB5; g.pucky = (uint16_t)-0x102;

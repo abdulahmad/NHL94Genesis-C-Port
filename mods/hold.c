@@ -768,13 +768,7 @@ static void skate_pose(void)
         g.puckx[0] = g.fox; g.pucky = g.foy;
         ST_W(g.puckz[0]);
     }
-    /* NHL 95 PC's assrefdrop gives him the puck off the ice (puckz -100: neither it nor a shadow is drawn) until he drops it. The
-     * cartridge's shadow (sort object 15, frame SPFpuck: palette 0's grey-pink colour 8) followed the puck in his hand and showed
-     * through his legs, the PC's own shadows being blue. Frame 0 is the shadow's way to be off (puckshadow, addframe2); only the
-     * shadow's own frame is touched (not the goal siren's, which it also draws). Back at the dot it is the cartridge's again */
-    struct SortObj *shadow = sortobj(puckscnum + 1);
-    if (hand && shadow->frame == SPFpuck) shadow->frame = 0;
-    else if (!hand && shadow->frame == 0) shadow->frame = SPFpuck;
+    (void)hand;                                         /* (the puck in his hand: puckz negative; its shadow is off, hold_shadow) */
     g.sflags |= HI(sfslock);                            /* (the view is the walk's: it follows the referee, no cut to where the puck lay) */
     sk_lock = 1;
     /* NHL 95 PC's checkwindow between plays: the camera follows the referee (object 10h) as he steps to the puck (RefStep: toward
@@ -823,6 +817,22 @@ static void skate_pose(void)
     }
 }
 
+/* NHL 95 PC draws the puck's shadow only with the puck on the ice (puckz 0 or more) and not in the referee's hand (puckc 10h):
+ * its frame code (hockey.asm, and changeplayer's copy) skips frame 189h otherwise. Its face off set up and assrefdrop put the
+ * puck off the ice (puckz -100) till he drops it, so from the whistle (or the anthem's line up) to the drop neither is seen.
+ * Here the puck is off the ice the same way (puckz's high byte FFh: the anthem, the walk's carry, the set up at the dot), and
+ * the cartridge's shadow (sort object 15, frame SPFpuck: palette 0's grey-pink colour 8) sat on the dot, over a centre ice
+ * logo. Frame 0 is the shadow's way to be off (puckshadow, addframe2); only the shadow's own frame is touched (not the goal
+ * siren's, which it also draws). It is the cartridge's again once the puck is on the ice at the dot (the drop): the out of
+ * play puck's frame 0 (collide.c, over the glass) is the game's own and stays till the set up's reset_ice_objects */
+static void hold_shadow(void)
+{
+    if (!(RULE(RULE_HOLD) || RULE(RULE_REFEREE) || anth)) return;
+    struct SortObj *pk = sortobj(puckscnum), *shadow = pk + 1;
+    if ((int16_t)g.puckz[0] < 0) { if (shadow->frame == SPFpuck) shadow->frame = 0; }
+    else if (shadow->frame == 0 && pk->Xpos == (int16_t)g.fox && pk->Ypos == (int16_t)g.foy) shadow->frame = SPFpuck;
+}
+
 void hold_tick(void)
 {
     if (getenv("HOLDVIEW")) fprintf(stderr, "view: %d vpos %d hpos %d yc1 %d yleader %d puck %d,%d sk %d\n", g.Vcount, (int16_t)g.Vpos, (int16_t)g.Hpos, (int16_t)g.yc1, (int16_t)g.yleader, (int16_t)g.puckx[0], (int16_t)g.pucky, sk_on);
@@ -843,6 +853,7 @@ void hold_tick(void)
                 if (q->position > 0 && q->position != 4 && q->asslist[q->assnum & 7] == afaceoff) q->facedir = spot_face[i];
         } else face_set = 0;
     }
+    hold_shadow();
     if (!sg.on) return;
     int playing = goal_sound_busy();
     if (playing) sg.started = 1;
