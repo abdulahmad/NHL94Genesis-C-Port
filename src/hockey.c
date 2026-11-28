@@ -51,6 +51,7 @@ void Begin(void)
  * return. */
 void StartGame(void)
 {
+    if (pa_hook) pa_hook(PA_QUIET, NULL, 0, 0, 0);       /* (the rink announcer: nothing left over from before) */
     ST_W(g.arenaanim);
     g.homepresses = 0;
     g.awaypresses = 0;
