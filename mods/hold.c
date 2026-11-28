@@ -29,6 +29,7 @@ static uint16_t anth_t0;
 static int ez_frames(const struct SortObj *pl, int ax, int ay, int bx, int by, int f, int f0);   /* (the PC's skate to a spot: below) */
 static int ez_pose(struct SortObj *pl, int ax, int ay, int bx, int by, int f, int f0, int r);
 static int dot_face(const struct SortObj *pl, int x, int y);
+static void stance(struct SortObj *pl, int f);
 static struct { int16_t x, y; } spot[12];
 static int16_t spot_face[12];
 static int face_set;                         /* the way each faced at his spot as the game set him up */
@@ -216,7 +217,7 @@ static void anthem_pose(void)
             if (ez_pose(pl, lx, ly, spot[i].x, spot[i].y, spot_face[i], ANTH_FACE, t - anth_len) || (pl->Xpos == spot[i].x && pl->Ypos == spot[i].y)) continue;
             x = spot[i].x;
             y = spot[i].y;
-            pl->facedir = spot_face[i];
+            stance(pl, spot_face[i]);
         } else {
             pl->facedir = ANTH_FACE;                            /* (all face the viewer: facedir 4, as the PC's skaters) */
         }
@@ -375,10 +376,25 @@ static void ez_turn_pose(struct SortObj *pl, int f0, int dx, int dy, int r)
 {
     int to = vtoa((int16_t)dx, (int16_t)dy) & 7, d = (to - f0) & 7, k = r * EZ_TURN >> 16;
     if (k > ez_turn_steps(f0, dx, dy)) k = ez_turn_steps(f0, dx, dy);
-    pl->facedir = (int16_t)((f0 + (d <= 4 ? k : -k)) & 7);
+    stance(pl, f0 + (d <= 4 ? k : -k));
     pl->Xvel = 0; pl->Yvel = 0;
+}
+
+/* a skater standing, facing f, shown so. The cartridge's sprite takes its picture from the facing only while an animation runs
+ * (updateanim; a picture that has just changed is kept 4 frames), and SPAglide does not loop: a facing set after it ended, or
+ * within those 4 frames, kept the picture of the way he faced before (the face off's wings and defencemen shown side on or
+ * backward at the drop). NHL 95 PC's asstakeposition sets its glide again with each step it turns him (SetSPA, every 8 frames);
+ * here the glide starts again from its first picture whenever the facing changes or it has ended, and the picture is taken at
+ * once, so what is shown is always the facing's */
+static void stance(struct SortObj *pl, int f)
+{
+    f &= 7;
+    if (pl->facedir == f && pl->SPA == SPAglide) return;
+    pl->facedir = (int16_t)f;
     pl->pflags &= (uint8_t)~(1 << pfalock);
+    pl->SPA = 0;
     SetSPA(pl, SPAglide);
+    pl->glitch = 0;                                     /* (the picture is taken at the next updateanim) */
 }
 
 /* the way a skater faces at his face off spot: NHL 95 PC's asstakeposition turns him toward the dot (fox, foy), a step every 8
@@ -433,8 +449,7 @@ static int ez_pose(struct SortObj *pl, int ax, int ay, int bx, int by, int f, in
     int way = ((f - fa) & 7) <= 4 ? 1 : -1;
     pl->Xpos = (int16_t)bx; pl->Ypos = (int16_t)by;
     pl->Xvel = 0; pl->Yvel = 0;
-    pl->facedir = (int16_t)((fa + way * k) & 7);
-    if (r == s.k) { pl->pflags &= (uint8_t)~(1 << pfalock); SetSPA(pl, SPAglide); }   /* (on the spot: the glide, whatever the stop's step) */
+    stance(pl, fa + way * k);                            /* (on the spot: the glide, whatever the stop's step, a step round every 8 frames) */
     return r < s.k + n * 8;
 }
 
@@ -730,9 +745,7 @@ static void skate_players(int t)
         /* (the walk's last frame: the face off men's stance comes once all are there, src/logic.c) */
         if (t == sk_dur || pl->Xpos != sk_to[i].x || pl->Ypos != sk_to[i].y) {
             pl->Xpos = sk_to[i].x; pl->Ypos = sk_to[i].y;
-            pl->facedir = SK_FACE(i);
-            pl->pflags &= (uint8_t)~(1 << pfalock);
-            SetSPA(pl, SPAglide);
+            stance(pl, SK_FACE(i));
         }
         pl->Xvel = 0;
         pl->Yvel = 0;
@@ -850,7 +863,7 @@ void hold_tick(void)
         if (asn == pfaceoff || asn == pfaceoff2) {
             struct SortObj *q = sortobj(0);
             for (int i = 0; i < 12; i++, q++)
-                if (q->position > 0 && q->position != 4 && q->asslist[q->assnum & 7] == afaceoff) q->facedir = spot_face[i];
+                if (q->position > 0 && q->position != 4 && q->asslist[q->assnum & 7] == afaceoff && (q->facedir != spot_face[i] || q->SPA != SPAglide)) stance(q, spot_face[i]);
         } else face_set = 0;
     }
     hold_shadow();
