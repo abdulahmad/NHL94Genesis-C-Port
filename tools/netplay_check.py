@@ -54,6 +54,12 @@ the setup screen), EA's 4 Way Play in the ports (the solo run's --four-way).
   pencall  host and join, 25 ms +-15, 5% lost, delay 1: the host's RULE_PENCALL with RULE_REFEREE and RULE_HOLD (the referee
            skates to the timekeeper's side and signals the call, then the cut to the penalty screen, mods/referee.c); a
            hooking penalty is forced at vblank 300 on every machine (HOLDTEST, HOLDPEN); the host alone draws the PC referee
+  refroll  host and join, 45 ms +-30, 15% lost, delay 1 (many rollbacks): pencall's rules, a penalty forced at vblank 300
+           and a goal at 1500 (HOLDTEST), so rollbacks go back over the call, the referee's signal, his walk and the goal's
+  penshot  host and join, 45 ms +-30, 15% lost, delay 1: a penalty shot forced at vblank 300 (HOLDTEST ps) with the referee in
+           play and the pause: his assrefpenshot sequence and its whistle in every rollback's
+  moves    host and join, 25 ms +-15, 5% lost, delay 1: NHL 95 PC's shot blocks and drop passes (RULE_SHOTBLOCK 1,
+           RULE_DROPPASS 1, mods/moves.c) with the referee in play
   wide     host and join, 25 ms +-15, 5% lost, delay 1: a 4:3 host and a 16:9 guest (--widescreen). The session draws the wide
            picture (RULE_VIEW 1) on both, as a 16:9 solo run does; and the play (--play-hashes: the objects, the teams, the
            clock, the game's camera) of each machine and of that solo run is a 4:3 solo run's, frame for frame
@@ -95,11 +101,17 @@ SCENARIOS = [
     ('ticker', 6000, ['--rule', 'ticker_highlights=1'], 'join', 1, '25,15,5,1', 9, [1, 1]),
     ('pencall', 7000, ['--rule', 'penalty_call=1', '--rule', 'referee_in_play=on', '--rule', 'hold_play=on', '--pc-ref'], 'join', 1,
      '25,15,5,1', 10, [1, 1]),
+    ('refroll', 9000, ['--rule', 'penalty_call=1', '--rule', 'referee_in_play=on', '--rule', 'hold_play=on', '--pc-ref'], 'join', 1,
+     '45,30,15,1', 13, [1, 1]),
+    ('penshot', 7000, ['--rule', 'referee_in_play=on', '--rule', 'hold_play=on', '--pc-ref'], 'join', 1, '45,30,15,1', 15, [1, 1]),
+    ('moves', 7000, ['--rule', 'shot_block=1', '--rule', 'drop_pass=1', '--rule', 'referee_in_play=on'], 'join', 1, '25,15,5,1', 14,
+     [1, 1]),
     ('wide', 6000, [], 'join', 1, '25,15,5,1', 11, [1, 1]),
     ('widehost', 6000, ['--widescreen'], 'join', 1, '25,15,5,1', 12, [1, 1]),
 ]
 NEEDS = {'rosters': 'out/rosters/thirty-two', 'siren': 'build/NHL95.iso'}
-ENVS = {'siren': {'HOLDTEST': 'goal:200,away'}, 'pencall': {'HOLDTEST': 'pen:300', 'HOLDPEN': '30'}}           # (every machine's, and the solo run's: the same forced goal)
+ENVS = {'siren': {'HOLDTEST': 'goal:200,away'}, 'pencall': {'HOLDTEST': 'pen:300', 'HOLDPEN': '30'},
+        'refroll': {'HOLDTEST': 'pen:300,goal:1500', 'HOLDPEN': '30'}, 'penshot': {'HOLDTEST': 'ps:300'}}           # (every machine's, and the solo run's: the same forced goal)
 RESETS = {'reset': 3600}                                  # (the host's pad 1 resets the console at this frame)
 LOADS = {'load': (4000, 3000)}                            # (the host loads from this frame a state the solo run saved at that)
 GUESTS = {'wide': ['--widescreen']}                       # (a guest's own options: its picture)

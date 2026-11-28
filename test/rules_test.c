@@ -211,6 +211,15 @@ static void referee(void)
     CHECK(referee_state_load(a, REFEREE_STATE_SIZE_10) == 0);   /* (version 10: before his fight watch) */
     memcpy(b, a, sizeof b); b[29] = 3; CHECK(referee_state_load(b, sizeof b) < 0);
     memcpy(b, a, sizeof b); b[30] = 0x3D; CHECK(referee_state_load(b, sizeof b) < 0);
+    /* (version 17: his picture and its frames come back as they were; one out of range is refused; 12 to 16 from his phase) */
+    CHECK(referee_state_load(a, sizeof a) == 0);
+    memcpy(b, a, sizeof b); b[38] = REF_TURNL; b[39] = 0; b[40] = 5; b[41] = 0;
+    CHECK(referee_state_load(b, sizeof b) == 0);
+    { uint8_t c[REFEREE_STATE_SIZE]; referee_state_save(c); CHECK(c[38] == REF_TURNL && c[40] == 5 && c[41] == 0); }
+    memcpy(b, a, sizeof b); b[38] = REF_POINT + 1; CHECK(referee_state_load(b, sizeof b) < 0);
+    memcpy(b, a, sizeof b); b[39] = 1; CHECK(referee_state_load(b, sizeof b) < 0);
+    memcpy(b, a, sizeof b); b[42] = 3; CHECK(referee_state_load(b, sizeof b) < 0);   /* (the penalty shot's whistle: 0 to 2) */
+    CHECK(referee_state_load(a, REFEREE_STATE_SIZE_12) == 0);
     CHECK(referee_state_load(NULL, 0) == 0 && !referee_get(&v));
     classic_rules();
 }
@@ -1044,7 +1053,8 @@ static void wide_view(void)
     rules[RULE_VIEW] = 0;
     CHECK(view_play_more() == 0 && view_more() == 0 && view_hpos() == 0x3C);
 
-    /* the state's part: version 16 keeps 1 and 2; version 15 is it with the walk before the announcer's byte; version 14 is that
+    /* the state's part: version 17 keeps 1 and 2; 16 is it with the referee's part before his picture; version 15 is that with the walk
+     * before the announcer's byte; version 14 is that
      * without the goalie's part; version 13's 1 (the wide view played by) loads as 2 */
     classic_rules();
     hold_state_load(NULL);
@@ -1055,7 +1065,13 @@ static void wide_view(void)
         classic_rules();
         rules[RULE_VIEW] = (uint8_t)view;
         size_t n = rules_state_save(NULL, NULL);
-        CHECK(n <= sizeof st && rules_state_save(NULL, st) == n && st[0] == 16);
+        CHECK(n <= sizeof st && rules_state_save(NULL, st) == n && st[0] == 17);
+        classic_rules();
+        CHECK(rules_state_load(NULL, st, n) == 0 && rules[RULE_VIEW] == view);
+        size_t refp = 2 + RULE_COUNT + 9 + st[2 + RULE_COUNT + 8] + REFEREE_STATE_SIZE_12;   /* (version 16: the referee's part without his picture) */
+        memmove(st + refp, st + refp + (REFEREE_STATE_SIZE - REFEREE_STATE_SIZE_12), n - refp - (REFEREE_STATE_SIZE - REFEREE_STATE_SIZE_12));
+        n -= REFEREE_STATE_SIZE - REFEREE_STATE_SIZE_12;
+        st[0] = 16;
         classic_rules();
         CHECK(rules_state_load(NULL, st, n) == 0 && rules[RULE_VIEW] == view);
         memmove(st + n - GOALIE_STATE_SIZE - 1, st + n - GOALIE_STATE_SIZE, GOALIE_STATE_SIZE);   /* (version 15: the walk without the announcer's last byte) */
@@ -1070,7 +1086,7 @@ static void wide_view(void)
         classic_rules();
         CHECK(rules_state_load(NULL, st, n - GOALIE_STATE_SIZE) == 0 && rules[RULE_VIEW] == (view ? 2 : 0));
     }
-    st[0] = 17;
+    st[0] = 18;
     CHECK(rules_state_load(NULL, st, rules_state_save(NULL, NULL)) < 0);
     classic_rules();
 }

@@ -574,6 +574,9 @@ static long script_reset = -1;          /* alone: the frame a script's RESET was
  * (mods/hold.c) at the game's own call sites. */
 static int holdtest_goal = -1, holdtest_pen = -1, holdtest_fight = -1, holdtest_ps = -1, holdtest_last = -1;
 static long holdtest_fired = -1;                          /* (the console frame the goal was forced at) */
+static long holdtest_pen_fired = -1, holdtest_ps_fired = -1, holdtest_fight_fired = -1;   /* (the penalty's, the penalty shot's, the fight's: a
+                                                         * rollback to before one forces it again, as the goal; before, each fired once a
+                                                         * process, and a session whose rollback went back over it lost it: pencall's desync) */
 static void holdtest_frame(void)
 {
     int now = (int)g.Vcount;
@@ -583,6 +586,9 @@ static void holdtest_frame(void)
     if (!g.demoflag) return;
     long console = (long)mdrt_frame_count(native_m);
     if (console < holdtest_fired) holdtest_fired = -1; /* (a rollback went back before it: its frames again force it the same) */
+    if (console < holdtest_pen_fired) holdtest_pen_fired = -1;
+    if (console < holdtest_ps_fired) holdtest_ps_fired = -1;
+    if (console < holdtest_fight_fired) holdtest_fight_fired = -1;
     if (holdtest_goal >= 0 && holdtest_fired < 0 && now >= holdtest_goal && !(g.gmode & (1 << gmclock))) {
         struct SortObj *o = sortobj(puckscnum);
         holdtest_fired = console;
@@ -590,26 +596,26 @@ static void holdtest_frame(void)
         int dir = strstr(getenv("HOLDTEST"), "away") ? -1 : 1;
         o->Xpos = 0; o->OldXpos = 0; o->Ypos = (int16_t)(dir * 0x108); o->OldYpos = (int16_t)(dir * 0x100); o->Zpos = 2; o->OldZpos = 2; o->Yvel = (int16_t)(dir * 0x300); o->Xvel = 0; o->Zvel = 0;
     }
-    if (holdtest_fight >= 0 && now >= holdtest_fight && g.gmode == 0) {      /* (fight:FRAME: a home and a visiting skater collide hard (with --rule fighting=2, NHL 92's roll, always a fight)) */
+    if (holdtest_fight >= 0 && holdtest_fight_fired < 0 && now >= holdtest_fight && g.gmode == 0) {      /* (fight:FRAME: a home and a visiting skater collide hard (with --rule fighting=2, NHL 92's roll, always a fight)) */
         struct SortObj *a = sortobj_at(team_struct(0)->tmsort) + 2, *b = sortobj_at(team_struct(1)->tmsort) + 2;
-        holdtest_fight = -1;
+        holdtest_fight_fired = console;
         if (getenv("HOLDFIGHTAT")) { int fx, fy; if (sscanf(getenv("HOLDFIGHTAT"), "%d,%d", &fx, &fy) == 2) { a->Xpos = (int16_t)fx; a->Ypos = (int16_t)fy; } }   /* (HOLDFIGHTAT=X,Y: the fight there) */
         b->Xpos = (int16_t)(a->Xpos + 12); b->Ypos = a->Ypos;
         a->impact = b->impact = 0x7FFF;
         fprintf(stderr, "holdtest: frame %d fight forced (%d against %d)\n", now, a->SCnum, b->SCnum);
         checkfight(a, b);
     }
-    if (holdtest_ps >= 0 && now >= holdtest_ps && g.gmode == 0) {   /* (ps:FRAME: a visitor on a breakaway hooked by a home skater: a penalty shot, PenShotChk) */
+    if (holdtest_ps >= 0 && holdtest_ps_fired < 0 && now >= holdtest_ps && g.gmode == 0) {   /* (ps:FRAME: a visitor on a breakaway hooked by a home skater: a penalty shot, PenShotChk) */
         struct SortObj *a = sortobj_at(team_struct(0)->tmsort) + 2, *b = sortobj_at(team_struct(1)->tmsort) + 2;
-        holdtest_ps = -1;
+        holdtest_ps_fired = console;
         b->pflags3 |= 1 << pf3break;
         if (!g.OptPen) g.OptPen = 1;                     /* (penalties on: a penalty shot needs them, getBAplayerInfo) */
         uint16_t pen = PenShotChk((uint16_t)(getenv("HOLDPEN") ? atoi(getenv("HOLDPEN")) : 0x1E), b, a);
         fprintf(stderr, "holdtest: frame %d penalty shot forced (penalty %d)\n", now, pen);
         AddPenalty(pen, a);
     }
-    if (holdtest_pen >= 0 && now >= holdtest_pen && g.gmode == 0) {
-        holdtest_pen = -1;
+    if (holdtest_pen >= 0 && holdtest_pen_fired < 0 && now >= holdtest_pen && g.gmode == 0) {
+        holdtest_pen_fired = console;
         fprintf(stderr, "holdtest: frame %d penalty forced\n", now);
         if (getenv("HOLDPUCKAT")) {                      /* (HOLDPUCKAT=X,Y: the puck there, loose and still, as the penalty is queued) */
             int px, py;
