@@ -385,6 +385,7 @@ int native_in_replay(void) { return in_replay > 0; }
 volatile unsigned native_replay_entries, native_replay_passes;   /* ReplayMode's calls, and its passes (its getpzjoy reads): the mouse's taps (replaymouse.c) */
 void (*native_replay_pass_hook)(unsigned entries);         /* set by the window front end: at each pass's pad read, the mouse's camera (replaycam.c) */
 int native_replay_banner(void) { return (g.sflags5 & 1) != 0; }
+int native_in_highlight(void) { return (g.gmode & (1 << gmhl)) != 0; }
 int native_replay_pad(void) { if (g.FourWayPlay != 0 && g.pausepad != 0) return g.pausepad == 3 ? 2 : 3; return (g.sflags & HI(sfpj)) ? 1 : 0; }   /* (getpzjoy's) */
 int native_menu_kind(void) { return menu_kind; }
 static int pause_x[4], pause_y[4], pause_n, setup_d7 = -1, in_moveframe;
