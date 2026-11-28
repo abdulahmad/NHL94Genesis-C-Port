@@ -711,11 +711,20 @@ static unsigned script_request(void *user)
     return r;
 }
 
-/* netplay's local player, headless: this pad's script, at the frame the session asks in */
+/* netplay's local player, headless: this pad's script, at the frame the session asks in. RESET is asked for once: a
+ * rollback asks again for the frames it plays again, and their buttons are the session's own by then (the reset among
+ * them); asked again, the console would hold it for the next frame it takes (Overbar ob_console_local) and reset twice */
 static uint16_t script_pad(int pad, int k)
 {
     (void)k;
-    return script_buttons(pad, (long)mdrt_frame_count(native_m));   /* (the console's frames: on through a reset) */
+    static long reset_asked = -1;
+    long f = (long)mdrt_frame_count(native_m);           /* (the console's frames: on through a reset) */
+    uint16_t b = script_buttons(pad, f);
+    if (b & MDRT_NET_RESET_BIT) {
+        if (f <= reset_asked) b &= (uint16_t)~MDRT_NET_RESET_BIT;
+        else reset_asked = f;
+    }
+    return b;
 }
 
 /* --segacd-screens: each frame, the picture with the disc's opening screens in it (segacd_present) */
