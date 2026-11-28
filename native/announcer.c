@@ -39,7 +39,7 @@
 #define QUEUE 48                            /* clips waiting */
 #define WALK_DEPTH 3
 
-struct clip { char name[16]; int16_t *pcm; long len; };
+struct clip { char name[16]; int16_t *pcm; long len; int speech; };   /* (speech: a 47 FB clip, Ron Barr's and the .rnk .awa .hom team names) */
 
 static struct {
     SDL_atomic_t on, found, searched;       /* the row; the clips are read; the search ended */
@@ -49,6 +49,7 @@ static struct {
     struct { const struct clip *c; double at; } v[2];   /* the two channels the clips alternate on (95 PC's speechchannel) */
     int ch;                                 /* the channel the last clip started on */
     double wait;                            /* source samples until the next queued clip starts (SpeechTimerTick's delay) */
+    double clock;                           /* ANNOUNCER_LOG: seconds of the voice's mix so far (the log's times) */
     const struct clip *queue[QUEUE];
     int nq;
     int log;                                /* ANNOUNCER_LOG: the clips said, to stderr */
@@ -139,6 +140,7 @@ static int parse(const uint8_t *d, long n)
             memcpy(cl[k].name, name, (size_t)len + 1);
             cl[k].pcm = sc;
             cl[k].len = sn;
+            cl[k].speech = 1;
             k++;
             continue;
         }
@@ -457,7 +459,9 @@ static int begin(int interrupt, int drop_if_busy)
 static void hook(int ev, struct Team *tm, int player, int a, int b)
 {
     if (A.log) fprintf(stderr, "announcer: event %d (on %d, found %d, demo %d)\n", ev, SDL_AtomicGet(&A.on), SDL_AtomicGet(&A.found), g.demoflag);
+    if (ev == PA_QUIET) { announcer_stop(); return; }    /* (a highlight is over, or a game starts: nothing said before goes on) */
     if (!SDL_AtomicGet(&A.on) || !SDL_AtomicGet(&A.found) || (!g.demoflag && ev != PA_HIGHLIGHT)) return;                 /* (a demo game is silent: demoflag is clear then) */
+    if ((g.gmode & (1 << gmhl)) && ev != PA_HIGHLIGHT) return;   /* (a highlight's own goals and clock are not said: only its line) */
     SDL_MemoryBarrierAcquire();
     SDL_LockMutex(A.lock);
     const char *abbr = tm ? team_abbr(tm) : NULL;
@@ -547,8 +551,11 @@ void announcer_mix(int16_t *out, int frames, unsigned rate)
             A.ch ^= 1;
             A.v[A.ch].c = c;
             A.v[A.ch].at = 0;
-            if (A.log) fprintf(stderr, "announcer: plays %s at %u Hz\n", c->name, rate);
-            long ticks = (long)(c->len / 2) * 100 / 5512 - 26;
+            /* OpenSpeechBank's delay: a rink clip's (4-bit, two samples a byte) length less 26 ticks, so the next starts over its tail;
+             * a speech clip's ('G': Ron Barr's words and the .rnk .awa .hom team names) its whole length, size * 100 / 11025, so the
+             * highlight line's words follow one another and never overlap */
+            long ticks = c->speech ? c->len * 100 / 11025 : (long)(c->len / 2) * 100 / 5512 - 26;
+            if (A.log) fprintf(stderr, "announcer: %.2f s plays %s (%.2f s long, next in %.2f s)\n", A.clock + (double)i / rate, c->name, (double)c->len / RATE, ticks > 0 ? ticks / 100.0 : 0.0);
             A.wait = ticks > 0 ? (double)ticks * RATE / 100.0 : 0;
         }
         if (!A.v[0].c && !A.v[1].c && !A.nq) { A.wait = 0; break; }
@@ -567,6 +574,7 @@ void announcer_mix(int16_t *out, int frames, unsigned rate)
             out[2 * i + c] = (int16_t)(x > 32767 ? 32767 : x < -32768 ? -32768 : x);
         }
     }
+    A.clock += (double)frames / rate;
     SDL_AtomicSet(&A.talking, A.v[0].c || A.v[1].c || A.nq);
     SDL_UnlockMutex(A.lock);
 }

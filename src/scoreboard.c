@@ -584,6 +584,9 @@ void StartHL(struct Matchup *gs, int16_t game) { StartHL2(gs, game); }
 
 /* StartHL2's .sv / .lo: keep the game's RAM from gmode on (and ScoreSumbytes) at M68K_RAM while
  * a highlight game uses it */
+/* the rink announcer: the highlight is over, nothing of it goes on (PA_QUIET) */
+static void hl_quiet(void) { if (pa_hook) pa_hook(PA_QUIET, NULL, 0, 0, 0); }
+
 static void hl_save(void)
 {
     rp ram = ram_at(RAM_BASE);
@@ -627,6 +630,7 @@ static void hl_set_team(struct Team *tm)
  * it with a random result (sf3sbut). */
 void StartHL2(struct Matchup *gs, int16_t game)
 {
+    int said = 0;                                         /* (the rink announcer: a tied game's highlight again is not announced again) */
     for (;;) {
         struct Matchup *a0 = gs;
         if (g.sflags3 & (1 << sf3sbut)) { hl_random_result(a0); return; }
@@ -635,15 +639,16 @@ void StartHL2(struct Matchup *gs, int16_t game)
         int16_t d3 = CheckGameTickerStatus(game, &t);
         a0 = t;
         NewTicker3(d3, a0);
-        if (g.sflags3 & (1 << sf3sbut)) { hl_restore(); hl_random_result(a0); g.sflags3 |= 1 << sf3sbut; return; }
+        if (g.sflags3 & (1 << sf3sbut)) { hl_restore(); hl_quiet(); hl_random_result(a0); g.sflags3 |= 1 << sf3sbut; return; }
         g.printx = 4;
         g.printy -= 6;
         Framer(0x18, 3);
         g.printx += 1;
         g.printy -= 2;
         printz(str_StartHL2_1, sizeof str_StartHL2_1);
-        if (pa_hook) pa_hook(PA_HIGHLIGHT, NULL, 0, a0->gst1, a0->gst2);   /* (the rink announcer: "we take you now to the highlight...") */
-        if (waitxsr(0xB4) & 0x80) { hl_restore(); hl_random_result(a0); g.sflags3 |= 1 << sf3sbut; return; }
+        if (pa_hook && !said) pa_hook(PA_HIGHLIGHT, NULL, 0, a0->gst1, a0->gst2);   /* (the rink announcer: "we take you now to the highlight...") */
+        said = 1;
+        if (waitxsr(0xB4) & 0x80) { hl_restore(); hl_quiet(); hl_random_result(a0); g.sflags3 |= 1 << sf3sbut; return; }
         ST_W(g.Zamx);
         g.CwdExciteLvl = 0;
         g.HomeTeam = a0->gst1;
@@ -678,6 +683,7 @@ void StartHL2(struct Matchup *gs, int16_t game)
         ClrHor();
         vdp_ctrl16(SYM_VDPR_WINX);
         vdp_ctrl16(SYM_VDPR_WINY);
+        view_rink_mode();                                 /* (the wide view's 40 columns, as the game's own rink: the pause screen left 32) */
         DecompressGraphicsPlain(ART(RefsMap) + 8, g.ExtraChars);   /* the ref cam */
         g.Vpos = 0;
         g.Hpos = 0;
@@ -718,6 +724,7 @@ void StartHL2(struct Matchup *gs, int16_t game)
         forceblack();
         for (int i = 0; i < 0x10; i++) sortobj(i)->Xpos = 0;
         hl_restore();
+        hl_quiet();
         setplayercolors();
         SetHor();
         setvideo();
