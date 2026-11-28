@@ -422,6 +422,71 @@ static void referee_skating(void)
     classic_rules();
 }
 
+/* a puck out of play at the whistle (RULE_HOLD): NHL 95 PC's assrefwhistle takes him to the timekeeper's side, turns him to facing 2 a
+ * step every 8 ticks and has him point (SPArefpointgoa, 8 and 24 ticks), then assrefdrop to the dot. Before, he only glided there */
+static void refpoint(void)
+{
+    classic_rules();
+    hold_state_load(NULL);
+    rules[RULE_HOLD] = 1;
+    g.gameclock = 100; g.PerTimeTotal = 300; g.Vcount = 1000;
+    for (int i = 0; i < 12; i++) { struct SortObj *o = sortobj(i); memset(o, 0, sizeof *o); o->SCnum = (int16_t)i; o->position = i % 6 ? 1 : 0; o->pnum = (uint8_t)i; }
+    g.puckx[0] = 0xA0; g.pucky = 0x40;                     /* (over the glass) */
+    hold_skate_begin();
+    for (int i = 0; i < 12; i++) { sortobj(i)->Xpos = 100; sortobj(i)->Ypos = 100; }
+    g.fox = 100; g.foy = 100;
+    hold_skate_arm();
+    struct hold_refpose q;
+    int first = -1, n = 0, ok = 1, pick = 0;
+    for (int k = 0; k < 900 && hold_skating(); k++, g.Vcount++) {
+        hold_skate_ref_pose(0, 0, 0, 0, 0, &q);
+        if (q.anim == REF_PICKUP) pick = 1;
+        if (q.anim != REF_POINT) continue;
+        if (first < 0) first = k;
+        n++;
+        if (q.dir != 2 || q.vx || q.vy || q.y != 0) ok = 0;
+    }
+    CHECK(first > 0 && n == 34 && ok && !pick);
+    rules[RULE_HOLD] = 0;
+    hold_state_load(NULL);
+    classic_rules();
+}
+
+/* the referee's way between plays keeps out of the nets (NHL 95 PC's avdgoal and SkateToSpot aims, mods/referee.c referee_way): from
+ * centre ice, the follow spots and the corners to a puck behind a net and back to every face off spot, no point of it within the net's
+ * frame (the cartridge's oval about 0, +-10Ch). Before, the straight way from centre to behind the net went through it */
+static void refnet(void)
+{
+    struct SortObj *n12 = sortobj(12), *n13 = sortobj(13);
+    memset(n12, 0, sizeof *n12); memset(n13, 0, sizeof *n13);
+    n12->Ypos = 0x10C; n13->Ypos = -0x10C;
+    for (int i = 0; i < 12; i++) { struct SortObj *o = sortobj(i); o->position = 1; o->frame = 0; }
+    CHECK(referee_in_net(0, 0x10C, NULL, NULL) && referee_in_net(30, 0x10C, NULL, NULL) && !referee_in_net(34, 0x10C, NULL, NULL) &&
+          !referee_in_net(0, 0xF8, NULL, NULL) && !referee_in_net(0, 0x118, NULL, NULL) && referee_in_net(0, -0x112, NULL, NULL));
+    static const int16_t from[][2] = { { 0, 0 }, { 0x7A, 0 }, { -0x7A, 0x60 }, { 0x66, 0x108 }, { -0x66, 0x108 }, { 0x3B, 0x10D }, { 0, 0xC0 },
+                                       { 0x10, 0xD0 }, { -0x40, 0x120 }, { 0x60, 0x11E }, { 0, 0x120 }, { 0x30, -0x100 } };
+    static const int16_t to[][2] = { { 0, 0x120 }, { 0x08, 0x11E }, { -0x18, 0x122 }, { 0x30, 0x120 }, { 0, 0xF8 }, { -0x50, 0xC0 }, { 0x50, 0xC0 },
+                                     { -0x50, 0x58 }, { 0, 0 }, { 0x50, -0xC0 }, { 0x12, 0x10C + 14 }, { 0, -0x120 } };
+    int bad = 0;
+    for (int sign = 1; sign >= -1; sign -= 2)
+        for (size_t a = 0; a < sizeof from / sizeof from[0]; a++)
+            for (size_t b = 0; b < sizeof to / sizeof to[0]; b++) {
+                int ax = from[a][0], ay = from[a][1] * sign, bx = to[b][0], by = to[b][1] * sign;
+                if (referee_in_net(ax, ay, NULL, NULL) || referee_in_net(bx, by, NULL, NULL)) continue;
+                int wx[5], wy[5], n = referee_way(ax, ay, bx, by, wx, wy, 5), x = ax, y = ay, hit = 0;
+                for (int i = 0; i < n; x = wx[i], y = wy[i], i++)
+                    for (int k = 0; k <= 64; k++)
+                        if (referee_in_net(x + (wx[i] - x) * k / 64, y + (wy[i] - y) * k / 64, NULL, NULL)) hit = 1;
+                if (hit || wx[n - 1] != bx || wy[n - 1] != by) {
+                    bad++;
+                    printf("  net: %d,%d -> %d,%d:", ax, ay, bx, by);
+                    for (int i = 0; i < n; i++) printf(" %d,%d", wx[i], wy[i]);
+                    printf("\n");
+                }
+            }
+    CHECK(bad == 0);
+}
+
 /* RULE_HOLD (mods/hold.c): the walk to the spots and the referee's puck are the game's alone (where the puck lay, the dot, the
  * walk's time); the pause goes through the state's bytes and bytes that are not a pause's are refused. RULE_ANTHEM: the
  * anthem's wait is the rule's, fixed per recording */
@@ -932,6 +997,8 @@ int main(void)
     referee_avoid();
     referee_pencall();
     referee_skating();
+    refnet();
+    refpoint();
     hold();
     siren();
     fight_ratings();

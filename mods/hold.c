@@ -483,6 +483,8 @@ static int ez_pose(struct SortObj *pl, int ax, int ay, int bx, int by, int f, in
  * Before, he went at an even pace from the whistle to the drop, the puck at 96/256 of the skaters' walk: a crawl to a puck close
  * by, a dash with no speeding up or stopping to the dot (Abdul, beta 1). Integers only. */
 #define RW_PICK 13                                      /* (SPArefpickup's 12 ticks: updateanim's 13 frames) */
+#define RW_POINT 34                                     /* (SPArefpointgoa's 8 and 24 ticks: 9 and 25 frames) */
+#define TK_FACE 2                                       /* (assrefwhistle: at the timekeeper he turns to facing 2 and points) */
 static int rw_isqrt(int64_t v)
 {
     int64_t r = 0, b = (int64_t)1 << 40;
@@ -493,20 +495,28 @@ static int rw_isqrt(int64_t v)
 }
 static int rw_len(int dx, int dy) { return rw_isqrt((int64_t)dx * dx + (int64_t)dy * dy); }
 
-struct rleg { int ax, ay, bx, by, d, v0, f0, f, turn, k, acc, top, brake; };
+/* A leg is his way from a to b round the nets (mods/referee.c referee_way: 95 PC's avdgoal and SkateToSpot's aims, where they change
+ * as he goes): up to RW_WAY straight parts, b the last, skated as one way (ez_run along all of it, so he does not stop at a
+ * corner; his facing is the part's). Before, one straight way, which went through a net between a puck behind it and the play */
+#define RW_WAY 5
+struct rleg { int ax, ay, bx, by, d, v0, f0, f, f1, turn, k, acc, top, brake, n; int wx[RW_WAY], wy[RW_WAY], cum[RW_WAY]; };
 /* a leg from a to b, setting off at v0 along it facing f0 (-1: no turn first; from rest he turns where he stands, doplayeracc) */
 static void rleg_set(struct rleg *l, int ax, int ay, int bx, int by, int v0, int f0)
 {
     l->ax = ax; l->ay = ay; l->bx = bx; l->by = by;
-    l->d = rw_len(bx - ax, by - ay);
+    l->n = referee_way(ax, ay, bx, by, l->wx, l->wy, RW_WAY);
+    l->d = 0;
+    for (int i = 0, x = ax, y = ay; i < l->n; x = l->wx[i], y = l->wy[i], i++) { l->d += rw_len(l->wx[i] - x, l->wy[i] - y); l->cum[i] = l->d; }
     referee_rates((ay < 0 ? -ay : ay) >= 0x84, &l->acc, &l->top, &l->brake);   /* (the stopped clock's top speed 74h (PC) from centre) */
-    l->f = l->d >= 2 ? vtoa((int16_t)(bx - ax), (int16_t)(by - ay)) & 7 : f0 >= 0 ? f0 : 2;
+    int lx = l->n > 1 ? l->wx[l->n - 2] : ax, ly = l->n > 1 ? l->wy[l->n - 2] : ay;   /* (the last part's start) */
+    l->f = l->d >= 2 && (bx != lx || by != ly) ? vtoa((int16_t)(bx - lx), (int16_t)(by - ly)) & 7 : f0 >= 0 ? f0 : 2;
+    l->f1 = l->d >= 2 ? vtoa((int16_t)(l->wx[0] - ax), (int16_t)(l->wy[0] - ay)) & 7 : l->f;
     int vmax = rw_isqrt((int64_t)2 * l->d * 65536 * l->brake * 17) / 17;   /* (no faster than he can stop in: ez_run's brake) */
     if (v0 > vmax) v0 = vmax;
     if (v0 < 0 || l->d < 2) v0 = 0;
     if (v0 > l->top) v0 = l->top;
     l->v0 = v0; l->f0 = f0;
-    l->turn = v0 || f0 < 0 || l->d < 2 ? 0 : ez_turn_frames(f0, bx - ax, by - ay);
+    l->turn = v0 || f0 < 0 || l->d < 2 ? 0 : ez_turn_frames(f0, l->wx[0] - ax, l->wy[0] - ay);
     l->k = l->d < 2 ? 0 : ez_run_k(l->acc, l->top, l->brake, v0, l->d, EZ_CAP, 1).k;
 }
 static int rleg_len(const struct rleg *l) { return l->turn + l->k; }
@@ -516,7 +526,7 @@ static void rleg_pose(const struct rleg *l, int r, struct hold_refpose *p)
 {
     p->vx = p->vy = 0;
     if (r < l->turn) {                                  /* (turning where he stands, gliding) */
-        int d = (l->f - l->f0) & 7, n = d > 4 ? 8 - d : d, k = r * EZ_TURN >> 16;
+        int d = (l->f1 - l->f0) & 7, n = d > 4 ? 8 - d : d, k = r * EZ_TURN >> 16;
         if (k > n) k = n;
         p->x = l->ax * 256; p->y = l->ay * 256;
         p->dir = (l->f0 + (d <= 4 ? k : -k)) & 7;
@@ -525,11 +535,18 @@ static void rleg_pose(const struct rleg *l, int r, struct hold_refpose *p)
     }
     r -= l->turn;
     struct ez s = ez_run_k(l->acc, l->top, l->brake, l->v0, l->d, r, 1);
-    int64_t run = s.pos >> 8, L = l->d > 0 ? l->d : 1;  /* (256ths of a pixel along) */
-    p->x = l->ax * 256 + (int)((l->bx - l->ax) * run / L);
-    p->y = l->ay * 256 + (int)((l->by - l->ay) * run / L);
-    p->dir = l->f;
-    p->vx = (int)((l->bx - l->ax) * (int64_t)s.v / L); p->vy = (int)((l->by - l->ay) * (int64_t)s.v / L);
+    int64_t run = s.pos >> 8;                           /* (256ths of a pixel along) */
+    int i = 0;
+    while (i < l->n - 1 && run > (int64_t)l->cum[i] * 256) i++;   /* (the part he is on) */
+    int x0 = i ? l->wx[i - 1] : l->ax, y0 = i ? l->wy[i - 1] : l->ay, c0 = i ? l->cum[i - 1] : 0, dx = l->wx[i] - x0, dy = l->wy[i] - y0;
+    int64_t L = l->cum[i] - c0 > 0 ? l->cum[i] - c0 : 1;
+    run -= (int64_t)c0 * 256;
+    if (run > L * 256) run = L * 256;
+    p->x = x0 * 256 + (int)(dx * run / L);
+    p->y = y0 * 256 + (int)(dy * run / L);
+    p->dir = dx || dy ? vtoa((int16_t)dx, (int16_t)dy) & 7 : l->f;
+    if (s.ph == EZ_THERE) p->dir = l->f;
+    p->vx = (int)(dx * (int64_t)s.v / L); p->vy = (int)(dy * (int64_t)s.v / L);
     p->at = r + 1;
     if (s.ph == EZ_SKATE) p->anim = REF_SKATE;
     else p->anim = (p->vx > 0xF0F || p->vx < -0xF0F || p->vy > 0xF0F || p->vy < -0xF0F) ? REF_STOP : REF_GLIDE;   /* (dostop: SPArefstop over 1000h (PC) an axis) */
@@ -559,7 +576,13 @@ static void rw_sched(int sx, int sy, int v0, int f0, struct rsched *s)
         s->T1 = rleg_len(&s->l1); s->PK = RW_PICK;
         pick_spot(&qx, &qy);                            /* (at it, every 8 ticks a step toward the puck till within a step of facing it, then the
                                                          * pick up facing it: assrefgoalpa) */
-        if (!sk_oop() && (qx != px || qy != py)) {
+        if (sk_oop()) {                                 /* (out of play: at the timekeeper's side, every 8 ticks a step to facing 2, then
+                                                         * SPArefpointgoa: assrefwhistle 4E8EF) */
+            s->fpk = TK_FACE;
+            int d = (s->fpk - s->l1.f) & 7;
+            s->nt = d > 4 ? 8 - d : d;
+            s->PK = RW_POINT;
+        } else if (qx != px || qy != py) {
             s->fpk = vtoa((int16_t)(qx - px), (int16_t)(qy - py)) & 7;
             int d = (s->fpk - s->l1.f) & 7, n = d > 4 ? 8 - d : d;
             s->nt = n > 1 ? n - 1 : 0;
@@ -578,7 +601,9 @@ static int rw_along(int x, int y, int vx, int vy)
 {
     int px, py;
     ref_pick(&px, &py);
-    int dx = px - x, dy = py - y, d = rw_len(dx, dy);
+    int wx[RW_WAY], wy[RW_WAY];
+    referee_way(x, y, px, py, wx, wy, RW_WAY);          /* (along the first part of his way) */
+    int dx = wx[0] - x, dy = wy[0] - y, d = rw_len(dx, dy);
     if (d < 2) return 0;
     int v = (int)(((int64_t)vx * dx + (int64_t)vy * dy) / d);
     return v < 0 ? 0 : v > 0x3000 ? 0x3000 : v;
@@ -610,9 +635,9 @@ static void rw_pose(int t, const struct rsched *s, const struct rsched *o, struc
         return;
     }
     t -= s->PT;
-    if (t < s->PK) {                                    /* (the pick up; the timekeeper's puck: he glides there) */
+    if (t < s->PK) {                                    /* (the pick up; the timekeeper's puck: he points, SPArefpointgoa) */
         p->x = s->l1.bx * 256; p->y = s->l1.by * 256; p->dir = s->fpk; p->vx = p->vy = 0;
-        p->anim = sk_oop() ? REF_GLIDE : REF_PICKUP; p->at = sk_oop() ? 1 : t;
+        p->anim = sk_oop() ? REF_POINT : REF_PICKUP; p->at = t;
         return;
     }
     t -= s->PK;

@@ -37,9 +37,9 @@
  *
  * Against 95 PC, what is not the PC's (the cartridge's game has needs the PC's does not):
  *  - between plays (RULE_HOLD) he walks to the puck and carries it to the dot on mods/hold.c's walk, a fixed time
- *    from the game's state, not the PC's assrefwhistle / assrefgoalpa / assrefdrop / SkateToSpot steps; a puck out
- *    of play is not fetched (assrefgoalpa), he goes to the timekeeper's side for one (mods/hold.c). The PC's stop
- *    at the timekeeper (assrefwhistle to (0A0h, 0)) and his signals (assrefsignal, assrefgoalline) are not done.
+ *    from the game's state, not the PC's assrefwhistle / assrefgoalpa / assrefdrop / SkateToSpot steps, round the nets
+ *    as their aims take him (referee_way); a puck out of play is not fetched (assrefgoalpa): he goes to the timekeeper's
+ *    side for one, turns to facing 2 and points (assrefwhistle: SPArefpointgoa). assrefgoalline is not done.
  *  - a fight (the PC has none): assfwatchref, NHLPA 93's assfwatch for him: he watches it from 50h, never between the two.
  *  - no EvadePlayers in play (95 PC's referee sidesteps skaters closing on him; by Abdul's direction he only gets out of a fight).
  *  - his collisions with skaters and the puck are the cartridge's checkcx / puckbody (above). */
@@ -50,6 +50,7 @@
 #include "rules.h"
 #include "anim_gen.h"
 #include "symbols_gen.h"
+#include "pccoord.h"
 
 #define REF_WEIGHT 7                                   /* (95 PC's findpc: SortCords[SCref].weight = 7) */
 #define REF_FALL 48                                    /* (SPAreffallback: 10 + 28 + 10 ticks) */
@@ -220,8 +221,8 @@ static void ref_inside(int32_t *x, int32_t *y);
 #define REF_LEGSTR 0x0F                                 /* (findpc: the referee's legstr = legspd = 0Fh) */
 #define REF_MAX 0x0434A900u                             /* (MaxSpeed[0Fh]: playeracc's fixed index for him) */
 #define REF_MAX_STOP 0x03B19000u                        /* (MaxSpeed[0Ch]: the clock stopped and he is 74h (PC) or more from centre) */
-#define PCX(v) ((v) * 0x88 / 0xA0)                      /* (a PC x on the cartridge's rink) */
-#define PCY(v) ((v) <= 0xE8 ? (v) * 0x108 / 0xE8 : 0x108 + ((v) - 0xE8) * 0x22 / 0x20)   /* (a PC y, 0 or more) */
+#define PCX(v) pc_x(v)                                  /* (a PC x on the cartridge's rink: mods/pccoord.h) */
+#define PCY(v) pc_y(v)
 static const int16_t pc_dirtab[8][2] = { { 0, 0xC8 }, { 0x8D, 0x8D }, { 0xC8, 0 }, { 0x8D, -0x8D }, { 0, -0xC8 }, { -0x8D, -0x8D }, { -0xC8, 0 }, { -0x8D, 0x8D } };
 static const int8_t pc_ftab[8] = { 0, 16, 16, 16, 0, -16, -16, -16 };   /* (doplayeracc_ftab) */
 
@@ -360,10 +361,11 @@ static void ref_doacc(struct SortObj *o, int dir)
  * used here: by Abdul's direction he keeps his line in play, as the cartridge's own skaters do, and only steps out of a fight's way,
  * assfwatchref below) */
 
-/* skateto (5E93B): every 12 ticks (the countdown in temp2's high byte) avdgoal (the game's own, src/logic.c, its scratch put back;
- * the PC's avdgoal leaves a stopped clock's referee alone on his own side of the goal line), the aim led by his speed's high byte,
+/* skateto (5E93B): every 12 ticks (the countdown in temp2's high byte) avdgoal (the PC's: ref_aim, below; it leaves a stopped clock's
+ * referee alone on his own side of the goal line), the aim led by his speed's high byte,
  * 9 (close enough) within 0Ch, else vtoa of it (no evade routine: see above), kept in temp2's low byte; no direction and still, a step toward
  * the puck (a fight: xc1 / yc1). Every tick doplayeracc with the kept direction */
+static void ref_aim(int x, int y, int tx, int ty, int stopped, int spot, int *ax, int *ay);
 static void ref_skate(struct SortObj *o, int16_t x, int16_t y, int stop)
 {
     int8_t tk = (int8_t)((uint16_t)o->temp2 >> 8);
@@ -372,11 +374,7 @@ static void ref_skate(struct SortObj *o, int16_t x, int16_t y, int stop)
     if (tk < 0) {
         o->temp2 = (int16_t)(((uint16_t)(uint8_t)(tk + 0xC) << 8) | ((uint16_t)o->temp2 & 0xFF));
         int16_t ox = x, oy = y;
-        if (!((g.gmode & (1 << gmclock)) && iabs(y) < 0x108 && (y ^ o->Ypos) >= 0)) {
-            uint16_t sdx = g.deltax, sdy = g.deltay;
-            avdgoal(&x, &y, o);
-            g.deltax = sdx; g.deltay = sdy;
-        }
+        { int ax, ay; ref_aim(o->Xpos, o->Ypos, x, y, (g.gmode & (1 << gmclock)) != 0, 0, &ax, &ay); x = (int16_t)ax; y = (int16_t)ay; }
         int px = o->Xpos + (o->Xvel >> 8), py = o->Ypos + (o->Yvel >> 8);
         int a0 = (int16_t)(x - px), a1 = (int16_t)(y - py), dx = iabs((int16_t)(ox - px)), dy = iabs((int16_t)(oy - py));
         int d;
@@ -587,6 +585,205 @@ void referee_rates(int far, int *acc, int *top, int *brake)
     *brake = (int)cartv(200 + REF_LEGSTR);
 }
 
+/* ==== The nets. NHL 95 PC keeps its referee out of them two ways, as it does its skaters:
+ *  - avdgoal (5F151, PC's own: skateto calls it every 12 ticks, so it steers him in play and between plays): when the line from
+ *    him to where he skates to crosses a net's box (y E8h - 23h to FCh, x within 2Ch of the middle), the aim is moved beside a
+ *    post (x 2Ch + 0Ah) at the goal mouth (y C4h) or behind the net (FDh), by a 13 way switch on which sides of the box he and
+ *    the aim are; with the clock stopped it leaves him alone when the aim is in front of the goal line on his own side.
+ *    Between plays SkateToSpot (4E292) adds two of its own: behind the net (|x| 1Eh or less, |y| F2h or more) to an aim in
+ *    front, he aims first for behind the post on the aim's side (28h, FCh); beside it at the goal line, for 28h, DCh.
+ *  - the net's frame (checkwallcoll -> checkgoal -> checkgoalp, which takes SCnum 10h, without CheckBump): inside the oval about
+ *    the net (32 across, 11 deep: dx^2 / 4 + 2 dy^2 up to 256) he bounces off it as off the boards (wallcoll with nethit: a
+ *    player at the side posts or past the net's back keeps his old place on that axis).
+ * The cartridge has the same oval for its skaters (src/collide.c checkgoalp: dx^2 / 1024 + dy^2 / 121 up to 1, about its nets
+ * at 0, 10Ch), but not avdgoal's box: its avdgoal (src/logic.c) only nudges the aim off the goal line. Here the PC's avdgoal and
+ * SkateToSpot's rules on the PC's rink (mods/pccoord.h), and the cartridge's oval about its nets where they are */
+static int avd_box(int px, int py, int tx, int ty, int x1, int x2, int y, int *ps, int *pt)   /* (avdgoal_box: x1, x2 are y limits, y the x half width) */
+{
+    *ps = *pt = 0;
+    if (x1 > py) { *ps = 4; if (ty < x1) return 0; } else if (ty < x1) *pt = 4;
+    if (x2 > py) { if (ty >= x2) *pt = 1; } else { *ps = 1; if (ty >= x2) return 0; }
+    if (y > px) { if (y <= tx) *pt |= 2; } else { *ps |= 2; if (y <= tx) return 0; }
+    if (-y <= px) { if (-y > tx) *pt |= 8; } else { *ps |= 8; if (-y > tx) return 0; }
+    return 1;
+}
+
+/* the goalie in the net at that end (PC units; 0: none) */
+static int net_goalie(int top, int *gx, int *gy)
+{
+    const struct SortObj *o = sortobj(0);
+    for (int i = 0; i < 12; i++, o++)
+        if (o->position == 0 && o->frame && (o->Ypos > 0) == top) { *gx = cart_pc_x(o->Xpos); *gy = cart_pc_y(o->Ypos); return 1; }
+    return 0;
+}
+
+/* avdgoal for him (PC units): p his place, *tx / *ty the aim, changed in place. stopped: the clock is stopped */
+static void pc_avdgoal(int px, int py, int *ox, int *oy, int stopped)
+{
+    int ps, pt, gl, yl, yb, gk, gx = 0, gy = 0, tx = *ox, ty = *oy;
+    const int m = 0xA;                                  /* (not a goalie, not assignment 27h: the wide box) */
+    if (stopped && (ty < 0 ? -ty : ty) < 0xE8 && (ty ^ py) >= 0) return;
+    if (avd_box(px, py, tx, ty, 0xE8 - 0x23, 0xFC, 0x2C, &ps, &pt)) {
+        yb = 0xFD; yl = 0xE8 - 0x24; gl = 0xE8;
+        py = -py; ty = -ty;
+        gk = net_goalie(1, &gx, &gy);
+        if (ps & 5) ps ^= 5;
+        if (pt & 5) pt ^= 5;
+    } else {
+        if (!avd_box(px, py, tx, ty, -0xFC, 0x23 - 0xE8, 0x2C, &ps, &pt)) return;
+        yb = -0xFD; yl = 0x24 - 0xE8; gl = -0xE8;
+        gk = net_goalie(0, &gx, &gy);
+    }
+    int apx = px < 0 ? -px : px;
+    if (pt == 0) {
+        if (py >= -0xE8) {
+            if (ty < -0xE8) {
+                *oy = yl;
+                if (gk && ((tx - gx) ^ (px - tx)) < 0) *ox = px < gx ? -0x2C - m : m + 0x2C;
+                else {
+                    if (apx >= m + 0x2C) return;
+                    *ox = px < 0 ? -0x2C - m : m + 0x2C;
+                }
+                if (apx > 0x26) *oy = yb;
+                return;
+            }
+            if (!gk) return;
+            if (px < tx) { if (px >= gx) return; } else if (px < gy) return;   /* (the PC's own: its goalie's y here) */
+            *oy = yl;
+            return;
+        }
+        if (ty < -0xE8) return;
+        if (px < -0x2C - m + 1) *ox = -0x2C - m;
+        else if (px >= m + 0x2C) *ox = 0x2C + m;
+        else {
+            *oy = yb;
+            if (tx >= 0) { if (m + 0x2C > tx) *ox = 0x2C + m; } else if (-0x2C - m + 1 <= tx) *ox = -0x2C - m;
+        }
+        if (apx > 0x26) *oy = yl;
+        return;
+    }
+    switch (ps) {
+    case 0:
+        if (py < -0xE8) {
+            if (px < -0x2C - m + 1) *ox = -0x2C - m;
+            else if (px >= m + 0x2C) *ox = m + 0x2C;
+            else {
+                *oy = yb;
+                if (tx >= 0) { if (m + 0x2C > tx) *ox = m + 0x2C; } else if (-0x2C - m + 1 <= tx) *ox = -0x2C - m;
+            }
+            return;
+        }
+        if (ty >= -0xE8) {
+            if (gk && ((tx - gx) ^ (px - tx)) < 0) *ox = px < gx ? -0x2C - m : m + 0x2C;
+            else if (apx < m + 0x2C) *ox = px < 0 ? -0x2C - m : m + 0x2C;
+            if (apx > 0x26) *oy = yb;
+            return;
+        }
+        *oy = gl;
+        if (gk) *ox = px < gy ? -0x2C - m : m + 0x2C;    /* (the PC's own: its goalie's y here) */
+        else if (tx >= 0) { if (m + 0x2C > tx) *ox = m + 0x2C; } else if (-0x2C - m + 1 <= tx) *ox = -0x2C - m;
+        return;
+    case 1:
+        *oy = yl;
+        if (pt & 4) return;
+        if (tx >= 0) { if (tx < m + 0x2C) *ox = m + 0x2C; } else if (tx >= -0x2C - m + 1) *ox = -0x2C - m;
+        return;
+    case 2: *ox = m + 0x2C; if (pt & 5) return; *oy = yl; return;
+    case 3: if (pt == 8) *oy = yl; else *ox = m + 0x2C; return;
+    case 4:
+        *oy = yb;
+        if (!(pt & 1)) return;
+        if (tx >= 0) { if (tx < m + 0x2C) *ox = m + 0x2C; } else if (tx >= -0x2C - m + 1) *ox = -0x2C - m;
+        return;
+    case 6: if (pt != 8) *ox = m + 0x2C; else *oy = yb; return;
+    case 8: *ox = -0x2C - m; if (!(pt & 5)) return; *oy = yl; return;
+    case 9: if (pt == 2) *oy = yl; else *ox = -0x2C - m; return;
+    case 12: if (pt == 2) *oy = yb; return;
+    }
+}
+
+/* where he aims from x, y for the spot tx, ty (the cartridge's units): avdgoal, and between plays (spot 1) SkateToSpot's own two */
+static void ref_aim(int x, int y, int tx, int ty, int stopped, int spot, int *ax, int *ay)
+{
+    int px = cart_pc_x(x), py = cart_pc_y(y), qx = cart_pc_x(tx), qy = cart_pc_y(ty), ax2 = qx, ay2 = qy;
+    int apx = px < 0 ? -px : px, apy = py < 0 ? -py : py, aqy = qy < 0 ? -qy : qy;
+    if (spot && apx <= 0x1E && apy >= 0xF2 && aqy < 0xF2) { ay2 = py < 0 ? -0xFC : 0xFC; ax2 = qx < 0 ? -0x28 : 0x28; }
+    else if (spot && apx >= 0x10 && apx <= 0x1E && apy >= 0xE8 && (py ^ qy) >= 0 && aqy < 0xE8 && aqy > 0xE0 && (qx < 0 ? -qx : qx) < 0x14) {
+        ay2 = py < 0 ? -0xDC : 0xDC; ax2 = px < 0 ? -0x28 : 0x28;
+    }
+    pc_avdgoal(px, py, &ax2, &ay2, stopped);
+    if (ax2 == qx && ay2 == qy) { *ax = tx; *ay = ty; return; }   /* (unchanged: the spot itself, not its round trip) */
+    *ax = pc_x(ax2); *ay = pc_y(ay2);
+}
+
+/* does the straight way from a to b (the cartridge's units) cross a net's box (avdgoal's: PC x within 2Ch, y E8h - 23h to FCh)? the
+ * net's end (1 top, -1 bottom) or 0. Every 2 pixels */
+static int way_box(int ax, int ay, int bx, int by, int frame)
+{
+    int dx = bx - ax, dy = by - ay, d = (int)isqrt64((uint64_t)((int64_t)dx * dx + (int64_t)dy * dy)) / 2 + 1;
+    for (int k = 0; k <= d; k++) {
+        int x = ax + dx * k / d, y = ay + dy * k / d;
+        if (frame) { if (referee_in_net(x, y, NULL, NULL)) return y > 0 ? 1 : -1; continue; }
+        int px = cart_pc_x(x), py = cart_pc_y(y), apy = py < 0 ? -py : py;
+        if (px > -0x2C && px < 0x2C && apy >= 0xE8 - 0x23 && apy < 0xFC) return py > 0 ? 1 : -1;
+    }
+    return 0;
+}
+
+/* his way between plays from a to b (the clock stopped: SkateToSpot, skateto, avdgoal), the corners of it, b last; at most n; the count.
+ *  - behind the net (PC |x| 1Eh or less, |y| F2h or more) to a spot in front: first behind the post on the spot's side (28h, FCh),
+ *    SkateToSpot's own aim;
+ *  - a way through a net's box goes round it by avdgoal's aims, beside the post (x 2Ch + 0Ah) at the goal mouth (C4h) and behind the
+ *    net (FDh), on his side of it (the spot's when he is straight in front or behind). With the clock stopped avdgoal leaves him alone
+ *    to a spot in front of the goal line on his own side; then only a way into the net's frame goes round (the PC's checkgoalp would
+ *    bounce him off it).
+ * Not avdgoal's every case: looked at as he skates (12 ticks), its aim straight in front of the net for a spot behind it is the goal
+ * mouth, where he stops: the PC's referee waits there until assrefgoalpa's 258h ticks give him the puck. Here he goes round */
+int referee_way(int ax, int ay, int bx, int by, int *wx, int *wy, int n)
+{
+    int k = 0, x = ax, y = ay, side = 0;
+    int px = cart_pc_x(x), py = cart_pc_y(y), qx = cart_pc_x(bx), qy = cart_pc_y(by);
+    int apx = px < 0 ? -px : px, apy = py < 0 ? -py : py, aqy = qy < 0 ? -qy : qy;
+    if (apx <= 0x1E && apy >= 0xF2 && aqy < 0xF2 && k < n - 1) {
+        x = wx[k] = pc_x(qx < 0 ? -0x28 : 0x28); y = wy[k] = pc_y(py < 0 ? -0xFC : 0xFC); k++;
+        side = qx < 0 ? -1 : 1;
+    }
+    while (k < n - 1) {
+        int e = way_box(x, y, bx, by, 0);
+        if (!e) break;
+        int sy = cart_pc_y(y) * e, sty = cart_pc_y(by) * e;   /* (his and the spot's PC y toward that net's end) */
+        if (sy < 0xE8 && sty < 0xE8 && (y ^ (e > 0 ? 1 : -1)) >= 0 && (by ^ (e > 0 ? 1 : -1)) >= 0 && !way_box(x, y, bx, by, 1)) break;   /* (the stopped clock's leave) */
+        if (!side) { int sx = cart_pc_x(x); side = sx > 4 ? 1 : sx < -4 ? -1 : bx < 0 ? -1 : 1; }
+        int cx = pc_x(side * (0x2C + 0xA)), lx = cart_pc_x(x) * side, front = pc_y(e * (0xE8 - 0x24)), back = pc_y(e * 0xFD);
+        int ty;
+        if (lx >= 0x2C + 0xA - 2) ty = sty >= 0xEC ? back : front;   /* (beside the net: along it to the spot's side of it, the net's
+                                                         * middle at ECh: the cartridge's 10Ch) */
+        else ty = sy < 0xEC ? front : back;             /* (in front of it or behind it: to the post's corner on that side) */
+        if (cx == x && ty == y) break;
+        x = wx[k] = cx; y = wy[k] = ty; k++;
+    }
+    wx[k] = bx; wy[k] = by;
+    return k + 1;
+}
+
+/* in a net's frame at x, y (the cartridge's oval, src/collide.c checkgoalp, about the net's place): 1 and the way out (wallcoll's
+ * c, s, 100h long) */
+int referee_in_net(int x, int y, int16_t *c, int16_t *s)
+{
+    for (int i = 12; i <= 13; i++) {
+        const struct SortObj *net = sortobj(i);
+        int dx = x - net->Xpos, dy = y - net->Ypos;
+        if (dx < -32 || dx > 32 || dy < -11 || dy > 11) continue;
+        if ((uint32_t)(dx * 16) * (uint32_t)(dx * 16) / 0x400 + (uint32_t)(dy * 16) * (uint32_t)(dy * 16) / 0x79 > 0x100) continue;
+        if (c) {
+            int d = (int)isqrt64((uint64_t)(dx * dx + dy * dy)) + 1;
+            *c = (int16_t)(-dy * 256 / d); *s = (int16_t)(dx * 256 / d);
+        }
+        return 1;
+    }
+    return 0;
+}
+
 /* updateplayers (5C40F) for him: on the ice a 64th of the speed off a frame, the move, the frames of his picture; then checkwallcoll's
  * boards. 2: he hit them hard (the game's referee plays SFXplayerwall, the picture's does not) */
 int referee_glide(struct SortObj *o)
@@ -599,10 +796,20 @@ int referee_glide(struct SortObj *o)
     if (o->Yvel > lim) o->Yvel = lim;
     if (o->Yvel < -lim) o->Yvel = (int16_t)-lim;
     int32_t d4 = kfr() * elapsed;
+    int16_t ox = o->Xpos, oy = o->Ypos;
+    uint16_t oxf = o->Xfrac, oyf = o->Yfrac;
     int32_t p = POS32(o->Xpos, o->Xfrac) + (int32_t)o->Xvel * d4; o->Xpos = (int16_t)(p >> 16); o->Xfrac = (uint16_t)p;
     p = POS32(o->Ypos, o->Yfrac) + (int32_t)o->Yvel * d4; o->Ypos = (int16_t)(p >> 16); o->Yfrac = (uint16_t)p;
     if (o->SPAcnt < 0xFFFF) o->SPAcnt = (uint16_t)(o->SPAcnt + elapsed);
     int16_t c, s;
+    if (referee_in_net(o->Xpos, o->Ypos, &c, &s)) {     /* (checkgoalp: off the net's frame, wallcoll with nethit: no sound, and at the side posts
+                                                         * or past the net's back his old place on that axis) */
+        ref_bounce(o, c, s);
+        if ((ox <= -PCX(0x18) && o->Xvel > 0) || (ox >= PCX(0x18) && o->Xvel < 0)) { o->Xvel = 0; o->Xpos = ox; o->Xfrac = oxf; }
+        int ny = oy < 0 ? -PCY(0xEC) : PCY(0xEC);
+        if ((oy > ny + PCY(0xA) && o->Yvel < 0) || (oy < ny - PCY(6) && o->Yvel > 0)) { o->Yvel = 0; o->Ypos = oy; o->Yfrac = oyf; }
+        return 1;
+    }
     return ref_walls(o->Xpos, o->Ypos, &c, &s) ? ref_bounce(o, c, s) : 0;
 }
 
