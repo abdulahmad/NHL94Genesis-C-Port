@@ -673,16 +673,23 @@ static void ref_live(void)
              * started from the dot (PR #167's walk) or from where the period's start had left him (the fx0 it kept): gone from
              * the view and back, or a jump) */
         } else { R.x = (fx > 0 ? fx + 15 : fx - 15) * 256; R.y = fy * 256; put = 1; }
+        int tick = g.Vcount != stepvc;
         stepvc = g.Vcount;
         double ddx = R.x - ox, ddy = R.y - oy;
-        int want = fx > 0 ? 6 : 2;
-        if (walk && R.init && ddx * ddx + ddy * ddy > 77.0 * 77.0) {        /* (on his way, over 0.3 a frame: striding, turning to his way) */
-            int d = (int)floor(atan2(ddx, ddy) / (M_PI / 4) + 0.5);
-            ref_turn(((d % 8) + 8) % 8, 0x1800);
-            R.anim = REF_SKATE; R.t = R.t + 1;
+        int want = fx > 0 ? 6 : 2, moved = ddx * ddx + ddy * ddy > 77.0 * 77.0;
+        static uint16_t movevc;                                              /* (the last frame his walk moved him) */
+        if (walk && R.init && moved) movevc = g.Vcount;
+        if (walk && R.init && (moved || (uint16_t)(g.Vcount - movevc) < 8)) {
+            /* (on his way, over 0.3 a frame: striding, turning to his way. A frame the game's pass did not run (a lag frame: he did
+             * not move) keeps his stride: PR #233 had him standing for it, the stride back to its first frame, so on a walk with
+             * lag frames every few frames the skating frames never got past the first, he slid along, and the standing frame
+             * flashed in between) */
+            if (moved) { int d = (int)floor(atan2(ddx, ddy) / (M_PI / 4) + 0.5); ref_turn(((d % 8) + 8) % 8, 0x1800); }
+            if (R.anim != REF_SKATE) R.t = 0;
+            R.anim = REF_SKATE; R.t = R.t + tick;
         } else {
-            if (put || !R.init) R.dir = want;                                /* (put at the dot: assrefatdot's facing) */
-            else ref_turn(want, 0x2000);                                     /* (there: a step every 8, assrefdrop's) */
+            if ((put && ddx * ddx + ddy * ddy > 2048.0 * 2048.0) || !R.init) R.dir = want;   /* (put at the dot: assrefatdot's facing) */
+            else ref_turn(want, 0x2000);                                     /* (there, or come to it on the walk: a step every 8, assrefdrop's; it snapped round when the walk ended) */
             R.anim = REF_GLIDE; R.t = 0;
         }
         R.vx = R.vy = 0;
