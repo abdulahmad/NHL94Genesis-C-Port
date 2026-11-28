@@ -3452,7 +3452,7 @@ void puckfaceoff2(struct Team *tm, struct SortObj *o)
     g.disflags |= HI(4);
     ClrHor();
     g.crowdnoisedelay = 0x2710;
-    if (!nofade) { g.Vpos = 0; g.Hpos = 0; }                 /* (RULE_HOLD mid-play: the view stays where it was and follows the ref's puck to the dot) */
+    if (nofade != 1) { g.Vpos = 0; g.Hpos = 0; }             /* (RULE_HOLD mid-play: the view stays where it was and follows the ref's puck to the dot; 2: a cut from the penalty screen) */
     g.puckx[0] = g.fox;
     g.pucky = g.foy;
     ST_W(g.puckz[0]);                                     /* no visible puck */

@@ -94,6 +94,9 @@ void chkprogress(void)
 cont:
     if (!(g.gmode & (1 << gmpen))) return;
     if ((int16_t)g.PenCntDwn < 0) { InProgress(); return; }
+    int call = pencall_ready();                           /* (RULE_PENCALL, mods/referee.c: the PC referee's call, then a cut; 0 the cartridge's) */
+    if (call < 0) return;
+    if (call) g.PenCntDwn = 0;
     g.PenCntDwn = (uint16_t)(g.PenCntDwn - elapsed);
     if ((int16_t)g.PenCntDwn >= 0) return;
     g.gmode &= (uint8_t)~(1 << gmpendel);
@@ -104,7 +107,7 @@ cont:
     }
     g.sflags2 |= HI(sf2drec);
     uint16_t vc = g.Vcount;
-    forceblack();
+    if (!call) forceblack();                              /* (RULE_PENCALL: a cut, no fade) */
     g.Vcount = vc;
     SetHor();
     DecompressGraphicsPlain(ART(RefMap2) + 8, g.ExtraChars);   /* the horizontal ref tiles */

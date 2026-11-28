@@ -744,6 +744,7 @@ static const struct { int rule; const char *key; int group; } cd_rows[] = {
     { RULE_SHOTBLOCK, "shot_block", 4 },
     { RULE_GOALIE, "goalie_anims", 4 },                  /* (the PC goalie's saves and hop: mods/goalie.c) */
     { RULE_TICKER_HL, "ticker_highlights", 4 },          /* (the other games' highlights from the pregame: mods/ticker.c) */
+    { RULE_PENCALL, "penalty_call", 4 },                 /* (NHL 95 PC's penalty call by the referee in play: mods/referee.c) */
 };
 #define CD_ROWS ((int)(sizeof cd_rows / sizeof cd_rows[0]))
 #define CD_HOLD 9                                          /* (RULE_HOLD) */
@@ -754,6 +755,7 @@ static const struct { int rule; const char *key; int group; } cd_rows[] = {
 #define CD_FAKESHOT 14                                     /* (RULE_FAKESHOT, then RULE_DROPPASS, RULE_SHOTBLOCK, RULE_GOALIE) */
 #define CD_GOALIE 17
 #define CD_TICKER 18                                       /* (RULE_TICKER_HL) */
+#define CD_PENCALL 19                                      /* (RULE_PENCALL) */
 #define CD_ROSTERS CD_ROWS                                /* (the roster set: the cartridge's, or a built-in one, list entries 1-3) */
 #define CD_MUSIC (CD_ROWS + 1)                            /* (this machine's sound only: the disc's music, its crowd bed) */
 #define CD_CROWD (CD_ROWS + 2)
@@ -1144,7 +1146,7 @@ static void game_page_init(void)
                                                   "Sega CD playoff password", "Sega CD shot data fix", "Sega CD uniforms",
                                                   "Sega CD sound choices", "Sega CD song timing", "Sega CD period end", "PC between-play pause", "Fighting", "Fight ratings", "Rink announcer: when he speaks",
                                                   "Double minors and majors", "Fake shot", "Drop pass", "Shot blocking", "Goalie animations",
-                                                  "Ticker highlights" };
+                                                  "Ticker highlights", "Penalty call" };
     for (int k = 0; k < CD_ROWS; k++) {
         char key[64];
         snprintf(key, sizeof key, "rules.%s", cd_rows[k].key);
@@ -1203,7 +1205,8 @@ static void game_page_init(void)
             "NHL 95's drop pass. NHL 95 PC: a pass to a team-mate trailing you in the attacking zone is left on the ice for him. NHL 95 Genesis: press A with the pad pulled back.",
             "NHL 95's shot blocks. NHL 95 PC: A with no one in reach dives, slides or kneels in front of a shot, and defenders do it themselves. NHL 95 Genesis: A while a shooter winds up (or just after the shot) kneels to block, and defenders in the shot's line do it too.",
             "The goalie in NHL 95 PC's animations: falling back, dropping to the stick or glove side, and his own hop over the boards. With 96 Genesis: also its straight on blocks and knee catches. The pictures need NHL 95 PC's files; without them the cartridge's look.",
-            "The other games on the score ticker. Cartridge: they have played 0 to 2 periods when your game starts, so the first highlight can come at the first intermission at the earliest. From the pregame: they may have played all 3, so a close one goes to overtime and its highlight plays at the Start Game screen." };
+            "The other games on the score ticker. Cartridge: they have played 0 to 2 periods when your game starts, so the first highlight can come at the first intermission at the earliest. From the pregame: they may have played all 3, so a close one goes to overtime and its highlight plays at the Start Game screen.",
+            "Who calls a penalty. Cartridge: the picture fades out to the penalty screen and fades back in. PC referee: as in NHL 95 PC, no fade at the whistle; the referee skates to the timekeeper's side, turns to face you and signals the penalty, then the picture cuts to the penalty screen and cuts back after it. Only with the referee in play (PC referee: Full); otherwise the cartridge's way." };
         for (int k = 0; k < CD_ROWS; k++) game_help[k] = hp[k];
         game_help[CD_ROSTERS] = "Who plays: the cartridge's rosters (1992-93 at the trade deadline), the Sega CD's (1992-93 after the expansion draft), or 1993-94's on opening night or after the trade deadline (the game restarts to change them).";
         game_help[CD_ROSTERMENU] = "A Rosters line on the game's own setup menu, under Play Mode, to choose the rosters there (not in an online game).";
@@ -1283,6 +1286,8 @@ static void game_page_init(void)
     pv[2][CD_FIGHTRATE] = 1;
     pv[1][CD_PENALTIES] = 0;                                                   /* (NHL 96 Genesis's double minors: not the Sega CD's; off in Recommended, it changes the 94 game) */
     for (int k = CD_FAKESHOT; k <= CD_GOALIE; k++) pv[1][k] = 0;              /* (NHL 95's moves and the PC goalie: not the Sega CD's; off in Recommended too, they change the 94 game) */
+    pv[1][CD_PENCALL] = 0;                                                     /* (the PC referee's call: not the Sega CD's; on in Recommended, it acts only with the referee in play, PC referee: Full) */
+    pv[2][CD_PENCALL] = 1;
     pv[1][CD_TICKER] = 0;                                                      /* (pregame highlights: not the Sega CD's; off in Recommended too, it changes the other games' scores) */
     pv[1][CD_FIGHT] = 0;                                                       /* (NHL 93's fights: not the Sega CD's; off in Recommended too until tried) */
     pv[1][CD_HATS] = 0;                                                        /* (the SNES's: not the Sega CD's) */

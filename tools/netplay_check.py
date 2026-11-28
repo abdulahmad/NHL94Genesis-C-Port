@@ -51,6 +51,9 @@ the setup screen), EA's 4 Way Play in the ports (the solo run's --four-way).
            in the away net is forced at vblank 200 on every machine (HOLDTEST, the game's own test aid)
   ticker   host and join, 25 ms +-15, 5% lost, delay 1: the host's RULE_TICKER_HL (the other games' 0-3 periods before the
            pregame, mods/ticker.c), drawn on the game's own seed on every machine
+  pencall  host and join, 25 ms +-15, 5% lost, delay 1: the host's RULE_PENCALL with RULE_REFEREE and RULE_HOLD (the referee
+           skates to the timekeeper's side and signals the call, then the cut to the penalty screen, mods/referee.c); a
+           hooking penalty is forced at vblank 300 on every machine (HOLDTEST, HOLDPEN); the host alone draws the PC referee
 
     tools/netplay_check.py [NAME...]
 """
@@ -86,9 +89,11 @@ SCENARIOS = [
     ('siren', 7000, ['--rule', 'announce_timing=2', '--rule', 'goal_siren=1', '--rule', 'hold_play=on', '--pc-siren', '--pc-crowd'],
      'join', 1, '25,15,5,1', 8, [1, 1]),
     ('ticker', 6000, ['--rule', 'ticker_highlights=1'], 'join', 1, '25,15,5,1', 9, [1, 1]),
+    ('pencall', 7000, ['--rule', 'penalty_call=1', '--rule', 'referee_in_play=on', '--rule', 'hold_play=on', '--pc-ref'], 'join', 1,
+     '25,15,5,1', 10, [1, 1]),
 ]
 NEEDS = {'rosters': 'out/rosters/thirty-two', 'siren': 'build/NHL95.iso'}
-ENVS = {'siren': {'HOLDTEST': 'goal:200,away'}}           # (every machine's, and the solo run's: the same forced goal)
+ENVS = {'siren': {'HOLDTEST': 'goal:200,away'}, 'pencall': {'HOLDTEST': 'pen:300', 'HOLDPEN': '30'}}           # (every machine's, and the solo run's: the same forced goal)
 RESETS = {'reset': 3600}                                  # (the host's pad 1 resets the console at this frame)
 LOADS = {'load': (4000, 3000)}                            # (the host loads from this frame a state the solo run saved at that)
 

@@ -70,7 +70,8 @@ static struct {
     SDL_atomic_t on, phys;                  /* phys: skaters bump him (ref_bump), the picture's alone */
     int init, x, y, vx, vy;                 /* the rink position and velocity in 1/256 pixels */
     int dir, t, wasfo, drop, fall;          /* fall: the frames into his fall (RULE_REFEREE), -1 standing; t: the frames into his picture */
-    int anim;                               /* his picture: REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL / R (src/rules.h) */
+    int anim;                               /* his picture: REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL / R, REF_SIGNAL (src/rules.h) */
+    int sig;                                /* REF_SIGNAL: the call (REF_SIG_ROUGH ...) */
     int sx, sy, valid;                      /* the sprite table position of the last frame */
 } R;
 
@@ -681,7 +682,7 @@ static void ref_live(void)
     } else if (referee_get(&gv)) {                                          /* (RULE_REFEREE: in play, where the game has him) */
         R.x = gv.x / 256; R.y = gv.y / 256; R.vx = gv.vx / 256; R.vy = gv.vy / 256;
         R.wasfo = 0; R.drop = gv.drop; R.init = 1;
-        R.dir = gv.dir; R.anim = gv.anim; R.t = gv.at;
+        R.dir = gv.dir; R.anim = gv.anim; R.t = gv.at; R.sig = gv.sig;
         if (gv.fall >= 0) { R.fall = gv.fall; R.dir = gv.fall_dir; }
     } else {
         vis = 1;
@@ -791,6 +792,22 @@ static int ref_frame(void)
     }
     int b = 5 * ((8 - d) & 7);
     static const int o[4] = { 2, 3, 0, 1 };
+    if (R.anim == REF_SIGNAL) {                                                          /* (RULE_PENCALL: refsigspa_m2's signal, frames.asm) */
+        static const int16_t sp[REF_SIGS][16] = {
+            { 847, 12, 859, 12, 860, 24, 847, 0 },                                       /* (SPArefrough) */
+            { 847, 12, 863, 12, 864, 12, 865, 12, 863, 12, 864, 12, 865, 12, 847, 0 },   /* (SPArefcharge) */
+            { 847, 12, 852, 12, 853, 24, 847, 0 },                                       /* (SPArefslash) */
+            { 847, 12, 854, 12, 855, 24, 847, 0 },                                       /* (SPArefxcheck) */
+            { 847, 12, 850, 12, 851, 24, 847, 0 },                                       /* (SPArefhook) */
+            { 847, 12, 861, 12, 862, 24, 847, 0 },                                       /* (SPAreftrip) */
+            { 847, 12, 857, 48, 847, 0 },                                                /* (SPArefinterfer) */
+            { 847, 12, 856, 48, 847, 0 },                                                /* (SPArefhold) */
+            { 847, 12, 711, 12, 712, 24, 711, 8, 847, 0 } };                             /* (SPArefpenshot) */
+        const int16_t *l = sp[R.sig >= 0 && R.sig < REF_SIGS ? R.sig : 0];
+        int t = R.t;
+        for (; l[1] && t >= l[1]; l += 2) t -= l[1];
+        return l[0];
+    }
     switch (R.anim) {                                                                    /* (95 PC's frames.asm) */
     case REF_SKATE: return 651 + b + o[(R.t / 10) & 3];                                  /* (SPArefskate: 10 ticks a frame) */
     case REF_STOP: return 771 + 2 * d + ((R.t / 4) & 1);                                 /* (SPArefstop: 4 ticks a frame, looping) */
