@@ -60,7 +60,7 @@
 #define PEN_REFEREE 0x1A                               /* (PenRoughing: the cartridge's nearest to 95 PC's 16h, Abuse of Official) */
 
 static struct SortObj ref;                             /* (only the fields below are his: Xpos ... impact, nopuck[0]) */
-static struct referee_extra { uint8_t mode, drop, fall, fdir, hits, faller, call, sig, st, abuse; uint16_t ct; } rx;   /* mode 0 off the ice, 1 at the dot, 2 in play;
+static struct referee_extra { uint8_t mode, drop, fall, fdir, hits, faller, call, sig, st, abuse, psw; uint16_t ct; } rx;   /* mode 0 off the ice, 1 at the dot, 2 in play;
                                                                  * call (RULE_PENCALL): 0 none, 1 skating to the spot, 2 turning to face the call, 3 the
                                                                  * signal (sig, st its frames), 4 made; ct the frames since the whistle */
 
@@ -585,6 +585,14 @@ static void assrefpenshot(struct SortObj *o)
         o->Xpos = o->Ypos = 0; o->Xfrac = o->Yfrac = 0; o->Xvel = o->Yvel = 0;   /* (the cartridge does not wait for him: he is at centre with
                                                          * the puck as its penalty shot's set up (behind its black) puts the puck there) */
         o->temp3 = (int16_t)(vtoa(sh->Xpos, sh->Ypos) & 7);   /* (facing the shooter: his spot is 0, 0 till he puts the puck down) */
+        rx.psw = 0;
+    }
+    {   /* (the PC's whistle, sfx A4h, as it lets the shooter go: here as the cartridge does, the puck leaving its penalty shot's set up
+         * (ppenshot); psw 2 once it is seen there, 1 once whistled. The PC's A4h is its Stop4Pen whistle, the cartridge's SFXwhistle) */
+        const struct SortObj *pk = sortobj(puckscnum);
+        int asn = pk->asslist[pk->assnum & 7];
+        if (asn == ppenshot) rx.psw = 2;
+        else if (rx.psw == 2) { sfx(SYM_SFXwhistle); rx.psw = 1; }
     }
     switch (o->temp5) {
     case 0x10:
@@ -1020,22 +1028,27 @@ size_t referee_state_save(uint8_t *out)
         b[11] = (uint8_t)ref._pad56; b[12] = (uint8_t)(ref._pad56 >> 8); b[13] = (uint8_t)ref.temp4; b[14] = (uint8_t)((uint16_t)ref.temp4 >> 8);
         b[15] = (uint8_t)ref.temp5; b[16] = (uint8_t)ref.temp1; b[17] = (uint8_t)ref.temp3; b[18] = (uint8_t)((uint16_t)ref.temp3 >> 8);   /* (version 11: his fight watch) */
         b[19] = rx.call; b[20] = rx.sig; b[21] = rx.st; b[22] = (uint8_t)rx.ct; b[23] = (uint8_t)(rx.ct >> 8);   /* (version 12: his penalty call) */
+        b[24] = (uint8_t)ref.SPA; b[25] = (uint8_t)(ref.SPA >> 8); b[26] = (uint8_t)ref.SPAcnt; b[27] = (uint8_t)(ref.SPAcnt >> 8);   /* (version 17: his picture and its frames,
+                                                                         * which his skating reads: ref_aip; the penalty shot's whistle) */
+        b[28] = rx.psw;
     }
     return REFEREE_STATE_SIZE;
 }
 
 /* a state's n bytes, or (in NULL) none: a state from before the referee, which starts him off the ice. A state from before his
  * skating (version 6 to 9 of the rules' part: REFEREE_STATE_SIZE_9 bytes) starts it afresh where he is; one from before his fight
- * watch (version 10: REFEREE_STATE_SIZE_10) has him not watching one; one from before his penalty call (version 11: REFEREE_STATE_SIZE_11) has him not making one */
+ * watch (version 10: REFEREE_STATE_SIZE_10) has him not watching one; one from before his penalty call (version 11: REFEREE_STATE_SIZE_11) has him not making one;
+ * one from before his picture was kept (12 to 16: REFEREE_STATE_SIZE_12) has it from his phase */
 int referee_state_load(const uint8_t *in, size_t n)
 {
     memset(&ref, 0, sizeof ref);
     memset(&rx, 0, sizeof rx);
     if (!in) return 0;
-    if (n != REFEREE_STATE_SIZE && n != REFEREE_STATE_SIZE_11 && n != REFEREE_STATE_SIZE_10 && n != REFEREE_STATE_SIZE_9) return -1;
+    if (n != REFEREE_STATE_SIZE && n != REFEREE_STATE_SIZE_12 && n != REFEREE_STATE_SIZE_11 && n != REFEREE_STATE_SIZE_10 && n != REFEREE_STATE_SIZE_9) return -1;
     if (n >= REFEREE_STATE_SIZE_11 && ((in[29] > 2 && (in[29] < 0x10 || in[29] > 0x14) && in[29] != 0x20 && in[29] != 0x21) || in[30] > 0x3C)) return -1;   /* (temp5: the fight watch 0-2,
                                                                          * the penalty shot 10h-14h, the goal line 20h-21h) */
-    if (n == REFEREE_STATE_SIZE && (in[33] > 4 || in[34] >= REF_SIGS)) return -1;
+    if (n >= REFEREE_STATE_SIZE_12 && (in[33] > 4 || in[34] >= REF_SIGS)) return -1;
+    if (n == REFEREE_STATE_SIZE && (in[38] > REF_POINT || in[39] || in[42] > 2)) return -1;
     if (n >= REFEREE_STATE_SIZE_10 && (in[22] > 7 || (in[23] > 9) || (int8_t)in[24] < -0xC || (int8_t)in[24] > 0xC)) return -1;
     if (in[15] > 2 || in[16] > REF_DROP || in[17] > REF_FALL || in[18] > 7 || in[19] > 2 || in[20] > 0xB || in[21] > 1) return -1;   /* (a state is checked before it is used) */
     int16_t w[7];
@@ -1047,9 +1060,10 @@ int referee_state_load(const uint8_t *in, size_t n)
     referee_skate_start(&ref, x, y);
     ref.Xfrac = (uint16_t)w[1]; ref.Yfrac = (uint16_t)w[3]; ref.Xvel = vx; ref.Yvel = vy;
     if (n >= REFEREE_STATE_SIZE_11) { ref.temp5 = in[29]; ref.temp1 = in[30]; ref.temp3 = (int16_t)(in[31] | in[32] << 8); }
-    if (n == REFEREE_STATE_SIZE) { rx.call = in[33]; rx.sig = in[34]; rx.st = in[35]; rx.ct = (uint16_t)(in[36] | in[37] << 8); if (rx.call == 3) ref.SPA = REF_SIGNAL; }
+    if (n >= REFEREE_STATE_SIZE_12) { rx.call = in[33]; rx.sig = in[34]; rx.st = in[35]; rx.ct = (uint16_t)(in[36] | in[37] << 8); if (rx.call == 3) ref.SPA = REF_SIGNAL; }
     if (ref.temp5 == 0x21) ref.SPA = REF_POINT;
     if (ref.temp5 == 0x11) ref.SPA = REF_PICKUP;
+    if (n == REFEREE_STATE_SIZE) { ref.SPA = in[38]; ref.SPAcnt = (uint16_t)(in[40] | in[41] << 8); rx.psw = in[42]; }   /* (version 17: as it was) */
     if (n >= REFEREE_STATE_SIZE_10) {
         ref.facedir = in[22]; ref.temp2 = (int16_t)(in[23] | in[24] << 8);
         ref._pad56 = (uint16_t)(in[25] | in[26] << 8); ref.temp4 = (int16_t)(in[27] | in[28] << 8);

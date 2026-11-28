@@ -183,7 +183,8 @@ void referee_rates(int far, int *acc, int *top, int *brake);
 int referee_way(int ax, int ay, int bx, int by, int *wx, int *wy, int n);   /* his way between plays round the nets: corners, b last; the count */
 int referee_drop_at_dot(void);                                             /* at the dot: the ticks left of his drop (from the face off's countdown), 0 before it */
 int referee_in_net(int x, int y, int16_t *c, int16_t *s);                  /* in a net's frame (the cartridge's oval): 1, the way out */
-#define REFEREE_STATE_SIZE 38                       /* (version 12 of the rules' part; 11: REFEREE_STATE_SIZE_11; 10: REFEREE_STATE_SIZE_10; 9 and before: REFEREE_STATE_SIZE_9) */
+#define REFEREE_STATE_SIZE 43                       /* (version 17 of the rules' part; 12 to 16: REFEREE_STATE_SIZE_12; 11: REFEREE_STATE_SIZE_11; 10: REFEREE_STATE_SIZE_10; 9 and before: REFEREE_STATE_SIZE_9) */
+#define REFEREE_STATE_SIZE_12 38
 #define REFEREE_STATE_SIZE_11 33
 #define REFEREE_STATE_SIZE_10 29
 #define REFEREE_STATE_SIZE_9 22
