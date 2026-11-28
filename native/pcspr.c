@@ -465,27 +465,55 @@ static const uint8_t pc_team[NTEAMS] = {
     26, 0, 1, 2, 3, 8, 4, 5, 25, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 18, 17, 19, 20, 21, 22, 23, 24, 27,
 };
 
-/* the anthem's idle pictures (SPAanthem1-3 and SPArefanthem1 of NHL 95 PC: now and then a skater shifts his stance, the referee
- * glances about). Only what the eye sees: a hash of who and when, so no game state is touched. */
-static unsigned idle_hash(int who, int slot) { unsigned h = (unsigned)who * 2654435761u + (unsigned)slot * 40503u + 12345u; h ^= h >> 13; h *= 1274126177u; return h ^ (h >> 16); }
-static int idle_skater(int who, int t)
+/* A sequence of NHL 95 PC's frames.asm: frame / time pairs, the last time negative. updateanim (5CAEF) takes 1 off SPAcnt a game
+ * frame (60 a second) and moves on once it is below 0, so a pair shows for its time + 1 ticks; SetSPA leaves SPAcnt at -1, which
+ * updateanim's first pass loads with the first time, so the first pair has one tick more. seq_len is the whole sequence's ticks,
+ * seq_at the frame dt ticks in (its last frame after the end). */
+static int seq_len(const int16_t *s)
 {
-    unsigned h = idle_hash(who, t / 160);
-    if (h % 100 >= 40) return 369;
-    int dt = t % 160 - (int)(h / 100 % 10);
-    static const int a[3][6] = { { 369, 370, 371, 370, 0, 0 }, { 369, 370, 371, 0, 0, 0 }, { 369, 370, 371, 370, 371, 0 } };
-    int k = dt / 30, n = (int)(h / 10000 % 3);
-    return dt >= 0 && k < 5 && a[n][k] ? a[n][k] : 369;
+    int n = 1;
+    for (;; s += 2) { n += abs(s[1]) + 1; if (s[1] < 0) return n; }
 }
-static int idle_ref(int t)
+static int seq_at(const int16_t *s, int dt)
 {
-    unsigned h = idle_hash(99, t / 300);
-    if (h % 100 >= 60) return 649;
-    int dt = t % 300 - (int)(h / 100 % 10);
-    static const int a[8] = { 649, 705, 706, 707, 706, 707, 705, 649 };
-    int k = dt / 30;
-    return dt >= 0 && k < 8 ? a[k] : 649;
+    dt -= 1;
+    for (;; s += 2) { dt -= abs(s[1]) + 1; if (dt < 0 || s[1] < 0) return s[0]; }
 }
+
+/* The anthem's idle animations. NHL 95 PC's assintrostand (4842A, a skater on his line) and assintroline (484DA, the referee at the
+ * end of his) do, each game frame while no animation is on (pflags2 bit 1 clear: updateanim clears it at the end of one), 1 in 80
+ * (randomd0(50h) == 0): SetSPA and set the bit. assintrostand takes introstandanims_m2[randomd0(9) % 5]: SPAanthem3, SPAanthem4,
+ * SPAanthem2, SPAanthem5, SPAanthem1, so the first four 2 times in 9 and anthem1 1 in 9 (the table's dw 023Ah puts each SPA in the
+ * high word of the dword it loads); assintroline SPArefanthem1 or SPArefanthem2, 1 in 2. Both stand in their first frame (369, 649)
+ * otherwise. Here only the picture: the draw is a hash of who and when (each frame of the anthem's song, hold_anthem_time), so no game
+ * state is touched and every machine shows the same. IDL keeps where the last call got to (a time before it starts over from 0). */
+static const int16_t SEQ_anthem1[] = { 369, 30, 370, 30, 371, 30, 370, 30, 369, -60 };
+static const int16_t SEQ_anthem2[] = { 369, 30, 370, 30, 371, 30, 369, -60 };
+static const int16_t SEQ_anthem3[] = { 369, 30, 370, 30, 371, 30, 370, 30, 371, 30, 369, -60 };
+static const int16_t SEQ_anthem4[] = { 369, 30, 380, 45, 369, -60 };              /* (SPFPen+4: the PC's 380, a man standing face on) */
+static const int16_t SEQ_anthem5[] = { 369, 30, 381, 45, 369, -60 };              /* (SPFPen+5) */
+static const int16_t SEQ_refanthem1[] = { 649, 30, 705, 30, 706, 30, 707, 30, 706, 30, 707, 30, 705, 30, 649, -30 };
+static const int16_t SEQ_refanthem2[] = { 649, 30, 690, 30, 705, 30, 649, -30 };
+static const int16_t *const introstand[5] = { SEQ_anthem3, SEQ_anthem4, SEQ_anthem2, SEQ_anthem5, SEQ_anthem1 };   /* (introstandanims_m2) */
+static unsigned idle_hash(int who, int t) { unsigned h = (unsigned)who * 2654435761u + (unsigned)t * 40503u + 12345u; h ^= h >> 13; h *= 1274126177u; return h ^ (h >> 16); }
+static struct { int next, on, start; const int16_t *seq; } IDL[13];                 /* (next: the first frame not yet drawn for) */
+static int idle_run(int k, int who, int t, int base)
+{
+    if (t < IDL[k].next - 1) IDL[k].next = 0, IDL[k].on = 0;
+    for (int u = IDL[k].next; u <= t; u++) {
+        if (IDL[k].on && u - IDL[k].start >= seq_len(IDL[k].seq)) IDL[k].on = 0;              /* (the animation is over: the bit clear) */
+        if (IDL[k].on) continue;
+        unsigned h = idle_hash(who, u);
+        if (h % 80) continue;                                                                   /* (randomd0(50h)) */
+        IDL[k].on = 1;
+        IDL[k].start = u;
+        IDL[k].seq = who == 99 ? ((h / 80) & 1 ? SEQ_refanthem1 : SEQ_refanthem2) : introstand[h / 80 % 9 % 5];   /* (randomd0(2) / randomd0(9) % 5) */
+    }
+    if (t >= IDL[k].next) IDL[k].next = t + 1;
+    return IDL[k].on ? seq_at(IDL[k].seq, t - IDL[k].start) : base;
+}
+static int idle_skater(int who, int t) { return idle_run(who % 12, who, t, 369); }
+static int idle_ref(int t) { return idle_run(12, 99, t, 649); }
 
 /* A fade (between plays, the pause, to and from the penalty screen): cramfade steps each colour's components toward palfadenew, one
  * step of 2 a time, red, green and blue in turn. The PC's pictures, which are not in colour RAM, are dimmed the same way: toward black,
@@ -559,16 +587,171 @@ static void fade_update(const mdrt_vdp *vdp)
  * The fight frames, SPFgloves 353 to SPFfinjury+5 376 (NHL 93's fights: mods/fight.c), have no PC frames: NHL 95 PC has no fights and
  * gave those numbers (352-375) to other pictures (frames.asm: the face off stances 360-368, the anthem's standing 369-371, the goalie's
  * wall jump 372-375, the cup 357-358), so a fighter was drawn as a face off or anthem man. The hook takes a fighter's frame through
- * fight_frame_shown first (the cartridge frame he is drawn with: holding, hooking, falling), whose PC frame is the real one. */
+ * fight_frame_shown first (the cartridge frame he is drawn with: holding, hooking, falling), whose PC frame is the real one.
+ *
+ * The goalie's ready frames, SPFgready 539-562: the cartridge has three a direction (539 + 3d + k, SPAgready's twitches k 0, 1, 2), the
+ * PC two (SPFgready 538 + 2d: its SPAgready, which goalieacc (5F8B2) sets at rest and assgoalie (4B774) in the crease without the puck,
+ * plays 538 + 2d and 539 + 2d in turn). So k 1 is the PC's second and k 0 and 2 its first; the frames after them are 9 less. */
+static int board_frame(int fr);
 static int pc_frame(int fr)
 {
     if (fr >= MODF_BASE) return mod_frame_pc((uint16_t)fr);   /* (the PC's pictures of NHL 95's moves and goalie, mods/anims.c) */
+    if (fr >= 738 && fr < 838) return board_frame(fr);   /* (the cartridge's board falls, bench falls and crosscheck stop, below) */
     if (fr < 1 || fr > 657) return -1;
     if (fr >= SPFgloves && fr < SPFPen) return -1;      /* (the fight frames: fight_frame_shown leaves only the gloves, 353) */
     if (fr == SPFPen + 4 || fr == SPFPen + 5) return -1; /* (the box's wall jump seen from the side, below) */
-    if (fr <= 554) return fr - 1;
-    if (fr <= 562) return -1;                          /* (the cartridge's extra goalie ready frames) */
+    if (fr < SPFgready) return fr - 1;
+    if (fr < SPFSiren) return 538 + (fr - SPFgready) / 3 * 2 + ((fr - SPFgready) % 3 == 1);   /* (the goalie's ready frames) */
     return fr - 9;
+}
+
+/* The board falls, the bench falls and the crosscheck stop: the cartridge's own 94 frames, 738-837 (frames94.asm SPAboardfront ...
+ * SPAcrosscheck), which have no PC frames of those numbers. NHL 95 PC plays its own sequences for the same SPAs (frames.asm, PC frames
+ * 876-973): FallDown (562DB) sets SPAboard* from FallList by the side of the rink and SPAbenchcheckr / l near the benches,
+ * NetCollide (5601D) SPAboard* against the net, checkcheck (5382C) SPAcrosscheck on the checker after a board hit. While the
+ * cartridge plays one of those SPAs, the picture is the PC sequence's frame at the same part of it: the ticks since the cartridge's
+ * animation started, scaled from its length to the PC's. The direction is the one the cartridge's updateanim reads its frame list by
+ * (facedir; 2 less in the side view; mirrored, 8 less), which the PC's updateanim takes the same way.
+ *
+ * The PC's sequence for each of the eight directions (its direction offsets resolved): most are B5, the hit, against the boards
+ * (held 65), sliding off and down; F6 ones fall back onto the ice and get up (SPFfallback+k ..., SPFduck). The bench falls end over
+ * the bench boards (879, 883 ... held 40): the PC's updateanim then puts him at x -A0h behind the bench, facing 2, and sets
+ * SPAwallright. The cartridge keeps him on the ice, lying (SPFfallback+11 / +27, 80) and getting up (SPFduck+2 / +6), so the PC's
+ * fall over the boards is shown over the cartridge's flip into the boards only (its first nine pairs, to the 761 / 769 one), and
+ * after that his own lying and getting up (pc_frame). */
+#define B5(a, b) { a, 10, b, 10, b + 1, 65, b + 2, 10, b + 3, -10 }
+#define F6(a, b, k) { a, 10, b, 10, 272 + (k), 10, 273 + (k), 55, 274 + (k), 10, 336 + ((k) - 1) / 4, -10 }
+static const int16_t board_seq[28][12] = {
+    B5(904, 905), B5(914, 915), B5(949, 915), F6(950, 925, 17), B5(955, 940), B5(939, 940),               /* 0-5 */
+    B5(944, 940), F6(947, 910, 9), B5(951, 930), B5(929, 930), B5(934, 935),                              /* 6-10 */
+    F6(945, 905, 1), B5(948, 920), B5(919, 920), B5(924, 925), B5(954, 930),                              /* 11-15 */
+    B5(946, 915), B5(909, 910), B5(952, 920), F6(953, 935, 25),                                           /* 16-19 */
+    { 944, 10, 876, 10, 877, 10, 878, 10, 879, -40 }, { 947, 10, 968, 10, 969, 10, 970, -40 },            /* 20-23 SPAbenchcheckr */
+    { 951, 10, 960, 10, 961, 10, 962, 10, 963, -40 }, { 955, 10, 956, 10, 957, 10, 958, 10, 959, -40 },
+    { 946, 10, 880, 10, 881, 10, 882, 10, 883, -40 }, { 949, 10, 884, 10, 885, 10, 886, 10, 887, -40 },   /* 24-27 SPAbenchcheckl */
+    { 952, 10, 964, 10, 965, 10, 966, 10, 967, -40 }, { 953, 10, 971, 10, 972, 10, 973, -40 },
+};
+#undef B5
+#undef F6
+static const uint16_t board_spa[7] = { SPAboardfront, SPAboardright, SPAboardback, SPAboardleft, SPAbenchcheckr, SPAbenchcheckl, SPAcrosscheck };
+static const uint8_t board_dir[6][8] = {
+    { 0, 1, 2, 3, 3, 3, 4, 5 },             /* SPAboardfront: .0 .1 .2 .3 .3 .3 .6 .7 */
+    { 6, 7, 7, 7, 8, 9, 10, 5 },            /* SPAboardright: .0 .1 .1 .1 .4 .5 .6 .7 */
+    { 11, 11, 12, 13, 14, 9, 15, 15 },      /* SPAboardback: .0 .0 .2 .3 .4 .5 .6 .6 */
+    { 16, 1, 17, 13, 18, 19, 19, 19 },      /* SPAboardleft: .0 .1 .2 .3 .4 .5 .5 .5 */
+    { 20, 20, 21, 21, 22, 22, 23, 23 },     /* SPAbenchcheckr: .0 .0 .2 .2 .4 .4 .6 .6 */
+    { 24, 24, 25, 25, 26, 26, 27, 27 },     /* SPAbenchcheckl */
+};
+static int board_kind(uint16_t spa) { for (int i = 0; i < 7; i++) if (board_spa[i] == spa) return i; return -1; }
+/* the PC sequence of kind k (board_spa) in direction d; SPAcrosscheck is 888 + 2d / 5, 889 + 2d / 10, 888 + 2d / -6 */
+static const int16_t *board_pc(int k, int d, int16_t buf[6])
+{
+    if (k < 6) return board_seq[board_dir[k][d & 7]];
+    buf[0] = buf[4] = (int16_t)(888 + 2 * (d & 7)); buf[1] = 5; buf[2] = (int16_t)(889 + 2 * (d & 7)); buf[3] = 10; buf[5] = -6;
+    return buf;
+}
+/* a cartridge frame list (spa_table's, the direction's): pair i's frame and time, as updateanim reads them */
+static int cart_fr(const uint8_t *l, int i) { return rd16(l + 4 * i); }
+static int cart_t(const uint8_t *l, int i) { return (int16_t)rd16(l + 4 * i + 2); }
+static const uint8_t *cart_list(uint16_t spa, int d) { const uint8_t *a0 = spa_table(spa); return a0 + (int16_t)rd16(a0 + (d & 7) * 2); }
+/* the cartridge's pairs to show the PC's sequence over: all of them, but for a bench fall those before its lying on the ice */
+static int cart_pairs(int k, const uint8_t *l)
+{
+    int n = 0;
+    while (n < 32 && cart_t(l, n) >= 0) n++;
+    n++;
+    if (k == 4 || k == 5)
+        for (int i = 0; i < n; i++) if (cart_fr(l, i) >= SPFfallback && cart_fr(l, i) < SPFduck + 8) return i;
+    return n;
+}
+/* the ticks the cartridge's pairs 0 .. n-1 take (as seq_len), and those into them at pair i with SPAcnt c (counting down from the
+ * pair's time; -1: just set) */
+static int cart_len(const uint8_t *l, int n) { int len = 1; for (int j = 0; j < n; j++) len += abs(cart_t(l, j)) + 1; return len; }
+static int cart_el(const uint8_t *l, int i, int c) { return cart_len(l, i) + (c < 0 ? 0 : abs(cart_t(l, i)) - c); }
+/* the PC's frame at the same part of its sequence */
+static int board_at(int k, int d, const uint8_t *l, int n, int i, int c)
+{
+    int16_t buf[6];
+    const int16_t *s = board_pc(k, d, buf);
+    return seq_at(s, (int)((long)cart_el(l, i, c) * seq_len(s) / cart_len(l, n)));
+}
+/* the frame a 738-837 frame stands for when the SPA is not there to time it (a replay keeps only the frames): the PC's frame at the
+ * middle of the first pair that shows it */
+static int board_frame(int fr)
+{
+    static int16_t map[100];
+    static int made;
+    if (!made) {
+        made = 1;
+        for (int k = 0; k < 7; k++)
+            for (int d = 0; d < 8; d++) {
+                const uint8_t *l = cart_list(board_spa[k], d);
+                int n = cart_pairs(k, l);
+                for (int i = 0; i < n; i++) {
+                    int f = cart_fr(l, i);
+                    if (f >= 738 && f < 838 && !map[f - 738]) map[f - 738] = (int16_t)(board_at(k, d, l, n, i, abs(cart_t(l, i)) / 2) + 1);
+                }
+            }
+    }
+    return map[fr - 738] - 1;
+}
+
+/* the direction a cartridge object's frame list is read by (logic.c updateanim) */
+static int anim_dir(const struct SortObj *q)
+{
+    int d = q->facedir;
+    if ((g.sflags & HI(sfhor)) && q->SCnum < 0xC) d = (d - 2) & 7;
+    if (q->attribute & HI(3)) d = (-d + 8) & 7;
+    return d & 7;
+}
+static int board_live(const struct SortObj *q)
+{
+    int k = board_kind(q->SPA);
+    if (k < 0) return -1;
+    int d = anim_dir(q);
+    const uint8_t *l = cart_list(q->SPA, d);
+    int n = cart_pairs(k, l), i = q->SPAnum / 4;
+    if (i >= n) return -1;                                  /* (a bench fall's lying and getting up: his own frames) */
+    return board_at(k, d, l, n, i, (int16_t)q->SPAcnt);
+}
+
+/* The face off. NHL 95 PC's assfaceoffpl (4D528), the centre at the dot: on taking the assignment (pflags bit 1) it sets frame 167h (359)
+ * or, facing 0, 16Ch (364) and SetSPA 0, so he stands in that stance; then (a computer player, while no animation is on) it counts temp5
+ * down and plays SPAfaceoffr (360 / 365, 5), and swings with SPAfaceoff (361-363 / 366-368, 6 8 8) once the puck's temp1, the drop's
+ * countdown, is 10h or less (unsigned), or 1 in 8 earlier; a swing that starts with temp1 11h or more is SPAfaceoffpoke (361 / 366, 6;
+ * 362 / 367, 8: the stick only half way). faceoffinput (4FF0D) does the same for a player's man: SPAfaceoffr when temp5 runs out,
+ * the swing or the poke on button 10h by the same temp1 test. The PC's tables give direction 0 (.0) the 364-368 set and every other
+ * the 359-363 one. The cartridge has the same assignment (afaceoffpl) and the same SPAs with skating frames for pictures (its stance is
+ * the glide, SPFskatewp); the PC's are drawn in their place: the stance while he is in the assignment and not skating to the dot
+ * (hold_skating), SPAfaceoffr and SPAfaceoff by the PC's frames (SPAfaceoff by the pair, SPAnum >> 2), until they end. Whether a swing
+ * is a poke: the puck's temp1 when it started (the ticks it has run added back), kept for the rest of it (fo_poke) once the drop
+ * has gone. The cartridge's computer man plays SPAfaceoffr from the first frame (its assfaceoffpl has no temp5), where the PC's
+ * stands in the stance for temp5's count first: assfaceoffpl's 28h, or 14h + randomd0(0Ah) for team 1 (pflags bit 6, pfteam), before
+ * its first SPAfaceoffr. So the stance is also drawn for that long from when he was first seen in the assignment (fo_t0; a hash for the
+ * random part), unless he swings before. */
+static int8_t fo_poke[12], fo_on[12];
+static uint16_t fo_t0[12], fo_last[12];
+static int faceoff_frame(int sc, const struct SortObj *q)
+{
+    int infaceoff = q->asslist[q->assnum] == afaceoffpl && !hold_skating();
+    if (!infaceoff) fo_on[sc] = 0;
+    else if (!fo_on[sc] || (int16_t)(g.Vcount - fo_last[sc]) < 0 || (int16_t)(g.Vcount - fo_last[sc]) > 4) fo_on[sc] = 1, fo_t0[sc] = g.Vcount;
+    fo_last[sc] = g.Vcount;
+    if (!infaceoff && q->SPA != SPAfaceoff && q->SPA != SPAfaceoffr) return -1;
+    int stance = (int16_t)(g.Vcount - fo_t0[sc]) <= ((q->pflags & (1 << pfteam)) ? 0x14 + (int)(idle_hash(sc, fo_t0[sc]) % 10) : 0x28);
+    if (q->SPA == 0) return (q->facedir == 0 ? 364 : 359) + !stance;   /* (after a SPAfaceoffr the PC's SPA is 0 too, its frame left at 360) */
+    if (q->SPA != SPAfaceoff && q->SPA != SPAfaceoffr) return -1;      /* (another animation: a check, a fall) */
+    int base = anim_dir(q) == 0 ? 364 : 359;
+    if (q->SPA == SPAfaceoffr) return base + !(infaceoff && stance);
+    const uint8_t *l = cart_list(q->SPA, anim_dir(q));
+    int i = q->SPAnum / 4, el = cart_el(l, i, (int16_t)q->SPAcnt);
+    const struct SortObj *pk = sortobj(puckscnum);
+    if (pk->asslist[pk->assnum & 7] == pfaceoff2) fo_poke[sc] = pk->temp1 + el - 1 >= 0x11;
+    if (fo_poke[sc]) {
+        static const int16_t poke[] = { 361, 6, 362, -8 };
+        return seq_at(poke, (int)((long)el * seq_len(poke) / cart_len(l, 3))) + base - 359;
+    }
+    return base + 2 + (i > 2 ? 2 : i);
 }
 
 /* the referee is drawn with the Game page's row, or whenever he is in play (RULE_REFEREE: play must not have an unseen man in it) */
@@ -887,6 +1070,11 @@ static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o
     if (!SDL_AtomicGet(&P.on) || !SDL_AtomicGet(&P.found) || !g.demoflag || sc > 13 || P.nshow >= 16) return 0;
     if (sc < 12 && fight93_have(o->frame & 0x7FF)) return 0;   /* (a fighter in NHL 93's own fight frames: his sprite stays, the PC has none) */
     int pf = pc_frame(sc < 12 ? fight_frame_shown(o->frame & 0x7FF, sortobj(sc)->facedir) : (o->frame & 0x7FF));   /* (a fighter: the cartridge frame his is drawn with, fight.c) */
+    if (sc < 12 && !(g.sflags2 & HI(sf2replay))) {              /* (a replay keeps only the frames: pc_frame's for them) */
+        int a = faceoff_frame(sc, sortobj(sc));
+        if (a < 0) a = board_live(sortobj(sc));
+        if (a >= 0) pf = a;
+    }
     if (hold_anthem_time() >= 0 && sc < 12 && sortobj(sc)->position > 0) pf = idle_skater(sc, hold_anthem_time());      /* (the anthem: the PC's standing picture, number 369) */
     if (pf < 0 || pf >= NFRAMES || !P.f[pf].px) return 0;   /* (no such PC frame: the cartridge's sprite stays) */
     P.show[P.nshow].pc = (int16_t)pf;
