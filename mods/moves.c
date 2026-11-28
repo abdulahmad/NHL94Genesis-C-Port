@@ -11,6 +11,7 @@
  *
  * The animations are mods/anims.c's (the blocks in the PC's pictures). 95G's flags and shot timer are this file's own state, kept in
  * every state (MOVES_STATE_SIZE, native/rules.c). */
+#include "pccoord.h"
 #include "game.h"
 #include "rom.h"
 #include "rules.h"
@@ -34,6 +35,11 @@ static int16_t puckx(void) { return (int16_t)g.puckx[0]; }
 static int16_t pucky(void) { return (int16_t)g.pucky; }
 static int16_t puckc(void) { return (int16_t)puck_carrier(); }
 static int dist(int dx, int dy) { return Sroot((uint32_t)(dx * dx + dy * dy)); }   /* (the PC's vecdist) */
+/* places on the PC's rink (mods/pccoord.h): 95 PC's tests below measure there, with the PC's own numbers */
+#define PX(o) cart_pc_x((o)->Xpos)
+#define PY(o) cart_pc_y((o)->Ypos)
+static int ppx(void) { return cart_pc_x(puckx()); }
+static int ppy(void) { return cart_pc_y(pucky()); }
 
 void moves_frame(void)
 {
@@ -141,16 +147,16 @@ static int lane_open(void)
 {
     if (puckc() < 0) return 0;
     const struct SortObj *c = sortobj(puckc());
-    int up = PFLAG(c, pfgoal) != 0, y = c->Ypos;
+    int up = PFLAG(c, pfgoal) != 0, y = PY(c);
     if (up ? y < 0 : y > 0) return 0;
     int gy = up ? 0xE8 : -0xE8, lim = up ? y + 4 : y - 4;
-    int mine = dist(c->Xpos, y - gy);
+    int mine = dist(PX(c), y - gy);
     const struct SortObj *q = sortobj(c->SCnum < 6 ? 6 : 0);
     for (int i = 0; i < 6; i++, q++) {
         if (q->position <= 0) continue;
-        if (up ? q->Ypos > lim : q->Ypos < lim) return 0;
+        if (up ? PY(q) > lim : PY(q) < lim) return 0;
         if (up ? q->Yvel < 0 : q->Yvel > 0) continue;
-        if (dist(q->Xpos, q->Ypos - gy) <= mine) return 0;
+        if (dist(PX(q), PY(q) - gy) <= mine) return 0;
     }
     return 1;
 }
@@ -162,15 +168,15 @@ static int pass_lane(const struct SortObj *p, const struct SortObj *o)
     int side = PFLAG(p, pfgoal) != 0;
     if (p->position == 0) return 0;
     if (lane_open()) return 0;
-    int oy = o->Ypos, y = p->Ypos;
+    int oy = PY(o), y = PY(p);
     if ((y > (side ? 0x4E : -0x4E)) ^ side) return 0;
     if (abs(y) <= abs(oy) || abs(y) > 0x76) return 0;
     if (side ? (o->Yvel < 0 || p->Yvel < 0) : (o->Yvel > 0 || p->Yvel > 0)) return 0;
-    if (((y - 0x4E) ^ ((int8_t)((uint16_t)o->Yvel >> 8) + oy - 0x4E)) < 0) return 0;
-    if (abs(oy - y) > 0x3C || abs(p->Xpos - o->Xpos) > 0x28) return 0;
+    if (((y - 0x4E) ^ (cart_pc_y(o->Ypos + (int8_t)((uint16_t)o->Yvel >> 8)) - 0x4E)) < 0) return 0;   /* (where he is a frame on) */
+    if (abs(oy - y) > 0x3C || abs(PX(p) - PX(o)) > 0x28) return 0;
     int a = vtoa(o->Xvel, o->Yvel);
     if (a == 8) a = o->facedir;
-    a -= vtoa((int16_t)(p->Xpos - o->Xpos), (int16_t)(p->Ypos - o->Ypos));
+    a -= vtoa((int16_t)(PX(p) - PX(o)), (int16_t)(y - oy));
     return ((a + 1) & 7) < 3;
 }
 
@@ -233,9 +239,9 @@ static int canblockshot(const struct SortObj *p, int *slide)
 {
     int pc = puckc();
     if (pc >= 0 && (pc < 6) == (p->SCnum < 6)) return 0;
-    int e = abs(pucky());
+    int e = abs(ppy());
     if (e > 0xE8 || e < 0x4E) return 0;
-    int pd = dist(puckx() - p->Xpos, pucky() - p->Ypos);
+    int pd = dist(ppx() - PX(p), ppy() - PY(p));
     if (pd > 0x50) return 0;
     int side = PFLAG(p, pfgoal) != 0;
     const struct SortObj *net = sortobj(12 + side);
@@ -249,17 +255,17 @@ static int canblockshot(const struct SortObj *p, int *slide)
         k = s;
     }
     if (!shooting(sortobj(k)->SPA)) return 0;
-    int dx = puckx() - net->Xpos, y = pucky() - net->Ypos;
+    int dx = ppx() - PX(net), y = ppy() - PY(net);
     int far = dist(dx, y), dir = vtoa((int16_t)dx, (int16_t)y);
-    y = p->Ypos;
-    if (!(side && y < -0x4E && y > -0xE8 && y < pucky()))
-        if (side || y <= 0x4E || y >= 0xE8 || y <= pucky()) return 0;
-    dx = p->Xpos - net->Xpos;
-    y -= net->Ypos;
+    y = PY(p);
+    if (!(side && y < -0x4E && y > -0xE8 && y < ppy()))
+        if (side || y <= 0x4E || y >= 0xE8 || y <= ppy()) return 0;
+    dx = PX(p) - PX(net);
+    y -= PY(net);
     int near = dist(dx, y), a = vtoa((int16_t)dx, (int16_t)y);
     int joy = PFLAG(p, pfjoycon) != 0;
-    if (!joy && (a == 2 || a == 6 || abs(p->Ypos) < 0x80 || abs(p->Xpos) > 0x64)) return 0;
-    int to = vtoa((int16_t)(puckx() - p->Xpos), (int16_t)(pucky() - p->Ypos));
+    if (!joy && (a == 2 || a == 6 || abs(PY(p)) < 0x80 || abs(PX(p)) > 0x64)) return 0;
+    int to = vtoa((int16_t)(ppx() - PX(p)), (int16_t)(ppy() - PY(p)));
     int b = (to - p->facedir + 2) & 7;
     a = (dir - a + 2) & 7;
     if (((to - dir + 1) & 7) > 2) return 0;
@@ -308,7 +314,7 @@ static int opp_in_reach(const struct SortObj *p)
 {
     const struct SortObj *q = sortobj(p->SCnum < 6 ? 6 : 0);
     for (int i = 0; i < 6; i++, q++) {
-        int dx = q->Xpos - p->Xpos;
+        int dx = PX(q) - PX(p);
         int t = vtoa((int16_t)dx, (int16_t)dx);
         if (((t - p->facedir + 2) & 7) <= 4 && abs(dx) < 0x1E) return 1;
     }

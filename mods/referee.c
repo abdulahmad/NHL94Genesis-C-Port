@@ -229,9 +229,9 @@ static void ref_inside(int32_t *x, int32_t *y);
 static const int16_t pc_dirtab[8][2] = { { 0, 0xC8 }, { 0x8D, 0x8D }, { 0xC8, 0 }, { 0x8D, -0x8D }, { 0, -0xC8 }, { -0x8D, -0x8D }, { -0xC8, 0 }, { -0x8D, 0x8D } };
 static const int8_t pc_ftab[8] = { 0, 16, 16, 16, 0, -16, -16, -16 };   /* (doplayeracc_ftab) */
 
-static int kfr(void) { return g.PalMode ? 0x16 : 0x11; }
-static int32_t pcv(int32_t v) { return v * kfr() / 16; }                 /* (a cartridge speed in the PC's units) */
-static int32_t cartv(int32_t a) { return a * 16 / kfr(); }               /* (a PC speed step in the cartridge's) */
+static int kfr(void) { return cart_pc_speed(16, g.PalMode); }          /* (the PC's 16 ticks in the cartridge's frames) */
+static int32_t pcv(int32_t v) { return cart_pc_speed(v, g.PalMode); }   /* (a cartridge speed in the PC's units: mods/pccoord.h) */
+static int32_t cartv(int32_t a) { return pc_speed(a, g.PalMode); }       /* (a PC speed step in the cartridge's) */
 static int iabs(int v) { return v < 0 ? -v : v; }
 
 /* SetSPA for his picture: a new one starts from its first frame */
