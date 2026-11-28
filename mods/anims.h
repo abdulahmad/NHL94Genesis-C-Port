@@ -10,6 +10,7 @@ enum {
     MA_BLOCKL, MA_BLOCKR, MA_BLOCKF, MA_BLOCKK,   /* NHL 95 PC's slides left and right, the block in front, on a knee */
     MA_GWALLR, MA_GWALLL,                 /* the PC goalie over the boards (SPAgwallright, SPAgwallleft) */
     MA_GFALLB, MA_GFALLG, MA_GFALLS, MA_GKNEE,   /* the PC goalie's saves: falling back, to the glove, to the stick; the knee */
+    MA_GPOKE, MA_GKNEEHOLD,               /* the PC goalie's poke check (SPAgoaliepoke), the knee he freezes the puck on (SPAgokneehold) */
     MA_COUNT
 };
 #define MA_STRIDE 0x200                       /* (the table bytes each: 95G's fake shots take 306) */

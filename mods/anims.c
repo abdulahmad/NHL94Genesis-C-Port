@@ -28,7 +28,7 @@ static void put(uint8_t *t, int at, int v) { t[at] = (uint8_t)((uint16_t)v >> 8)
 static int mf(int pc, int cart)
 {
     for (int i = 0; i < mf_n; i++) if (mf_pc[i] == pc) return MODF_BASE + i;
-    if (mf_n >= MODF_MAX) return cart;                    /* (never: anims_init gives 141) */
+    if (mf_n >= MODF_MAX) return cart;                    /* (never: anims_init gives 157) */
     mf_pc[mf_n] = (uint16_t)pc;
     mf_cart[mf_n] = (uint16_t)cart;
     return MODF_BASE + mf_n++;
@@ -103,9 +103,9 @@ static void anims_init(void)
     }
     /* the PC goalie's hop over the boards: the skaters' hop in the cartridge (SPAwallright .1, frames 377-380) */
     begin(MA_GWALLR);
-    for (int d = 0; d < 8; d++) { dir(d); for (int k = 0; k < 4; k++) { int j = d < 3 ? k : 3 - k; add(mf(372 + j, SPFPen + j), k < 3 ? 8 : -8); } }
+    for (int d = 0; d < 8; d++) { dir(d); for (int k = 0; k < 4; k++) { int j = d < 4 ? k : 3 - k; add(mf(372 + j, SPFPen + j), k < 3 ? 8 : -8); } }
     begin(MA_GWALLL);
-    for (int d = 0; d < 8; d++) { dir(d); for (int k = 0; k < 4; k++) { int j = d < 3 ? 3 - k : k; add(mf(372 + j, SPFPen + j), k < 3 ? 8 : -8); } }
+    for (int d = 0; d < 8; d++) { dir(d); for (int k = 0; k < 4; k++) { int j = d < 4 ? 3 - k : k; add(mf(372 + j, SPFPen + j), k < 3 ? 8 : -8); } }
     /* the PC goalie's saves (frames.asm), each standing for the cartridge's save of that kind in its direction */
     begin(MA_GFALLB);
     for (int d = 0; d < 8; d++) { dir(d); add(mf(1012 + 2 * d, cart_frame(SPAgstackr, d, 0)), 8); add(mf(1013 + 2 * d, cart_frame(SPAgstackr, d, 1)), 20); add(G + 3 * d, -4); }
@@ -131,6 +131,25 @@ static void anims_init(void)
         } else {
             int a = 1000 + 2 * (d - 2);
             add(G + 3 * d, 6); add(mf(a, s), 6); add(mf(a + 1, s), 20); add(mf(a, s), 6); add(G + 3 * d, 4); add(G + 3 * d, -4);
+        }
+    }
+    /* the PC goalie's poke check (frames.asm SPAgoaliepoke): standing for the cartridge's goalie pass swing, whose stick reaches out */
+    begin(MA_GPOKE);
+    for (int d = 0; d < 8; d++) {
+        int a = 978 + 2 * d, s0 = cart_frame(SPAgswing, d, 0), s1 = cart_frame(SPAgswing, d, 1);
+        dir(d); add(mf(a, s0), 4); add(mf(a + 1, s1), 15); add(mf(a, s0), -6);
+    }
+    /* the knee he freezes the puck on (SPAgokneehold): the knee's pictures, held 90 */
+    begin(MA_GKNEEHOLD);
+    for (int d = 0; d < 8; d++) {
+        int s = cart_frame(SPAgstickr, d, 0);
+        dir(d);
+        if (d < 2) {
+            int a = 994 + 3 * d;
+            add(mf(a, s), 6); add(mf(a + 1, s), 6); add(mf(a + 2, s), 90); add(mf(a + 1, s), 6); add(mf(a, s), 6); add(G + 3 * d, -4);
+        } else {
+            int a = 1000 + 2 * (d - 2);
+            add(G + 3 * d, 6); add(mf(a, s), 6); add(mf(a + 1, s), 90); add(mf(a, s), 6); add(G + 3 * d, 6); add(G + 3 * d, -4);
         }
     }
 }

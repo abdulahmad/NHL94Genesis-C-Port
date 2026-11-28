@@ -16,7 +16,9 @@
  * cartridge's closest save (off): falling back the stack save, the falls to the side the stick saves, the block and catches the knee
  * save. NHL 96 PC's toe save is the knee save, its kick the stick save; 96 Genesis's reach out blocker the blocker save. The save odds are
  * those of the cartridge frame each picture stands for. 1, 2 and 4 also have the goalie's own hop over the boards (SPAgwallright,
- * SPAgwallleft: 95 Genesis has none). 0 is the cartridge's (native/vanilla/mods.c). */
+ * SPAgwallleft: 95 Genesis has none). 1 and 4 also have the PC goalie's own plays: the poke check at an opponent carrying the puck
+ * close by (SPAgoaliepoke: 10 in 256 a decision, then 240 ticks before the next) and the knee he freezes the puck on with an attacker
+ * on it (SPAgokneehold), its hold count running on while he kneels. 0 is the cartridge's (native/vanilla/mods.c). */
 #include "game.h"
 #include "rules.h"
 #include "anim_gen.h"
@@ -165,6 +167,73 @@ int goalie_save(const struct PuckCross *pc, int16_t goalline, struct SortObj *gk
     if (r == 3 && (g.sflags & HI(sfssdir))) gk->Xvel = 0;
     if (r == 2) turn_96g(gk);
     return 1;
+}
+
+/* ---- NHL 95 PC's and NHL 96 PC's goalie plays (95 PC assgoalie.c), with their saves (values 1 and 4) ---- */
+static uint16_t poke_wait[2];                            /* (the PC's word 4Ah, by team: ticks until he may poke again) */
+
+static int pc_plays(void) { int r = RULE(RULE_GOALIE); return r == 1 || r == 4; }
+static uint16_t dist(int16_t dx, int16_t dy) { return Sroot((uint32_t)((int32_t)dx * dx + (int32_t)dy * dy)); }   /* (the PC's vecdist) */
+
+void goalie_tick(struct SortObj *o)
+{
+    uint16_t *w = &poke_wait[PFLAG(o, pfteam) ? 1 : 0];
+    if (!pc_plays()) { *w = 0; return; }
+    *w = *w > (uint16_t)elapsed ? (uint16_t)(*w - elapsed) : 0;
+}
+
+int goalie_poke(struct SortObj *o)
+{
+    if (!pc_plays()) return 0;
+    int16_t car = (int16_t)puck_carrier();
+    if (car < 0 || (o->SCnum < 6) == (car < 6)) return 0;   /* (an opponent has the puck) */
+    uint16_t *w = &poke_wait[PFLAG(o, pfteam) ? 1 : 0];
+    if (*w) return 0;
+    if (randomd0(0x100) >= 0xA) return 0;
+    int16_t dx = (int16_t)(puckx_of() - o->Xpos), dy = (int16_t)(pucky_of() - o->Ypos);
+    if (dist(dx, dy) >= 0x23 || abs(pucky_of()) >= 0xE9) return 0;
+    o->facedir = (int16_t)vtoa(dx, dy);
+    o->pflags2 |= 2;
+    SetSPA(o, MA_SPA(MA_GPOKE));
+    *w = 0xF0;
+    return 1;
+}
+
+int goalie_kneehold(struct SortObj *o)
+{
+    if (!pc_plays()) return 0;
+    const struct SortObj *q = sortobj(PFLAG(o, pfteam) ? 0 : 6);   /* (the other team) */
+    for (int k = 0; k < 6; k++, q++) {
+        if ((q->pflags2 & 4) || q->position <= 0) continue;
+        if (dist((int16_t)(puckx_of() - q->Xpos), (int16_t)(pucky_of() - q->Ypos)) >= 0x14) continue;
+        o->pflags2 |= 2;
+        SetSPA(o, MA_SPA(MA_GKNEEHOLD));
+        return 1;
+    }
+    return 0;
+}
+
+void goalie_busy(struct SortObj *o)
+{
+    if (!pc_plays() || o->SPA != MA_SPA(MA_GKNEEHOLD)) return;   /* (the PC's hold count runs on while he kneels on it) */
+    if (!(g.BA_PS_flags & HI(2)) && (g.gmode & (1 << gmclock))) return;
+    if (o->temp5 < 0 || o->SCnum != (int16_t)puck_carrier()) return;
+    o->temp5 = (int16_t)(o->temp5 - elapsed);
+    if (o->temp5 < 0) {
+        if (g.BA_PS_flags & HI(2)) g.BA_PS_flags |= HI(4);
+        else AddPenalty2(8, o);                           /* (the whistle: he has frozen it) */
+    }
+}
+
+size_t goalie_state_save(uint8_t *out)
+{
+    for (int t = 0; t < 2; t++) { out[2 * t] = (uint8_t)(poke_wait[t] >> 8); out[2 * t + 1] = (uint8_t)poke_wait[t]; }
+    return GOALIE_STATE_SIZE;
+}
+
+void goalie_state_load(const uint8_t *in)
+{
+    for (int t = 0; t < 2; t++) poke_wait[t] = in ? (uint16_t)(in[2 * t] << 8 | in[2 * t + 1]) : 0;
 }
 
 uint16_t goalie_wall_spa(const struct SortObj *o, uint16_t spa)

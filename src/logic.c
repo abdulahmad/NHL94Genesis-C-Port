@@ -1994,6 +1994,7 @@ void assgoaliecpu(struct Team *tm, struct SortObj *o)
  * (puckcross) to pick a save or move across the crease. Ends in playeracc or stopna. */
 void checkanim(struct Team *tm, struct SortObj *o)
 {
+    goalie_tick(o);                                       /* (RULE_GOALIE 1, 4: the PC goalie's poke wait, mods/goalie.c) */
     g.TmpPuckX = (uint16_t)puckx();
     if ((g.sflags4 & HI(0)) && !(o->pflags2 & 2)) {
         if (g.sflags4 & HI(1)) {
@@ -2024,7 +2025,7 @@ void checkanim(struct Team *tm, struct SortObj *o)
         skateto(d0, d1, NULL, o);
         return;
     }
-    if (o->pflags2 & 2) return;
+    if (o->pflags2 & 2) { goalie_busy(o); return; }     /* (RULE_GOALIE 1, 4: the hold count on the PC's knee) */
     if (g.sflags4 & HI(0)) {
         if (o->frame == SPFslamtop + 1) o->facedir = 0;
         else if (o->frame == SPFslambot + 1) o->facedir = 4;
@@ -2063,6 +2064,7 @@ void checkanim(struct Team *tm, struct SortObj *o)
         if (o->temp5 < 0) o->temp5 = 0x5A;
         ST_W(o->temp4);
         if (o->temp5 <= 0x5A && (vdp_hv16() & 3) == 0) {
+            if (goalie_kneehold(o)) return;               /* (RULE_GOALIE 1, 4: the PC goalie kneels on it, an attacker on it) */
             struct SortObj *a0 = sortobj(PFLAG(o, pfteam) ? 0 : 6);   /* the other team */
             for (int i = 0; i < 6; i++, a0++) {
                 if (a0->pflags2 & 4) continue;
@@ -2077,6 +2079,7 @@ void checkanim(struct Team *tm, struct SortObj *o)
         }
         goto de1;
     }
+    if (goalie_poke(o)) return;                           /* (RULE_GOALIE 1, 4: the PC goalie's poke check at the carrier) */
     /* nobody has the puck: dive on it when it is loose and slow beside him */
     if (o->temp4 != 0) goto de1;
     if (puckc() >= 0) goto de1;

@@ -211,6 +211,16 @@ int moves_state_load(const uint8_t *in);
 /* RULE_GOALIE (mods/goalie.c): goalie_save, another game's goaliesave (1 when it made the save; 0 the cartridge's makes it);
  * goalie_wall_spa, the hop over the boards (assbench, asseben) */
 int goalie_save(const struct PuckCross *pc, int16_t goalline, struct SortObj *gk);
+/* NHL 95 PC's goalie plays with RULE_GOALIE 1 and 4 (checkanim): goalie_tick at the start (the poke's wait), goalie_busy while an
+ * animation runs (the hold count on the knee), goalie_kneehold holding the puck (1: he kneels on it), goalie_poke at a carrier (1: a
+ * poke check). The state's bytes: GOALIE_STATE_SIZE (goalie_state_load(NULL): none, a state from before them) */
+void goalie_tick(struct SortObj *o);
+void goalie_busy(struct SortObj *o);
+int goalie_kneehold(struct SortObj *o);
+int goalie_poke(struct SortObj *o);
+#define GOALIE_STATE_SIZE 4
+size_t goalie_state_save(uint8_t *out);
+void goalie_state_load(const uint8_t *in);
 uint16_t goalie_wall_spa(const struct SortObj *o, uint16_t spa);
 
 /* RULE_TICKER_HL (mods/ticker.c): InitScores's randomd0 range, the other games' periods before the pregame (the cartridge's 3: 0-2) */
