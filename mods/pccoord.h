@@ -1,8 +1,9 @@
 /* NHL 95 PC's rink on the cartridge's. The PC's is 0A0h across to the boards and 108h long to the end boards, with its goal line
  * at 0E8h; the cartridge's 88h, 12Ah and 108h. A PC x is put on the cartridge's rink times 88h / 0A0h; a PC y times 108h / 0E8h
  * up to the goal line and beyond it the end's 22h / 20h, so the PC's goal line, blue line (4Eh: the cartridge's 58h) and end
- * boards land on the cartridge's own. Both ways, signed (the rink is the same either side of the middle). Integers only: the
- * game's state depends on these */
+ * boards land on the cartridge's own. Both ways, signed (the rink is the same either side of the middle). A gap (a distance along
+ * one axis, not a place) goes by the inside scale alone. A speed is the same on both rinks but for the frame: the PC's 16 ticks are
+ * the cartridge's 11h frames (NTSC; 16h PAL). Integers only: the game's state depends on these */
 #ifndef PCCOORD_H
 #define PCCOORD_H
 
@@ -29,5 +30,13 @@ static inline int cart_pc_y(int v)
     a = a <= CART_GOAL_Y ? a * PC_GOAL_Y / CART_GOAL_Y : PC_GOAL_Y + (a - CART_GOAL_Y) * (PC_END_Y - PC_GOAL_Y) / (CART_END_Y - CART_GOAL_Y);
     return v < 0 ? -a : a;
 }
+/* a gap along x / y: PC to the cartridge, and back */
+static inline int pc_dx(int v) { return v * CART_SIDE_X / PC_SIDE_X; }
+static inline int pc_dy(int v) { return v * CART_GOAL_Y / PC_GOAL_Y; }
+static inline int cart_pc_dx(int v) { return v * PC_SIDE_X / CART_SIDE_X; }
+static inline int cart_pc_dy(int v) { return v * PC_GOAL_Y / CART_GOAL_Y; }
+/* a speed (or a speed's step): PC to the cartridge's frame, and back (pal: the cartridge's PalMode) */
+static inline int pc_speed(int v, int pal) { return v * 16 / (pal ? 0x16 : 0x11); }
+static inline int cart_pc_speed(int v, int pal) { return v * (pal ? 0x16 : 0x11) / 16; }
 
 #endif

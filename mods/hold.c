@@ -14,6 +14,7 @@
 #include "rules.h"
 #include "anim_gen.h"
 #include "view.h"
+#include "pccoord.h"
 
 #define PFLAG(o, b) ((o)->pflags & (1 << (b)))
 
@@ -21,6 +22,7 @@ static uint16_t until;                                /* the vblank (g.Vcount) t
 static int pending;
 static int anth;                                      /* the wait is the anthems' */
 static int anth_pose, anth_len, anth_lock;
+#define ANTH_REF_X pc_x(0x8E)                           /* (the PC's referee for the anthem: FadeOutPalCycle, x 8Eh, y 0) */
 #define ANTH_FACE 4                                     /* (the anthem's lines face the viewer: vtoa(0, 100)) */
 #define ANTH_VPOS (-18)                                 /* (the PC shows centre ice half way down its rink view) */                        /* the anthem's line up (1 once the spots are taken); the anthem's own frames */
 static uint16_t anth_t0;
@@ -114,7 +116,8 @@ int hold_anthem_time(void)
 }
 
 
-/* the anthem's line of each skater (the PC's lines: x lane * 28h - 50h, y +30h / -3Ah; goalies have none: 0) */
+/* the anthem's line of each skater (the PC's lines, FadeOutPalCycle: x lane * 28h - 50h, y +30h / -3Ah, on the cartridge's rink:
+ * mods/pccoord.h; its random 4 either way is here 4 by the team; goalies have none: 0) */
 static void anth_line(int lx[12], int ly[12])
 {
     int slot[2] = {0, 0};
@@ -122,8 +125,8 @@ static void anth_line(int lx[12], int ly[12])
     for (int i = 0; i < 12; i++, pl++) {
         if (pl->position <= 0) { lx[i] = ly[i] = 0; continue; }
         int team = PFLAG(pl, pfteam) ? 1 : 0, n = slot[team]++;
-        lx[i] = n * 40 - 80 + (team ? 4 : -4);
-        ly[i] = team ? 0x30 : -0x3A;
+        lx[i] = pc_x(n * 0x28 - 0x50 + (team ? 4 : -4));
+        ly[i] = pc_y(team ? 0x30 : -0x3A);
     }
 }
 
@@ -149,7 +152,7 @@ int hold_anthem_ref(int *x, int *y, int *dir, int *moving)
     int fx = (int16_t)g.fox, fy = (int16_t)g.foy;
     int tx = (fx > 0 ? fx + 15 : fx - 15), ty = fy;
     *dir = 6;                                           /* (he stands on the right: facing the rink, the lines of players) */
-    if (t < 0) { *x = 108; *y = 0; *moving = 0; return 1; }
+    if (t < 0) { *x = ANTH_REF_X; *y = 0; *moving = 0; return 1; }
     rw_anth(t, tx, ty, x, y, dir, moving);              /* (then to the dot with 95 PC's skating, as between plays) */
     return 1;
 }
@@ -283,7 +286,7 @@ static uint16_t sk_view[4];                             /* the view at the whist
 #define DOOR_GLIDE 0x10                                 /* (the last stretch to the gate: gliding, turning) */
 #define ENTER_X (-0x88)
 #define BENCH_GAP 8                                     /* (frames on the bench between the one going off and the one coming on) */
-#define REF_START_X (-0x78)                             /* (the PC's referee at the start of play: StartHL2, x -78h, y 0) */
+#define REF_START_X pc_x(-0x78)                         /* (the PC's referee at the start of play: StartHL2, x -78h, y 0) */
 
 static void skate_pose(void);
 static struct { uint8_t on, side; int16_t sx, sy, v0; int8_t f0; } rw;   /* (where he set off, his speed along his way, his facing (-1: none known);
@@ -528,7 +531,7 @@ static void rleg_set(struct rleg *l, int ax, int ay, int bx, int by, int v0, int
     l->n = referee_way(ax, ay, bx, by, l->wx, l->wy, RW_WAY);
     l->d = 0;
     for (int i = 0, x = ax, y = ay; i < l->n; x = l->wx[i], y = l->wy[i], i++) { l->d += rw_len(l->wx[i] - x, l->wy[i] - y); l->cum[i] = l->d; }
-    referee_rates((ay < 0 ? -ay : ay) >= 0x84, &l->acc, &l->top, &l->brake);   /* (the stopped clock's top speed 74h (PC) from centre) */
+    referee_rates((ay < 0 ? -ay : ay) >= pc_y(0x74), &l->acc, &l->top, &l->brake);   /* (the stopped clock's top speed 74h (PC) from centre) */
     int lx = l->n > 1 ? l->wx[l->n - 2] : ax, ly = l->n > 1 ? l->wy[l->n - 2] : ay;   /* (the last part's start) */
     l->f = l->d >= 2 && (bx != lx || by != ly) ? vtoa((int16_t)(bx - lx), (int16_t)(by - ly)) & 7 : f0 >= 0 ? f0 : 2;
     l->f1 = l->d >= 2 ? vtoa((int16_t)(l->wx[0] - ax), (int16_t)(l->wy[0] - ay)) & 7 : l->f;
@@ -570,7 +573,10 @@ static void rleg_pose(const struct rleg *l, int r, struct hold_refpose *p)
     p->vx = (int)(dx * (int64_t)s.v / L); p->vy = (int)(dy * (int64_t)s.v / L);
     p->at = r + 1;
     if (s.ph == EZ_SKATE) p->anim = REF_SKATE;
-    else p->anim = (p->vx > 0xF0F || p->vx < -0xF0F || p->vy > 0xF0F || p->vy < -0xF0F) ? REF_STOP : REF_GLIDE;   /* (dostop: SPArefstop over 1000h (PC) an axis) */
+    else {                                              /* (dostop: SPArefstop over 1000h (PC) an axis) */
+        int st = pc_speed(0x1000, g.PalMode);
+        p->anim = (p->vx > st || p->vx < -st || p->vy > st || p->vy < -st) ? REF_STOP : REF_GLIDE;
+    }
 }
 /* 65536ths of the leg done r frames into it */
 static int rleg_frac(const struct rleg *l, int r)
@@ -676,7 +682,7 @@ static int rw_anth(int t, int tx, int ty, int *x, int *y, int *dir, int *moving)
 {
     struct rleg l;
     struct hold_refpose p;
-    rleg_set(&l, 108, 0, tx, ty, 0, 6);
+    rleg_set(&l, ANTH_REF_X, 0, tx, ty, 0, 6);
     if (t < 0) return rleg_len(&l);
     if (t >= rleg_len(&l)) { *x = tx; *y = ty; *moving = 0; return 0; }
     rleg_pose(&l, t, &p);
@@ -841,7 +847,8 @@ void hold_skate_place(void)
  * (puckc 10h, puckz -100: not on the ice). Here a puck past the cartridge's boards (88h, 12Ah) at the whistle: he skates to the
  * timekeeper's side (TK_X, 0) instead of to it, with no puck on the ice, and from there carries one to the dot. Before, he skated
  * out of the rink to where it lay (PR #167's walk, then #193's for the game's referee) */
-#define TK_X 0x78
+#define TK_X (0x80 - 8)                                 /* (the PC's 0A0h is its boards, the cartridge's 88h (pc_x): he stops 8 inside a
+                                                         * skater's limit, as pick_spot has him by a puck on the boards) */
 static int sk_oop(void) { return !sk_pstart && (sk_puckx > 0x88 || sk_puckx < -0x88 || sk_pucky > 0x12A || sk_pucky < -0x12A); }
 static void pick_spot(int *x, int *y)
 {
