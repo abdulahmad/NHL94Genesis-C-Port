@@ -569,7 +569,7 @@ static uint16_t script_buttons(int pad, long frame)
 static long script_reset = -1;          /* alone: the frame a script's RESET was given for (the console powers on again at its wait) */
 
 /* HOLDTEST=goal:FRAME,pen:FRAME,fight:FRAME (a headless run; HOLDFIGHTAT=X,Y puts the fight there): at that vblank in a game in play the puck is put into a net (",away": the other), a penalty queued on
- * a home skater, or a home and a visiting skater put together for a fight (checkfight; with --rule fighting=2 it always starts),
+ * a home skater (HOLDPUCKAT=X,Y: the puck put there then), or a home and a visiting skater put together for a fight (checkfight; with --rule fighting=2 it always starts),
  * and every change of the stoppage wait is logged with its frame: tests the announcer and the face off wait
  * (mods/hold.c) at the game's own call sites. */
 static int holdtest_goal = -1, holdtest_pen = -1, holdtest_fight = -1, holdtest_last = -1;
@@ -602,6 +602,13 @@ static void holdtest_frame(void)
     if (holdtest_pen >= 0 && now >= holdtest_pen && g.gmode == 0) {
         holdtest_pen = -1;
         fprintf(stderr, "holdtest: frame %d penalty forced\n", now);
+        if (getenv("HOLDPUCKAT")) {                      /* (HOLDPUCKAT=X,Y: the puck there, loose and still, as the penalty is queued) */
+            int px, py;
+            if (sscanf(getenv("HOLDPUCKAT"), "%d,%d", &px, &py) == 2) {
+                struct SortObj *o = sortobj(puckscnum);
+                o->Xpos = o->OldXpos = (int16_t)px; o->Ypos = o->OldYpos = (int16_t)py; o->Xvel = o->Yvel = o->Zvel = 0; o->Zpos = o->OldZpos = 0;
+            }
+        }
         AddPenalty2((uint16_t)(getenv("HOLDPEN") ? atoi(getenv("HOLDPEN")) : 4), sortobj_at(team_struct(0)->tmsort) + 2);
     }
 }

@@ -143,8 +143,8 @@ struct referee_view {
     int dir, anim, at;                              /* his facedir; his picture (REF_GLIDE ...) and the frames into it */
     int sig;                                        /* REF_SIGNAL: which call (REF_SIG_ROUGH ...) */
 };
-enum { REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL, REF_TURNR, REF_SIGNAL, REF_PICKUP };   /* (SPArefglide, SPArefskate, SPArefstop, SPArefturnl / r; the
-                                                                             * call's signal, SPArefrough ... by referee_view's sig: refsigspa; SPArefpickup) */
+enum { REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL, REF_TURNR, REF_SIGNAL, REF_PICKUP, REF_POINT };   /* (SPArefglide, SPArefskate, SPArefstop, SPArefturnl / r; the
+                                                                             * call's signal, SPArefrough ... by referee_view's sig: refsigspa; SPArefpickup; SPArefpointgoa) */
 enum { REF_SIG_ROUGH, REF_SIG_CHARGE, REF_SIG_SLASH, REF_SIG_XCHECK, REF_SIG_HOOK, REF_SIG_TRIP, REF_SIG_INTERFER, REF_SIG_HOLD,
        REF_SIG_PENSHOT, REF_SIGS };                 /* (NHL 95 PC's SPArefrough, charge, slash, xcheck, hook, trip, interfer, hold, penshot) */
 int referee_call_made(void);                        /* RULE_PENCALL: the call made, the penalty screen cut to (till the face off) */
@@ -166,6 +166,8 @@ int referee_glide(struct SortObj *o);
 int referee_walk_from(int *x, int *y, int *vx, int *vy, int *dir);
 void referee_follow_spot(int side, int *x, int *y);
 void referee_rates(int far, int *acc, int *top, int *brake);
+int referee_way(int ax, int ay, int bx, int by, int *wx, int *wy, int n);   /* his way between plays round the nets: corners, b last; the count */
+int referee_in_net(int x, int y, int16_t *c, int16_t *s);                  /* in a net's frame (the cartridge's oval): 1, the way out */
 #define REFEREE_STATE_SIZE 38                       /* (version 12 of the rules' part; 11: REFEREE_STATE_SIZE_11; 10: REFEREE_STATE_SIZE_10; 9 and before: REFEREE_STATE_SIZE_9) */
 #define REFEREE_STATE_SIZE_11 33
 #define REFEREE_STATE_SIZE_10 29

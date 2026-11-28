@@ -827,6 +827,7 @@ static int ref_frame(void)
     case REF_TURNL: return 755 + d;                                                      /* (SPArefturnl) */
     case REF_TURNR: return 763 + d;                                                      /* (SPArefturnr) */
     case REF_PICKUP: return 691 + ((8 - d) & 7);                                         /* (SPArefpickup: one picture, 12 ticks) */
+    case REF_POINT: return 699 + 2 * d + (R.t >= 9);                                     /* (SPArefpointgoa: 8 ticks, then the point held 24) */
     default: return 650 + b;                                                             /* (SPArefglide) */
     }
 }
