@@ -99,7 +99,7 @@ NATIVE := $(wildcard native/*.c)
 # build/nhl94-vanilla, its own objects (native/vanilla/stubs.c, docs/VANILLA.md)
 ifeq ($(VANILLA),1)
 NATIVE := $(filter-out $(addprefix native/,rules.c rosters.c rom95g.c romsrc.c art.c banner.c ratings.c state.c net.c menuopts.c fightrate.c),$(NATIVE)) native/vanilla/stubs.c native/vanilla/mods.c
-SRC    := $(wildcard src/*.c)
+SRC    := $(wildcard src/*.c) mods/pascript.c                    # (the announcer's lines: native/announcer.c says them)
 VFLAGS := -DNHL94_VANILLA                                # (src/rules.h: every RULE() the cartridge's 0)
 BIN    ?= build/nhl94-vanilla$(EXE)
 OBJ    ?= build/obj-vanilla

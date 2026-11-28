@@ -599,17 +599,19 @@ static void hold(void)
     {
         uint8_t w[HOLD_WALK_SIZE], w2[HOLD_WALK_SIZE];
         struct hold_refpose p, p2;
-        CHECK(hold_walk_save(w) == HOLD_WALK_SIZE && hold_walk_check(w) == 0 && w[0] == 1);
+        CHECK(hold_walk_save(w) == HOLD_WALK_SIZE && hold_walk_check(w, HOLD_WALK_SIZE) == 0 && w[0] == 1);
         hold_skate_ref_pose(0, 0, 0, 0, 0, &p);
-        hold_walk_load(NULL);
-        hold_walk_load(w);
+        hold_walk_load(NULL, 0);
+        hold_walk_load(w, HOLD_WALK_SIZE);
         hold_skate_ref_pose(0, 0, 0, 0, 0, &p2);
         hold_walk_save(w2);
         CHECK(!memcmp(w, w2, sizeof w) && p.x == p2.x && p.y == p2.y && p.anim == p2.anim);
-        memcpy(w2, w, sizeof w); w2[0] = 2; CHECK(hold_walk_check(w2) < 0);
-        memcpy(w2, w, sizeof w); w2[8] = 8; CHECK(hold_walk_check(w2) < 0);
-        memcpy(w2, w, sizeof w); w2[6] = 0xFF; w2[7] = 0x7F; CHECK(hold_walk_check(w2) < 0);
-        CHECK(hold_walk_check(NULL) == 0);
+        memcpy(w2, w, sizeof w); w2[0] = 2; CHECK(hold_walk_check(w2, HOLD_WALK_SIZE) < 0);
+        memcpy(w2, w, sizeof w); w2[8] = 8; CHECK(hold_walk_check(w2, HOLD_WALK_SIZE) < 0);
+        memcpy(w2, w, sizeof w); w2[9] = 2; CHECK(hold_walk_check(w2, HOLD_WALK_SIZE) < 0);   /* (the last penalty's team: -1, 0 or 1) */
+        CHECK(hold_walk_check(w, HOLD_WALK_SIZE_13) == 0 && hold_walk_check(w, 8) < 0);   /* (version 13's, without it) */
+        memcpy(w2, w, sizeof w); w2[6] = 0xFF; w2[7] = 0x7F; CHECK(hold_walk_check(w2, HOLD_WALK_SIZE) < 0);
+        CHECK(hold_walk_check(NULL, 0) == 0);
     }
     /* a puck against the boards: he reaches it from inside */
     g.puckx[0] = 0x85; g.pucky = 0x20;
@@ -619,6 +621,29 @@ static void hold(void)
     CHECK(x == 0x78 && y == 0x20);
     hold_state_load(NULL);
     classic_rules();
+}
+
+/* NHL 95 PC's rink announcer's lines (mods/pascript.c): the clips each call says and, from their lengths in XBRUCE2.VIV less 26 ticks a
+ * joint (SpeechTimerTick), the stoppage's wait for them; a run of penalties to one team says "and number" from the second on */
+static void pascript(void)
+{
+    struct pa_line l;
+    int last = -1;
+    pa_script(PA_ONEMIN, NULL, 0, 0, 0, &last, &l);
+    CHECK(l.n == 1 && !strcmp(l.clip[0], "oneleft.cor") && pa_line_frames(&l) == 128);   /* (213 ticks) */
+    struct Team *tm = team_struct(0);
+    pa_script(PA_GOAL, tm, 1, -1, -1, &last, &l);
+    int g0 = pa_line_frames(&l);
+    CHECK(l.n == 3 && !strcmp(l.clip[1], "goalnum.cor") && g0 > 150 && g0 < 300);
+    pa_script(PA_GOAL, tm, 1, 2, 3, &last, &l);
+    CHECK(l.n == 9 && !strcmp(l.clip[4], "asstnum.cor") && !strcmp(l.clip[7], "andnum.cor") && pa_line_frames(&l) > g0 + 150);
+    pa_script(PA_PENALTY, tm, 1, 0x1E, 2 | 1 << 8 | 1 << 16, &last, &l);   /* (hooking, another to come, the same team's) */
+    CHECK(!strcmp(l.clip[1], "pensnum.cor") && !strcmp(l.clip[5], "hooking.pen") && last == 0);
+    int p1 = pa_line_frames(&l);
+    pa_script(PA_PENALTY, tm, 2, 0x20, 2, &last, &l);                     /* (tripping, the last: "and number", then the time) */
+    CHECK(!strcmp(l.clip[0], "andnum.cor") && !strcmp(l.clip[4], "tripping.pen") && !strcmp(l.clip[6], "at.cor") && last == -1);
+    CHECK(p1 > 200 && p1 < 400 && pa_line_frames(&l) > 200);
+    l.n = 1; strcpy(l.clip[0], "nosuch.cor"); CHECK(pa_line_frames(&l) == 0);
 }
 
 /* RULE_SIREN: the announcer's wait after the goal (RULE_ANNOUNCE 2) is the PC siren's fixed 420 frames from the siren, the game's
@@ -1019,8 +1044,8 @@ static void wide_view(void)
     rules[RULE_VIEW] = 0;
     CHECK(view_play_more() == 0 && view_more() == 0 && view_hpos() == 0x3C);
 
-    /* the state's part: version 15 keeps 1 and 2; version 14 is it without the goalie's part; version 13's 1 (the wide view played by)
-     * loads as 2 */
+    /* the state's part: version 16 keeps 1 and 2; version 15 is it with the walk before the announcer's byte; version 14 is that
+     * without the goalie's part; version 13's 1 (the wide view played by) loads as 2 */
     classic_rules();
     hold_state_load(NULL);
     referee_state_load(NULL, 0);
@@ -1030,7 +1055,12 @@ static void wide_view(void)
         classic_rules();
         rules[RULE_VIEW] = (uint8_t)view;
         size_t n = rules_state_save(NULL, NULL);
-        CHECK(n <= sizeof st && rules_state_save(NULL, st) == n && st[0] == 15);
+        CHECK(n <= sizeof st && rules_state_save(NULL, st) == n && st[0] == 16);
+        classic_rules();
+        CHECK(rules_state_load(NULL, st, n) == 0 && rules[RULE_VIEW] == view);
+        memmove(st + n - GOALIE_STATE_SIZE - 1, st + n - GOALIE_STATE_SIZE, GOALIE_STATE_SIZE);   /* (version 15: the walk without the announcer's last byte) */
+        n -= HOLD_WALK_SIZE - HOLD_WALK_SIZE_13;
+        st[0] = 15;
         classic_rules();
         CHECK(rules_state_load(NULL, st, n) == 0 && rules[RULE_VIEW] == view);
         st[0] = 14;
@@ -1040,7 +1070,7 @@ static void wide_view(void)
         classic_rules();
         CHECK(rules_state_load(NULL, st, n - GOALIE_STATE_SIZE) == 0 && rules[RULE_VIEW] == (view ? 2 : 0));
     }
-    st[0] = 16;
+    st[0] = 17;
     CHECK(rules_state_load(NULL, st, rules_state_save(NULL, NULL)) < 0);
     classic_rules();
 }
@@ -1063,6 +1093,7 @@ int main(void)
     refdrop();
     hold();
     siren();
+    pascript();
     fight_ratings();
     penalties();
     moves();

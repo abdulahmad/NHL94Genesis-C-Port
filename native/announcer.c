@@ -395,56 +395,6 @@ static void add(const char *fmt, ...)
     if (c && A.nq < QUEUE) A.queue[A.nq++] = c;
 }
 
-/* the 95 PC abbreviation of each of the cartridge's teams, in its order (the art's: a roster set's team plays as one of them) */
-static const char *const abbr95[28] = {
-    "ANA", "BOS", "BUF", "CGY", "CHI", "DAL", "DET", "EDM", "FLA", "HFD", "LA", "MTL", "NJ", "NYI",
-    "NYR", "OTT", "PHI", "PIT", "QUE", "SJ", "STL", "TB", "TOR", "VAN", "WSH", "WPG", "ASE", "ASW",
-};
-
-static const char *team_abbr(struct Team *tm)
-{
-    uint16_t t = rosters_art(tm->tmteam);
-    return t < 28 ? abbr95[t] : NULL;
-}
-
-/* the player's number (the roster keeps it as BCD) */
-static int jersey(int player, struct Team *tm)
-{
-    const struct RosterPlayer *p = (const struct RosterPlayer *)(const void *)GetPlayerNamePointer((uint16_t)player, tm);
-    return (p->number >> 4) * 10 + (p->number & 15);
-}
-
-/* "at <minutes> <seconds>" (QueueTimeClips: 1 minute and 1 second have clips of their own; seconds after minutes are two digits) */
-static void say_time(int min, int sec)
-{
-    add("at.cor");
-    add("pause.cor");
-    if (min) {
-        if (!sec) { if (min == 1) add("1minute.cor"); else { add("%d.num", min); add("minutes.cor"); } }
-        else add("%d.num", min);
-    }
-    if (sec == 1) { if (!min) add("1second.cor"); else add("%02d.num", sec); }
-    else if (sec > 1) {
-        if (!min) { add("%d.num", sec); add("seconds.cor"); }
-        else add("%02d.num", sec);
-    }
-}
-
-static const char *pen_clip(int pen)
-{
-    switch (pen) {
-    case 0x12: case 0x1A: return "roughing";
-    case 0x16: return "charging";
-    case 0x18: return "slashing";
-    case 0x1C: return "xcheck";
-    case 0x1E: return "hooking";
-    case 0x20: return "tripping";
-    case 0x22: return "interfer";
-    case 0x24: return "holding";
-    }
-    return NULL;                                        /* (fighting, the instigator: 95 PC has no clip) */
-}
-
 /* a new announcement: a goal and a penalty shot take over from what is being said; the rest wait their turn (or are dropped when
  * the voice is busy, as 95 PC's SpeechIdle) */
 static int begin(int interrupt, int drop_if_busy)
@@ -464,72 +414,36 @@ static void hook(int ev, struct Team *tm, int player, int a, int b)
     if ((g.gmode & (1 << gmhl)) && ev != PA_HIGHLIGHT) return;   /* (a highlight's own goals and clock are not said: only its line) */
     SDL_MemoryBarrierAcquire();
     SDL_LockMutex(A.lock);
-    const char *abbr = tm ? team_abbr(tm) : NULL;
-    int away = tm == team_struct(1);
+    struct pa_line l;
+    l.n = 0;
     switch (ev) {
-    case PA_GOAL:                                       /* tm the scorer's team, player him, a and b the assists (-1 none) */
-        if (!abbr || !begin(1, 0)) break;
-        A.last_pen_team = -1;
-        add("%s.tea", abbr);
-        add("goalnum.cor");
-        add("%d.num", jersey(player, tm));
-        if (a >= 0) { add("pause.cor"); add("asstnum.cor"); add("%d.num", jersey(a, tm)); }
-        if (b >= 0) { add("pause.cor"); add("andnum.cor"); add("%d.num", jersey(b, tm)); }
+    case PA_GOAL: case PA_PENSHOT:                      /* (95 PC's PaGoal and PaPenaltyShot take over from what is being said) */
+        if (begin(1, 0)) pa_script(ev, tm, player, a, b, &A.last_pen_team, &l);
         break;
-    case PA_PENALTY: {                                  /* a the penalty, b its minutes | remaining penalties << 8 | the next one is this team's << 16 */
-        int mins = b & 0xFF, remaining = b >> 8 & 0xFF, next_same = b >> 16 & 1;
-        if (!abbr || !begin(0, 0)) break;
-        int idx = A.last_pen_team == away ? 2 : 1;
-        A.last_pen_team = away;
-        if (idx == 1) {
-            add("%s.tea", abbr);
-            add(next_same ? "pensnum.cor" : "pennum.cor");
-        } else add("andnum.cor");
-        add("%d.num", jersey(player, tm));
-        add("pause.cor");
-        if (mins == 4) { add("4.num"); add("minutes.cor"); }   /* (a double minor, RULE_PENALTIES: 95 PC has no clip of its own) */
-        else add(mins == 5 ? "5min.cor" : "2min.cor");
-        const char *pc = pen_clip(a);
-        if (pc) add("%s.pen", pc);
-        add("pause.cor");
-        if (!remaining) { say_time(g.gameclock / 60, g.gameclock % 60); A.last_pen_team = -1; }
+    case PA_PENALTY:                                    /* (its clips wait their turn) */
+        if (begin(0, 0)) pa_script(ev, tm, player, a, b, &A.last_pen_team, &l);
         break;
-    }
-    case PA_PENSHOT:                                    /* tm the shooter's team, player him */
-        if (!abbr || !begin(1, 0)) break;
-        A.last_pen_team = -1;
-        add("%s.tea", abbr);
-        add("penshot.cor");
-        add("%d.num", jersey(player, tm));
-        add("pause.cor");
-        say_time(g.gameclock / 60, g.gameclock % 60);
+    case PA_ONEMIN:                                     /* (dropped when the voice is busy, as SpeechIdle) */
+        if (begin(0, 1)) pa_script(ev, tm, player, a, b, &A.last_pen_team, &l);
         break;
-    case PA_ONEMIN:
-        if (!begin(0, 1)) break;
-        add("oneleft.cor");
+    case PA_STAR:
+        pa_script(ev, tm, player, a, b, &A.last_pen_team, &l);
         break;
     case PA_HIGHLIGHT: {                                /* a the home team, b the away team: PaHighlightIntro's eight clips */
         uint16_t h = rosters_art((uint16_t)a), v = rosters_art((uint16_t)b);
-        if (h >= 28 || v >= 28 || !begin(1, 0)) break;
+        if (!pa_abbr(h) || !pa_abbr(v) || !begin(1, 0)) break;
         add("takeynow.bar");
-        add("%s.rnk", abbr95[h]);
+        add("%s.rnk", pa_abbr(h));
         add("highlite.bar");
         add("of.bar");
         add("gamebtwn.bar");
-        add("%s.awa", abbr95[v]);
+        add("%s.awa", pa_abbr(v));
         add("and.bar");
-        add("%s.hom", abbr95[h]);
+        add("%s.hom", pa_abbr(h));
         break;
     }
-    case PA_STAR:                                       /* a the star, 0-2: "first star", "<team> number <n>" */
-        if (!abbr) break;
-        add("%s", a == 0 ? "1ststar.cor" : a == 1 ? "2ndstar.cor" : "3rdstar.cor");
-        add("%s.frm", abbr);
-        add("pause.cor");
-        add("number.cor");
-        add("%d.num", jersey(player, tm));
-        break;
     }
+    for (int i = 0; i < l.n; i++) add("%s", l.clip[i]);
     SDL_AtomicSet(&A.talking, A.v[0].c || A.v[1].c || A.nq);
     SDL_UnlockMutex(A.lock);
 }

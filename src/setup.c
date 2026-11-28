@@ -1527,8 +1527,7 @@ void PenaltyShotBox(void)
     Framer(0x1B, 8);
     printbig(SYM_PenShotBigTxt);
     uint16_t shooter = sortobj((int16_t)g.BA_Sktr_SCnum)->pnum;
-    if (pa_hook) pa_hook(PA_PENSHOT, team_struct(g.BA_Team != 0), shooter, 0, 0);   /* (the rink announcer) */
-    hold_for(450);                                        /* (RULE_HOLD: "penalty shot number n, at 8 minutes 2 seconds", 7.5 s) */
+    hold_speech(PA_PENSHOT, team_struct(g.BA_Team != 0), shooter, 0, 0);   /* (the rink announcer, and with RULE_HOLD the wait for him) */
     print(FormatPlayerNumInitial(shooter, team_struct(g.BA_Team != 0)));
     PRINTZ(str_PenaltyShotBox_2);
     const uint8_t *list = rom_ptr(SYM_Penaltylist);
@@ -1569,18 +1568,13 @@ void ShowGoalBox(void)
     }
     printbig(text);
     uint16_t scorer = e[3];
-    {                                                    /* (RULE_HOLD, RULE_ANNOUNCE: 3.7 s for the goal, 2.6 s and 2 s for the assists) */
-        int a1 = -1, a2 = -1, assists = 0;
+    {                                                    /* (the rink announcer; RULE_HOLD, RULE_ANNOUNCE: the wait for him, mods/hold.c) */
+        int a1 = -1, a2 = -1;
         if (!(e[4] & 0x80) && !(g.sflags4 & HI(5))) {
-            a1 = e[4]; assists = 1;
-            if (!(e[5] & 0x80)) { a2 = e[5]; assists = 2; }
+            a1 = e[4];
+            if (!(e[5] & 0x80)) a2 = e[5];
         }
-        int frames = 222 + (assists ? 156 : 0) + (assists > 1 ? 120 : 0);
-        if (RULE(RULE_ANNOUNCE) == 2) hold_goal_after_song(frames, tm, scorer, a1, a2);   /* (the siren and the song first, home goal or away) */
-        else {
-            if (pa_hook) pa_hook(PA_GOAL, tm, scorer, a1, a2);           /* (the rink announcer) */
-            hold_for(frames);
-        }
+        hold_speech(PA_GOAL, tm, scorer, a1, a2);
     }
     g.printx = 0xC;
     print(FormatPlayerName(scorer, tm));

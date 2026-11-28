@@ -82,6 +82,17 @@ extern int (*fight_cheat_hook)(void);
  * must; hold_reset forgets it (a state loaded). The wait is in the game's own vblank count, not in audio:
  * every machine of a session waits the same, with the announcer or without. */
 void hold_for(int frames);
+/* NHL 95 PC's rink announcer's line for a call (PA_GOAL ...: mods/pascript.c): its clips (the host's voice says them) and, from their
+ * lengths in the bank, its frames (the stoppage's wait). last_pen_team: the team of the penalty said last in a run of them (-1 none),
+ * which the next one's words depend on ("and number"), kept by the caller */
+#define PA_CLIPS 24
+struct pa_line { int n; char clip[PA_CLIPS][16]; };
+void pa_script(int ev, struct Team *tm, int player, int a, int b, int *last_pen_team, struct pa_line *l);
+int pa_line_frames(const struct pa_line *l);
+const char *pa_abbr(uint16_t art);                  /* (95 PC's abbreviation of the cartridge's team art, NULL past 28) */
+/* the stoppage's wait for the announcer's call (RULE_HOLD / RULE_ANNOUNCE): the host's voice is told (pa_hook) and the drop waits for
+ * the line's length (mods/hold.c); the vanilla build: only the voice */
+void hold_speech(int ev, struct Team *tm, int player, int a, int b);
 void hold_anthem(int frames);
 int hold_skate_carry(int *x, int *y);               /* the puck in the referee's hand on his way to the dot, 256ths of a pixel (0: not now) */
 /* the referee on his walk to the dot (NHL 95 PC's assrefgoalpa / assrefwhistle, then assrefdrop, with its skating: mods/hold.c): x, y
@@ -121,12 +132,14 @@ void hold_siren(void);                              /* the goal siren starts (RU
 #define HOLD_SIREN_SIZE 3
 size_t hold_siren_save(uint8_t *out);
 int hold_siren_load(const uint8_t *in);
-/* the referee's walk's part of a state (version 13: HOLD_WALK_SIZE bytes; NULL: none, a state from before it: he walks from the puck);
- * hold_walk_check -1 for bytes not this game's */
-#define HOLD_WALK_SIZE 9
+/* the referee's walk's part of a state, and the announcer's last penalty's team (version 16: HOLD_WALK_SIZE bytes; versions 13 to 15:
+ * HOLD_WALK_SIZE_13, the walk alone; NULL: none, a state from before it: he walks from the puck); hold_walk_check -1 for bytes not
+ * this game's */
+#define HOLD_WALK_SIZE 10
+#define HOLD_WALK_SIZE_13 9
 size_t hold_walk_save(uint8_t *out);
-int hold_walk_check(const uint8_t *in);
-void hold_walk_load(const uint8_t *in);
+int hold_walk_check(const uint8_t *in, size_t n);
+void hold_walk_load(const uint8_t *in, size_t n);
 #define FACEOFF_DEFER_SIZE 38
 size_t faceoff_defer_save(uint8_t *out);
 int faceoff_defer_check(const uint8_t *in);
