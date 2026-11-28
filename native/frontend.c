@@ -617,7 +617,16 @@ static void test_mouse_tick(void)
     if (now - last_log >= 250) { last_log = now; replaycam_state(line, sizeof line); fprintf(stderr, "TEST mouse t=%u: %s\n", (unsigned)(now - t0), line); }
 }
 
-static void hook_draw_over(const SDL_Rect *dst) { pic_dst = *dst; ob_pads_setup_draw(dst); ob_pads_mouse_draw(dst); options_ui_draw(dst); }
+/* a ticker highlight is the computer's game (StartHL2): no player of the mouse's, so no green arrow, the pointer hidden as in play (mouse
+ * mode stays play for the moment of drawing only: ob_pads_mouse_draw still notes where the picture is) */
+static void mouse_draw(const SDL_Rect *dst)
+{
+    int hl = native_in_highlight() && ob_pads_mouse_playing();
+    if (hl) ob_pads_mouse_mode(0);
+    ob_pads_mouse_draw(dst);
+    if (hl) ob_pads_mouse_mode(1);
+}
+static void hook_draw_over(const SDL_Rect *dst) { pic_dst = *dst; ob_pads_setup_draw(dst); mouse_draw(dst); options_ui_draw(dst); }
 static void hook_changed(void) { settings_write(); }
 /* the game stopped, its save RAM and the settings written */
 static void shutdown_game(void)
