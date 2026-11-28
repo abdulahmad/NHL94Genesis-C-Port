@@ -57,7 +57,9 @@
 #define PEN_REFEREE 0x1A                               /* (PenRoughing: the cartridge's nearest to 95 PC's 16h, Abuse of Official) */
 
 static struct SortObj ref;                             /* (only the fields below are his: Xpos ... impact, nopuck[0]) */
-static struct referee_extra { uint8_t mode, drop, fall, fdir, hits, faller; } rx;   /* mode 0 off the ice, 1 at the dot, 2 in play */
+static struct referee_extra { uint8_t mode, drop, fall, fdir, hits, faller, call, sig, st; uint16_t ct; } rx;   /* mode 0 off the ice, 1 at the dot, 2 in play;
+                                                                 * call (RULE_PENCALL): 0 none, 1 skating to the spot, 2 turning to face the call, 3 the
+                                                                 * signal (sig, st its frames), 4 made; ct the frames since the whistle */
 
 static int logging(void) { static int l = -1; if (l < 0) l = getenv("REFEREE_LOG") != NULL; return l; }
 
@@ -405,6 +407,84 @@ void referee_skate_start(struct SortObj *o, int16_t x, int16_t y)
     o->SPA = REF_GLIDE; o->SPAcnt = 0;
 }
 
+/* RULE_PENCALL: NHL 95 PC's penalty call. Stop4Pen's whistle stops play and InProgress calls SetPA, which gives the referee assrefsignal
+ * (Asstab 20h, goalie/assgoalie.c): he skates to (A0h, 0), the timekeeper's side at the red line (SkateToSpot, until within 0Ch in y
+ * and no more than 14h short in x), then every 8 ticks glides (SPArefglide), stops and turns a step toward the call's way (refsigdir:
+ * 4, facing the viewer); facing it he makes the signal (refsigspa_m2 by RefPen: SPArefrough ... one picture of 12 ticks, the
+ * signal's two or more, back to 847) and goes on to assrefgoalpa, which holds the stance while the penalty's overlay runs. Here the
+ * cartridge's penalty screen is that overlay: chkprogress waits for pencall_ready, then cuts to it with no fade (and the face off
+ * set up cuts back: hold_nofade). The cartridge's penalty number (a word offset into Penaltylist) is the PC's RefPen times 2 for
+ * roughing (9) to holding (12h); its fights are called with roughing's signal and the penalty shot versions with SPArefpenshot. */
+static const uint8_t sig_len[REF_SIGS] = { 60, 96, 60, 60, 60, 60, 72, 72, 68 };   /* (frames.asm: the pictures' ticks, the last held) */
+static int call_pen(void)                                         /* the first queued penalty with minutes (Penaltylist's byte 1), or -1 */
+{
+    const uint8_t *t = rom_ptr(SYM_Penaltylist);
+    for (const uint8_t *a = g.PenBuf; a < g.PenBuf + sizeof g.PenBuf - 1 && (a[0] | a[1]); a += 2) {
+        uint16_t pen = a[0];
+        if ((int8_t)(t + rd16(t + pen))[penmins] > 0) return pen;
+    }
+    return -1;
+}
+static int sig_of(int pen)
+{
+    switch (pen >> 1) {
+    case 0x09: case 0x0D: case 0x13: case 0x14: return REF_SIG_ROUGH;      /* (roughing, both; fighting: the PC has no fight) */
+    case 0x0B: return REF_SIG_CHARGE;
+    case 0x0C: return REF_SIG_SLASH;
+    case 0x0E: return REF_SIG_XCHECK;
+    case 0x0F: return REF_SIG_HOOK;
+    case 0x10: return REF_SIG_TRIP;
+    case 0x11: return REF_SIG_INTERFER;
+    case 0x12: return REF_SIG_HOLD;
+    default: return pen >= 0x2E ? REF_SIG_PENSHOT : REF_SIG_ROUGH;
+    }
+}
+static int call_on(void)
+{
+    return RULE(RULE_PENCALL) && (g.gmode & (1 << gmpen)) && (int16_t)g.PenCntDwn >= 0 && call_pen() >= 0;
+}
+static void assrefsignal(struct SortObj *o)
+{
+    if (!rx.call) { rx.call = 1; rx.sig = (uint8_t)sig_of(call_pen()); rx.st = 0; rx.ct = 0; o->temp1 = 0; o->temp5 = 0; }
+    if (rx.ct < 0xFFFF) rx.ct = (uint16_t)(rx.ct + elapsed);
+    int32_t tx = PCX(0xA0), ty = 0;
+    ref_inside(&tx, &ty);
+    g.sflags |= HI(sfslock);                                       /* (95 PC's checkwindow while RefStep is set: the view follows him) */
+    g.yc1 = (uint16_t)o->Ypos; g.xc1 = (uint16_t)o->Xpos; g.yleader = 0;
+    if (rx.call == 1) {
+        if (iabs(o->Ypos - (int16_t)ty) > 0xC || o->Xpos < tx - 0x14) { ref_skateto(o, (int16_t)tx, (int16_t)ty); return; }
+        rx.call = 2; o->temp1 = 0;
+    }
+    if (rx.call == 2) {
+        if (o->Xvel | o->Yvel) { ref_skate(o, o->Xpos, o->Ypos, 1); return; }   /* (SkateToSpot's stop there; then the turn alone) */
+        o->temp1 = (int16_t)(o->temp1 - elapsed);
+        if (o->temp1 >= 0) return;
+        o->temp1 = (int16_t)(o->temp1 + 8);
+        if (o->Xvel | o->Yvel) return;
+        int r = (4 - o->facedir) & 7;
+        if (r) { o->facedir = (int16_t)((o->facedir + (r < 5 ? 1 : -1)) & 7); o->_pad56 = 0; ref_anim(o, REF_GLIDE); return; }
+        rx.call = 3; rx.st = 0;
+        ref_anim(o, REF_SIGNAL);
+        return;
+    }
+    o->Xvel = o->Yvel = 0;
+    if (rx.call == 3) {
+        rx.st = (uint8_t)(rx.st + elapsed > 0xFF ? 0xFF : rx.st + elapsed);
+        if (rx.st >= sig_len[rx.sig]) rx.call = 4;
+    }
+}
+
+/* chkprogress: the cartridge's way (0), the call still being made (-1), or made: cut to the penalty screen (1). Not after 600 frames
+ * (a referee who cannot get there: the call is made where he is) */
+int pencall_ready(void)
+{
+    if (!RULE(RULE_PENCALL) || !active() || call_pen() < 0) return 0;
+    if (rx.call != 4 && rx.ct < 600) return -1;
+    rx.call = 4;                                                  /* (made: kept through the penalty screen, for the cut back, hold_nofade) */
+    return 1;
+}
+int referee_call_made(void) { return rx.call == 4; }
+
 /* assfwatchref: a fight (mods/fight.c; 95 PC has none) is the two fighters'; he gets out of it and watches, as every other skater does
  * with NHLPA 93's assfwatch (logic93.asm): on taking it (temp5 set) and then every 60 frames (temp1 the countdown) a spot 50h from the
  * fight's centre (xc1, yc1) on the line from it to him, x at most 7Eh across, here kept 8 inside the boards and their corners
@@ -530,7 +610,9 @@ void referee_update(void)
     if (ref.impact < 0) ref.impact = 0;
     if (rx.fall) rx.fall = (uint8_t)(rx.fall > elapsed ? rx.fall - elapsed : 0);   /* (down: he slides, as a skater does on the ice) */
     else if (rx.drop) { rx.drop--; ref.Xvel = ref.Yvel = 0; }
-    else referee_follow(&ref);                                    /* (assreffollow: 95 PC's skating, above) */
+    else if (call_on()) assrefsignal(&ref);                       /* (RULE_PENCALL: the penalty call, NHL 95 PC's assrefsignal) */
+    else referee_follow(&ref);
+    if (!call_on()) rx.call = 0;                                    /* (assreffollow: 95 PC's skating, above) */
     int16_t ox = ref.Xpos, oy = ref.Ypos;
     uint16_t oxf = ref.Xfrac, oyf = ref.Yfrac;
     if (referee_glide(&ref) == 2) sfx(0x20);                      /* (SFXplayerwall, as wallcoll plays it for a skater) */
@@ -562,7 +644,8 @@ int referee_get(struct referee_view *v)
     v->fall_dir = rx.fdir;
     v->dir = ref.facedir & 7;
     v->anim = ref.SPA;
-    v->at = ref.SPAcnt;
+    v->at = ref.SPA == REF_SIGNAL ? rx.st : ref.SPAcnt;
+    v->sig = rx.sig;
     return 1;
 }
 
@@ -577,20 +660,22 @@ size_t referee_state_save(uint8_t *out)
         b[8] = (uint8_t)(ref.facedir & 7); b[9] = (uint8_t)ref.temp2; b[10] = (uint8_t)((uint16_t)ref.temp2 >> 8);   /* (version 10: his skating) */
         b[11] = (uint8_t)ref._pad56; b[12] = (uint8_t)(ref._pad56 >> 8); b[13] = (uint8_t)ref.temp4; b[14] = (uint8_t)((uint16_t)ref.temp4 >> 8);
         b[15] = (uint8_t)ref.temp5; b[16] = (uint8_t)ref.temp1; b[17] = (uint8_t)ref.temp3; b[18] = (uint8_t)((uint16_t)ref.temp3 >> 8);   /* (version 11: his fight watch) */
+        b[19] = rx.call; b[20] = rx.sig; b[21] = rx.st; b[22] = (uint8_t)rx.ct; b[23] = (uint8_t)(rx.ct >> 8);   /* (version 12: his penalty call) */
     }
     return REFEREE_STATE_SIZE;
 }
 
 /* a state's n bytes, or (in NULL) none: a state from before the referee, which starts him off the ice. A state from before his
  * skating (version 6 to 9 of the rules' part: REFEREE_STATE_SIZE_9 bytes) starts it afresh where he is; one from before his fight
- * watch (version 10: REFEREE_STATE_SIZE_10) has him not watching one */
+ * watch (version 10: REFEREE_STATE_SIZE_10) has him not watching one; one from before his penalty call (version 11: REFEREE_STATE_SIZE_11) has him not making one */
 int referee_state_load(const uint8_t *in, size_t n)
 {
     memset(&ref, 0, sizeof ref);
     memset(&rx, 0, sizeof rx);
     if (!in) return 0;
-    if (n != REFEREE_STATE_SIZE && n != REFEREE_STATE_SIZE_10 && n != REFEREE_STATE_SIZE_9) return -1;
-    if (n == REFEREE_STATE_SIZE && (in[29] > 2 || in[30] > 0x3C)) return -1;
+    if (n != REFEREE_STATE_SIZE && n != REFEREE_STATE_SIZE_11 && n != REFEREE_STATE_SIZE_10 && n != REFEREE_STATE_SIZE_9) return -1;
+    if (n >= REFEREE_STATE_SIZE_11 && (in[29] > 2 || in[30] > 0x3C)) return -1;
+    if (n == REFEREE_STATE_SIZE && (in[33] > 4 || in[34] >= REF_SIGS)) return -1;
     if (n >= REFEREE_STATE_SIZE_10 && (in[22] > 7 || (in[23] > 9) || (int8_t)in[24] < -0xC || (int8_t)in[24] > 0xC)) return -1;
     if (in[15] > 2 || in[16] > REF_DROP || in[17] > REF_FALL || in[18] > 7 || in[19] > 2 || in[20] > 0xB || in[21]) return -1;   /* (a state is checked before it is used) */
     int16_t w[7];
@@ -601,7 +686,8 @@ int referee_state_load(const uint8_t *in, size_t n)
     int16_t x = ref.Xpos, y = ref.Ypos, vx = ref.Xvel, vy = ref.Yvel;
     referee_skate_start(&ref, x, y);
     ref.Xfrac = (uint16_t)w[1]; ref.Yfrac = (uint16_t)w[3]; ref.Xvel = vx; ref.Yvel = vy;
-    if (n == REFEREE_STATE_SIZE) { ref.temp5 = in[29]; ref.temp1 = in[30]; ref.temp3 = (int16_t)(in[31] | in[32] << 8); }
+    if (n >= REFEREE_STATE_SIZE_11) { ref.temp5 = in[29]; ref.temp1 = in[30]; ref.temp3 = (int16_t)(in[31] | in[32] << 8); }
+    if (n == REFEREE_STATE_SIZE) { rx.call = in[33]; rx.sig = in[34]; rx.st = in[35]; rx.ct = (uint16_t)(in[36] | in[37] << 8); if (rx.call == 3) ref.SPA = REF_SIGNAL; }
     if (n >= REFEREE_STATE_SIZE_10) {
         ref.facedir = in[22]; ref.temp2 = (int16_t)(in[23] | in[24] << 8);
         ref._pad56 = (uint16_t)(in[25] | in[26] << 8); ref.temp4 = (int16_t)(in[27] | in[28] << 8);

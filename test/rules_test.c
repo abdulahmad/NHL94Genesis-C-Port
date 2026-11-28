@@ -290,6 +290,57 @@ static void referee_avoid(void)
     classic_rules();
 }
 
+/* RULE_PENCALL (mods/referee.c): NHL 95 PC's penalty call. With a penalty with minutes waiting for its screen (gmpen, PenCntDwn), the
+ * referee in play skates to the timekeeper's side (A0h, 0: 8 inside the boards here), turns a step every 8 frames to face us (4) and
+ * signals the call (hooking: REF_SIG_HOOK); chkprogress waits for it (pencall_ready -1), then cuts (1). Off, or without the referee
+ * in play: the cartridge's way (0). The state keeps the call */
+static void referee_pencall(void)
+{
+    struct referee_view v;
+    classic_rules();
+    referee_state_load(NULL, 0);
+    g.demoflag = 1; g.sflags = 0; g.gmode = 0; g.gmode2 = 0; g.PalMode = 0; g.Vpos = 0x40; g.gameclock = 100;
+    struct SortObj *pk = sortobj(puckscnum);
+    memset(pk, 0, sizeof *pk);
+    pk->SCnum = puckscnum; pk->asslist[0] = pnorm; pk->newpos = 0xFF; pk->Xpos = -0x20; pk->Ypos = 0x40;
+    for (int i = 0; i < 12; i++) { struct SortObj *o = sortobj(i); memset(o, 0, sizeof *o); o->SCnum = (int16_t)i; o->position = -1; }
+    elapsed = 1;
+    rules[RULE_REFEREE] = 1;
+    for (int k = 0; k < 40; k++) referee_update();          /* (on beside the play) */
+    memset(g.PenBuf, 0, sizeof g.PenBuf);
+    g.PenBuf[0] = 0x1E; g.PenBuf[1] = 2;                    /* (hooking, player 2) */
+    g.gmode = (1 << gmclock) | (1 << gmpen); g.PenCntDwn = 100;
+    CHECK(pencall_ready() == 0);                            /* (the rule off: the cartridge's way) */
+    rules[RULE_PENCALL] = 1;
+    CHECK(pencall_ready() == -1);
+    int k, sig = 0, at = 0;
+    for (k = 0; k < 500 && pencall_ready() < 0; k++) {
+        referee_update();
+        referee_get(&v);
+        if (v.anim == REF_SIGNAL) { sig++; if (v.sig != REF_SIG_HOOK) at = -1; }
+        if (k == 100) {                                     /* (the state keeps the call) */
+            uint8_t a[REFEREE_STATE_SIZE], b[REFEREE_STATE_SIZE];
+            CHECK(referee_state_save(a) == REFEREE_STATE_SIZE && a[33] >= 1 && a[33] <= 4);
+            CHECK(referee_state_load(a, sizeof a) == 0);
+            referee_state_save(b);
+            CHECK(!memcmp(a, b, sizeof a));
+            memcpy(b, a, sizeof b); b[33] = 5; CHECK(referee_state_load(b, sizeof b) < 0);
+            memcpy(b, a, sizeof b); b[34] = REF_SIGS; CHECK(referee_state_load(b, sizeof b) < 0);
+            CHECK(referee_state_load(a, REFEREE_STATE_SIZE_11) == 0);   /* (version 11: no call under way) */
+            CHECK(referee_state_load(a, sizeof a) == 0);
+        }
+    }
+    referee_get(&v);
+    CHECK(pencall_ready() == 1 && referee_call_made());
+    CHECK((v.x >> 16) >= 0x78 - 0x14 && (v.x >> 16) <= 0x80 && (v.y >> 16) >= -0xC && (v.y >> 16) <= 0xC && v.dir == 4);
+    CHECK(sig >= 60 && at == 0);                            /* (the hooking signal, its 60 frames) */
+    rules[RULE_REFEREE] = 0;
+    CHECK(pencall_ready() == 0);                            /* (no referee in play: the cartridge's way) */
+    g.gmode = 0; memset(g.PenBuf, 0, sizeof g.PenBuf);
+    referee_state_load(NULL, 0);
+    classic_rules();
+}
+
 /* RULE_REFEREE: 95 PC's skating (mods/referee.c). The boards: skating into them, along a side or into a corner, he is turned back
  * as a skater is (checkwallcoll / wallcoll: the side boards at 80h, the ends at 126h, the corners' circles of 40h), never more than a
  * frame's way past them. The turn: his facing moves a step of 45 degrees at a time, the PC's doplayeracc rate (at least 5 frames a
@@ -693,6 +744,7 @@ int main(void)
     sega_cd();
     referee();
     referee_avoid();
+    referee_pencall();
     referee_skating();
     hold();
     siren();

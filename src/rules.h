@@ -57,6 +57,8 @@ enum {
                                  * files, the host's in a session: native/fightrate.c); 0 the cartridge's (mods/fight.c fight_rating) */
     RULE_TICKER_HL,             /* 1: ticker highlights from the pregame (mods/ticker.c): InitScores plays 0-3 periods of the other games, not
                                  * 0-2, so the pregame's UpdateScores can send a close game to overtime and DoHiLights plays it there */
+    RULE_PENCALL,               /* 1: with RULE_REFEREE, NHL 95 PC's penalty call (mods/referee.c): no fade at the whistle; the referee skates to
+                                 * the timekeeper's side and signals the call, then a cut to the penalty screen, and a cut back from it */
     RULE_COUNT
 };
 /* the original's values */
@@ -94,7 +96,7 @@ int hold_anthem_song(void);                         /* 1 while the anthem's song
 void hold_skate_puck(int *x, int *y, int *pickup);  /* the puck's whistle place, and when (of 256) the referee has it */
 int hold_skate_pstart(void);                         /* 1 while the skaters (and the referee) come on at the start of a period */
 int hold_skating(void);                             /* 1 while the skaters walk to the spots (the drop's time waits for them) */
-int hold_nofade(void);                             /* RULE_HOLD, a face off in the middle of play: no fade to black */
+int hold_nofade(void);                             /* RULE_HOLD, a face off in the middle of play: no fade to black (1); RULE_PENCALL, back from the penalty screen: a cut (2) */
 int hold_anthem_ref(int *x, int *y, int *dir, int *moving);   /* the anthem's referee: its place on the rink (1 while the anthem and the skate to the spots last) */
 /* RULE_ANNOUNCE 2: a goal's speech (pa_hook PA_GOAL with these arguments) starts when the goal song has ended; the face off waits for
  * both. frames is the speech's length. hold_tick is called every game frame. */
@@ -127,8 +129,15 @@ struct referee_view {
     int at_dot, drop;                               /* at the face off spot; the frames left of the puck drop */
     int fall, fall_dir;                             /* the frames into his fall (-1: standing), the way he faced */
     int dir, anim, at;                              /* his facedir; his picture (REF_GLIDE ...) and the frames into it */
+    int sig;                                        /* REF_SIGNAL: which call (REF_SIG_ROUGH ...) */
 };
-enum { REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL, REF_TURNR };   /* (SPArefglide, SPArefskate, SPArefstop, SPArefturnl / r) */
+enum { REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL, REF_TURNR, REF_SIGNAL };   /* (SPArefglide, SPArefskate, SPArefstop, SPArefturnl / r; the call's
+                                                                             * signal, SPArefrough ... by referee_view's sig: refsigspa) */
+enum { REF_SIG_ROUGH, REF_SIG_CHARGE, REF_SIG_SLASH, REF_SIG_XCHECK, REF_SIG_HOOK, REF_SIG_TRIP, REF_SIG_INTERFER, REF_SIG_HOLD,
+       REF_SIG_PENSHOT, REF_SIGS };                 /* (NHL 95 PC's SPArefrough, charge, slash, xcheck, hook, trip, interfer, hold, penshot) */
+int referee_call_made(void);                        /* RULE_PENCALL: the call made, the penalty screen cut to (till the face off) */
+int pencall_ready(void);                            /* RULE_PENCALL (chkprogress): 0 the cartridge's way; -1 the referee is still making the call;
+                                                     * 1 he has made it: cut to the penalty screen (no fade) */
 void referee_update(void);
 void referee_cx(int16_t x, int16_t y, struct SortObj *o);
 void referee_puck(struct SortObj *puck);
@@ -139,7 +148,8 @@ int referee_get(struct referee_view *v);
 void referee_skate_start(struct SortObj *o, int16_t x, int16_t y);
 void referee_follow(struct SortObj *o);
 int referee_glide(struct SortObj *o);
-#define REFEREE_STATE_SIZE 33                       /* (version 11 of the rules' part; 10: REFEREE_STATE_SIZE_10; 9 and before: REFEREE_STATE_SIZE_9) */
+#define REFEREE_STATE_SIZE 38                       /* (version 12 of the rules' part; 11: REFEREE_STATE_SIZE_11; 10: REFEREE_STATE_SIZE_10; 9 and before: REFEREE_STATE_SIZE_9) */
+#define REFEREE_STATE_SIZE_11 33
 #define REFEREE_STATE_SIZE_10 29
 #define REFEREE_STATE_SIZE_9 22
 size_t referee_state_save(uint8_t *out);

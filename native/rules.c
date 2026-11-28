@@ -18,6 +18,7 @@ static const char *const siren_names[2] = { "cartridge", "NHL 95 PC" };
 static const char *const penalty_names[3] = { "cartridge", "NHL 96 Genesis", "NHL rules" };   /* (double minors: mods/penalties.c) */
 static const char *const move95_names[3] = { "off", "NHL 95 PC", "NHL 95 Genesis" };   /* (NHL 95's moves: mods/moves.c) */
 static const char *const ticker_names[2] = { "cartridge", "from the pregame" };   /* (RULE_TICKER_HL: mods/ticker.c) */
+static const char *const pencall_names[2] = { "cartridge", "PC referee" };   /* (RULE_PENCALL: mods/referee.c) */
 static const char *const goalie_names[3] = { "cartridge", "NHL 95 PC", "NHL 95 PC + 96 Genesis" };   /* (mods/goalie.c) */
 
 /* the rules */
@@ -47,6 +48,7 @@ const mdrt_sdl_option rule_options[RULE_COUNT] = {
     [RULE_SHOTBLOCK] = { "rules.shot_block", "Shot blocking", 3, move95_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_GOALIE] = { "rules.goalie_anims", "Goalie animations", 3, goalie_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
     [RULE_TICKER_HL] = { "rules.ticker_highlights", "Ticker highlights", 2, ticker_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
+    [RULE_PENCALL] = { "rules.penalty_call", "Penalty call", 2, pencall_names, NULL, 0, 0, 0, 0, NULL, NULL, NULL },
 };
 
 /* a choice's value: its number, or (a list's) its index */
@@ -227,7 +229,7 @@ const char *rules_arg(const char *arg)
  * pause's HOLD_STATE_SIZE (RULE_HOLD, the anthems: mods/hold.c), then (version 8) the goal siren's
  * HOLD_SIREN_SIZE (RULE_SIREN: mods/hold.c), then (version 9) NHL 95's moves' MOVES_STATE_SIZE (mods/moves.c). The
  * roster set's tables are in the ROM the state's RAM points into, so a state loads with its own
- * roster set or not at all. Version 11 is this layout; version 10 is it with the referee's part before his fight watch (REFEREE_STATE_SIZE_10 bytes); version 9 is it with the referee's part before his skating (REFEREE_STATE_SIZE_9 bytes); version 8 is it without the moves (none then); version 7 is it without the siren (none then); version 6 without the pause (none then),
+ * roster set or not at all. Version 12 is this layout; version 11 is it with the referee's part before his penalty call (REFEREE_STATE_SIZE_11 bytes); version 10 is it with the referee's part before his fight watch (REFEREE_STATE_SIZE_10 bytes); version 9 is it with the referee's part before his skating (REFEREE_STATE_SIZE_9 bytes); version 8 is it without the moves (none then); version 7 is it without the siren (none then); version 6 without the pause (none then),
  * version 5 without the referee too (he starts off the ice). Version 4 (before the game's own extras
  * were taken out) held 24 rules and 64 bytes of plus/minus stats; it loads when those extras are at
  * their original values (OLD4: each old rule's place now, or -1 and the original value it needs). */
@@ -248,7 +250,7 @@ size_t rules_state_save(void *user, uint8_t *out)
     size_t n = strlen(dir) > 255 ? 255 : strlen(dir), at = 2 + RULE_COUNT;
     if (out) {
         uint64_t h = rosters_hash();
-        out[0] = 11;
+        out[0] = 12;
         out[1] = RULE_COUNT;
         memcpy(out + 2, rules, RULE_COUNT);
         for (int k = 0; k < 8; k++) out[at + k] = (uint8_t)(h >> (56 - 8 * k));
@@ -262,13 +264,13 @@ size_t rules_state_save(void *user, uint8_t *out)
     return at + 9 + n + REFEREE_STATE_SIZE + HOLD_STATE_SIZE + HOLD_SIREN_SIZE + MOVES_STATE_SIZE;
 }
 
-/* the referee's part of a version's state (6 to 9: before his skating; 10: before his fight watch; 11: REFEREE_STATE_SIZE) */
-static size_t ref_size(int v) { return v >= 11 ? REFEREE_STATE_SIZE : v == 10 ? REFEREE_STATE_SIZE_10 : v >= 6 ? REFEREE_STATE_SIZE_9 : 0; }
+/* the referee's part of a version's state (6 to 9: before his skating; 10: before his fight watch; 11: before his penalty call; 12: REFEREE_STATE_SIZE) */
+static size_t ref_size(int v) { return v >= 12 ? REFEREE_STATE_SIZE : v == 11 ? REFEREE_STATE_SIZE_11 : v == 10 ? REFEREE_STATE_SIZE_10 : v >= 6 ? REFEREE_STATE_SIZE_9 : 0; }
 
 /* where the roster set's part starts in a state's part, or 0 when it is not this build's */
 static size_t roster_part(const uint8_t *in, size_t size)
 {
-    if (size < 2 || in[0] < 4 || in[0] > 11) return 0;
+    if (size < 2 || in[0] < 4 || in[0] > 12) return 0;
     if (in[0] == 4 ? in[1] > OLD4_COUNT : in[1] > RULE_COUNT) return 0;
     size_t at = 2u + in[1] + (in[0] == 4 ? 64u : 0u);       /* (version 4: the plus/minus stats) */
     size_t tail = ref_size(in[0]) + (in[0] >= 7 ? HOLD_STATE_SIZE : 0) + (in[0] >= 8 ? HOLD_SIREN_SIZE : 0)

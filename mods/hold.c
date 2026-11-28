@@ -80,7 +80,11 @@ int hold_anthem_song(void) { return anth && pending && (int16_t)(g.Vcount - anth
  * rink in view). The start of a period keeps the cartridge's, and so does the way back from the penalty screen: the horizontal view is
  * still up there, and the cartridge's forceblack, its set up in the dark and the fade in are the way back to the rink (without them the
  * half set up rink showed for a frame, the face off window over the penalty screen's tiles, then a cut). */
-int hold_nofade(void) { return RULE(RULE_HOLD) && !anth && g.gameclock != g.PerTimeTotal && !(g.sflags & HI(sfhor)); }
+int hold_nofade(void)
+{
+    if ((g.sflags & HI(sfhor)) && referee_call_made()) return 2;   /* (RULE_PENCALL: a cut back from the penalty screen the call cut to) */
+    return RULE(RULE_HOLD) && !anth && g.gameclock != g.PerTimeTotal && !(g.sflags & HI(sfhor));
+}
 
 /* the frames into the anthem's song (-1 when no song is on: before it, after it, or no anthem) */
 int hold_anthem_time(void)

@@ -20,6 +20,8 @@ const uint8_t *spa_table(uint16_t spa) { return rom_ptr(SYM_SPAlist + spa); }   
 
 /* mods/referee.c: NHL 95 PC's referee in play. The cartridge has no referee on the ice. */
 void referee_update(void) {}
+int pencall_ready(void) { return 0; }
+int referee_call_made(void) { return 0; }
 void referee_cx(int16_t x, int16_t y, struct SortObj *o) { (void)x; (void)y; (void)o; }
 void referee_puck(struct SortObj *puck) { (void)puck; }
 int referee_get(struct referee_view *v) { (void)v; return 0; }
