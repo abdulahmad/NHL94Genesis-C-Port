@@ -17,8 +17,11 @@ int whiteice_on(void) { return on; }
 #define WHITE_SHEEN 0xFFEEF3F8u            /* (238, 243, 248): the lighter shade of the glare */
 #define WHITE_BRIGHT 0xFFFFFFFFu           /* (255, 255, 255): the lighter still, as the blue ice has its two */
 
-/* (a game: the graphics are ready (dfok) in the 32 column mode; the opening film has the mode without them) */
-static int rink_up(void) { return g.demoflag && (g.disflags & HI(dfok)) && (g.disflags & HI(df32c)); }
+/* (a game: the graphics are ready (dfok) in the 32 column mode, or the pause screen's side view (sfpz: it clears dfok), or a fade of
+ * a game's colours the game waits through (whiteice_fade_rink: pcspr.c); the opening film has the mode without them) */
+static volatile int fade_rink;
+void whiteice_fade_rink(int v) { fade_rink = v != 0; }
+static int rink_up(void) { return g.demoflag && ((g.disflags & HI(dfok)) || (g.sflags & HI(sfpz)) || fade_rink) && (g.disflags & HI(df32c)); }
 
 uint32_t whiteice_rgb(uint32_t c)
 {

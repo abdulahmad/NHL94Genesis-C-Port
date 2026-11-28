@@ -758,8 +758,7 @@ static void write_ppm(const char *path)
     }
     for (int i = 0; i < h; i++)
         for (int x = 0; x < w; x++) pic[i * 320 + x] = screen_frame ? screen_px[i * 320 + x] : 0xFF000000u | mdrt_vdp_rgb(px[i * 320 + x], 1);
-    if (!screen_frame) pcspr_present(v, px, 320, pic, w, h, 320);
-    if (!screen_frame) whiteice_present(pic, w, h, 320);
+    if (!screen_frame) pclayers_present(v, px, 320, pic, w, h, 320);   /* (the PC's sprites and white ice) */
     if (!screen_frame) hats_present(pic, w, h, 320);
     if (!screen_frame) cardcolor_present(v, pic, w, h, 320);   /* (--pc-photos) */
     int pitch = 320;
