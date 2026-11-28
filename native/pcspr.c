@@ -833,6 +833,18 @@ static int ref_frame(void)
     }
 }
 
+/* A mirrored skater's jersey crest. The PC's frames draw the crest (and the numbers' stripes) with colour numbers C0h-C4h, D0h-D4h,
+ * E0h-E4h and F0h-F4h, one number per column of the crest, which the team's remap turns into its colours. Mirroring a frame would
+ * mirror the crest. NHL 95 PC's DrawSprite (1CD73, src/front/screen_util/DrawSprite.c) stops that: drawing mirrored, it swaps
+ * entries 0 and 4, and 1 and 3, of each of those four groups of 16 in the remap (homeremap_eC0 / awayremap_eC0) around the
+ * SetColorRemap, so the crest's columns are mirrored back. The same here, on the colour number. */
+static int crest_flip(int v)
+{
+    if (v < 0xC0 || v > 0xFF) return v;
+    int k = v & 0xF;
+    return k == 0 || k == 1 || k == 3 || k == 4 ? (v & 0xF0) | (4 - k) : v;
+}
+
 /* the sprite table entries of the last sprite the hook took */
 static int hook(int ev, int sc, int16_t x, int16_t y, const struct SpriteHead *o)
 {
@@ -1690,7 +1702,8 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
                 if (v == 255) continue;
                 int px_ = x0 + x, py = y0 + y;
                 if (px_ < 0 || px_ >= w || py < 0 || py >= h || !mask[py * 320 + px_]) continue;   /* (something in front of him there) */
-                int r = v < 0x80 ? rec[192 + v] : rec[320 + v - 0x80];
+                if (list[i].flip) v = crest_flip(v);
+                int r = rec[192 + v];
                 pic[(long)py * pitch + px_] = fadec(0xFF000000u | (uint32_t)pal[r][0] << 16 | (uint32_t)pal[r][1] << 8 | pal[r][2]);
             }
         if (i == rk) ref_draw(pic, w, h, pitch, drop, ref_before);
