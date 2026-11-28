@@ -164,7 +164,9 @@ static int goal_sound_busy(void)
 void hold_goal_after_song(int frames, struct Team *tm, int player, int a1, int a2)
 {
     if (getenv("HOLDLOG")) fprintf(stderr, "hold: frame %d goal, song playing %d, delay %d\n", g.Vcount, song_playing(), (int16_t)g.songdelay);
-    if (!goal_sound_busy()) {                              /* no siren or song going or coming: the speech now */
+    if (!goal_sound_busy() || (g.gmode & (1 << gmhl))) {   /* no siren or song going or coming: the speech now; in a highlight never kept
+                                                            * for later (the announcer leaves a highlight's goals unsaid, and a speech
+                                                            * kept would come after it, in the game) */
         if (pa_hook) pa_hook(PA_GOAL, tm, player, a1, a2);
         hold_for(frames);
         return;
