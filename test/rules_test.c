@@ -625,7 +625,7 @@ static void ticker(void)
     CHECK(ticker_init_periods() == 3);
 }
 
-/* NHL 95's moves and the PC goalie (mods/moves.c, mods/goalie.c, mods/anims.c) */
+/* NHL 95's moves and the goalie's saves (mods/moves.c, mods/goalie.c, mods/anims.c) */
 static void moves(void)
 {
     classic_rules();
@@ -713,22 +713,43 @@ static void moves(void)
     o->pflags = (1 << pfgoal) | (1 << pfjoycon);
     CHECK(!moves_block_cpu(o) && moves_block_hold(o) && o->SPA == MA_SPA(MA_BLOCK_G));   /* (a pad player: A while he winds up) */
     g.sflags = 0; o->SPA = 0;
-    /* the PC goalie */
+    /* the goalie's saves */
     struct PuckCross pc = { 0x20, 4 };
     struct SortObj *gk = sortobj(0);
-    gk->Xpos = 0; gk->position = 0; g.puckvx = 0; g.puckvy = 0x3000; g.puckz[0] = 2; g.puckvz[0] = 0x100;
-    CHECK(goalie_save_spa(SPAgstickr, 3, &pc, gk) == SPAgstickr && goalie_wall_spa(gk, SPAwallright) == SPAwallright);
-    rules[RULE_GOALIE] = 1;
-    CHECK(goalie_save_spa(SPAgstickr, 3, &pc, gk) == MA_SPA(MA_GFALLS) && goalie_save_spa(SPAgstickl, 5, &pc, gk) == MA_SPA(MA_GFALLG));
-    CHECK(goalie_save_spa(SPAgglover, 1, &pc, gk) == SPAgglover);   /* (in front of him: the cartridge's) */
-    g.puckvy = 0x800;
-    CHECK(goalie_save_spa(SPAgstickr, 4, &pc, gk) == MA_SPA(MA_GFALLB));   /* (straight at him, slow) */
+    gk->Xpos = 0; gk->Ypos = 0xC0; gk->Xvel = gk->Yvel = 0; gk->position = 0; gk->pflags = 0; gk->attribute = 0; gk->handed[0] = 0;
+    gk->SPA = 0; set_puck_carrier((uint16_t)-1);
+    g.puckx[0] = 0; g.pucky = 0x90; g.puckvx = 0; g.puckvy = 0x800; g.puckz[0] = 2; g.puckvz[0] = 0x100;
+    int16_t sa = (int16_t)vtoa(0, (int16_t)(0x90 + 2 - 0xC0));
+    CHECK(!goalie_save(&pc, 0x108, gk) && gk->SPA == 0 && goalie_wall_spa(gk, SPAwallright) == SPAwallright);
+    rules[RULE_GOALIE] = 1;                                /* (95 PC) */
+    gk->facedir = (int16_t)((sa + 4) & 7);
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GFALLB));   /* (straight at him, slow: falls back) */
+    gk->facedir = (int16_t)((sa - 2) & 7);
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GFALLS));   /* (low, wide: to the stick side) */
+    gk->attribute = HI(3);
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GFALLG));   /* (the other way round: the glove side) */
+    gk->attribute = 0; g.puckz[0] = 0x20;
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == SPAgglover);           /* (high: no shoulder saves) */
     CHECK(goalie_wall_spa(gk, SPAwallright) == MA_SPA(MA_GWALLR) && goalie_wall_spa(o, SPAwallleft) == SPAwallleft);
-    rules[RULE_GOALIE] = 2;
-    pc.x = 1; g.puckvz[0] = 0x400;
-    CHECK(goalie_save_spa(SPAgglover, 1, &pc, gk) == MA_SPA(MA_GKNEE));
+    rules[RULE_GOALIE] = 4;                                /* (96 PC: a loose puck straight at him, the toe and kick saves) */
+    gk->facedir = sa; g.puckvy = 0x2000; g.puckz[0] = 2;
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GKNEE));
+    g.puckz[0] = 0xC;
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == SPAgstickr);
+    rules[RULE_GOALIE] = 2;                                /* (96 Genesis: at most 2 across, the block and the low catch) */
+    pc.x = 1; g.puckz[0] = 2; g.puckvz[0] = 0x400;
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GKNEE));
     g.puckvz[0] = 0x800;
-    CHECK(goalie_save_spa(SPAgglover, 1, &pc, gk) == MA_SPA(MA_GFALLB));
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GFALLB));
+    CHECK(goalie_wall_spa(gk, SPAwallright) == MA_SPA(MA_GWALLR));
+    rules[RULE_GOALIE] = 3;                                /* (95 Genesis: a pad stack facing up or down during a shot dives) */
+    pc.x = 0x40; pc.frames = 20; gk->Xpos = 0; gk->facedir = 0; g.puckz[0] = 2; g.puckvz[0] = 0x100;
+    set_puck_carrier(1); g.sflags = HI(sfssdir);
+    CHECK(goalie_save(&pc, 0x108, gk) && (gk->SPA == MA_SPA(MA_GFALLB) || gk->SPA == MA_SPA(MA_GFALLG)) && gk->Xvel == 0);
+    g.sflags = 0; g.puckz[0] = 4; gk->Xpos = 0;
+    CHECK(goalie_save(&pc, 0x108, gk) && (gk->SPA == SPAghighr || gk->SPA == SPAgglovel2));   /* (a raised puck: the high saves) */
+    CHECK(goalie_wall_spa(gk, SPAwallright) == SPAwallright);   /* (95 Genesis has no goalie hop) */
+    set_puck_carrier((uint16_t)-1); gk->SPA = 0; gk->Xpos = 0;
     moves_state_load(NULL);
     classic_rules();
 }
