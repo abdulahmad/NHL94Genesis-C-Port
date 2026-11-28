@@ -440,7 +440,31 @@ static void hold(void)
     hold_skate_arm();
     int x, y, x2, y2;
     CHECK(hold_skating() && !hold_skate_carry(&x, &y));    /* (the referee is on his way to the puck) */
-    for (int k = 0; k < 400 && hold_skate_ref() < 160; k++) g.Vcount++;   /* (past the pick up: the walk's length is the skaters' own) */
+    /* the referee's walk (NHL 95 PC's assrefgoalpa, assrefdrop and SkateToSpot): from rest he speeds up, skates at no more than the PC
+     * referee's top speed, brakes onto the puck, picks it up (SPArefpickup), carries it to the dot and turns there; the walk waits for him */
+    {
+        struct hold_refpose p, q;
+        int acc, top, brake, t0 = (int16_t)g.Vcount, fast = 0, early = -1, pick = -1, last = -1, ok = 1;
+        referee_rates(0, &acc, &top, &brake);
+        CHECK(acc > 200 && acc < 400 && top > 7000 && top < 8500 && brake > 150 && brake < 250);
+        CHECK(hold_skate_ref_pose(0, 0, 0, 0, 0, &p));
+        for (int k = 0; k < 600 && hold_skating(); k++, g.Vcount++) {
+            hold_skate_ref_pose(0, 0, 0, 0, 0, &q);
+            int64_t v2 = (int64_t)q.vx * q.vx + (int64_t)q.vy * q.vy;
+            if (v2 > (int64_t)top * top + top) ok = 0;
+            if (v2 > (int64_t)top * top / 2) fast = 1;
+            if (k == 3) early = (int)(v2 < (int64_t)top * top / 16);
+            if (q.anim == REF_PICKUP && pick < 0) { pick = k; if (q.x != -40 * 256 || q.y != 60 * 256 || v2) ok = 0; }
+            if (q.anim == REF_STOP && v2 == 0) ok = 0;
+            last = k;
+        }
+        CHECK(ok && fast && early == 1 && pick > 0);
+        CHECK(q.x == 115 * 256 && q.y == 100 * 256 && q.dir == 6);   /* (15 off the dot, facing it: assrefatdot) */
+        g.Vcount = (uint16_t)t0;
+        (void)last;
+    }
+    for (int k = 0; k < 600 && !hold_skate_carry(&x, &y); k++) g.Vcount++;   /* (the pick up: his own time, not a share of the skaters') */
+    for (int k = 0; k < 40; k++) g.Vcount++;
     CHECK(hold_skate_carry(&x, &y) && x > -40 * 256 && x < 115 * 256 && y > 60 * 256 && y < 100 * 256);
     uint8_t a[HOLD_STATE_SIZE], b[HOLD_STATE_SIZE];
     CHECK(hold_state_save(a) == HOLD_STATE_SIZE);
@@ -459,7 +483,7 @@ static void hold(void)
     memcpy(b, a, sizeof b); b[84] = 2; CHECK(hold_state_load(b) == 0);   /* (the speech waiting for the disc's goal song) */
     memcpy(b, a, sizeof b); b[334] = 4; CHECK(hold_state_load(b) < 0);                /* (the face off's flags: held back by the anthem 1, the window after the skate 2) */
     memcpy(b, a, sizeof b); b[334] = 2; CHECK(hold_state_load(b) == 0);
-    memcpy(b, a, sizeof b); b[98] = 0x91; b[99] = 1; CHECK(hold_state_load(b) < 0);   /* (a walk of more than 400 frames, EZ_CAP) */
+    memcpy(b, a, sizeof b); b[98] = 0x59; b[99] = 2; CHECK(hold_state_load(b) < 0);   /* (a walk of more than 600 frames) */
     memcpy(b, a, sizeof b); b[322] = 1; CHECK(hold_state_load(b) < 0);                /* (the puck picked up at 1 of 256) */
     memcpy(b, a, sizeof b); b[335] = 13; CHECK(hold_state_load(b) < 0);               /* (13 held back face off men) */
     memcpy(b, a, sizeof b); b[335] = 1; b[336] = 12; b[348] = afaceoff; CHECK(hold_state_load(b) < 0);   /* (not a skater's object) */
@@ -487,9 +511,27 @@ static void hold(void)
     CHECK(hold_skating() && x == 0x78 && y == 0);
     g.Vcount++; hold_tick();
     CHECK(pk->Zpos < 0 && sh->frame == 0);
-    x = -0x70 * 256; y = -0x100 * 256;
-    for (int k = 0; k < 20; k++) { x2 = x; hold_skate_ref_step(&x, &y); g.Vcount++; }
-    CHECK(x > x2 && y > -0x100 * 256);                     /* (on his way to it, not out of the rink) */
+    {
+        struct hold_refpose p;
+        for (int k = 0; k < 20; k++) { x2 = x; hold_skate_ref_pose(1, -0x70, -0x100, 0, 0, &p); x = p.x; y = p.y; g.Vcount++; }
+        CHECK(x > x2 && x > -0x70 * 256 && y > -0x100 * 256);   /* (on his way to it, not out of the rink) */
+    }
+    /* the walk's part of a state: kept, and bytes that are not one refused */
+    {
+        uint8_t w[HOLD_WALK_SIZE], w2[HOLD_WALK_SIZE];
+        struct hold_refpose p, p2;
+        CHECK(hold_walk_save(w) == HOLD_WALK_SIZE && hold_walk_check(w) == 0 && w[0] == 1);
+        hold_skate_ref_pose(0, 0, 0, 0, 0, &p);
+        hold_walk_load(NULL);
+        hold_walk_load(w);
+        hold_skate_ref_pose(0, 0, 0, 0, 0, &p2);
+        hold_walk_save(w2);
+        CHECK(!memcmp(w, w2, sizeof w) && p.x == p2.x && p.y == p2.y && p.anim == p2.anim);
+        memcpy(w2, w, sizeof w); w2[0] = 2; CHECK(hold_walk_check(w2) < 0);
+        memcpy(w2, w, sizeof w); w2[8] = 8; CHECK(hold_walk_check(w2) < 0);
+        memcpy(w2, w, sizeof w); w2[6] = 0xFF; w2[7] = 0x7F; CHECK(hold_walk_check(w2) < 0);
+        CHECK(hold_walk_check(NULL) == 0);
+    }
     /* a puck against the boards: he reaches it from inside */
     g.puckx[0] = 0x85; g.pucky = 0x20;
     hold_skate_begin();

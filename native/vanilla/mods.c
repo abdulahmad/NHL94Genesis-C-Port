@@ -49,7 +49,7 @@ int hold_skate_pstart(void) { return 0; }
 int hold_skating(void) { return 0; }
 int hold_skate_ref(void) { return -1; }
 int hold_skate_carry(int *x, int *y) { (void)x; (void)y; return 0; }
-int hold_skate_ref_step(int *x, int *y) { (void)x; (void)y; return 0; }
+int hold_skate_ref_pose(int own, int sx, int sy, int vx, int vy, struct hold_refpose *p) { (void)own; (void)sx; (void)sy; (void)vx; (void)vy; (void)p; return 0; }
 int hold_skate_pending(void) { return 0; }
 void hold_tick(void) {}
 int hold_wait(void) { return 0; }

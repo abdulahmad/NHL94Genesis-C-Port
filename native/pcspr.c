@@ -663,34 +663,31 @@ static void ref_live(void)
         R.x = ax_ * 256; R.y = ay_ * 256; R.vx = R.vy = 0;
         R.dir = ad_; R.t = am_ ? R.t + 1 : 0; R.anim = am_ ? REF_SKATE : REF_GLIDE; R.wasfo = 1; R.drop = 0; R.init = 1;
     } else if (fo) {
-        int ox = R.x, oy = R.y, walk = hold_skate_ref() >= 0, put = 0;
-        static uint16_t stepvc;
-        if (referee_get(&gv)) { R.x = gv.x / 256; R.y = gv.y / 256; put = !walk && !hold_skate_pending(); }   /* (RULE_REFEREE: where the game has him) */
-        else if (walk) {                                                     /* (the between-play pause: his walk, mods/hold.c, a step a frame) */
-            if (!R.init) { int pick; hold_skate_puck(&R.x, &R.y, &pick); R.x *= 256; R.y *= 256; }   /* (not seen till now, the penalty screen: at the puck) */
-            if (g.Vcount != stepvc) { int x = R.x, y = R.y; if (hold_skate_ref_step(&x, &y)) { R.x = x; R.y = y; } }
-        } else if (R.init && hold_skate_pending()) {
-            /* (the face off is set up a frame before the walk is: he stays where he is. Put at the dot that frame, the walk then
-             * started from the dot (PR #167's walk) or from where the period's start had left him (the fx0 it kept): gone from
-             * the view and back, or a jump) */
-        } else { R.x = (fx > 0 ? fx + 15 : fx - 15) * 256; R.y = fy * 256; put = 1; }
-        int tick = g.Vcount != stepvc;
-        stepvc = g.Vcount;
-        double ddx = R.x - ox, ddy = R.y - oy;
-        int want = fx > 0 ? 6 : 2, moved = ddx * ddx + ddy * ddy > 77.0 * 77.0;
-        static uint16_t movevc;                                              /* (the last frame his walk moved him) */
-        if (walk && R.init && moved) movevc = g.Vcount;
-        if (walk && R.init && (moved || (uint16_t)(g.Vcount - movevc) < 8)) {
-            /* (on his way, over 0.3 a frame: striding, turning to his way. A frame the game's pass did not run (a lag frame: he did
-             * not move) keeps his stride: PR #233 had him standing for it, the stride back to its first frame, so on a walk with
-             * lag frames every few frames the skating frames never got past the first, he slid along, and the standing frame
-             * flashed in between) */
-            if (moved) { int d = (int)floor(atan2(ddx, ddy) / (M_PI / 4) + 0.5); ref_turn(((d % 8) + 8) % 8, 0x1800); }
-            if (R.anim != REF_SKATE) R.t = 0;
-            R.anim = REF_SKATE; R.t = R.t + tick;
+        int ox = R.x, oy = R.y, walk = hold_skate_ref() >= 0, put = 0, posed = 0, full = referee_get(&gv);
+        static int was_walk, ws_x, ws_y, ws_vx, ws_vy;                       /* (where the picture's own referee set off on the walk, his speed) */
+        struct hold_refpose wp;
+        if (walk && !was_walk) {
+            if (R.init) { ws_x = R.x / 256; ws_y = R.y / 256; ws_vx = VO.Xvel; ws_vy = VO.Yvel; }   /* (as play left him: VO's last speed) */
+            else { int pick; hold_skate_puck(&ws_x, &ws_y, &pick); ws_vx = ws_vy = 0; }   /* (not seen till now, the penalty screen: at the puck) */
+        }
+        was_walk = walk;
+        if (walk) posed = hold_skate_ref_pose(!full, ws_x, ws_y, ws_vx, ws_vy, &wp);   /* (the between-play walk, mods/hold.c: 95 PC's skating, on the game's time) */
+        if (posed) {
+            R.x = wp.x; R.y = wp.y;
+            if ((wp.anim == REF_SKATE || wp.anim == REF_STOP) && R.init) ref_turn(wp.dir, 0x1800);   /* (turning to his way at speed, as doplayeracc does) */
+            else R.dir = wp.dir;                                              /* (where he stands: the walk's own steps, every 8 ticks or doplayeracc's from rest) */
+            R.anim = wp.anim; R.t = wp.at;
         } else {
+            if (full) { R.x = gv.x / 256; R.y = gv.y / 256; put = !hold_skate_pending(); }   /* (RULE_REFEREE: where the game has him) */
+            else if (R.init && hold_skate_pending()) {
+                /* (the face off is set up a frame before the walk is: he stays where he is. Put at the dot that frame, the walk then
+                 * started from the dot (PR #167's walk) or from where the period's start had left him (the fx0 it kept): gone from
+                 * the view, or a jump) */
+            } else { R.x = (fx > 0 ? fx + 15 : fx - 15) * 256; R.y = fy * 256; put = 1; }
+            double ddx = R.x - ox, ddy = R.y - oy;
+            int want = fx > 0 ? 6 : 2;
             if ((put && ddx * ddx + ddy * ddy > 2048.0 * 2048.0) || !R.init) R.dir = want;   /* (put at the dot: assrefatdot's facing) */
-            else ref_turn(want, 0x2000);                                     /* (there, or come to it on the walk: a step every 8, assrefdrop's; it snapped round when the walk ended) */
+            else if (put) ref_turn(want, 0x2000);                            /* (there: a step every 8, assrefdrop's) */
             R.anim = REF_GLIDE; R.t = 0;
         }
         R.vx = R.vy = 0;
@@ -829,6 +826,7 @@ static int ref_frame(void)
     case REF_STOP: return 771 + 2 * d + ((R.t / 4) & 1);                                 /* (SPArefstop: 4 ticks a frame, looping) */
     case REF_TURNL: return 755 + d;                                                      /* (SPArefturnl) */
     case REF_TURNR: return 763 + d;                                                      /* (SPArefturnr) */
+    case REF_PICKUP: return 691 + ((8 - d) & 7);                                         /* (SPArefpickup: one picture, 12 ticks) */
     default: return 650 + b;                                                             /* (SPArefglide) */
     }
 }
