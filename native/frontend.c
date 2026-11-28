@@ -335,8 +335,7 @@ static void present(void *user, const uint16_t *px, int w, int h, int pitch)
     }
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++) pic[y * 320 + x] = 0xFF000000u | mdrt_vdp_rgb(px[y * pitch + x], MDRT_RGB_GPGX);
-    if (w <= 320 && h <= 240) pcspr_present(vdp, px, pitch, pic, w, h, 320);   /* (NHL 95 PC's skater sprites, when on) */
-    if (w <= 320 && h <= 240) whiteice_present(pic, w, h, 320);                  /* (white ice, when on) */
+    if (w <= 320 && h <= 240) pclayers_present(vdp, px, pitch, pic, w, h, 320);   /* (NHL 95 PC's skater sprites and white ice, when on) */
     if (w <= 320 && h <= 240) hats_present(pic, w, h, 320);                      /* (the SNES's hat trick hats, when on) */
     if (w <= 320 && h <= 240) cardcolor_present(vdp, pic, w, h, 320);   /* (the players' photos in colour, when on) */
     int cd = w <= 320 && h <= 224 && segacd_present(pic, w, h);   /* (the Sega CD's opening screens, when they are on) */

@@ -23,6 +23,7 @@
 #include "rosters.h"
 #include "native.h"
 #include "pcspr.h"
+#include "whiteice.h"
 #include "fight93.h"
 #include "anim_gen.h"
 #include "pcsong.h"
@@ -487,11 +488,17 @@ static int idle_ref(int t)
 /* A fade (between plays, the pause, to and from the penalty screen): cramfade steps each colour's components toward palfadenew, one
  * step of 2 a time, red, green and blue in turn. The PC's pictures, which are not in colour RAM, are dimmed the same way: toward black,
  * each component less by the steps taken so far (the most any colour has come down from the colours before the fade); from black, each
- * component at most as bright as the brightest the colours have come up to. Per component: fade_sub[k] / fade_cap[k] in 8 bits. */
+ * component at most as bright as the brightest the colours have come up to. Per component: fade_sub[k] / fade_cap[k], a level 34 (MDRT_RGB_GPGX). */
 static int fade_on, fade_black, fade_sub[3], fade_cap[3] = { 255, 255, 255 };
-static uint32_t fadec(uint32_t c)
+static uint16_t fade_u[64];                                 /* (while fade_on) the colours the fade comes from (toward black) or goes to (from it) */
+/* a game's picture (the pause screen too: its rink strip has the skaters). dfok is set by each frame of play (setvideo), so a fade the
+ * game waits through (back from the pause screen, the penalty screen) has it clear: fade_rink, the fade of a game's colours (the last
+ * steady colours were a game's) */
+static int game_shown(void) { return g.demoflag && ((g.disflags & HI(dfok)) || (g.sflags & HI(sfpz))); }
+static int rink_seen, fade_rink;
+static uint16_t game_pal[64];                               /* (rink_seen) the game's colours */
+static uint32_t fade_level(uint32_t c)
 {
-    if (!fade_on) return c;
     uint32_t o = 0xFF000000u;
     for (int k = 0; k < 3; k++) {
         int sh = 16 - 8 * k, v = (int)(c >> sh & 255) - fade_sub[k];
@@ -501,6 +508,7 @@ static uint32_t fadec(uint32_t c)
     }
     return o;
 }
+static uint32_t fadec(uint32_t c) { return fade_on ? fade_level(c) : c; }
 static int lvl(unsigned c, int k) { return (int)(c >> (4 * k + 1) & 7); }   /* (component k, 0 red, of a bus format colour: 0..7) */
 static void fade_update(const mdrt_vdp *vdp)
 {
@@ -515,10 +523,16 @@ static void fade_update(const mdrt_vdp *vdp)
         memcpy(steady, vdp->s.cram, sizeof steady);
         have_steady = lit_cur > 0;
         fade_on = 0; fade_black = lit_cur == 0;
+        static int after;                                     /* (frames since a fade of a game's colours ended, the game not yet drawing: dfok clear) */
+        after = fade_rink || after ? after + 1 : 0;
+        fade_rink = !game_shown() && after > 0 && after <= 8 && !memcmp(vdp->s.cram, game_pal, sizeof game_pal);
+        if (!fade_rink) after = 0;
+        if (lit_cur && (rink_seen = game_shown() || fade_rink)) memcpy(game_pal, vdp->s.cram, sizeof game_pal);
         return;
     }
     fade_on = 1;
     fade_black = lit_cur == 0;
+    fade_rink = rink_seen && (lit_tgt <= lit_cur || !memcmp(g.palfadenew, game_pal, sizeof game_pal));   /* (up from black: to the game's colours) */
     for (int k = 0; k < 3; k++) {
         int down = 0, up = 0;
         for (int i = 0; i < 64; i++) {
@@ -527,9 +541,11 @@ static void fade_update(const mdrt_vdp *vdp)
             if (c > up) up = c;
         }
         int brighten = fading && lit_tgt > lit_cur;          /* (toward brighter colours: up from black) */
-        fade_sub[k] = brighten ? 0 : down * 255 / 7;
-        fade_cap[k] = brighten ? up * 255 / 7 : 255;
+        fade_sub[k] = brighten ? 0 : down * 34;              /* (a level is 34 in the picture: MDRT_RGB_GPGX) */
+        fade_cap[k] = brighten && up < 7 ? up * 34 : 255;
     }
+    int brighten = fading && lit_tgt > lit_cur;
+    memcpy(fade_u, brighten || before == 2 ? g.palfadenew : before == 1 ? steady : vdp->s.cram, sizeof fade_u);
 }
 
 /* The wall jump frames, SPFPen 377-383 (the PC's SPFPen 376-382, frames.asm). The cartridge's 377-380 (SPAwallright / SPAwallleft
@@ -556,7 +572,7 @@ static int pc_frame(int fr)
 /* the referee is drawn with the Game page's row, or whenever he is in play (RULE_REFEREE: play must not have an unseen man in it) */
 static int ref_on(void) { return SDL_AtomicGet(&R.on) || rules[RULE_REFEREE]; }
 
-static int in_game(void) { return g.demoflag && ((g.disflags & HI(dfok)) || (g.sflags & HI(sfpz))); }   /* (the pause screen too: its rink strip has the skaters) */
+static int in_game(void) { return game_shown() || fade_rink; }
 
 
 /* NHL 95 PC's referee is SortCords 10h, one of the objects checkplcoll / checkcx collide: a skater (or goalie) within 10h on
@@ -1578,7 +1594,6 @@ static void flag_draw(uint32_t *pic, int w, int h, int pitch)
 void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
 {
     if ((!SDL_AtomicGet(&P.on) && !ref_on() && !SDL_AtomicGet(&LGO.on) && hold_anthem_time() < 0) || !SDL_AtomicGet(&P.found) || !in_game()) return;
-    fade_update(vdp);
     shown list[16];
     int n = 0;
     unsigned sat0 = (unsigned)(mdrt_vdp_reg(vdp, 5) & (mdrt_vdp_width(vdp) == 320 ? 0x7E : 0x7F)) << 9;
@@ -1657,4 +1672,55 @@ void pcspr_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32
         if (i == rk) ref_draw(pic, w, h, pitch, drop, ref_before);
     }
     flag_draw(pic, w, h, pitch);
+}
+
+/* The host's layers over a finished picture: the PC's pictures (pcspr_present), then white ice (whiteice.c). Both look for the
+ * cartridge's colours (the ice, the red line, the logo's), which a fade (cramfade) has changed: so while one runs they are put on
+ * the picture as it is without the fade (the colours in fade_u, each pixel's colour RAM entry found by drawing the VDP again with
+ * entry i as colour i), and what they changed is then faded as the cartridge's colours are, a level (34) a step: toward black each
+ * component less by the steps taken, from it at most the level reached. Where the picture drawn again is not the one shown (a raster
+ * effect), that pixel is left as it is. Nothing is drawn on the black between screens (#215). */
+static uint16_t idx_colour(int i) { return (uint16_t)((i & 7) << 1 | (i >> 3 & 7) << 5); }   /* (64 distinct bus format colours) */
+void pclayers_present(const mdrt_vdp *vdp, const uint16_t *px, int pitch_px, uint32_t *pic, int w, int h, int pitch)
+{
+    fade_update(vdp);
+    whiteice_fade_rink(fade_rink);
+    int layers = whiteice_on() || ((SDL_AtomicGet(&P.on) || ref_on() || SDL_AtomicGet(&LGO.on) || hold_anthem_time() >= 0) && SDL_AtomicGet(&P.found));
+    if (!fade_on || !layers || w > 320 || h > 240) {
+        pcspr_present(vdp, px, pitch_px, pic, w, h, pitch);
+        whiteice_present(pic, w, h, pitch);
+        return;
+    }
+    if (fade_black || !(vdp->s.reg[1] & 0x40)) return;
+    static mdrt_vdp u;
+    static uint16_t ix[320 * 240], upx[320 * 240];
+    static uint32_t upic[320 * 240], base[320 * 240];
+    u = *vdp;
+    for (int i = 0; i < 64; i++) u.s.cram[i] = idx_colour(i);
+    mdrt_vdp_render(&u, ix, 320);
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            uint16_t c = px[(long)y * pitch_px + x], e = ix[y * 320 + x];
+            int i = (e >> 1 & 7) | (e >> 5 & 7) << 3;
+            upx[y * 320 + x] = e == idx_colour(i) && (vdp->s.cram[i] & 0xEEE) == (c & 0xEEE) ? fade_u[i] : c;
+            upic[y * 320 + x] = base[y * 320 + x] = 0xFF000000u | mdrt_vdp_rgb(upx[y * 320 + x], MDRT_RGB_GPGX);
+        }
+    memcpy(u.s.cram, fade_u, sizeof fade_u);
+    fade_on = 0;                                                 /* (the layers as without the fade) */
+    pcspr_present(&u, upx, 320, upic, w, h, 320);
+    whiteice_present(upic, w, h, 320);
+    fade_on = 1;
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+            if (upic[y * 320 + x] != base[y * 320 + x]) pic[(long)y * pitch + x] = fade_level(upic[y * 320 + x]);
+}
+
+/* A colour RAM entry as the sides of the 16:9 picture show it (wide.c): white ice, through a fade as above. */
+uint32_t pclayers_rgb(const mdrt_vdp *vdp, int i)
+{
+    uint32_t c = 0xFF000000u | mdrt_vdp_rgb(vdp->s.cram[i & 63], MDRT_RGB_GPGX);
+    if (!fade_on) return whiteice_rgb(c);
+    if (fade_black) return c;
+    uint32_t b = 0xFF000000u | mdrt_vdp_rgb(fade_u[i & 63], MDRT_RGB_GPGX), wb = whiteice_rgb(b);
+    return wb != b ? fade_level(wb) : c;
 }
