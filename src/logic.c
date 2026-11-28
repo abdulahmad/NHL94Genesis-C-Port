@@ -2226,6 +2226,7 @@ void AdjustFacingDirection(int16_t dir, struct SortObj *o)
  * picks the side, the height and distance pick the type. Slows him down. */
 void goaliesave(const struct PuckCross *pcross, int16_t goalline, struct SortObj *gk)
 {
+    if (goalie_save(pcross, goalline, gk)) return;        /* (RULE_GOALIE: another game's saves, mods/goalie.c) */
     int16_t d0 = (int16_t)(pcross->x - gk->Xpos);
     int16_t d1 = (int16_t)(goalline - gk->Ypos);
     d0 = (int16_t)((vtoa(d0, d1) - gk->facedir) & 7);
@@ -2259,7 +2260,7 @@ void goaliesave(const struct PuckCross *pcross, int16_t goalline, struct SortObj
     d1 = (int16_t)saveanim[d0];
     if (d1 == SPAgglovel && (d3 & 3) != 0 && (int8_t)gk->aggress >= 0xB)
         d1 = SPAgglovel2;                                 /* reach out glove save */
-    SetSPA(gk, goalie_save_spa((uint16_t)d1, d3, pcross, gk));   /* (RULE_GOALIE: the PC goalie's saves, mods/goalie.c) */
+    SetSPA(gk, (uint16_t)d1);
     g.Crowdlevel += 0x96;
     g.CwdExciteLvl += 0xA;
     gk->Xvel = (int16_t)(gk->Xvel >> 2);

@@ -52,8 +52,8 @@ enum {
                                  * shut), 2 NHL 95 Genesis's (A with the pad pulled back) */
     RULE_SHOTBLOCK,             /* blocking shots (mods/moves.c): 1 NHL 95 PC's (dives, slides and knee blocks), 2 NHL 95 Genesis's (the
                                  * kneeling block) */
-    RULE_GOALIE,                /* the goalie's PC animations (mods/goalie.c): 1 NHL 95 PC's saves and hop over the boards, 2 also
-                                 * NHL 96 Genesis's straight on blocks and low catches */
+    RULE_GOALIE,                /* the goalie's saves (mods/goalie.c): goaliesave by 1 NHL 95 PC's rules, 2 NHL 96 Genesis's, 3 NHL 95
+                                 * Genesis's, 4 NHL 96 PC's (and the goalie's own hop over the boards, but in 3) */
     RULE_FIGHT_RATINGS,         /* 1: with RULE_FIGHT, each skater's fighting on NHL 93's scale, from NHLPA 93 and NHL 96 PC (the player's own
                                  * files, the host's in a session: native/fightrate.c); 0 the cartridge's (mods/fight.c fight_rating) */
     RULE_TICKER_HL,             /* 1: ticker highlights from the pregame (mods/ticker.c): InitScores plays 0-3 periods of the other games, not
@@ -84,7 +84,12 @@ extern int (*fight_cheat_hook)(void);
 void hold_for(int frames);
 void hold_anthem(int frames);
 int hold_skate_carry(int *x, int *y);               /* the puck in the referee's hand on his way to the dot, 256ths of a pixel (0: not now) */
-int hold_skate_ref_step(int *x, int *y);            /* the referee's place on his walk to the dot, 256ths of a pixel, from where he is (0: no walk) */
+/* the referee on his walk to the dot (NHL 95 PC's assrefgoalpa / assrefwhistle, then assrefdrop, with its skating: mods/hold.c): x, y
+ * in 256ths of a pixel, his facing, his picture (REF_GLIDE ...) and the frames into it, his speed (the cartridge's units). own 0: the
+ * game's (from where the game had him at the whistle: RULE_REFEREE's referee, else a stand in by assreffollow's spot); own 1: a
+ * picture's own referee from sx, sy at speed vx, vy, on time with the game's (native/pcspr.c). 0: no walk */
+struct hold_refpose { int x, y, dir, anim, at, vx, vy; };
+int hold_skate_ref_pose(int own, int sx, int sy, int vx, int vy, struct hold_refpose *p);
 int hold_skate_pending(void);                    /* 1 between the face off's set up and the walk's start (the referee stays where he is) */
 void hold_skate_begin(void);                        /* the face off set up: the skaters' places before it moves them ... */
 void hold_skate_arm(void);                          /* ... and after: with RULE_HOLD they skate from the first to the second */
@@ -94,7 +99,7 @@ int hold_anthem_time(void);                         /* the frames into the anthe
 int hold_anthem_pending(void);                      /* 1 once the anthem has been asked for, until the face off drops */
 int hold_anthem_frames(int set, int home_art);      /* RULE_ANTHEM's wait for the home team's anthem (set: the rule's value) */
 int hold_anthem_song(void);                         /* 1 while the anthem's song lasts (the cartridge's songs stay quiet) */
-void hold_skate_puck(int *x, int *y, int *pickup);  /* the puck's whistle place, and when (of 256) the referee has it */
+void hold_skate_puck(int *x, int *y, int *pickup);  /* where the referee picks up the puck (pickup 0: he comes on with it) */
 int hold_skate_pstart(void);                         /* 1 while the skaters (and the referee) come on at the start of a period */
 int hold_skating(void);                             /* 1 while the skaters walk to the spots (the drop's time waits for them) */
 int hold_nofade(void);                             /* RULE_HOLD, a face off in the middle of play: no fade to black (1); RULE_PENCALL, back from the penalty screen: a cut (2) */
@@ -115,6 +120,12 @@ void hold_siren(void);                              /* the goal siren starts (RU
 #define HOLD_SIREN_SIZE 3
 size_t hold_siren_save(uint8_t *out);
 int hold_siren_load(const uint8_t *in);
+/* the referee's walk's part of a state (version 13: HOLD_WALK_SIZE bytes; NULL: none, a state from before it: he walks from the puck);
+ * hold_walk_check -1 for bytes not this game's */
+#define HOLD_WALK_SIZE 9
+size_t hold_walk_save(uint8_t *out);
+int hold_walk_check(const uint8_t *in);
+void hold_walk_load(const uint8_t *in);
 #define FACEOFF_DEFER_SIZE 38
 size_t faceoff_defer_save(uint8_t *out);
 int faceoff_defer_check(const uint8_t *in);
@@ -132,8 +143,8 @@ struct referee_view {
     int dir, anim, at;                              /* his facedir; his picture (REF_GLIDE ...) and the frames into it */
     int sig;                                        /* REF_SIGNAL: which call (REF_SIG_ROUGH ...) */
 };
-enum { REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL, REF_TURNR, REF_SIGNAL };   /* (SPArefglide, SPArefskate, SPArefstop, SPArefturnl / r; the call's
-                                                                             * signal, SPArefrough ... by referee_view's sig: refsigspa) */
+enum { REF_GLIDE, REF_SKATE, REF_STOP, REF_TURNL, REF_TURNR, REF_SIGNAL, REF_PICKUP };   /* (SPArefglide, SPArefskate, SPArefstop, SPArefturnl / r; the
+                                                                             * call's signal, SPArefrough ... by referee_view's sig: refsigspa; SPArefpickup) */
 enum { REF_SIG_ROUGH, REF_SIG_CHARGE, REF_SIG_SLASH, REF_SIG_XCHECK, REF_SIG_HOOK, REF_SIG_TRIP, REF_SIG_INTERFER, REF_SIG_HOLD,
        REF_SIG_PENSHOT, REF_SIGS };                 /* (NHL 95 PC's SPArefrough, charge, slash, xcheck, hook, trip, interfer, hold, penshot) */
 int referee_call_made(void);                        /* RULE_PENCALL: the call made, the penalty screen cut to (till the face off) */
@@ -149,6 +160,12 @@ int referee_get(struct referee_view *v);
 void referee_skate_start(struct SortObj *o, int16_t x, int16_t y);
 void referee_follow(struct SortObj *o);
 int referee_glide(struct SortObj *o);
+/* for the walk between plays (mods/hold.c): where the game's referee is and how he moves (0: RULE_REFEREE off or he is off the ice);
+ * assreffollow's spot for a referee on that side (1: x > 0) of the play as it is now; his skating's rates in the cartridge's units
+ * (playeracc's step, MaxSpeed's top: far 1 for the stopped clock's lower one, stopna's step) */
+int referee_walk_from(int *x, int *y, int *vx, int *vy, int *dir);
+void referee_follow_spot(int side, int *x, int *y);
+void referee_rates(int far, int *acc, int *top, int *brake);
 #define REFEREE_STATE_SIZE 38                       /* (version 12 of the rules' part; 11: REFEREE_STATE_SIZE_11; 10: REFEREE_STATE_SIZE_10; 9 and before: REFEREE_STATE_SIZE_9) */
 #define REFEREE_STATE_SIZE_11 33
 #define REFEREE_STATE_SIZE_10 29
@@ -191,9 +208,9 @@ int moves_blocking(const struct SortObj *o);
 size_t moves_state_save(uint8_t *out);
 int moves_state_load(const uint8_t *in);
 
-/* RULE_GOALIE (mods/goalie.c): goalie_save_spa, the save goaliesave starts (spa the cartridge's, d3 the way to where the puck crosses
- * against his facing); goalie_wall_spa, the hop over the boards (assbench, asseben) */
-uint16_t goalie_save_spa(uint16_t spa, int16_t d3, const struct PuckCross *pc, const struct SortObj *gk);
+/* RULE_GOALIE (mods/goalie.c): goalie_save, another game's goaliesave (1 when it made the save; 0 the cartridge's makes it);
+ * goalie_wall_spa, the hop over the boards (assbench, asseben) */
+int goalie_save(const struct PuckCross *pc, int16_t goalline, struct SortObj *gk);
 uint16_t goalie_wall_spa(const struct SortObj *o, uint16_t spa);
 
 /* RULE_TICKER_HL (mods/ticker.c): InitScores's randomd0 range, the other games' periods before the pregame (the cartridge's 3: 0-2) */

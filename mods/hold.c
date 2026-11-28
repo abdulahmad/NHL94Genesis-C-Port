@@ -22,12 +22,9 @@ static int anth_pose, anth_len, anth_lock;
 #define ANTH_FACE 4                                     /* (the anthem's lines face the viewer: vtoa(0, 100)) */
 #define ANTH_VPOS (-18)                                 /* (the PC shows centre ice half way down its rink view) */                        /* the anthem's line up (1 once the spots are taken); the anthem's own frames */
 static uint16_t anth_t0;
-/* the pace of the skate to the spots, pixels a frame: NHL 95 PC's skaters skate there at their top speed (5400 to 8400, 1.3 to 2.05
- * rink units a game frame at 60 a second: 16 x speed / 65536); its rink is 0.89 times the cartridge's along (264 against 298
- * to the end boards), so 1.5 to 2.3 of the cartridge's pixels, about its own top speed (velocity 8000: 17 x 8000 / 65536) */
-#define SKATE_SPEED 2
 static int ez_frames(const struct SortObj *pl, int ax, int ay, int bx, int by, int f, int f0);   /* (the PC's skate to a spot: below) */
 static int ez_pose(struct SortObj *pl, int ax, int ay, int bx, int by, int f, int f0, int r);
+static int rw_anth(int t, int tx, int ty, int *x, int *y, int *dir, int *moving);
 static int dot_face(const struct SortObj *pl, int x, int y);
 static void stance(struct SortObj *pl, int f);
 static struct { int16_t x, y; } spot[12];
@@ -95,7 +92,6 @@ int hold_anthem_time(void)
     return t >= 0 && t < anth_len ? t : -1;
 }
 
-static int anth_way(int ax, int ay, int bx, int by) { double dx = bx - ax, dy = by - ay; return (int)sqrt(dx * dx + dy * dy); }
 
 /* the anthem's line of each skater (the PC's lines: x lane * 28h - 50h, y +30h / -3Ah; goalies have none: 0) */
 static void anth_line(int lx[12], int ly[12])
@@ -111,10 +107,10 @@ static void anth_line(int lx[12], int ly[12])
 }
 
 /* the frames from the end of the song until all stand in place at their spots (the PC's skate there: ez_pose) and the referee
- * (at SKATE_SPEED) at his */
+ * (with his skating: rw_anth) at his */
 static int anth_skate(void)
 {
-    int lx[12], ly[12], far = anth_way(108, 0, (int16_t)g.fox > 0 ? (int16_t)g.fox + 15 : (int16_t)g.fox - 15, (int16_t)g.foy) / SKATE_SPEED;
+    int lx[12], ly[12], far = rw_anth(-1, (int16_t)g.fox > 0 ? (int16_t)g.fox + 15 : (int16_t)g.fox - 15, (int16_t)g.foy, NULL, NULL, NULL, NULL);
     anth_line(lx, ly);
     for (int i = 0; i < 12; i++) {
         if (sortobj(i)->position <= 0) continue;
@@ -131,13 +127,9 @@ int hold_anthem_ref(int *x, int *y, int *dir, int *moving)
     int t = (int16_t)(g.Vcount - anth_t0) - anth_len;
     int fx = (int16_t)g.fox, fy = (int16_t)g.foy;
     int tx = (fx > 0 ? fx + 15 : fx - 15), ty = fy;
-    int d = anth_way(108, 0, tx, ty), run = t < 0 ? 0 : t * SKATE_SPEED;
-    if (run > d) run = d;
-    *x = 108 + (d ? (tx - 108) * run / d : 0);
-    *y = 0 + (d ? (ty - 0) * run / d : 0);
     *dir = 6;                                           /* (he stands on the right: facing the rink, the lines of players) */
-    *moving = run > 0 && run < d;
-    if (*moving) *dir = tx > 108 ? 2 : 6;
+    if (t < 0) { *x = 108; *y = 0; *moving = 0; return 1; }
+    rw_anth(t, tx, ty, x, y, dir, moving);              /* (then to the dot with 95 PC's skating, as between plays) */
     return 1;
 }
 
@@ -273,6 +265,16 @@ static uint16_t sk_view[4];                             /* the view at the whist
 #define REF_START_X (-0x78)                             /* (the PC's referee at the start of play: StartHL2, x -78h, y 0) */
 
 static void skate_pose(void);
+static struct { uint8_t on, side; int16_t sx, sy, v0; int8_t f0; } rw;   /* (where he set off, his speed along his way, his facing (-1: none known);
+                                                         * the side the last drop left him: 1 x > 0) */
+static int rw_along(int x, int y, int vx, int vy);
+static uint8_t *hs_w8(uint8_t *p, int v);
+static uint8_t *hs_w16(uint8_t *p, int v);
+static int hs_r8(const uint8_t **p);
+static int hs_r16(const uint8_t **p);
+static int sk_oop(void);
+static void pick_spot(int *x, int *y);
+static void ref_pick(int *x, int *y);
 
 void hold_skate_begin(void)
 {
@@ -285,6 +287,12 @@ void hold_skate_begin(void)
     sk_pstart = 0;
     sk_puckx = (int16_t)g.puckx[0]; sk_pucky = (int16_t)g.pucky;
     sk_view[0] = g.Vpos; sk_view[1] = g.Hpos; sk_view[2] = g.yc1; sk_view[3] = g.xc1;
+    int rx_, ry_, vx, vy, f;                            /* (the referee as the whistle left him: the game's, or a stand in by assreffollow's spot) */
+    rw.on = 1; rw.f0 = -1; rw.v0 = 0;
+    if (referee_walk_from(&rx_, &ry_, &vx, &vy, &f)) { rw.f0 = (int8_t)f; rw.v0 = (int16_t)rw_along(rx_, ry_, vx, vy); }
+    else if (sk_dark) ref_pick(&rx_, &ry_);             /* (back from the penalty screen: the picture's referee is put by the puck, native/pcspr.c) */
+    else referee_follow_spot(rw.side, &rx_, &ry_);
+    rw.sx = (int16_t)rx_; rw.sy = (int16_t)ry_;
     sk_cap = 1;
 }
 
@@ -330,11 +338,10 @@ static int ez_top(const struct SortObj *pl)
  * still in it, then the jump onto the spot). Here one even brake of that strength (200 + legstr a frame) that ends on the spot:
  * he brakes once what is left of the way is what that brake needs, and each frame takes off what brings him to rest there
  * (speed squared over twice the way left), so there is no crawl at 640h and no jump. Integers only. */
-static struct ez ez_run(const struct SortObj *pl, int d, int r, int stop)
+static struct ez ez_run_k(int a, int top, int brake, int v0, int d, int r, int stop)
 {
-    struct ez s = { 0, 0, EZ_SKATE, 0 };
+    struct ez s = { 0, v0, EZ_SKATE, 0 };
     int32_t D = (int32_t)d << 16;
-    int a = ez_acc(pl), top = ez_top(pl), brake = 200 + pl->legstr;
     if (d < 2) { s.ph = EZ_THERE; s.pos = D; return s; }
     for (; s.k < r && s.k < EZ_CAP; s.k++) {
         int64_t rem = D - s.pos, sp = (int64_t)s.v * 17;                       /* (16.16 pixels: the way left, a frame's way) */
@@ -354,6 +361,7 @@ static struct ez ez_run(const struct SortObj *pl, int d, int r, int stop)
     }
     return s;
 }
+static struct ez ez_run(const struct SortObj *pl, int d, int r, int stop) { return ez_run_k(ez_acc(pl), ez_top(pl), 200 + pl->legstr, 0, d, r, stop); }
 
 /* the turns (8 frames each) from the way he came to facing f, the shorter way round */
 static int ez_turns(int dx, int dy, int f)
@@ -458,6 +466,214 @@ static int ez_pose(struct SortObj *pl, int ax, int ay, int bx, int by, int f, in
 }
 
 
+/* ==== The referee's walk between plays. NHL 95 PC gives him assrefgoalpa (4ED7C) after a stoppage with no signal (its refsigdir
+ * < 0) or once he has made one: SkateToSpot (4E292) to where the puck lies, through skateto (5E93B) / doplayeracc (5E16D) /
+ * playeracc (5EDAD), as in play but with the clock stopped (MaxSpeed 0Ch 74h from centre); within 0Ch of it, every 8 ticks a
+ * step toward it and, facing it, the pick up (SPArefpickup: one picture of 12 ticks, locked till it ends: RW_PICK). A puck out of
+ * play: assrefwhistle (4E8EF) to the timekeeper's side instead (here TK_X, 0: pick_spot), no puck on the ice. Then assrefdrop
+ * (4F5BF): from rest, SkateToSpot to 15 off the dot (dostop / stopna braking him, within 8 put on it), then every 8 ticks a step
+ * toward facing 2 / 6, and the drop once all are in place (AllInPlace: the walk's end, sk_dur, waits for him too). He keeps the
+ * speed the whistle left him with (skateto does not stop him first).
+ * Here each leg is one straight way with ez_run's steps, his own rates (mods/referee.c: referee_rates), so he speeds up from where
+ * he is, skates at the PC referee's top speed, brakes and glides onto the spot, and his stride and its pictures run on the PC's
+ * ticks (SPArefskate 10 a picture, whatever his speed, as on the PC). Every part is a time from the game's state alone: where he
+ * set off (rw, kept in the state), where the puck lay, the dot. The game's referee (RULE_REFEREE) is placed so; the picture's own
+ * (the Visual only one, which the game does not know) is taken to set off from assreffollow's spot on the side the last drop left
+ * him (rw.side) as the play was at the whistle, and native/pcspr.c skates him from where it really has him in the same time.
+ * Before, he went at an even pace from the whistle to the drop, the puck at 96/256 of the skaters' walk: a crawl to a puck close
+ * by, a dash with no speeding up or stopping to the dot (Abdul, beta 1). Integers only. */
+#define RW_PICK 13                                      /* (SPArefpickup's 12 ticks: updateanim's 13 frames) */
+static int rw_isqrt(int64_t v)
+{
+    int64_t r = 0, b = (int64_t)1 << 40;
+    if (v <= 0) return 0;
+    while (b > v) b >>= 2;
+    for (; b; b >>= 2) { if (v >= r + b) { v -= r + b; r = (r >> 1) + b; } else r >>= 1; }
+    return (int)r;
+}
+static int rw_len(int dx, int dy) { return rw_isqrt((int64_t)dx * dx + (int64_t)dy * dy); }
+
+struct rleg { int ax, ay, bx, by, d, v0, f0, f, turn, k, acc, top, brake; };
+/* a leg from a to b, setting off at v0 along it facing f0 (-1: no turn first; from rest he turns where he stands, doplayeracc) */
+static void rleg_set(struct rleg *l, int ax, int ay, int bx, int by, int v0, int f0)
+{
+    l->ax = ax; l->ay = ay; l->bx = bx; l->by = by;
+    l->d = rw_len(bx - ax, by - ay);
+    referee_rates((ay < 0 ? -ay : ay) >= 0x84, &l->acc, &l->top, &l->brake);   /* (the stopped clock's top speed 74h (PC) from centre) */
+    l->f = l->d >= 2 ? vtoa((int16_t)(bx - ax), (int16_t)(by - ay)) & 7 : f0 >= 0 ? f0 : 2;
+    int vmax = rw_isqrt((int64_t)2 * l->d * 65536 * l->brake * 17) / 17;   /* (no faster than he can stop in: ez_run's brake) */
+    if (v0 > vmax) v0 = vmax;
+    if (v0 < 0 || l->d < 2) v0 = 0;
+    if (v0 > l->top) v0 = l->top;
+    l->v0 = v0; l->f0 = f0;
+    l->turn = v0 || f0 < 0 || l->d < 2 ? 0 : ez_turn_frames(f0, bx - ax, by - ay);
+    l->k = l->d < 2 ? 0 : ez_run_k(l->acc, l->top, l->brake, v0, l->d, EZ_CAP, 1).k;
+}
+static int rleg_len(const struct rleg *l) { return l->turn + l->k; }
+
+/* r frames into the leg (under rleg_len): his place, facing, picture and speed */
+static void rleg_pose(const struct rleg *l, int r, struct hold_refpose *p)
+{
+    p->vx = p->vy = 0;
+    if (r < l->turn) {                                  /* (turning where he stands, gliding) */
+        int d = (l->f - l->f0) & 7, n = d > 4 ? 8 - d : d, k = r * EZ_TURN >> 16;
+        if (k > n) k = n;
+        p->x = l->ax * 256; p->y = l->ay * 256;
+        p->dir = (l->f0 + (d <= 4 ? k : -k)) & 7;
+        p->anim = REF_GLIDE; p->at = 1;
+        return;
+    }
+    r -= l->turn;
+    struct ez s = ez_run_k(l->acc, l->top, l->brake, l->v0, l->d, r, 1);
+    int64_t run = s.pos >> 8, L = l->d > 0 ? l->d : 1;  /* (256ths of a pixel along) */
+    p->x = l->ax * 256 + (int)((l->bx - l->ax) * run / L);
+    p->y = l->ay * 256 + (int)((l->by - l->ay) * run / L);
+    p->dir = l->f;
+    p->vx = (int)((l->bx - l->ax) * (int64_t)s.v / L); p->vy = (int)((l->by - l->ay) * (int64_t)s.v / L);
+    p->at = r + 1;
+    if (s.ph == EZ_SKATE) p->anim = REF_SKATE;
+    else p->anim = (p->vx > 0xF0F || p->vx < -0xF0F || p->vy > 0xF0F || p->vy < -0xF0F) ? REF_STOP : REF_GLIDE;   /* (dostop: SPArefstop over 1000h (PC) an axis) */
+}
+/* 65536ths of the leg done r frames into it */
+static int rleg_frac(const struct rleg *l, int r)
+{
+    if (r <= l->turn || l->d < 2) return r >= rleg_len(l) ? 65536 : 0;
+    struct ez s = ez_run_k(l->acc, l->top, l->brake, l->v0, l->d, r - l->turn, 1);
+    return (int)(((int64_t)s.pos) / l->d);
+}
+
+struct rsched { struct rleg l1, l2; int T1, PT, nt, fpk, PK, T2, n3, T3, want; };
+static int ref_spot_x(void);
+static void rw_sched(int sx, int sy, int v0, int f0, struct rsched *s)
+{
+    int ex = ref_spot_x(), ey = (int16_t)g.foy;
+    s->want = (int16_t)g.fox > 0 ? 6 : 2;
+    s->nt = 0; s->fpk = -1;
+    if (sk_pstart) {                                    /* (the start of a period: on with the puck from the PC's start of play, StartHL2's facing 2) */
+        rleg_set(&s->l1, REF_START_X, 0, REF_START_X, 0, 0, 2);
+        s->T1 = 0; s->PK = 0;
+    } else {
+        int px, py, qx, qy;
+        ref_pick(&px, &py);
+        rleg_set(&s->l1, sx, sy, px, py, v0, f0);
+        s->T1 = rleg_len(&s->l1); s->PK = RW_PICK;
+        pick_spot(&qx, &qy);                            /* (at it, every 8 ticks a step toward the puck till within a step of facing it, then the
+                                                         * pick up facing it: assrefgoalpa) */
+        if (!sk_oop() && (qx != px || qy != py)) {
+            s->fpk = vtoa((int16_t)(qx - px), (int16_t)(qy - py)) & 7;
+            int d = (s->fpk - s->l1.f) & 7, n = d > 4 ? 8 - d : d;
+            s->nt = n > 1 ? n - 1 : 0;
+        }
+    }
+    if (s->fpk < 0) s->fpk = s->l1.f;
+    s->PT = s->nt * 8;
+    rleg_set(&s->l2, s->l1.bx, s->l1.by, ex, ey, 0, s->fpk);
+    s->T2 = s->T1 + s->PT + s->PK + rleg_len(&s->l2);
+    int d = (s->want - s->l2.f) & 7;
+    s->n3 = d > 4 ? 8 - d : d;
+    s->T3 = s->T2 + s->n3 * 8;
+}
+/* his speed along the way from x, y to where the puck lay */
+static int rw_along(int x, int y, int vx, int vy)
+{
+    int px, py;
+    ref_pick(&px, &py);
+    int dx = px - x, dy = py - y, d = rw_len(dx, dy);
+    if (d < 2) return 0;
+    int v = (int)(((int64_t)vx * dx + (int64_t)vy * dy) / d);
+    return v < 0 ? 0 : v > 0x3000 ? 0x3000 : v;
+}
+static void rw_game(struct rsched *s)
+{
+    int px, py;
+    if (rw.on) { rw_sched(rw.sx, rw.sy, rw.v0, rw.f0, s); return; }
+    ref_pick(&px, &py);                                 /* (a state from before his walk was kept: from the puck) */
+    rw_sched(px, py, 0, -1, s);
+}
+
+/* t frames into the walk: the game's (o NULL) or, for a picture's own referee, o's way to the puck on the game's time */
+static void rw_pose(int t, const struct rsched *s, const struct rsched *o, struct hold_refpose *p)
+{
+    if (t < s->T1) {
+        const struct rleg *l = o ? &o->l1 : &s->l1;
+        int n = rleg_len(l);
+        if (n > s->T1) t = (int)((int64_t)t * n / s->T1);   /* (farther than the game's: a little quicker, there on time) */
+        if (t < n) { rleg_pose(l, t, p); return; }
+        p->x = l->bx * 256; p->y = l->by * 256; p->dir = l->f; p->anim = REF_GLIDE; p->at = 1; p->vx = p->vy = 0;   /* (there first: he waits on it) */
+        return;
+    }
+    t -= s->T1;
+    if (t < s->PT) {                                    /* (turning to the puck where he stands, a step every 8) */
+        int k = t / 8 + 1, way = ((s->fpk - s->l1.f) & 7) <= 4 ? 1 : -1;
+        if (k > s->nt) k = s->nt;
+        p->x = s->l1.bx * 256; p->y = s->l1.by * 256; p->dir = (s->l1.f + way * k) & 7; p->vx = p->vy = 0; p->anim = REF_GLIDE; p->at = 1;
+        return;
+    }
+    t -= s->PT;
+    if (t < s->PK) {                                    /* (the pick up; the timekeeper's puck: he glides there) */
+        p->x = s->l1.bx * 256; p->y = s->l1.by * 256; p->dir = s->fpk; p->vx = p->vy = 0;
+        p->anim = sk_oop() ? REF_GLIDE : REF_PICKUP; p->at = sk_oop() ? 1 : t;
+        return;
+    }
+    t -= s->PK;
+    if (t < rleg_len(&s->l2)) { rleg_pose(&s->l2, t, p); return; }
+    t -= rleg_len(&s->l2);
+    p->x = s->l2.bx * 256; p->y = s->l2.by * 256; p->vx = p->vy = 0; p->anim = REF_GLIDE;
+    int k = t / 8 + 1, way = ((s->want - s->l2.f) & 7) <= 4 ? 1 : -1;   /* (at the dot: a step round every 8, the first at once) */
+    if (k >= s->n3) { k = s->n3; p->at = t < s->n3 * 8 ? 1 : 0; } else p->at = 1;
+    p->dir = (s->l2.f + way * k) & 7;
+}
+
+/* the anthem's referee t frames after the song, from his place at the side (108, 0, facing 6) to his spot by the dot: where, his
+ * facing, 1 while he skates. t -1: the frames of it */
+static int rw_anth(int t, int tx, int ty, int *x, int *y, int *dir, int *moving)
+{
+    struct rleg l;
+    struct hold_refpose p;
+    rleg_set(&l, 108, 0, tx, ty, 0, 6);
+    if (t < 0) return rleg_len(&l);
+    if (t >= rleg_len(&l)) { *x = tx; *y = ty; *moving = 0; return 0; }
+    rleg_pose(&l, t, &p);
+    *x = p.x / 256; *y = p.y / 256; *dir = p.dir; *moving = p.anim != REF_GLIDE;
+    return 0;
+}
+
+int hold_skate_ref_pose(int own, int sx, int sy, int vx, int vy, struct hold_refpose *p)
+{
+    if (!sk_on) return 0;
+    int t = (int16_t)(g.Vcount - sk_t0);
+    struct rsched s, o;
+    rw_game(&s);
+    if (own && !sk_pstart) rw_sched(sx, sy, rw_along(sx, sy, vx, vy), -1, &o);
+    rw_pose(t, &s, own && !sk_pstart ? &o : NULL, p);
+    return 1;
+}
+
+/* the walk's state (version 13 of the rules' part) */
+size_t hold_walk_save(uint8_t *out)
+{
+    if (out) {
+        uint8_t *p = hs_w8(out, rw.on); p = hs_w8(p, rw.side); p = hs_w16(p, rw.sx); p = hs_w16(p, rw.sy); p = hs_w16(p, rw.v0);
+        hs_w8(p, (uint8_t)rw.f0);
+    }
+    return HOLD_WALK_SIZE;
+}
+int hold_walk_check(const uint8_t *in)
+{
+    if (!in) return 0;
+    const uint8_t *p = in;
+    int on = hs_r8(&p), side = hs_r8(&p), x = hs_r16(&p), y = hs_r16(&p), v = hs_r16(&p), f = (int8_t)hs_r8(&p);
+    return on > 1 || side > 1 || x < -0x200 || x > 0x200 || y < -0x200 || y > 0x200 || v < 0 || v > 0x3000 || f < -1 || f > 7 ? -1 : 0;
+}
+void hold_walk_load(const uint8_t *in)
+{
+    rw.on = 0; rw.side = 0; rw.sx = rw.sy = rw.v0 = 0; rw.f0 = -1;
+    if (!in) return;
+    const uint8_t *p = in;
+    rw.on = (uint8_t)hs_r8(&p); rw.side = (uint8_t)hs_r8(&p); rw.sx = (int16_t)hs_r16(&p); rw.sy = (int16_t)hs_r16(&p); rw.v0 = (int16_t)hs_r16(&p);
+    rw.f0 = (int8_t)hs_r8(&p);
+}
+
 /* an animation's frames in a direction (updateanim: each step lasts its time + 1) */
 static int anim_len(uint16_t spa, int dir)
 {
@@ -542,11 +758,14 @@ void hold_skate_arm(void)
     if (pstart) {                                       /* (the referee comes on too, with the puck: from the PC's start of play to the dot) */
         sk_puckx = REF_START_X; sk_pucky = 0;
         sk_pick = 0;
-        int rl = plen(REF_START_X, 0, (int16_t)g.fox, (int16_t)g.foy) / SKATE_SPEED + 1;
-        if (rl > sk_dur) sk_dur = rl;
+    }
+    {                                                   /* (all in place: the referee too, AllInPlace) */
+        struct rsched rs;
+        rw_game(&rs);
+        if (rs.T3 + 1 > sk_dur) sk_dur = rs.T3 + 1;
     }
     if (sk_dur < 24) return;
-    if (sk_dur > 400) sk_dur = 400;
+    if (sk_dur > 600) sk_dur = 600;                     /* (the referee's walk end to end: some 400) */
     sk_t0 = g.Vcount;
     sk_on = 1;
     g.yleader = 0;                                      /* (the PC's drop: the view on the dot, no lead) */
@@ -593,9 +812,20 @@ static void pick_spot(int *x, int *y)
     }
 }
 
-/* where the referee picks the puck up (where it lay at the whistle, or the timekeeper's for one out of play; valid with
- * hold_skate_ref() >= 0); he reaches it at SK_PICKUP of the 256 */
-void hold_skate_puck(int *x, int *y, int *pickup) { pick_spot(x, y); *pickup = sk_pick; }
+/* where the referee picks it up: by it; a puck in a net (after a goal, or frozen in it) from in front, as 95 PC's assrefgoalpa does
+ * for its goal's puck (6, F0h): to E3h (PC), just short of the goal line, reaching in. Here 10h short of the cartridge's (108h): the
+ * net's picture covers the 6 pixels the PC's would give, and he was drawn in the net */
+static void ref_pick(int *x, int *y)
+{
+    pick_spot(x, y);
+    int ay = *y < 0 ? -*y : *y;
+    if (!sk_oop() && *x >= -0x14 && *x <= 0x14 && ay >= 0x108 && ay <= 0x11C) *y = *y > 0 ? 0xF8 : -0xF8;
+}
+
+/* where the referee picks the puck up (by where it lay at the whistle, or the timekeeper's for one out of play; valid with
+ * hold_skate_ref() >= 0); pickup: 0 at the start of a period (he comes on with it), else SK_PICKUP (kept in the state from the
+ * walk before his own: the time he has it is his walk's now, rw_sched) */
+void hold_skate_puck(int *x, int *y, int *pickup) { ref_pick(x, y); *pickup = sk_pick; }
 
 /* 1 while the face off is to be set up and its walk is not yet known: the puck's assignment is the face off's, new (pfna: its set
  * up, puckfaceoff2's, runs in the next pass, hold_skate_begin to hold_skate_arm). The referee stays where he is till then */
@@ -625,45 +855,20 @@ int hold_skate_ref(void)
 /* the referee's spot by the dot (assrefatdot: 15 off it, on the side away from centre ice) */
 static int ref_spot_x(void) { int fx = (int16_t)g.fox; return fx > 0 ? fx + 15 : fx - 15; }
 
-/* where the referee has the puck on his way to the dot, in 256ths of a pixel: from where it lay at the whistle to his spot by
- * the dot, from SK_PICKUP of the walk to its end. Only the game's state decides it (the walk's time, the puck's place, the
- * dot), so every copy of the game puts the puck in the same place whatever its host draws. 0: he does not carry it now */
+/* where the referee has the puck, in 256ths of a pixel: from his pick up (where it lay at the whistle) on his way to his spot by
+ * the dot, and there till the drop. Only the game's state decides it (the walk's time, where he set off, the puck's place, the
+ * dot), so every copy of the game puts the puck in the same place whatever its host draws. 0: he does not have it now */
 int hold_skate_carry(int *x, int *y)
 {
     if (!sk_on || sk_pstart) return 0;
-    int pr = hold_skate_ref();
-    if (pr < sk_pick || pr >= 256) return 0;
-    int sx, sy, ex = ref_spot_x() * 256, ey = (int16_t)g.foy * 256;
-    pick_spot(&sx, &sy);
-    sx *= 256; sy *= 256;
-    int k = pr - sk_pick, kn = 256 - sk_pick;
-    *x = sx + (ex - sx) * k / kn;
-    *y = sy + (ey - sy) * k / kn;
-    return 1;
-}
-
-/* the referee's place on his walk, in 256ths of a pixel (x, y in: where he is now). The start of a period: from the PC's start
- * of play to his spot; else to the puck where it lay (each call a step: the frames left to SK_PICKUP share what is left of
- * the way), then with it to the dot (hold_skate_carry). For a referee of the game's own (RULE_REFEREE: mods/referee.c), whose
- * place is in every state: one call a frame. 0: no walk */
-int hold_skate_ref_step(int *x, int *y)
-{
-    if (!sk_on) return 0;
-    int pr = hold_skate_ref(), ex = ref_spot_x() * 256, ey = (int16_t)g.foy * 256;
-    if (sk_pstart) {
-        if (pr > 256) pr = 256;
-        *x = REF_START_X * 256 + (ex - REF_START_X * 256) * pr / 256;
-        *y = ey * pr / 256;
-        return 1;
-    }
-    if (hold_skate_carry(x, y)) return 1;
-    if (pr >= 256) { *x = ex; *y = ey; return 1; }
-    int t = (int16_t)(g.Vcount - sk_t0), tp = (sk_pick * sk_dur + 255) / 256, n = tp - t;   /* (tp: the first frame he has it) */
-    if (n < 1) n = 1;
-    int px, py;
-    pick_spot(&px, &py);
-    *x += (px * 256 - *x) / n;
-    *y += (py * 256 - *y) / n;
+    int t = (int16_t)(g.Vcount - sk_t0);
+    if (t >= sk_dur) return 0;
+    struct rsched s;
+    rw_game(&s);
+    if (t < s.T1 + s.PT) return 0;
+    struct hold_refpose p;
+    rw_pose(t, &s, NULL, &p);
+    *x = p.x; *y = p.y;
     return 1;
 }
 
@@ -768,7 +973,7 @@ static void skate_pose(void)
         g.puckx[0] = g.fox; g.pucky = g.foy;
         ST_W(g.puckz[0]);
         hand = t < sk_dur;
-    } else if (t < sk_dur && t * 256 / sk_dur < sk_pick) {      /* (the referee is still on his way to the puck where it lay) */
+    } else if (t < sk_dur && !hold_skate_carry(&rx, &ry)) {     /* (the referee is still on his way to the puck where it lay) */
         int qx, qy;
         pick_spot(&qx, &qy);
         pk->Xpos = (int16_t)qx; pk->Ypos = (int16_t)qy;
@@ -800,13 +1005,14 @@ static void skate_pose(void)
         else if (hold_skate_carry(&rx, &ry)) {          /* (he carries the puck to the dot: the view follows him) */
             tx = rx / 256; ty = ry / 256;
             if ((tx - fx) * (tx - fx) + (ty - fy) * (ty - fy) < 0x640) { tx = fx; ty = fy; mx = my = 0; }
-        } else {                                        /* (he skates to where the puck lay, from about where the view was at the whistle) */
-            int tp = (sk_pick * sk_dur + 255) / 256, k = t < tp ? t : tp;
-            if (tp < 1) tp = 1;
+        } else {                                        /* (he skates to where the puck lay, from about where the view was at the whistle: as far along as he is) */
+            struct rsched rs;
+            rw_game(&rs);
+            int fr = rleg_frac(&rs.l1, t);
             int qx, qy;
             pick_spot(&qx, &qy);
-            tx = (int16_t)sk_view[3] + (qx - (int16_t)sk_view[3]) * k / tp;
-            ty = (int16_t)sk_view[2] + (qy - (int16_t)sk_view[2]) * k / tp;
+            tx = (int16_t)sk_view[3] + (int)((int64_t)(qx - (int16_t)sk_view[3]) * fr >> 16);
+            ty = (int16_t)sk_view[2] + (int)((int64_t)(qy - (int16_t)sk_view[2]) * fr >> 16);
         }
         g.yleader = 0;
         int vh = view_hpos();
@@ -829,6 +1035,7 @@ static void skate_pose(void)
     }
     g.yc1 = g.Vpos; g.xc1 = g.Hpos;
     if (t >= sk_dur) {
+        rw.side = ref_spot_x() > 0;                     /* (where the drop leaves the referee: the side he follows the play on) */
         sk_on = sk_pstart = 0;
         if (sk_lock) { g.sflags &= (uint16_t)~HI(sfslock); sk_lock = 0; }
     }
@@ -939,7 +1146,7 @@ int hold_state_load(const uint8_t *in)
     int fs = hs_r8(&p), so = hs_r8(&p), sst = hs_r8(&p), sl = hs_r16(&p), sf = hs_r16(&p), stm = hs_r8(&p), spl = hs_r16(&p), sa1 = hs_r16(&p), sa2 = hs_r16(&p);
     if (!flag(fs) || !flag(so) || sst < 0 || sst > 2 || sf < 0 || sf > 900 || !flag(stm) || spl < 0 || spl > 31 || sa1 < -1 || sa1 > 31 || sa2 < -1 || sa2 > 31) return -1;
     int kc = hs_r8(&p), ko = hs_r8(&p), kd = hs_r16(&p), kt0 = hs_r16(&p);
-    if (!flag(kc) || !flag(ko) || kd < 0 || kd > 400 || (ko && kd < 24)) return -1;
+    if (!flag(kc) || !flag(ko) || kd < 0 || kd > 600 || (ko && kd < 24)) return -1;
     const uint8_t *walk = p;
     for (int i = 0; i < 12; i++) {
         p += 12;

@@ -441,7 +441,31 @@ static void hold(void)
     hold_skate_arm();
     int x, y, x2, y2;
     CHECK(hold_skating() && !hold_skate_carry(&x, &y));    /* (the referee is on his way to the puck) */
-    for (int k = 0; k < 400 && hold_skate_ref() < 160; k++) g.Vcount++;   /* (past the pick up: the walk's length is the skaters' own) */
+    /* the referee's walk (NHL 95 PC's assrefgoalpa, assrefdrop and SkateToSpot): from rest he speeds up, skates at no more than the PC
+     * referee's top speed, brakes onto the puck, picks it up (SPArefpickup), carries it to the dot and turns there; the walk waits for him */
+    {
+        struct hold_refpose p, q;
+        int acc, top, brake, t0 = (int16_t)g.Vcount, fast = 0, early = -1, pick = -1, last = -1, ok = 1;
+        referee_rates(0, &acc, &top, &brake);
+        CHECK(acc > 200 && acc < 400 && top > 7000 && top < 8500 && brake > 150 && brake < 250);
+        CHECK(hold_skate_ref_pose(0, 0, 0, 0, 0, &p));
+        for (int k = 0; k < 600 && hold_skating(); k++, g.Vcount++) {
+            hold_skate_ref_pose(0, 0, 0, 0, 0, &q);
+            int64_t v2 = (int64_t)q.vx * q.vx + (int64_t)q.vy * q.vy;
+            if (v2 > (int64_t)top * top + top) ok = 0;
+            if (v2 > (int64_t)top * top / 2) fast = 1;
+            if (k == 3) early = (int)(v2 < (int64_t)top * top / 16);
+            if (q.anim == REF_PICKUP && pick < 0) { pick = k; if (q.x != -40 * 256 || q.y != 60 * 256 || v2) ok = 0; }
+            if (q.anim == REF_STOP && v2 == 0) ok = 0;
+            last = k;
+        }
+        CHECK(ok && fast && early == 1 && pick > 0);
+        CHECK(q.x == 115 * 256 && q.y == 100 * 256 && q.dir == 6);   /* (15 off the dot, facing it: assrefatdot) */
+        g.Vcount = (uint16_t)t0;
+        (void)last;
+    }
+    for (int k = 0; k < 600 && !hold_skate_carry(&x, &y); k++) g.Vcount++;   /* (the pick up: his own time, not a share of the skaters') */
+    for (int k = 0; k < 40; k++) g.Vcount++;
     CHECK(hold_skate_carry(&x, &y) && x > -40 * 256 && x < 115 * 256 && y > 60 * 256 && y < 100 * 256);
     uint8_t a[HOLD_STATE_SIZE], b[HOLD_STATE_SIZE];
     CHECK(hold_state_save(a) == HOLD_STATE_SIZE);
@@ -460,7 +484,7 @@ static void hold(void)
     memcpy(b, a, sizeof b); b[84] = 2; CHECK(hold_state_load(b) == 0);   /* (the speech waiting for the disc's goal song) */
     memcpy(b, a, sizeof b); b[334] = 4; CHECK(hold_state_load(b) < 0);                /* (the face off's flags: held back by the anthem 1, the window after the skate 2) */
     memcpy(b, a, sizeof b); b[334] = 2; CHECK(hold_state_load(b) == 0);
-    memcpy(b, a, sizeof b); b[98] = 0x91; b[99] = 1; CHECK(hold_state_load(b) < 0);   /* (a walk of more than 400 frames, EZ_CAP) */
+    memcpy(b, a, sizeof b); b[98] = 0x59; b[99] = 2; CHECK(hold_state_load(b) < 0);   /* (a walk of more than 600 frames) */
     memcpy(b, a, sizeof b); b[322] = 1; CHECK(hold_state_load(b) < 0);                /* (the puck picked up at 1 of 256) */
     memcpy(b, a, sizeof b); b[335] = 13; CHECK(hold_state_load(b) < 0);               /* (13 held back face off men) */
     memcpy(b, a, sizeof b); b[335] = 1; b[336] = 12; b[348] = afaceoff; CHECK(hold_state_load(b) < 0);   /* (not a skater's object) */
@@ -488,9 +512,27 @@ static void hold(void)
     CHECK(hold_skating() && x == 0x78 && y == 0);
     g.Vcount++; hold_tick();
     CHECK(pk->Zpos < 0 && sh->frame == 0);
-    x = -0x70 * 256; y = -0x100 * 256;
-    for (int k = 0; k < 20; k++) { x2 = x; hold_skate_ref_step(&x, &y); g.Vcount++; }
-    CHECK(x > x2 && y > -0x100 * 256);                     /* (on his way to it, not out of the rink) */
+    {
+        struct hold_refpose p;
+        for (int k = 0; k < 20; k++) { x2 = x; hold_skate_ref_pose(1, -0x70, -0x100, 0, 0, &p); x = p.x; y = p.y; g.Vcount++; }
+        CHECK(x > x2 && x > -0x70 * 256 && y > -0x100 * 256);   /* (on his way to it, not out of the rink) */
+    }
+    /* the walk's part of a state: kept, and bytes that are not one refused */
+    {
+        uint8_t w[HOLD_WALK_SIZE], w2[HOLD_WALK_SIZE];
+        struct hold_refpose p, p2;
+        CHECK(hold_walk_save(w) == HOLD_WALK_SIZE && hold_walk_check(w) == 0 && w[0] == 1);
+        hold_skate_ref_pose(0, 0, 0, 0, 0, &p);
+        hold_walk_load(NULL);
+        hold_walk_load(w);
+        hold_skate_ref_pose(0, 0, 0, 0, 0, &p2);
+        hold_walk_save(w2);
+        CHECK(!memcmp(w, w2, sizeof w) && p.x == p2.x && p.y == p2.y && p.anim == p2.anim);
+        memcpy(w2, w, sizeof w); w2[0] = 2; CHECK(hold_walk_check(w2) < 0);
+        memcpy(w2, w, sizeof w); w2[8] = 8; CHECK(hold_walk_check(w2) < 0);
+        memcpy(w2, w, sizeof w); w2[6] = 0xFF; w2[7] = 0x7F; CHECK(hold_walk_check(w2) < 0);
+        CHECK(hold_walk_check(NULL) == 0);
+    }
     /* a puck against the boards: he reaches it from inside */
     g.puckx[0] = 0x85; g.pucky = 0x20;
     hold_skate_begin();
@@ -626,7 +668,7 @@ static void ticker(void)
     CHECK(ticker_init_periods() == 3);
 }
 
-/* NHL 95's moves and the PC goalie (mods/moves.c, mods/goalie.c, mods/anims.c) */
+/* NHL 95's moves and the goalie's saves (mods/moves.c, mods/goalie.c, mods/anims.c) */
 static void moves(void)
 {
     classic_rules();
@@ -714,22 +756,43 @@ static void moves(void)
     o->pflags = (1 << pfgoal) | (1 << pfjoycon);
     CHECK(!moves_block_cpu(o) && moves_block_hold(o) && o->SPA == MA_SPA(MA_BLOCK_G));   /* (a pad player: A while he winds up) */
     g.sflags = 0; o->SPA = 0;
-    /* the PC goalie */
+    /* the goalie's saves */
     struct PuckCross pc = { 0x20, 4 };
     struct SortObj *gk = sortobj(0);
-    gk->Xpos = 0; gk->position = 0; g.puckvx = 0; g.puckvy = 0x3000; g.puckz[0] = 2; g.puckvz[0] = 0x100;
-    CHECK(goalie_save_spa(SPAgstickr, 3, &pc, gk) == SPAgstickr && goalie_wall_spa(gk, SPAwallright) == SPAwallright);
-    rules[RULE_GOALIE] = 1;
-    CHECK(goalie_save_spa(SPAgstickr, 3, &pc, gk) == MA_SPA(MA_GFALLS) && goalie_save_spa(SPAgstickl, 5, &pc, gk) == MA_SPA(MA_GFALLG));
-    CHECK(goalie_save_spa(SPAgglover, 1, &pc, gk) == SPAgglover);   /* (in front of him: the cartridge's) */
-    g.puckvy = 0x800;
-    CHECK(goalie_save_spa(SPAgstickr, 4, &pc, gk) == MA_SPA(MA_GFALLB));   /* (straight at him, slow) */
+    gk->Xpos = 0; gk->Ypos = 0xC0; gk->Xvel = gk->Yvel = 0; gk->position = 0; gk->pflags = 0; gk->attribute = 0; gk->handed[0] = 0;
+    gk->SPA = 0; set_puck_carrier((uint16_t)-1);
+    g.puckx[0] = 0; g.pucky = 0x90; g.puckvx = 0; g.puckvy = 0x800; g.puckz[0] = 2; g.puckvz[0] = 0x100;
+    int16_t sa = (int16_t)vtoa(0, (int16_t)(0x90 + 2 - 0xC0));
+    CHECK(!goalie_save(&pc, 0x108, gk) && gk->SPA == 0 && goalie_wall_spa(gk, SPAwallright) == SPAwallright);
+    rules[RULE_GOALIE] = 1;                                /* (95 PC) */
+    gk->facedir = (int16_t)((sa + 4) & 7);
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GFALLB));   /* (straight at him, slow: falls back) */
+    gk->facedir = (int16_t)((sa - 2) & 7);
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GFALLS));   /* (low, wide: to the stick side) */
+    gk->attribute = HI(3);
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GFALLG));   /* (the other way round: the glove side) */
+    gk->attribute = 0; g.puckz[0] = 0x20;
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == SPAgglover);           /* (high: no shoulder saves) */
     CHECK(goalie_wall_spa(gk, SPAwallright) == MA_SPA(MA_GWALLR) && goalie_wall_spa(o, SPAwallleft) == SPAwallleft);
-    rules[RULE_GOALIE] = 2;
-    pc.x = 1; g.puckvz[0] = 0x400;
-    CHECK(goalie_save_spa(SPAgglover, 1, &pc, gk) == MA_SPA(MA_GKNEE));
+    rules[RULE_GOALIE] = 4;                                /* (96 PC: a loose puck straight at him, the toe and kick saves) */
+    gk->facedir = sa; g.puckvy = 0x2000; g.puckz[0] = 2;
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GKNEE));
+    g.puckz[0] = 0xC;
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == SPAgstickr);
+    rules[RULE_GOALIE] = 2;                                /* (96 Genesis: at most 2 across, the block and the low catch) */
+    pc.x = 1; g.puckz[0] = 2; g.puckvz[0] = 0x400;
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GKNEE));
     g.puckvz[0] = 0x800;
-    CHECK(goalie_save_spa(SPAgglover, 1, &pc, gk) == MA_SPA(MA_GFALLB));
+    CHECK(goalie_save(&pc, 0x108, gk) && gk->SPA == MA_SPA(MA_GFALLB));
+    CHECK(goalie_wall_spa(gk, SPAwallright) == MA_SPA(MA_GWALLR));
+    rules[RULE_GOALIE] = 3;                                /* (95 Genesis: a pad stack facing up or down during a shot dives) */
+    pc.x = 0x40; pc.frames = 20; gk->Xpos = 0; gk->facedir = 0; g.puckz[0] = 2; g.puckvz[0] = 0x100;
+    set_puck_carrier(1); g.sflags = HI(sfssdir);
+    CHECK(goalie_save(&pc, 0x108, gk) && (gk->SPA == MA_SPA(MA_GFALLB) || gk->SPA == MA_SPA(MA_GFALLG)) && gk->Xvel == 0);
+    g.sflags = 0; g.puckz[0] = 4; gk->Xpos = 0;
+    CHECK(goalie_save(&pc, 0x108, gk) && (gk->SPA == SPAghighr || gk->SPA == SPAgglovel2));   /* (a raised puck: the high saves) */
+    CHECK(goalie_wall_spa(gk, SPAwallright) == SPAwallright);   /* (95 Genesis has no goalie hop) */
+    set_puck_carrier((uint16_t)-1); gk->SPA = 0; gk->Xpos = 0;
     moves_state_load(NULL);
     classic_rules();
 }
@@ -769,7 +832,7 @@ static void defaults(void)
 
 /* the wide view (src/view.h): 16:9 makes the picture wide (RULE_VIEW 1) and nothing of the play. The game's camera keeps the
  * cartridge's reach ($3C) and a pad's goalie is off screen where the cartridge's is; the picture's camera (view_cam) stays within
- * the wide picture. Wide play (2), an option of its own, plays by the 320, and 16:9 leaves it so. A state from before version 13,
+ * the wide picture. Wide play (2), an option of its own, plays by the 320, and 16:9 leaves it so. A state from before version 14,
  * whose 1 was played by the wide view, loads as wide play */
 static void wide_view(void)
 {
@@ -834,7 +897,7 @@ static void wide_view(void)
     rules[RULE_VIEW] = 0;
     CHECK(view_play_more() == 0 && view_more() == 0 && view_hpos() == 0x3C);
 
-    /* the state's part: version 13 keeps 1 and 2; version 12's 1 (the wide view played by) loads as 2 */
+    /* the state's part: version 14 keeps 1 and 2; version 13's 1 (the wide view played by) loads as 2 */
     classic_rules();
     hold_state_load(NULL);
     referee_state_load(NULL, 0);
@@ -844,14 +907,14 @@ static void wide_view(void)
         classic_rules();
         rules[RULE_VIEW] = (uint8_t)view;
         size_t n = rules_state_save(NULL, NULL);
-        CHECK(n <= sizeof st && rules_state_save(NULL, st) == n && st[0] == 13);
+        CHECK(n <= sizeof st && rules_state_save(NULL, st) == n && st[0] == 14);
         classic_rules();
         CHECK(rules_state_load(NULL, st, n) == 0 && rules[RULE_VIEW] == view);
-        st[0] = 12;
+        st[0] = 13;
         classic_rules();
         CHECK(rules_state_load(NULL, st, n) == 0 && rules[RULE_VIEW] == (view ? 2 : 0));
     }
-    st[0] = 14;
+    st[0] = 15;
     CHECK(rules_state_load(NULL, st, rules_state_save(NULL, NULL)) < 0);
     classic_rules();
 }

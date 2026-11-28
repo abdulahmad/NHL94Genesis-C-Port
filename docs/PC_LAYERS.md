@@ -59,3 +59,10 @@ pictures get the same treatment, per component:
 `forceblack` leaves colour RAM black with no fade running, and `palfadenew` still holds the colours to come back to. That counts
 as black too. Nothing is drawn while the display is off or every colour is black. Before, the PC pictures flashed for one frame at
 full brightness on the black screen before the penalty screen.
+
+## Mirrored frames
+
+The cartridge mirrors a skater's frame for half the directions, and the PC draws the same frames mirrored (`DrawFrameSprite`'s
+flip). The jersey crest is drawn with colour numbers C0h-C4h, D0h-D4h, E0h-E4h and F0h-F4h. Each number is one column of the
+crest, and the team's remap colours it. NHL 95 PC's `DrawSprite` (1CD73) swaps remap entries 0 and 4, and 1 and 3, of those four
+groups while it draws a mirrored sprite, so the crest reads the right way round. `crest_flip` in pcspr.c does the same.

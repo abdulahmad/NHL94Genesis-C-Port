@@ -49,7 +49,7 @@ int hold_skate_pstart(void) { return 0; }
 int hold_skating(void) { return 0; }
 int hold_skate_ref(void) { return -1; }
 int hold_skate_carry(int *x, int *y) { (void)x; (void)y; return 0; }
-int hold_skate_ref_step(int *x, int *y) { (void)x; (void)y; return 0; }
+int hold_skate_ref_pose(int own, int sx, int sy, int vx, int vy, struct hold_refpose *p) { (void)own; (void)sx; (void)sy; (void)vx; (void)vy; (void)p; return 0; }
 int hold_skate_pending(void) { return 0; }
 void hold_tick(void) {}
 int hold_wait(void) { return 0; }
@@ -82,9 +82,9 @@ int moves_blocking(const struct SortObj *o) { (void)o; return 0; }
 /* mods/ticker.c: the other games' periods before the pregame. The cartridge's InitScores plays 0-2 (randomd0(3)), so no highlight at the pregame. */
 uint16_t ticker_init_periods(void) { return 3; }
 
-/* mods/goalie.c and mods/anims.c: the PC goalie's animations. The cartridge's goalie saves and hops the boards in its own, and every
- * frame is a cartridge frame. */
-uint16_t goalie_save_spa(uint16_t spa, int16_t d3, const struct PuckCross *pc, const struct SortObj *gk) { (void)d3; (void)pc; (void)gk; return spa; }
+/* mods/goalie.c and mods/anims.c: other games' goalie saves. The cartridge's goaliesave makes every save, the goalie hops the boards in
+ * his own, and every frame is a cartridge frame. */
+int goalie_save(const struct PuckCross *pc, int16_t goalline, struct SortObj *gk) { (void)pc; (void)goalline; (void)gk; return 0; }
 uint16_t goalie_wall_spa(const struct SortObj *o, uint16_t spa) { (void)o; return spa; }
 uint16_t mod_frame(uint16_t fr) { return fr; }
 int mod_frame_pc(uint16_t fr) { (void)fr; return -1; }

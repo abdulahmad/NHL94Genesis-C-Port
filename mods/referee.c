@@ -553,6 +553,40 @@ void referee_follow(struct SortObj *o)
     ref_skateto(o, (int16_t)tx, (int16_t)ty);
 }
 
+/* assreffollow's spot (above) for a referee on that side of the play as it is now, beside the play keeping the view's y: where the
+ * picture's own referee (the Visual only one, which the game does not know) is taken to be at the whistle, for his walk's time */
+void referee_follow_spot(int side, int *x, int *y)
+{
+    const struct SortObj *pk = sortobj(puckscnum);
+    int16_t px = pk->Xpos, py = pk->Ypos;
+    int ax = iabs(px), ay = iabs(py);
+    int32_t tx, ty;
+    if (ax < PCX(0x32) && ay > PCY(0xAC) && ay < PCY(0xE8)) { tx = side ? PCX(0x46) : -PCX(0x46); ty = py > 0 ? PCY(0xED) : -PCY(0xED); }
+    else if (ay > PCY(0x62) && ((int16_t)puck_carrier() < 0 || (((sortobj((int16_t)puck_carrier())->pflags & (1 << pfgoal)) != 0) ^ (py < 0)))) {
+        tx = side ? PCX(0x78) : -PCX(0x78); ty = py > 0 ? PCY(0xE8) : -PCY(0xE8);
+    } else { tx = side ? PCX(0x90) : -PCX(0x90); ty = (int16_t)g.Vpos; }
+    ref_inside(&tx, &ty);
+    *x = (int)tx; *y = (int)ty;
+}
+
+/* the game's referee as the whistle left him (RULE_REFEREE): place, speed (the cartridge's units), facing */
+int referee_walk_from(int *x, int *y, int *vx, int *vy, int *dir)
+{
+    if (!rules[RULE_REFEREE] || !rx.mode) return 0;
+    *x = ref.Xpos; *y = ref.Ypos; *vx = ref.Xvel; *vy = ref.Yvel; *dir = ref.facedir & 7;
+    return 1;
+}
+
+/* his skating's rates in the cartridge's units: ref_acc's step along a straight way (dirtab's C8h), MaxSpeed's (0Fh, or 0Ch with the
+ * clock stopped 74h from centre: far), ref_stop's step */
+void referee_rates(int far, int *acc, int *top, int *brake)
+{
+    int32_t a = 0xC8 * (REF_LEGSTR + 0x30) / 64;
+    *acc = (int)cartv(a * (0x20 - (REF_WEIGHT >> 3) + REF_LEGSTR) >> 5);
+    *top = (int)cartv((int32_t)isqrt64(far ? REF_MAX_STOP : REF_MAX));
+    *brake = (int)cartv(200 + REF_LEGSTR);
+}
+
 /* updateplayers (5C40F) for him: on the ice a 64th of the speed off a frame, the move, the frames of his picture; then checkwallcoll's
  * boards. 2: he hit them hard (the game's referee plays SFXplayerwall, the picture's does not) */
 int referee_glide(struct SortObj *o)
@@ -580,21 +614,25 @@ void referee_update(void)
     int asn = pk->asslist[pk->assnum & 7];
     int16_t fx = (int16_t)g.fox, fy = (int16_t)g.foy;
     if (asn == pfaceoff || asn == pfaceoff2) {                   /* (assrefatdot 4DFF7: 15 off the dot, at rest, facing 2 / 6) */
-        int wx = POS32(ref.Xpos, ref.Xfrac) >> 8, wy = POS32(ref.Ypos, ref.Yfrac) >> 8;
-        if (hold_skate_ref_step(&wx, &wy)) {                     /* (RULE_HOLD: he skates there, fetching the puck, mods/hold.c) */
-            ref.Xpos = (int16_t)(wx >> 8); ref.Xfrac = (uint16_t)((uint32_t)wx << 8);
-            ref.Ypos = (int16_t)(wy >> 8); ref.Yfrac = (uint16_t)((uint32_t)wy << 8);
+        struct hold_refpose wp;
+        if (hold_skate_ref_pose(0, 0, 0, 0, 0, &wp)) {           /* (RULE_HOLD: he skates there with 95 PC's skating, fetching the puck, mods/hold.c) */
+            ref.Xpos = (int16_t)(wp.x >> 8); ref.Xfrac = (uint16_t)((uint32_t)wp.x << 8);
+            ref.Ypos = (int16_t)(wp.y >> 8); ref.Yfrac = (uint16_t)((uint32_t)wp.y << 8);
+            ref.Xvel = (int16_t)wp.vx; ref.Yvel = (int16_t)wp.vy;
+            ref.facedir = (int16_t)wp.dir; ref._pad56 = 0; ref.temp2 = 9;
+            ref_anim(&ref, wp.anim); ref.SPAcnt = (uint16_t)wp.at;
         } else if (rx.mode && hold_skate_pending()) {
-            /* (RULE_HOLD: the face off is set up a frame before the walk is: he stays where he is that frame. Put at the dot he was
-             * gone from the view, and the walk then started from the dot: PR #193's walk, and he showed again only as it neared
-             * the view) */
+            /* (RULE_HOLD: the face off is set up a frame before the walk is: he stays where he is that frame, his speed and facing kept
+             * for the walk, which goes on from them. Put at the dot he was gone from the view, and the walk then started from the
+             * dot: PR #193's walk, and he showed again only as it neared the view) */
+            ref_anim(&ref, REF_GLIDE);
         } else {
             ref.Xpos = (int16_t)(fx > 0 ? fx + 15 : fx - 15); ref.Xfrac = 0;
             ref.Ypos = fy; ref.Yfrac = 0;
+            ref.Xvel = ref.Yvel = 0;
+            ref.facedir = fx > 0 ? 6 : 2; ref._pad56 = 0; ref.temp2 = 9;
+            ref_anim(&ref, REF_GLIDE);
         }
-        ref.Xvel = ref.Yvel = 0;
-        ref.facedir = fx > 0 ? 6 : 2; ref._pad56 = 0; ref.temp2 = 9;
-        ref_anim(&ref, REF_GLIDE);
         rx.mode = 1; rx.drop = 0; rx.fall = 0;
         return;
     }
